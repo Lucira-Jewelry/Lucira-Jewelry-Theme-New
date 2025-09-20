@@ -8,87 +8,86 @@
   Usage:
   {% render 'product-variant-picker', product: product, block: block, product_form_id: product_form_id %}
 {% endcomment %}
-{%- unless product.has_only_default_variant -%}
-  <variant-selects
-    id="variant-selects-{{ section.id }}"
-    data-section="{{ section.id }}"
-    {{ block.shopify_attributes }}
-  >
-    {%- for option in product.options_with_values -%}
-      {%- liquid
-        assign swatch_count = option.values | map: 'swatch' | compact | size
-        assign picker_type = block.settings.picker_type
 
-        if swatch_count > 0 and block.settings.swatch_shape != 'none'
-          if block.settings.picker_type == 'dropdown'
-            assign picker_type = 'swatch_dropdown'
-          else
-            assign picker_type = 'swatch'
-          endif
-        endif
-      -%}
-      {%- if picker_type == 'swatch' -%}
-        <fieldset class="js product-form__input product-form__input--swatch">
-          <legend class="form__label">
-            {{ option.name }}:
-            <span data-selected-value>
-              {{- option.selected_value -}}
-            </span>
-          </legend>
-          {% render 'product-variant-options',
-            product: product,
-            option: option,
-            block: block,
-            picker_type: picker_type
-          %}
-        </fieldset>
-      {%- elsif picker_type == 'button' -%}
-        <fieldset class="js product-form__input product-form__input--pill">
-          <legend class="form__label">{{ option.name }}</legend>
-          {% render 'product-variant-options',
-            product: product,
-            option: option,
-            block: block,
-            picker_type: picker_type
-          %}
-        </fieldset>
-      {%- else -%}
-        <div class="product-form__input product-form__input--dropdown">
-          <label class="form__label" for="Option-{{ section.id }}-{{ forloop.index0 }}">
-            {{ option.name }}
-          </label>
-          <div class="select">
-            {%- if picker_type == 'swatch_dropdown' -%}
-              <span
-                data-selected-value
-                class="dropdown-swatch"
-              >
-                {% render 'swatch', swatch: option.selected_value.swatch, shape: block.settings.swatch_shape %}
-              </span>
-            {%- endif -%}
-            <select
-              id="Option-{{ section.id }}-{{ forloop.index0 }}"
-              class="select__select"
-              name="options[{{ option.name | escape }}]"
-              form="{{ product_form_id }}"
-            >
-              {% render 'product-variant-options',
-                product: product,
-                option: option,
-                block: block,
-                picker_type: picker_type
-              %}
-            </select>
-            <span class="svg-wrapper">
-              {{- 'icon-caret.svg' | inline_asset_content -}}
-            </span>
-          </div>
+
+{% assign variant_parts = product.selected_or_first_available_variant.title |
+  split: '/' %}
+<div class="size-and-customization-section"  id="variant-selects-{{ section.id }}" data-section="{{ section.id }}">
+  {%- unless product.has_only_default_variant -%}
+    <variant-selects
+      id="variant-selects-{{ section.id }}"
+      data-section="{{ section.id }}"
+      {{ block.shopify_attributes }}
+    >
+      <div class="size-and-customization-title-wrapper">
+        <div class="size_customization_title">
+          <h4 class="customization_title">
+            SIZE & CUSTOMIZATION
+          </h4>
         </div>
-      {%- endif -%}
-    {%- endfor -%}
+        <span
+          id="size_drawer"
+          class="size-guide-button"
+          onclick="
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: 'promoClick',
+            promoClick: {
+              promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+              promo_name: '{{ product.title }}',
+              creative_name: 'Size Guide Clicked'
+            }
+          });
+        "
+          >Size Guide</span
+        >
+      </div>
+      <div class="size-and-customization-wrapper">
+        <div class="customization-wrapper">
+            <div class="customization-item">
+              {% assign metal = variant_parts[0] | downcase %}
+              <div id="customization-metal-color-circle" style="display: inline-block; vertical-align: middle;">
+                {% if metal contains 'yellow' %}
+                  {{- 'yellow-color.svg' | inline_asset_content -}}
+                {% elsif metal contains 'rose' %}
+                  {{- 'rose-color.svg' | inline_asset_content -}}
+                {% else %}
+                  {{- 'silver-color.svg' | inline_asset_content -}}
+                {% endif %}
+              </div>
+    
+              {% assign image_url = '' %} 
+              
+              {% assign bg_color = '' %}
+    
+              {% if variant_parts contains 'Yellow Gold' %}
+                {% assign bg_color = '' %}
+                {{- 'yellow-color.svg' | inline_asset_content -}}
+              {% elsif variant_parts contains 'Rose Gold' %}
+                {% assign bg_color = '' %}
+                {{- 'rose-color.svg' | inline_asset_content -}}
+              {% elsif variant_parts contains 'White Gold' %}
+                {% assign bg_color = '#f8f8f8' %}
+                {{- 'silver-color.svg' | inline_asset_content -}}
+              {% endif %}
+    
+              <div class="customization-item-div" id="customization-metal-color">
+                {{ variant_parts[0] }}
+              </div>
+              <!-- <div class="label">14K Metal</div> -->
+            </div>
+            {% if variant_parts[1] %}
+            <div class="customization-item">
+              <div class="label">Size :</div>
+              <div class="customization-item-div size-customization-item">
+                <span id="customization-size">{{ variant_parts[1] }}</span> IND
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          <span class="customize-button" id="product_variant_drawer">CUSTOMIZE</span>
+      </div>
+    </variant-selects>
+  {%- endunless -%}
+</div>
 
-    <script type="application/json" data-selected-variant>
-      {{ product.selected_or_first_available_variant | json }}
-    </script>
-  </variant-selects>
-{%- endunless -%}

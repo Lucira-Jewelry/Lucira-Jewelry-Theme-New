@@ -1,0 +1,1182 @@
+<script>
+(function () {
+  if (!window.ShopifyIconCarousel) {
+    window.ShopifyIconCarousel = class {
+      constructor(containerElement) {
+        this.container = containerElement;
+        this.textContent = this.container.querySelector('.text-content');
+        this.icons = this.container.querySelectorAll('.icon');
+        this.currentIndex = 0;
+        this.isAnimating = false;
+        this.cycleCount = 0;
+        this.productId = this.container.dataset.productId;
+        this.isExpanded = false;
+        this.isMobile = this.checkIfMobile();
+        this.isInitialized = false;
+        this.hasBeenViewed = false;
+        this.animationStarted = false;
+
+        this.items = [];
+        this.icons.forEach((icon, index) => {
+          const tagType = icon.dataset.tagType || `tag-${index}`;
+          const altText = icon.alt || `Tag ${index + 1}`;
+          this.items.push({
+            iconClass: `.tag-icon-${index}`,
+            text: altText,
+            tagType: tagType
+          });
+        });
+
+        this.maxCycles = Math.max(2, this.items.length * 2);
+
+        if (this.items.length > 0) {
+          this.init();
+        }
+      }
+
+      checkIfMobile() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+          window.innerWidth <= 768;
+      }
+
+      async init() {
+        await this.waitForDOMReady();
+        await this.preCalculateWidths();
+        this.setInitialState();
+        await this.wait(100);
+        this.isInitialized = true;
+        this.setupScrollObserver();
+      }
+
+      setupScrollObserver() {
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !this.hasBeenViewed && !this.animationStarted) {
+              this.hasBeenViewed = true;
+              this.animationStarted = true;
+              this.startAnimation();
+            }
+          });
+        }, {
+          threshold: 0.5,
+          rootMargin: '0px 0px -50px 0px'
+        });
+
+        observer.observe(this.container);
+      }
+
+      async waitForDOMReady() {
+        return new Promise(resolve => {
+          if (document.readyState === 'complete') {
+            resolve();
+          } else {
+            window.addEventListener('load', resolve, { once: true });
+          }
+        });
+      }
+
+      async preCalculateWidths() {
+        const tempElement = document.createElement('div');
+        tempElement.className = 'text-measurer';
+        tempElement.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          white-space: nowrap;
+          font-family: 'Futura, sans-serif';
+          font-weight: 400;
+          font-size: 12px;
+          line-height: 150%;
+          text-transform: capitalize;
+          top: -9999px;
+          left: -9999px;
+        `;
+        document.body.appendChild(tempElement);
+
+        this.widthCache = {};
+        for (let i = 0; i < this.items.length; i++) {
+          tempElement.textContent = this.items[i].text;
+          tempElement.offsetWidth;
+          this.widthCache[i] = this.calculateWidthForText(tempElement.offsetWidth);
+        }
+
+        document.body.removeChild(tempElement);
+      }
+
+      calculateWidthForText(textWidth) {
+        const iconWidth = this.isMobile ? 36 : 50;
+        const leftMargin = 8;
+        const rightSpace = this.isMobile ? 2 : 3;
+        const basePadding = this.isMobile ? 0 : 6;
+        const totalWidth = iconWidth + leftMargin + textWidth + basePadding + rightSpace;
+        const maxWidth = window.innerWidth - 40;
+        return Math.min(totalWidth, maxWidth);
+      }
+
+      setInitialState() {
+        const initialWidth = this.widthCache[this.currentIndex] || this.calculateOptimalWidth();
+        this.container.style.setProperty('--dynamic-width', `${initialWidth}px`);
+        const firstIcon = this.container.querySelector(this.items[0].iconClass);
+        if (firstIcon) firstIcon.classList.add('active');
+        this.textContent.textContent = this.items[this.currentIndex].text;
+      }
+
+      calculateOptimalWidth() {
+        if (this.widthCache && this.widthCache[this.currentIndex]) {
+          return this.widthCache[this.currentIndex];
+        }
+
+        const currentText = this.textContent.textContent;
+        const tempElement = document.createElement('div');
+        tempElement.className = 'text-measurer';
+        tempElement.textContent = currentText;
+        tempElement.style.cssText = `
+          position: absolute;
+          visibility: hidden;
+          white-space: nowrap;
+          font-family: 'Futura, sans-serif';
+          font-weight: 400;
+          font-size: 12px;
+          line-height: 150%;
+          text-transform: capitalize;
+          top: -9999px;
+          left: -9999px;
+        `;
+
+        document.body.appendChild(tempElement);
+        const textWidth = tempElement.offsetWidth;
+        document.body.removeChild(tempElement);
+
+        return this.calculateWidthForText(textWidth);
+      }
+
+      async switchIcon(newIndex) {
+        if (this.items.length <= 1) return;
+
+        const currentIcon = this.container.querySelector(this.items[this.currentIndex].iconClass);
+        const newIcon = this.container.querySelector(this.items[newIndex].iconClass);
+        if (!currentIcon || !newIcon) return;
+
+        this.textContent.textContent = this.items[newIndex].text;
+        const newWidth = this.widthCache[newIndex] || this.calculateOptimalWidth();
+        this.container.style.setProperty('--dynamic-width', `${newWidth}px`);
+
+        currentIcon.classList.remove('active');
+        currentIcon.classList.add('exit');
+        await this.wait(100);
+
+        currentIcon.classList.remove('exit');
+        newIcon.classList.add('active', 'enter');
+
+        setTimeout(() => {
+          newIcon.classList.remove('enter');
+        }, 200);
+      }
+
+      async animateItem(index) {
+        if (this.isAnimating) return;
+        this.isAnimating = true;
+        this.container.classList.add('animating');
+
+        if (index !== this.currentIndex && this.items.length > 1) {
+          await this.switchIcon(index);
+          this.currentIndex = index;
+        }
+
+        const optimalWidth = this.widthCache[index] || this.calculateOptimalWidth();
+        this.container.style.setProperty('--dynamic-width', `${optimalWidth}px`);
+        await this.wait(25);
+
+        this.container.classList.add('expanded');
+        await this.wait(2000);
+        this.container.classList.remove('expanded');
+        await this.wait(400);
+        this.container.classList.remove('animating');
+
+        this.isAnimating = false;
+      }
+
+      wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async startAnimation() {
+        if (!this.isInitialized) {
+          await this.wait(50);
+          return this.startAnimation();
+        }
+
+        let index = 0;
+        let animationCount = 0;
+        await this.wait(200);
+
+        while (animationCount < this.maxCycles) {
+          await this.animateItem(index);
+          animationCount++;
+          if (this.items.length > 1) {
+            index = (index + 1) % this.items.length;
+          }
+          if (animationCount < this.maxCycles) {
+            await this.wait(300);
+          }
+        }
+
+        this.container.classList.add('animation-complete');
+        this.setupInteractionFunctionality();
+      }
+
+      setupInteractionFunctionality() {
+        if (this.isMobile) {
+          this.container.addEventListener('touchstart', this.handleMobileTouch.bind(this), { passive: true });
+          this.container.addEventListener('click', this.handleMobileClick.bind(this));
+          this.container.classList.add('mobile-interactive');
+          this.container.style.cursor = 'pointer';
+        } else {
+          this.container.addEventListener('mouseenter', () => {
+            if (!this.isAnimating) {
+              const optimalWidth = this.widthCache[this.currentIndex] || this.calculateOptimalWidth();
+              this.container.style.setProperty('--dynamic-width', `${optimalWidth}px`);
+              this.container.classList.add('expanded');
+              this.isExpanded = true;
+            }
+          });
+
+          this.container.addEventListener('mouseleave', async () => {
+            if (!this.isAnimating) {
+              this.container.classList.remove('expanded');
+              this.isExpanded = false;
+              if (this.items.length > 1) {
+                await this.wait(150);
+                await this.switchToNextTag();
+              }
+            }
+          });
+        }
+      }
+
+      handleMobileTouch(e) {
+        e.preventDefault();
+        this.handleMobileInteraction();
+      }
+
+      handleMobileClick(e) {
+        e.stopPropagation();
+        this.handleMobileInteraction();
+      }
+
+      async handleMobileInteraction() {
+        if (this.isAnimating) return;
+
+        if (!this.isExpanded) {
+          const optimalWidth = this.widthCache[this.currentIndex] || this.calculateOptimalWidth();
+          this.container.style.setProperty('--dynamic-width', `${optimalWidth}px`);
+          await this.wait(25);
+
+          this.container.classList.add('expanded');
+          this.isExpanded = true;
+
+          setTimeout(async () => {
+            if (this.isExpanded) {
+              this.container.classList.remove('expanded');
+              this.isExpanded = false;
+              if (this.items.length > 1) {
+                await this.wait(150);
+                await this.switchToNextTag();
+              }
+            }
+          }, 2500);
+        } else {
+          if (this.items.length > 1) {
+            await this.switchToNextTag();
+          }
+        }
+      }
+
+      async switchToNextTag() {
+        if (this.isAnimating || this.items.length <= 1) return;
+        const nextIndex = (this.currentIndex + 1) % this.items.length;
+        await this.switchIcon(nextIndex);
+        this.currentIndex = nextIndex;
+      }
+    };
+  }
+
+  function initializeCarousels() {
+    const carouselContainers = document.querySelectorAll('.carousel-container');
+    requestAnimationFrame(() => {
+      carouselContainers.forEach(container => {
+        if (!container.hasAttribute('data-carousel-initialized')) {
+          new window.ShopifyIconCarousel(container);
+          container.setAttribute('data-carousel-initialized', 'true');
+        }
+      });
+    });
+  }
+
+  function domReady(fn) {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', fn);
+    } else {
+      fn();
+    }
+  }
+
+  domReady(() => setTimeout(initializeCarousels, 50));
+
+  let mutationTimeout;
+  const observer = new MutationObserver((mutations) => {
+    clearTimeout(mutationTimeout);
+    mutationTimeout = setTimeout(() => {
+      let shouldInitialize = false;
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === Node.ELEMENT_NODE) {
+              if ((node.classList && node.classList.contains('carousel-container')) ||
+                node.querySelectorAll('.carousel-container').length > 0) {
+                shouldInitialize = true;
+              }
+            }
+          });
+        }
+      });
+
+      if (shouldInitialize) {
+        initializeCarousels();
+      }
+    }, 100);
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  document.addEventListener('shopify:section:load', initializeCarousels);
+  document.addEventListener('shopify:section:reorder', initializeCarousels);
+  document.addEventListener('theme:collection:updated', initializeCarousels);
+  document.addEventListener('collection:updated', initializeCarousels);
+  document.addEventListener('ajax:success', initializeCarousels);
+  document.addEventListener('facets:updated', initializeCarousels);
+
+  const productGridSelectors = [
+    '.product-grid',
+    '.collection-product-list',
+    '.product-collection',
+    '.collection-grid',
+    '[data-collection-products]'
+  ];
+
+  function setupGridObservers() {
+    productGridSelectors.forEach(selector => {
+      const grids = document.querySelectorAll(selector);
+      grids.forEach(grid => {
+        if (!grid.hasAttribute('data-grid-observed')) {
+          const gridObserver = new MutationObserver(() => {
+            clearTimeout(grid.initTimeout);
+            grid.initTimeout = setTimeout(initializeCarousels, 100);
+          });
+          gridObserver.observe(grid, { childList: true, subtree: true });
+          grid.setAttribute('data-grid-observed', 'true');
+        }
+      });
+    });
+  }
+
+  domReady(setupGridObservers);
+
+  let lastCarouselCount = 0;
+  const startTime = Date.now();
+  const intervalCheck = setInterval(() => {
+    const currentCount = document.querySelectorAll('.carousel-container').length;
+    if (currentCount !== lastCarouselCount) {
+      initializeCarousels();
+      lastCarouselCount = currentCount;
+    }
+    if (Date.now() - startTime > 30000) {
+      clearInterval(intervalCheck);
+    }
+  }, 2000);
+
+  window.initializeCarousels = initializeCarousels;
+})();
+</script>
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    // Create modal if it doesn't exist
+    let modal = document.getElementById('VideoModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'VideoModal';
+      modal.className = 'video-modal hidden';
+      modal.innerHTML = `
+        <div class="video-modal__overlay">
+          <div class="video-modal__content">
+            <button class="video-modal__close"><i class="fa-solid fa-xmark"></i></button>
+            <div class="video-modal__video-container"></div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+
+      // Add CSS styles for the modal
+      const style = document.createElement('style');
+      style.textContent = `
+        .video-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); opacity: 0; visibility: hidden; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+        .video-modal:not(.hidden) { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); opacity: 1; visibility: visible; }
+        .video-modal__content { position: relative; max-width: 100vw; max-height: 90vh; margin: 0 auto; }
+        .video-modal__close { position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10001; }
+        .video-modal__video-container video { width: 100%; height: auto; max-height: 90vh; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    const overlay = modal.querySelector('.video-modal__overlay');
+    const closeBtn = modal.querySelector('.video-modal__close');
+    const videoContainer = modal.querySelector('.video-modal__video-container');
+
+    // Function to handle modal opening
+    function openVideoModal(productHandle, videoId) {
+      console.log('Opening Shopify video:', productHandle, videoId);
+      videoContainer.innerHTML = '';
+
+      fetch(`/products/${productHandle}.js`)
+        .then((response) => response.json())
+        .then((product) => {
+          const video = product.media.find(
+            (media) => media.media_type === 'video' && media.id.toString() === videoId.toString()
+          );
+
+          if (video && video.sources && video.sources.length > 0) {
+            const videoUrl = video.sources[0].url;
+            videoContainer.innerHTML = `
+              <video autoplay muted playsinline loop>
+                <source src="${videoUrl}" type="video/mp4">
+                Your browser does not support the video tag.
+              </video>
+            `;
+
+            modal.style.display = 'block';
+            requestAnimationFrame(() => {
+              modal.classList.remove('hidden');
+            });
+            document.body.style.overflow = 'hidden';
+          }
+        })
+        .catch((error) => {
+          console.error('Error fetching product data:', error);
+        });
+    }
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      setTimeout(() => {
+        if (modal.classList.contains('hidden')) {
+          modal.style.display = 'none';
+          videoContainer.innerHTML = '';
+        }
+      }, 600);
+      document.body.style.overflow = '';
+    }
+
+    // Event delegation - works for all current and future video icons
+    document.addEventListener(
+      'click',
+      function (e) {
+        const videoIcon = e.target.closest('.product-video-icon-wrapper');
+
+        if (videoIcon) {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const productHandle = videoIcon.getAttribute('data-product-handle');
+          const videoId = videoIcon.getAttribute('data-video-id');
+
+          if (productHandle && videoId) {
+            openVideoModal(productHandle, videoId);
+          }
+        }
+      },
+      true
+    );
+
+    // Modal close handlers
+    if (overlay) {
+      overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) {
+          closeModal();
+        }
+      });
+    }
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', closeModal);
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+        closeModal();
+      }
+    });
+  });
+</script>
+
+<script>
+  // Original functionality - expand clicked image wrapper and collapse others
+  function handleImageWrapperClick(event) {
+    // Get the clicked element
+    const clickedWrapper = event.currentTarget;
+    // Reset all wrappers
+    document.querySelectorAll('.brad-plp-pg-component-image-wrapper').forEach((el) => {
+      el.classList.remove('active');
+      el.style.height = '20%'; // Reset all divs to 20%
+    });
+    // Expand the clicked wrapper
+    clickedWrapper.classList.add('active');
+    clickedWrapper.style.height = '80%';
+  }
+
+  // Function to attach click events to image wrappers
+  function attachImageWrapperEvents() {
+    // Find all image wrappers that don't have the event listener yet
+    document.querySelectorAll('.brad-plp-pg-component-image-wrapper:not([data-event-attached])').forEach((div) => {
+      // Mark element as having event attached
+      div.setAttribute('data-event-attached', 'true');
+      // Add click event listener
+      div.addEventListener('click', handleImageWrapperClick);
+    });
+  }
+
+  // Run once to attach events to existing elements
+  attachImageWrapperEvents();
+
+  // Create a MutationObserver to watch for newly added image wrappers
+  const observer = new MutationObserver((mutations) => {
+    let needsUpdate = false;
+    // Check if any mutations added new image wrappers
+    mutations.forEach((mutation) => {
+      if (mutation.addedNodes.length > 0) {
+        needsUpdate = true;
+      }
+    });
+    // Only run the attachment function if new nodes were added
+    if (needsUpdate) {
+      attachImageWrapperEvents();
+    }
+  });
+
+  // Get the container where new elements will be loaded
+  // Replace this with your actual container where products are loaded
+  const productContainer = document.querySelector('.product-list-container') || document.body;
+
+  // Start observing the container for DOM changes
+  observer.observe(productContainer, {
+    childList: true, // Watch for changes to direct children
+    subtree: true, // Watch for changes in the entire subtree
+  });
+</script>
+
+<script>
+  (function () {
+    "use strict";
+  
+    // Enhanced auto-selection function to detect color from image and select correct variant
+    function autoSelectVariantFromImage() {
+      document
+        .querySelectorAll('[id^="product-image-"]')
+        .forEach((productImage) => {
+          const productId = productImage.id.replace("product-image-", "");
+          const currentSrc = productImage.getAttribute("src");
+          const currentAlt = productImage.getAttribute("alt") || "";
+  
+          if (currentSrc && productId) {
+            const swatches = document.querySelectorAll(
+              '.color-option[data-product-id="' + productId + '"]'
+            );
+  
+            // First, clear all active states
+            swatches.forEach((swatch) => swatch.classList.remove("active"));
+  
+            // Try to detect color from image alt text or filename
+            let detectedColor = detectColorFromImage(currentSrc, currentAlt);
+  
+            // If we detected a color, find the matching swatch
+            if (detectedColor) {
+              const matchingSwatch = Array.from(swatches).find((swatch) => {
+                const swatchColor = swatch.getAttribute("data-color");
+                return (
+                  swatchColor &&
+                  swatchColor.toLowerCase() === detectedColor.toLowerCase()
+                );
+              });
+  
+              if (matchingSwatch) {
+                matchingSwatch.classList.add("active");
+                console.log(
+                  "Auto-selected variant:",
+                  detectedColor,
+                  "for product:",
+                  productId
+                );
+                return;
+              }
+            }
+  
+            // Fallback: try exact image matching (existing logic)
+            let foundMatch = false;
+            swatches.forEach((btn) => {
+              if (foundMatch) return;
+  
+              const swatchSrc = btn.getAttribute("data-image-src");
+              if (swatchSrc && currentSrc.includes(swatchSrc.split("?")[0])) {
+                btn.classList.add("active");
+                foundMatch = true;
+                console.log(
+                  "Auto-selected variant by image match for product:",
+                  productId
+                );
+              }
+            });
+  
+            // Final fallback: select first available swatch if none matched
+            if (!foundMatch && swatches.length > 0) {
+              swatches[0].classList.add("active");
+              console.log(
+                "Auto-selected first variant as fallback for product:",
+                productId
+              );
+            }
+          }
+        });
+    }
+  
+    // Function to detect color from image source or alt text
+    function detectColorFromImage(imageSrc, imageAlt) {
+      const colorKeywords = {
+        "yellow gold": ["yellow", "gold", "yg"],
+        "rose gold": ["rose", "pink", "rg"],
+        "white gold": ["white", "wg"],
+        platinum: ["platinum", "pt", "plat"],
+      };
+  
+      // Combine image source and alt text for analysis
+      const searchText = (imageSrc + " " + imageAlt).toLowerCase();
+  
+      // Check for color keywords in order of specificity
+      for (const [color, keywords] of Object.entries(colorKeywords)) {
+        for (const keyword of keywords) {
+          if (searchText.includes(keyword)) {
+            // Return the properly formatted color name
+            return color
+              .split(" ")
+              .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+              .join(" ");
+          }
+        }
+      }
+  
+      // Try to detect from filename patterns
+      const filename = imageSrc.split("/").pop().toLowerCase();
+  
+      // Common filename patterns
+      if (
+        filename.includes("yellow") ||
+        filename.includes("_yg_") ||
+        filename.includes("-yg-")
+      ) {
+        return "Yellow Gold";
+      }
+      if (
+        filename.includes("rose") ||
+        filename.includes("pink") ||
+        filename.includes("_rg_") ||
+        filename.includes("-rg-")
+      ) {
+        return "Rose Gold";
+      }
+      if (
+        filename.includes("white") ||
+        filename.includes("_wg_") ||
+        filename.includes("-wg-")
+      ) {
+        return "White Gold";
+      }
+      if (
+        filename.includes("platinum") ||
+        filename.includes("_pt_") ||
+        filename.includes("-pt-")
+      ) {
+        return "Platinum";
+      }
+  
+      return null;
+    }
+  
+    function initializeProductImageSwitch() {
+      // Handle color variant clicks
+      const colorOptions = document.querySelectorAll(
+        ".color-option:not([data-initialized])"
+      );
+  
+      colorOptions.forEach(function (button) {
+        // Mark as initialized to prevent duplicate listeners
+        button.setAttribute("data-initialized", "true");
+  
+        button.addEventListener("click", function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+  
+          const productId = this.getAttribute("data-product-id");
+          const variantId = this.getAttribute("data-variant-id");
+          const imageSrc = this.getAttribute("data-image-src");
+          const imageAlt = this.getAttribute("data-image-alt") || "";
+  
+          console.log("Color option clicked:", {
+            productId: productId,
+            variantId: variantId,
+            imageSrc: imageSrc,
+            imageAlt: imageAlt,
+          });
+  
+          if (!productId) {
+            console.warn("Missing product ID");
+            return;
+          }
+  
+          // Remove active class from all color options for this product
+          const productContainer =
+            this.closest(".color-variants-options") ||
+            this.closest('[data-product-id="' + productId + '"]') ||
+            this.parentElement;
+  
+          if (productContainer) {
+            const allColorOptions = productContainer.querySelectorAll(
+              '.color-option[data-product-id="' + productId + '"]'
+            );
+            allColorOptions.forEach(function (btn) {
+              btn.classList.remove("active");
+            });
+          }
+  
+          // Add active class to clicked button
+          this.classList.add("active");
+  
+          // Get product media data
+          const mediaData = getProductMediaData(productId);
+          let primaryImage = null;
+          let secondaryImage = null;
+  
+          if (imageAlt && mediaData && mediaData.media) {
+            // Find images for this variant by alt text (exclude videos)
+            const variantImages = mediaData.media.filter(function (media) {
+              // Skip if it's a video or doesn't match our alt text
+              if (media.media_type === 'video') return false;
+              return (
+                media.media_type === "image" &&
+                media.alt &&
+                media.alt.toLowerCase().includes(imageAlt.toLowerCase())
+              );
+            });
+  
+            console.log("Found variant images:", variantImages);
+  
+            if (variantImages.length > 0) {
+              primaryImage = variantImages[0]; // First image as primary
+              
+              // Only use the second image if it exists and is not a video
+              if (variantImages.length > 1) {
+                secondaryImage = variantImages[1];
+              }
+            }
+          }
+  
+          // Fallback to provided image src if no variant images found
+          if (!primaryImage && imageSrc) {
+            primaryImage = {
+              src: imageSrc,
+              alt: imageAlt,
+            };
+          }
+  
+          // Update the primary product image
+          const productImage = document.getElementById(
+            "product-image-" + productId
+          );
+          if (productImage && primaryImage) {
+            console.log("Updating primary image:", primaryImage.src);
+  
+            // Add loading state
+            productImage.style.opacity = "0.7";
+            productImage.style.transition = "opacity 0.3s ease";
+  
+            // Create a new image to preload
+            const newImage = new Image();
+            newImage.onload = function () {
+              // Update the src and alt
+              productImage.src = primaryImage.src;
+              productImage.alt = primaryImage.alt || "";
+              productImage.setAttribute("data-current-variant", imageAlt);
+  
+              // Update srcset if needed
+              if (primaryImage.src.includes("width=")) {
+                const baseUrl = primaryImage.src.split("?")[0];
+                const newSrcset = [
+                  baseUrl + "?width=165 165w",
+                  baseUrl + "?width=360 360w",
+                  baseUrl + "?width=533 533w",
+                  baseUrl + "?width=720 720w",
+                  baseUrl + "?width=940 940w",
+                  baseUrl + "?width=1066 1066w",
+                ].join(", ");
+                productImage.srcset = newSrcset;
+              }
+  
+              // Restore opacity
+              productImage.style.opacity = "1";
+  
+              console.log("Primary image updated successfully");
+            };
+  
+            newImage.onerror = function () {
+              console.error("Failed to load primary image:", primaryImage.src);
+              productImage.style.opacity = "1";
+            };
+  
+            newImage.src = primaryImage.src;
+          }
+  
+          // Update the secondary image (for hover effect)
+          const secondaryImageEl = document.getElementById(
+            "product-image-secondary-" + productId
+          );
+          if (secondaryImageEl) {
+            if (secondaryImage) {
+              console.log("Updating secondary image:", secondaryImage.src);
+  
+              const newSecondaryImage = new Image();
+              newSecondaryImage.onload = function () {
+                secondaryImageEl.src = secondaryImage.src;
+                secondaryImageEl.alt = secondaryImage.alt || "";
+  
+                // Update srcset
+                if (secondaryImage.src.includes("width=")) {
+                  const baseUrl = secondaryImage.src.split("?")[0];
+                  const newSrcset = [
+                    baseUrl + "?width=165 165w",
+                    baseUrl + "?width=360 360w",
+                    baseUrl + "?width=533 533w",
+                    baseUrl + "?width=720 720w",
+                    baseUrl + "?width=940 940w",
+                    baseUrl + "?width=1066 1066w",
+                  ].join(", ");
+                  secondaryImageEl.srcset = newSrcset;
+                }
+  
+                console.log("Secondary image updated successfully");
+              };
+  
+              newSecondaryImage.onerror = function () {
+                console.error(
+                  "Failed to load secondary image:",
+                  secondaryImage.src
+                );
+              };
+  
+              newSecondaryImage.src = secondaryImage.src;
+            } else {
+              // Hide secondary image if no second image for this variant
+              secondaryImageEl.style.opacity = "0";
+            }
+          }
+  
+          // Update any hidden form inputs
+          const variantInput =
+            document.querySelector(
+              'input[name="id"][data-product-id="' + productId + '"]'
+            ) || document.querySelector('input[name="id"]');
+          if (variantInput && variantId) {
+            variantInput.value = variantId;
+            console.log("Updated variant input:", variantId);
+          }
+  
+          // Trigger custom event
+          try {
+            const event = new CustomEvent("variant:changed", {
+              detail: {
+                productId: productId,
+                variantId: variantId,
+                primaryImage: primaryImage,
+                secondaryImage: secondaryImage,
+              },
+            });
+            document.dispatchEvent(event);
+          } catch (error) {
+            console.warn("CustomEvent not supported");
+          }
+        });
+      });
+  
+      console.log(
+        "Product image switch initialized for",
+        colorOptions.length,
+        "new color options"
+      );
+  
+      // Run the enhanced auto-selection after initializing event listeners
+      autoSelectVariantFromImage();
+    }
+  
+    function initializeVideoIcons() {
+      document
+        .querySelectorAll(".product-video-icon-wrapper:not([data-initialized])")
+        .forEach((icon) => {
+          // Mark as initialized to prevent duplicate listeners
+          icon.setAttribute("data-initialized", "true");
+  
+          icon.addEventListener("click", function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+  
+            const productHandle = this.getAttribute("data-product-handle");
+            const videoId = this.getAttribute("data-video-id");
+  
+            console.log("Video icon clicked:", {
+              productHandle: productHandle,
+              videoId: videoId,
+            });
+  
+            // Find the product modal if it exists
+            const modal = document.querySelector(
+              `#ProductModal-${productHandle}`
+            );
+  
+            if (modal) {
+              // Find the video media item and click it to open
+              const videoButton = modal.querySelector(
+                `[data-media-id="${videoId}"]`
+              );
+              if (videoButton) {
+                videoButton.click();
+              }
+            } else {
+              // If modal doesn't exist, navigate to product page
+              window.location.href = `/products/${productHandle}?view=video`;
+            }
+          });
+        });
+  
+      console.log(
+        "Video icons initialized for",
+        document.querySelectorAll(".product-video-icon-wrapper[data-initialized]")
+          .length,
+        "icons"
+      );
+    }
+  
+    // Function to get product media data from the hidden script tag
+    function getProductMediaData(productId) {
+      const mediaScript = document.querySelector(
+        '.product-media-data[data-product-id="' + productId + '"]'
+      );
+      if (!mediaScript) {
+        console.warn("No media data script found for product:", productId);
+        return null;
+      }
+  
+      try {
+        // First sanitize the JSON string
+        let jsonString = mediaScript.textContent
+          .replace(/[\u0000-\u001F\u007F-\u009F]/g, "") // Remove control characters
+          .trim();
+  
+        // Handle common Shopify JSON issues
+        jsonString = jsonString
+          .replace(/([{,]\s*)([a-zA-Z0-9_]+)(\s*:)/g, '$1"$2"$3') // Ensure property names are quoted
+          .replace(/'/g, '"'); // Replace single quotes with double quotes
+  
+        return JSON.parse(jsonString);
+      } catch (e) {
+        console.error(
+          "Failed to parse product media data for product:",
+          productId,
+          "Error:",
+          e
+        );
+        console.error("Problematic JSON content:", mediaScript.textContent);
+        return null;
+      }
+    }
+  
+    // Main initialization function
+    function initializeAll() {
+      console.log("Initializing all product functionality...");
+      initializeProductImageSwitch();
+      initializeVideoIcons();
+    }
+  
+    // Initialize when DOM is ready
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", initializeAll);
+    } else {
+      initializeAll();
+    }
+  
+    // Also initialize on page load as fallback
+    window.addEventListener("load", function () {
+      setTimeout(initializeAll, 100);
+    });
+  
+    // MutationObserver to watch for new product cards added to DOM
+    const observer = new MutationObserver(function (mutations) {
+      let shouldReinitialize = false;
+  
+      mutations.forEach(function (mutation) {
+        // Check if new nodes were added
+        mutation.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1) {
+            // Element node
+            // Check if the added node contains product cards or is a product card itself
+            if (
+              node.matches &&
+              (node.matches(".product-card-wrapper") ||
+                node.matches(".card-wrapper") ||
+                node.matches(".color-option") ||
+                node.matches(".product-video-icon-wrapper") ||
+                node.querySelector(".color-option") ||
+                node.querySelector(".product-video-icon-wrapper") ||
+                node.querySelector(".product-card-wrapper") ||
+                node.querySelector(".card-wrapper"))
+            ) {
+              shouldReinitialize = true;
+            }
+          }
+        });
+      });
+  
+      if (shouldReinitialize) {
+        console.log("New product content detected, reinitializing...");
+        // Small delay to ensure DOM is fully updated
+        setTimeout(initializeAll, 50);
+      }
+    });
+  
+    // Start observing the document for changes
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+  
+    // Listen for common AJAX events that might indicate new content
+    document.addEventListener("ajaxComplete", function () {
+      console.log("AJAX complete detected, reinitializing...");
+      setTimeout(initializeAll, 100);
+    });
+  
+    // Listen for Shopify section reloads
+    document.addEventListener("shopify:section:load", function () {
+      console.log("Shopify section loaded, reinitializing...");
+      setTimeout(initializeAll, 100);
+    });
+  
+    // Listen for jQuery AJAX events if jQuery is available
+    if (typeof jQuery !== "undefined") {
+      jQuery(document).ajaxComplete(function () {
+        console.log("jQuery AJAX complete detected, reinitializing...");
+        setTimeout(initializeAll, 100);
+      });
+    }
+  
+    // Custom event for manual triggering if needed
+    document.addEventListener("product-cards:refresh", function () {
+      console.log("Manual refresh triggered, reinitializing...");
+      initializeAll();
+    });
+  
+    // Listen for filter/sort events (common event names)
+    document.addEventListener("collection:updated", function () {
+      console.log("Collection updated, reinitializing...");
+      setTimeout(initializeAll, 100);
+    });
+  
+    document.addEventListener("products:loaded", function () {
+      console.log("Products loaded, reinitializing...");
+      setTimeout(initializeAll, 100);
+    });
+  
+    // Expose global function for manual triggering
+    window.reinitializeProductCards = initializeAll;
+  
+    console.log("Product card functionality script loaded and initialized");
+  })();
+
+  
+
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const links = document.querySelectorAll('.open-in-new-tab');
+
+  links.forEach(link => {
+    link.addEventListener('click', function(e) {
+      const url = link.dataset.productUrl || link.href;
+
+      if (window.innerWidth >= 1024) {
+        // Desktop → block original navigation
+        e.preventDefault();
+        e.stopImmediatePropagation(); // stop other scripts from re-firing
+        window.open(url, '_blank');
+        return false; // final kill switch for default redirect
+      }
+      // Mobile → normal href works
+    }, true); // <-- use capture phase to intercept before theme JS
+  });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const wishlistBtns = document.querySelectorAll(".product-card-wrapper .iWishAddColl");
+
+  wishlistBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      if (!btn.classList.contains("iwishAdded")) {
+        const productCard = btn.closest(".product-card-wrapper"); // adjust selector if different
+
+        if (!productCard) return;
+
+        // Collect info from the DOM
+        const titleEl = productCard.querySelector(".card__heading a, .product-title a");
+        const priceEl = productCard.querySelector(".price .price-item--regular");
+        const compareAtEl = productCard.querySelector(".price .price-item--sale, .price .price-item--compare");
+        const imgEl = productCard.querySelector("img");
+
+        const productData = {
+          
+          product_url: titleEl ? titleEl.href : "",
+          price: priceEl ? parseFloat(priceEl.innerText.replace(/[^0-9.]/g, "")) : "",
+          offer_price: compareAtEl ? parseFloat(compareAtEl.innerText.replace(/[^0-9.]/g, "")) : "",
+          thumbnail_image: imgEl ? imgEl.src : "",
+          currency: "{{ shop.currency }}", // still safe to inject via Liquid
+        };
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "addToWishlist",
+          products: productData
+        });
+      }
+    });
+  });
+});
+
+// Disable console logs in production
+if (typeof console !== "undefined") {
+  console.log = function() {};
+  console.warn = function() {};
+  console.error = function() {};
+  console.info = function() {};
+  console.debug = function() {};
+}
+</script>

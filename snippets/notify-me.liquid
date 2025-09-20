@@ -1,0 +1,160 @@
+<div class="overlay overflow-hidden" id="notifyOverlay">
+  <div class="form-container">
+    <div class="form-wrapper">
+      <h2 class="topic">Notify on Price Drop</h2>
+      <h3 id="notify-me-topic">Get Alert on price drops!</h3>
+      <span class="close-btn" style="cursor: pointer;"><i class="fa-solid fa-xmark"></i></span>
+
+      <form id="contactForm">
+        <div class="notify-me-wrapper">
+          <div>
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="Email Id." required>
+            <div class="error" id="emailError">Please enter a valid email address</div>
+          </div>
+          <div>
+            <label for="phone">Phone Number</label>
+            <input
+              type="tel"
+              id="phone"
+              name="phone"
+              placeholder="Mobile No."
+              pattern="\d{10}"
+              maxlength="10"
+              inputmode="numeric"
+              oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+              required
+              style="margin-bottom: 0px;"
+            >
+            <div class="error" id="phoneError">Please enter a valid phone number</div>
+          </div>
+          <button type="submit" id="notifySubmitBtn" disabled>Notify Me</button>
+        </div>
+      </form>
+    </div>
+    <div class="success-message" id="successMessage">
+      <!-- Progress Bar -->
+      <div class="progress-bar-container">
+        <div class="progress-bar"></div>
+      </div>
+
+      <div></div>
+      <svg width="138" height="132" viewBox="0 0 138 132" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M47.7434 131.768L35.8467 111.718L13.2567 106.768L15.4617 83.5133L0.155029 66L15.4617 48.4867L13.2567 25.2317L35.8467 20.2817L47.7434 0.231689L69 9.25668L90.2567 0.231689L102.153 20.2817L124.743 25.2317L122.538 48.4867L137.845 66L122.538 83.5133L124.743 106.768L102.153 111.718L90.2567 131.768L69 122.743L47.7434 131.768ZM52 119L69 111.795L86.205 119L95.6667 103L114 98.795L112.333 80L124.667 66L112.333 51.795L114 33L95.6667 29L86 13L69 20.205L51.795 13L42.3334 29L24 33L25.6667 51.795L13.3334 66L25.6667 80L24 99L42.3334 103L52 119ZM62 87.3584L97.3584 52L90.3334 44.77L62 73.1033L47.6667 58.975L40.6417 66L62 87.3584Z" fill="#008000"/>
+      </svg>
+      <p>Thank you! We'll let you know when the price drops for this design.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const overlay = document.getElementById('notifyOverlay');
+    const formContainer = overlay.querySelector('.form-container');
+    const contactForm = document.getElementById('contactForm');
+    const notifyTopic = document.getElementById('notify-me-topic');
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+    const successMessage = document.getElementById('successMessage');
+    const emailError = document.getElementById('emailError');
+    const phoneError = document.getElementById('phoneError');
+    const submitBtn = document.getElementById('notifySubmitBtn');
+    const openFormBtn = document.getElementById('open-notify-btn');
+    const closeBtn = overlay.querySelector('.close-btn');
+
+    var product = {{ product | json }};
+
+    openFormBtn.addEventListener('click', function () {
+      overlay.style.display = 'flex';
+      document.body.classList.add('no-scroll');
+      contactForm.style.display = 'flex';
+      notifyTopic.style.display = 'block';
+      successMessage.style.display = 'none';
+      submitBtn.disabled = true;
+    });
+
+    closeBtn.addEventListener('click', function () {
+      overlay.style.display = 'none';
+      document.body.classList.remove('no-scroll');
+    });
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) {
+        overlay.style.display = 'none';
+        document.body.classList.remove('no-scroll');
+      }
+    });
+
+    function validateInputs() {
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+      const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
+      submitBtn.disabled = !(emailValid && phoneValid);
+    }
+
+    emailInput.addEventListener('input', validateInputs);
+    phoneInput.addEventListener('input', validateInputs);
+
+    contactForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const email = emailInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const phoneValid = /^\d{10}$/.test(phone);
+
+      emailError.style.display = emailValid ? 'none' : 'block';
+      phoneError.style.display = phoneValid ? 'none' : 'block';
+
+      if (!emailValid || !phoneValid) return;
+
+      const payload = {
+        email,
+        phone,
+        productLink: window.location.href,
+        productTitle: product.title,
+        productPrice: product.price,
+        productId: product.id,
+        productImage: "https://lucirajewelry.com/cdn/shop/{{ product.featured_image }}",
+      };
+
+      fetch('https://notify-me-webhook-385594025448.asia-south1.run.app/notify_me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Submission failed');
+        return response.json();
+      })
+      .then(data => {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: payload,
+        });
+
+        contactForm.style.display = 'none';
+        notifyTopic.style.display = 'none';
+        successMessage.style.display = 'block';
+        contactForm.reset();
+        submitBtn.disabled = true;
+
+        // Reset progress bar animation
+        const progressBar = document.querySelector('.progress-bar');
+        progressBar.style.animation = 'none';
+        progressBar.offsetHeight; // trigger reflow
+        progressBar.style.animation = 'shrinkBar 10s linear forwards';
+
+        // Auto-close after 5s
+        setTimeout(() => {
+          overlay.style.display = 'none';
+          document.body.classList.remove('no-scroll');
+        }, 5000);
+      })
+      .catch(err => {
+        console.error('Error:', err);
+    alert('Something went wrong while submitting the form.');
+      });
+    });
+  });
+</script>
