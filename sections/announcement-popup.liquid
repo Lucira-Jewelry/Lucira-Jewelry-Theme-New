@@ -1,0 +1,314 @@
+<style>
+  .popup-icon-button { position: fixed; bottom: {{ section.settings.icon_button_bottom | default: 100 }}px; right: {{ section.settings.icon_button_right | default: 20 }}px; width: {{ section.settings.icon_button_size | default: 60 }}px; height: {{ section.settings.icon_button_size | default: 60 }}px; background: {{ section.settings.icon_button_bg_color | default: '#ffffff' }}; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 999999999; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15); transition: all 0.3s ease; }
+  .popup-icon-button:hover { transform: scale(1.1); box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2); }
+  .popup-icon-button.active { background: #b76f78; }
+  .popup-icon-button img { width: {{ section.settings.icon_button_image_size | default: 40 }}px; height: {{ section.settings.icon_button_image_size | default: 40 }}px; border-radius: 50%; object-fit: cover; }
+  .popup-icon-button.active lottie-player { display: none; }
+  .popup-icon-button .popup-icon-dark { display: none; }
+  .popup-icon-button.active .popup-icon-dark { display: block; width: 30px; height: 30px; }
+
+  /* Header Popup Icon Button */
+  .header-popup-icon-button { position: relative; display: inline-flex; align-items: center; justify-content: center; width: {{ section.settings.header_icon_button_size | default: 40 }}px; height: {{ section.settings.header_icon_button_size | default: 40 }}px; background: {{ section.settings.header_icon_button_bg_color | default: 'transparent' }}; border: {{ section.settings.header_icon_button_border_width | default: 2 }}px solid {{ section.settings.header_icon_button_border_color | default: '#000' }}; border-radius: 50%; cursor: pointer; transition: all 0.3s ease; z-index: 999999998; }
+  .header-popup-icon-button:hover { background: {{ section.settings.header_icon_button_hover_bg_color | default: '#000' }}; transform: scale(1.05); }
+  .header-popup-icon-button.active { background: {{ section.settings.header_icon_button_active_bg_color | default: '#b76f78' }}; border-color: {{ section.settings.header_icon_button_active_border_color | default: '#b76f78' }}; }
+  .header-popup-icon-button img { width: {{ section.settings.header_icon_button_image_size | default: 24 }}px; height: {{ section.settings.header_icon_button_image_size | default: 24 }}px; object-fit: cover; }
+  .header-popup-icon-button.active lottie-player { display: none; }
+  .header-popup-icon-button .header-popup-icon-dark { display: none; }
+  .header-popup-icon-button.active .header-popup-icon-dark { display: block; width: {{ section.settings.header_icon_button_image_size | default: 24 }}px; height: {{ section.settings.header_icon_button_image_size | default: 24 }}px; }
+
+  @keyframes bounce {
+      0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+      40% { transform: translateY(-10px); }
+      60% { transform: translateY(-5px); }
+  }
+
+  .popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999999; opacity: 0; visibility: hidden; display: flex; justify-content: center; align-items: center; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .popup-overlay.active { opacity: 1; visibility: visible; }
+  .header-popup-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 99999998; opacity: 0; visibility: hidden; display: flex; justify-content: center; align-items: center; transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .header-popup-overlay.active { opacity: 1; visibility: visible; }
+  .popup-container { background: {{ section.settings.popup_bg_color | default: '#ffffff' }}; border-radius: 12px; max-width: 400px; height: 485px; width: 100%; aspect-ratio: 4 / 5; overflow: hidden; transform: translateX(100%) scale(0.9); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 30px; right: 110px; z-index: 99999999; box-shadow: 0 20px 60px rgba(0,0,0,0.2); padding: 11px; }
+  .header-popup-container { background: {{ section.settings.header_popup_bg_color | default: '#ffffff' }}; border-radius: 12px; max-width: 400px; height: 485px; width: 100%; aspect-ratio: 4 / 5; overflow: hidden; transform: translateX(100%) scale(0.9); transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1); position: fixed; bottom: 30px; right: 110px; z-index: 99999998; box-shadow: 0 20px 60px rgba(0,0,0,0.2); padding: 11px; }
+  .popup-container.header-positioned, .header-popup-container.header-positioned { bottom: auto; right: 20px; transform: translateX(100%); transition: transform 0.3s ease; }
+  
+  .popup-subtitle, .header-popup-subtitle { color: #1A1A1A; letter-spacing: 0.05em; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; line-height: 26px; vertical-align: middle; text-transform: uppercase; margin-bottom: 4px; }
+  .popup-overlay.active .popup-container { transform: translate(0, 0) scale(1); }
+  .popup-overlay.active .popup-container.header-positioned { transform: translateX(0); }
+  .header-popup-overlay.active .header-popup-container { transform: translate(0, 0) scale(1); }
+  .header-popup-overlay.active .header-popup-container.header-positioned { transform: translateX(0); }
+  
+  .popup-overlay .popup-close img{filter:invert(1);mix-blend-mode:difference}
+  .header-popup-close,.popup-close{position:absolute;top:10px;right:22px;background:0 0;border:none;color:#fff;font-size:34px;cursor:pointer;padding:5px;z-index:10}
+  .header-popup-image-banner,.popup-image-banner{width:100%;height:auto;display:block;object-fit:cover}
+  .header-popup-text-wrapper,.popup-text-wrapper{padding:20px;text-align:left}
+  .header-popup-title,.popup-title{font-size:18px;font-weight:400;color:#000;margin-bottom:0;line-height:1.3}
+  .header-popup-description,.popup-description{font-size:14px;color:#555;line-height:1.5;margin-bottom:20px}
+  .popup-cta,
+  .header-popup-cta {background: {{ section.settings.button_bg_color | default: '#667eea' }};
+      color: {{ section.settings.button_text_color | default: '#ffffff' }};text-decoration: none; padding: 12px 20px; border-radius: 25px; font-weight: 400; display: inline-flex; align-items: center; justify-content: center; transition: all 0.3s ease;}
+  .popup-cta:hover, .header-popup-cta:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
+  .popup-arrow, .header-popup-arrow { font-size: 30px; }
+  .progress-bar { height: 6px; background: {{ section.settings.progress_bar_color | default: '#667eea' }}; width: 0%; transition: width 0.1s ease; position: absolute; bottom: 0; left: 0; }
+
+  @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
+  }
+
+  .popup-box-link, .header-popup-box-link { display: block; text-decoration: none; color: inherit; }
+  .popup-flex-wrapper, .header-popup-flex-wrapper { display: flex; justify-content: space-between; align-items: flex-end; padding: 20px 10px; }
+  .popup-text-block, .header-popup-text-block { flex: 1; }
+  .popup-arrow-circle, .header-popup-arrow-circle { width: 48px; height: 48px; border-radius: 50%; border: 2px solid #000; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: all 0.3s ease; }
+  .popup-arrow-circle:hover, .header-popup-arrow-circle:hover { background: #000; color: #fff; }
+  
+  @media (max-width: 768px) {
+    .popup-arrow-circle, .header-popup-arrow-circle { width: 35px; height: 35px; border-radius: 50%; border: 1px solid #000; }
+    .popup-icon-button { bottom: {{ section.settings.icon_button_bottom_mobile | default: 90 }}px; right: {{ section.settings.icon_button_right_mobile | default: 20 }}px; width: {{ section.settings.icon_button_size_mobile | default: 50 }}px; height: {{ section.settings.icon_button_size_mobile | default: 50 }}px; } 
+    .popup-icon-button img { width: {{ section.settings.icon_button_image_size_mobile | default: 30 }}px; height: {{ section.settings.icon_button_image_size_mobile | default: 30 }}px; } 
+    .header-popup-icon-button { width: {{ section.settings.header_icon_button_size_mobile | default: 35 }}px; height: {{ section.settings.header_icon_button_size_mobile | default: 35 }}px; } 
+    .header-popup-icon-button img, .header-popup-icon-button .header-popup-icon-dark { width: {{ section.settings.header_icon_button_image_size_mobile | default: 20 }}px; height: {{ section.settings.header_icon_button_image_size_mobile | default: 20 }}px; }
+    .popup-container, .header-popup-container { width: 90%; top: 50%; left: 50%; bottom: auto; right: auto; transform: translate(-50%, -50%) scale(0.9); }
+    .popup-container.header-positioned, .header-popup-container.header-positioned { width: 90%; top: 50%; left: 50%; bottom: auto; right: auto; transform: translate(-50%, -50%) translateX(100%); }
+    .popup-overlay.active .popup-container { transform: translate(-50%, -50%) scale(1); } 
+    .popup-overlay.active .popup-container.header-positioned { transform: translate(-50%, -50%) translateX(0); } .header-popup-overlay.active .header-popup-container { transform: translate(-50%, -50%) scale(1); } 
+    .header-popup-overlay.active .header-popup-container.header-positioned { transform: translate(-50%, -50%) translateX(0); } 
+    .popup-container .popup-title, .header-popup-container .header-popup-title { font-size: 16px; } 
+    .popup-container .popup-subtitle, .header-popup-container .header-popup-subtitle { font-size: 12px; } 
+    .popup-icon-button { width: 50px; height: 50px; bottom: 95px; right: 20px; } 
+    .popup-text-wrapper, .header-popup-text-wrapper { padding: 15px; }
+    .popup-container {height: auto;}
+  }
+</style>
+
+{% schema %}
+{
+  "name": "Popup Notification",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "enable_popup",
+      "label": "Enable Popup",
+      "default": true
+    },
+    {
+      "type": "header",
+      "content": "Popup Content"
+    },
+    {
+      "type": "text",
+      "id": "popup_title",
+      "label": "Popup Title",
+      "default": "DISCOVER OUR NEW FEATURE"
+    },
+    {
+      "type": "text",
+      "id": "popup_subtitle",
+      "label": "Popup Subtitle",
+      "default": "Limited Time Offer"
+    },
+    {
+      "type": "image_picker",
+      "id": "popup_image",
+      "label": "Popup Image"
+    },
+    {
+      "type": "header",
+      "content": "Button Settings"
+    },
+    {
+      "type": "url",
+      "id": "popup_button_url",
+      "label": "Icon Link"
+    },
+    {
+      "type": "header",
+      "content": "Icon Button Settings"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_icon_button",
+      "label": "Show Floating Icon Button",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_icon_only_on_homepage",
+      "label": "Show Icon Button Only on Homepage",
+      "default": false,
+      "info": "If checked, the icon button will only appear on the homepage. The popup overlay will still be available on all pages."
+    },
+    {
+      "type": "header",
+      "content": "Behavior Settings"
+    },
+    {
+      "type": "checkbox",
+      "id": "auto_trigger_on_scroll",
+      "label": "Auto-trigger popup on scroll",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "scroll_trigger",
+      "label": "Scroll Distance to Trigger (px)",
+      "min": 50,
+      "max": 500,
+      "step": 50,
+      "default": 100
+    },
+    {
+      "type": "range",
+      "id": "popup_duration",
+      "label": "Popup Duration (seconds)",
+      "min": 3,
+      "max": 15,
+      "step": 1,
+      "default": 5
+    },
+    {
+      "type": "checkbox",
+      "id": "show_immediately",
+      "label": "Show Popup Immediately on Page Load",
+      "default": false
+    },
+    {
+      "type": "range",
+      "id": "immediate_delay",
+      "label": "Delay before showing (seconds)",
+      "min": 1,
+      "max": 10,
+      "step": 1,
+      "default": 2
+    },
+    {
+      "type": "header",
+      "content": "Styling"
+    },
+    {
+      "type": "color",
+      "id": "popup_bg_color",
+      "label": "Popup Background Color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "header_text_color",
+      "label": "Popup Header Text Color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "content_text_color",
+      "label": "Popup Content Text Color",
+      "default": "#333333"
+    },
+    {
+      "type": "color",
+      "id": "progress_bg_color",
+      "label": "Progress Bar Background Color",
+      "default": "#e0e0e0"
+    },
+    {
+      "type": "color",
+      "id": "progress_bar_color",
+      "label": "Progress Fill Color",
+      "default": "#667eea"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Popup Notification"
+    }
+  ]
+}
+{% endschema %}
+
+{% if section.settings.enable_popup %}
+  {% assign show_icon_button = section.settings.show_icon_button %}
+  {% if section.settings.show_icon_only_on_homepage %}
+    {% assign show_icon_button = false %}
+    {% if template.name == 'index' %}
+      {% assign show_icon_button = section.settings.show_icon_button %}
+    {% endif %}
+  {% endif %}
+
+  {% if show_icon_button %}
+    <div class="popup-icon-button" id="popupIconButton" onclick="togglePopup()">
+      <lottie-player
+        id="announcementLottie"
+        src="{{ 'Announcement_Icon_ani.json' | file_url }}"
+        background="transparent"
+        speed="1"
+        style="width: 30px; height: 30px;"
+        autoplay
+        loop
+      ></lottie-player>
+      <img
+        src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Announcement.svg?v=1752310787"
+        class="popup-icon-dark"
+        width="auto"
+        height="auto" loading="lazy"
+      >
+      <img
+        id="announcementStatic"
+        src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Announcement_3.svg?v=1752573974"
+        style="display: none; width: 30px; height: 30px;"
+        alt="Announcement static" width="auto" height="auto" loading="lazy"
+      >
+    </div>
+  {% endif %}
+
+  <div class="popup-overlay" id="popupOverlay">
+    <div class="popup-container">
+      <button class="popup-close" onclick="closePopup()">
+        {% comment %} <img
+          src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/close_2.svg?v=1752320154"
+          width="auto"
+          height="auto" loading="lazy"
+        > {% endcomment %}
+        <i class="fa-solid fa-xmark" style="font-size:20px;"></i>
+      </button>
+
+      {% if section.settings.popup_image %}
+        <img
+          src="{{ section.settings.popup_image | img_url: '800x' }}"
+          alt="{{ section.settings.popup_title }}"
+          class="popup-image-banner"
+          width="390"
+          height="390" loading="lazy"
+        >
+      {% endif %}
+
+      {% if section.settings.popup_button_url %}
+        <a href="{{ section.settings.popup_button_url }}" class="popup-box-link" onclick="closePopup()"></a>
+      {% endif %}
+      <div class="popup-flex-wrapper">
+        <div class="popup-text-block">
+          {% if section.settings.popup_subtitle %}
+            <div class="popup-subtitle">
+              {{ section.settings.popup_subtitle }}
+            </div>
+          {% endif %}
+
+          {% if section.settings.popup_title %}
+            <div class="popup-title">
+              {{ section.settings.popup_title }}
+            </div>
+          {% endif %}
+        </div>
+        {% if section.settings.popup_button_url %}
+          <a href="{{ section.settings.popup_button_url }}">
+            <img
+              src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Frame_427321511.svg?v=1752319992"
+              width="40"
+              height="40" style="display: block;" loading="lazy"
+            >
+          </a>
+        {%  endif %}
+      </div>
+
+      <div class="progress-container">
+        <div class="progress-bar" id="progressBar"></div>
+      </div>
+    </div>
+  </div>
+{% endif %}
