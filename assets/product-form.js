@@ -140,3 +140,516 @@ if (!customElements.get('product-form')) {
     }
   );
 }
+
+function openDrawer() {
+  drawer.classList.add('active');
+  overlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDrawer() {
+  drawer.classList.remove('active');
+  overlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+const sizeDrawer = document.getElementById('size-drawer');
+const sizeOverlay = document.getElementById('size-drawer-overlay');
+
+function openSizeDrawer() {
+  sizeDrawer.classList.add('active');
+  sizeOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeSizeDrawer() {
+  sizeDrawer.classList.remove('active');
+  sizeOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Open drawer button
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#size_drawer')) {
+    openSizeDrawer();
+  }
+});
+
+// Close drawer buttons (X button or Customize button inside)
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-size-button') ||
+    e.target.closest('#size-drawer-overlay')
+  ) {
+    closeSizeDrawer();
+  }
+});
+
+// Escape key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && drawer.classList.contains('active')) {
+    closeSizeDrawer();
+  }
+});
+
+const engravingDrawer = document.getElementById('engraving-drawer');
+const engravingOverlay = document.getElementById('engraving-drawer-overlay');
+
+function openEngravingDrawer() {
+  engravingDrawer.classList.add('active');
+  engravingOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeEngravingDrawer() {
+  engravingDrawer.classList.remove('active');
+  engravingOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Open drawer button
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#engraving_drawer')) {
+    openEngravingDrawer();
+  }
+});
+
+// Close drawer buttons (X button or overlay click)
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-engraving-button') ||
+    e.target.closest('#engraving-drawer-overlay')
+  ) {
+    closeEngravingDrawer();
+  }
+});
+
+// Escape key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && engravingDrawer.classList.contains('active')) {
+    closeEngravingDrawer();
+  }
+});
+
+
+const priceDrawer = document.getElementById('price-drawer');
+const priceOverlay = document.getElementById('price-drawer-overlay');
+
+function openPriceDrawer() {
+  priceDrawer.classList.add('active');
+  priceOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
+
+function closePriceDrawer() {
+  priceDrawer.classList.remove('active');
+  priceOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+// Open drawer button
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#price-breakup-button')) {
+    openPriceDrawer();
+  }
+});
+
+// Close drawer buttons (X button or Customize button inside)
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-price-button') ||
+    e.target.closest('#price-drawer-overlay')
+  ) {
+    closePriceDrawer();
+  }
+});
+
+// Escape key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && drawer.classList.contains('active')) {
+    closePriceDrawer();
+  }
+});
+
+
+const drawer = document.getElementById('variant-drawer');
+const overlay = document.getElementById('drawer-overlay');
+// Open drawer button
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#product_variant_drawer')) {
+    openDrawer();
+  }
+});
+
+// Close drawer buttons (X button or Customize button inside)
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-drawer') ||
+    e.target.closest('#customize_close_drawer') ||
+    e.target.closest('#drawer-overlay')
+  ) {
+    closeDrawer();
+  }
+});
+
+// Escape key support
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && drawer.classList.contains('active')) {
+    closeDrawer();
+  }
+});
+
+
+// Enhanced Comparison Table Integration
+class ComparisonTableManager {
+  constructor(priceGuideConfig) {
+    this.config = priceGuideConfig;
+    this.labGrownRates = {
+      'sc': 40000,
+      'vvs': 32000,
+      'default': 40000
+    };
+    
+    this.numberFormatter = new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      maximumFractionDigits: 0,
+      minimumFractionDigits: 0
+    });
+    
+    this.init();
+  }
+
+  init() {
+    // Update comparison table on page load
+    this.updateComparisonTable(this.config.currentVariantId);
+    
+    // Listen for variant changes
+    this.setupEventListeners();
+  }
+
+  setupEventListeners() {
+    // Listen for variant changes from the main form
+    document.addEventListener('change', (e) => {
+      if (e.target.name === 'id' || e.target.classList.contains('variant-selector')) {
+        const variantId = this.getCurrentVariantId();
+        this.updateComparisonTable(variantId);
+      }
+    });
+
+    // Listen for URL changes (for variant parameter updates)
+    window.addEventListener('popstate', () => {
+      const variantId = this.getCurrentVariantId();
+      this.updateComparisonTable(variantId);
+    });
+  }
+
+  getCurrentVariantId() {
+    const url = new URL(window.location);
+    return url.searchParams.get("variant") || this.config.currentVariantId;
+  }
+
+  updateComparisonTable(variantId) {
+    try {
+      const variantConfig = this.config.variantConfigs[variantId];
+      if (!variantConfig) {
+        console.warn('[Comparison Table] No configuration found for variant:', variantId);
+        return;
+      }
+
+      // Calculate diamond data
+      const diamondData = this.calculateDiamondComparison(variantConfig);
+      
+      // Update comparison table elements
+      this.renderComparisonTable(diamondData);
+      
+      console.log('[Comparison Table] Updated for variant:', variantId, diamondData);
+      
+    } catch (error) {
+      console.error('[Comparison Table] Error updating comparison:', error);
+    }
+  }
+
+  calculateDiamondComparison(variantConfig) {
+    if (!variantConfig.advanced_stone_config) {
+      return {
+        totalWeight: 0,
+        minedPrice: 0,
+        labGrownPrice: 0,
+        savings: 0
+      };
+    }
+
+    let totalWeight = 0;
+    let totalMinedPrice = 0;
+    let totalLabGrownPrice = 0;
+
+    // Filter for diamond stones only
+    const diamondStones = variantConfig.advanced_stone_config.filter(
+      stone => stone.stone_type.toLowerCase() === 'diamond'
+    );
+
+    for (const stoneConfig of diamondStones) {
+      try {
+        // Get stone pricing slab
+        const { slab, title } = this.fetchStonePricingSlab(stoneConfig);
+        if (!slab) continue;
+
+        const stoneWeight = parseFloat(stoneConfig.stone_weight) || 0;
+        const stoneQuantity = parseInt(stoneConfig.stone_quantity) || 1;
+        
+        // Calculate per piece weight for mined diamond rate
+        const perPieceWeight = stoneWeight / stoneQuantity;
+        
+        // Calculate mined diamond price using the existing rate structure
+        // Use the original slab price (not the discounted rate from price breakdown)
+        const minedRate = this.getMinedDiamondRate(perPieceWeight);
+        const minedPrice = minedRate * stoneWeight;
+        
+        // For comparison table, we don't apply discounts to show true market comparison
+
+        // Calculate lab grown price
+        const labGrownRate = this.getLabGrownRate(title);
+        const labGrownPrice = labGrownRate * stoneWeight;
+
+        totalWeight += stoneWeight;
+        totalMinedPrice += minedPrice;
+        totalLabGrownPrice += labGrownPrice;
+
+        console.log(`Diamond: ${title}, Weight: ${stoneWeight} Ct, Mined: ${this.formatCurrency(minedPrice)}, Lab Grown: ${this.formatCurrency(labGrownPrice)}`);
+
+      } catch (error) {
+        console.warn('Error calculating diamond comparison:', error);
+      }
+    }
+
+    const savings = Math.max(0, totalMinedPrice - totalLabGrownPrice);
+
+    return {
+      totalWeight,
+      minedPrice: totalMinedPrice,
+      labGrownPrice: totalLabGrownPrice,
+      savings
+    };
+  }
+
+  getMinedDiamondRate(caratWeight) {
+    // Rate structure from your original comparison table script
+    if (caratWeight <= 0.109) return 86800;
+    else if (caratWeight <= 0.249) return 97020;
+    else if (caratWeight <= 0.499) return 114917;
+    else if (caratWeight <= 0.749) return 74266;
+    else if (caratWeight <= 0.999) return 89373;
+    else if (caratWeight <= 1.499) return 126906;
+    else if (caratWeight <= 1.999) return 179840;
+    else if (caratWeight <= 2.999) return 301515;
+    else return 395589;
+  }
+
+  getLabGrownRate(diamondDetails) {
+    const details = diamondDetails.toLowerCase();
+    if (details.includes('sc')) {
+      return this.labGrownRates.sc;
+    } else if (details.includes('vvs')) {
+      return this.labGrownRates.vvs;
+    }
+    return this.labGrownRates.default;
+  }
+
+  fetchStonePricingSlab(stoneConfig) {
+    const perStoneWeight = (+stoneConfig.stone_weight) / (+stoneConfig.stone_quantity);
+
+    for (const shopStonePricing of this.config.shopStonePricings) {
+      if (shopStonePricing.id != stoneConfig.pricing_id) continue;
+
+      for (const slab of shopStonePricing.slabs) {
+        if (perStoneWeight >= slab.from_weight && perStoneWeight <= slab.to_weight) {
+          return { slab: slab, title: shopStonePricing.title };
+        }
+      }
+    }
+
+    throw new Error(`Slab not found for stone weight: ${perStoneWeight.toFixed(4)} carat (Pricing ID: ${stoneConfig.pricing_id})`);
+  }
+
+  renderComparisonTable(diamondData) {
+    // Update carat weight values
+    const labGrownWeight = document.querySelector('.carate-weight-value-1');
+    const minedWeight = document.querySelector('.carate-weight-value-2');
+    
+    if (labGrownWeight) {
+      labGrownWeight.textContent = `${diamondData.totalWeight.toFixed(2)}`;
+    }
+    if (minedWeight) {
+      minedWeight.textContent = `${diamondData.totalWeight.toFixed(2)}`;
+    }
+
+    // Update price values
+    const labGrownPrice = document.querySelector('.caret-weight-price-1');
+    const minedPrice = document.querySelector('.caret-weight-price-2');
+    
+    if (labGrownPrice) {
+      labGrownPrice.textContent = this.formatCurrency(diamondData.labGrownPrice);
+    }
+    if (minedPrice) {
+      minedPrice.textContent = this.formatCurrency(diamondData.minedPrice);
+    }
+
+    // Update savings
+    const savingsElement = document.querySelector('.Total-saving-price');
+    if (savingsElement) {
+      savingsElement.textContent = this.formatCurrency(diamondData.savings);
+      
+      // Add visual indicator for savings
+      if (diamondData.savings > 0) {
+        savingsElement.classList.add('green');
+        savingsElement.classList.remove('red');
+      } else {
+        savingsElement.classList.add('red');
+        savingsElement.classList.remove('green');
+      }
+    }
+  }
+
+  formatCurrency(price) {
+    return this.numberFormatter.format(price);
+  }
+}
+
+// Integration with existing PriceGuideManager
+if (typeof PriceGuideConfig !== 'undefined') {
+  // Initialize comparison table manager
+  let comparisonManager = null;
+
+  function initializeComparisonTable() {
+    if (!comparisonManager) {
+      comparisonManager = new ComparisonTableManager(PriceGuideConfig);
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeComparisonTable);
+  } else {
+    initializeComparisonTable();
+  }
+
+  // If PriceGuideManager exists, integrate with it
+  if (typeof PriceGuideManager !== 'undefined') {
+    const originalUpdatePriceBreakdown = PriceGuideManager.prototype.updatePriceBreakdown;
+    
+    PriceGuideManager.prototype.updatePriceBreakdown = function(variantId) {
+      // Call original method
+      originalUpdatePriceBreakdown.call(this, variantId);
+      
+      // Update comparison table
+      if (comparisonManager) {
+        comparisonManager.updateComparisonTable(variantId);
+      }
+    };
+  }
+} else {
+  console.warn('[Comparison Table] PriceGuideConfig not found. Make sure the price breakdown script is loaded first.');
+}
+
+// Fallback initialization for cases where PriceGuideConfig is available but not immediately
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(function() {
+    if (typeof PriceGuideConfig !== 'undefined' && !window.comparisonManager) {
+      window.comparisonManager = new ComparisonTableManager(PriceGuideConfig);
+    }
+  }, 100);
+});
+
+function luciraLocateMe() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.address && data.address.postcode) {
+              document.getElementById("lucira-delivery-zipcode").value =
+                data.address.postcode;
+
+              document
+                .getElementById("lucira-delivery-zipcode")
+                .dispatchEvent(new Event("input", { bubbles: true }));
+            } else {
+              alert("Pincode not found for your location.");
+            }
+          })
+          .catch((error) => console.error("Error fetching pincode:", error));
+      },
+      (error) => {
+        alert("Unable to retrieve location. Please allow location access.");
+      }
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+  const container = document.querySelector("#pdp-delivery-check");
+  if (!container) return;
+
+  const submitBtn = container.querySelector(".lucira-delivery-input-container button");
+  const pincodeInput = document.querySelector("#lucira-delivery-zipcode");
+
+  const deliveryDays = Number(container.getAttribute("data-delivery-days")) || 4;
+  const productSku = container.getAttribute("data-product-sku");
+  const productTitle = container.getAttribute("data-product-title");
+
+  if (pincodeInput) {
+    pincodeInput.addEventListener("input", () => {
+      submitBtn.disabled = pincodeInput.value.trim().length === 0;
+    });
+  }
+
+  if (submitBtn) {
+    submitBtn.addEventListener("click", function () {
+      const pincode = pincodeInput?.value?.trim();
+      if (!pincode || submitBtn.disabled) return;
+
+      // Push to GTM
+      const productData = {
+        promo_id: productSku,
+        promo_name: productTitle,
+        creative_name: "pincodeEntered",
+        promo_position: pincode
+      };
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: productData
+      });
+
+      // Add +2 buffer days
+      const totalDays = deliveryDays + 2;
+
+      const deliveryDate = new Date();
+      deliveryDate.setDate(deliveryDate.getDate() + totalDays);
+
+      const formattedDate = deliveryDate.toLocaleDateString("en-US", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+
+      const deliveryTextElement = document.querySelector(".lucira-delivery-time");
+      if (deliveryTextElement) {
+        deliveryTextElement.innerHTML = `Expected Delivery By <span style="color:#147217;font-weight:600;">${formattedDate}</span>`;
+      }
+
+      const deliveryHint = document.querySelector(".lucira-delivery-text");
+      if (deliveryHint) deliveryHint.style.display = "none";
+    });
+  }
+});

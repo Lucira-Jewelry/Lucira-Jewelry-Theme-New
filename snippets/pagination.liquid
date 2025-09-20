@@ -1,78 +1,425 @@
 {% comment %}
-  Renders a set of links for paginated results. Must be used within paginate tags.
+  Renders ultra-fast infinite scroll pagination for products. Must be used within paginate tags.
+
+  Preloads content instantly so users never wait. Fixed duplicate prevention.
 
   Usage:
   {% paginate results by 2 %}
-    {% render 'pagination', paginate: paginate, anchor: '#yourID' %}
+    {% render 'infinite-scroll-pagination', paginate: paginate, anchor: '#yourID' %}
   {% endpaginate %}
 
   Accepts:
   - paginate: {Object}
-  - anchor: {String} (optional) This can be added so that on page reload it takes you to wherever you've placed your anchor tag.
+  - anchor: {String} (optional)
 {% endcomment %}
 
 {{ 'component-pagination.css' | asset_url | stylesheet_tag }}
 
 {%- if paginate.parts.size > 0 -%}
-  <div class="pagination-wrapper" data-page="{{ paginate.current_page }}">
-    <nav class="pagination" role="navigation" aria-label="{{ 'general.pagination.label' | t }}">
-      <ul class="pagination__list list-unstyled" role="list">
-        {%- if paginate.previous -%}
-          <li>
-            <a
-              href="{{ paginate.previous.url }}{{ anchor }}"
-              class="pagination__item pagination__item--next pagination__item-arrow link motion-reduce"
-              aria-label="{{ 'general.pagination.previous' | t }}"
-            >
-              <span class="svg-wrapper">
-                {{- 'icon-caret.svg' | inline_asset_content -}}
-              </span>
-            </a>
-          </li>
-        {%- endif -%}
+  <div class="infinite-scroll-wrapper">
+    <!-- Loading indicator (elegant dots for luxury) -->
+    <div id="infinite-scroll-loader" class="infinite-scroll-loader" style="display: none;">
+      <div class="loader-content">
+        <div class="elegant-dots">
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+        <p class="loading-text">Discovering more exquisite pieces...</p>
+      </div>
+    </div>
 
-        {%- for part in paginate.parts -%}
-          <li>
-            {%- if part.is_link -%}
-              <a
-                href="{{ part.url }}{{ anchor }}"
-                class="pagination__item link"
-                aria-label="{{ 'general.pagination.page' | t: number: part.title }}"
-              >
-                {{- part.title -}}
-              </a>
-            {%- else -%}
-              {%- if part.title == paginate.current_page -%}
-                <a
-                  role="link"
-                  aria-disabled="true"
-                  class="pagination__item pagination__item--current light"
-                  aria-current="page"
-                  aria-label="{{ 'general.pagination.page' | t: number: part.title }}"
-                >
-                  {{- part.title -}}
-                </a>
-              {%- else -%}
-                <span class="pagination__item">{{ part.title }}</span>
-              {%- endif -%}
-            {%- endif -%}
-          </li>
-        {%- endfor -%}
+    <!-- End of products indicator -->
+    
 
-        {%- if paginate.next -%}
-          <li>
-            <a
-              href="{{ paginate.next.url }}{{ anchor }}"
-              class="pagination__item pagination__item--prev pagination__item-arrow link motion-reduce"
-              aria-label="{{ 'general.pagination.next' | t }}"
-            >
-              <span class="svg-wrapper">
-                {{- 'icon-caret.svg' | inline_asset_content -}}
-              </span>
-            </a>
-          </li>
-        {%- endif -%}
-      </ul>
-    </nav>
+    <!-- Hidden next page URL for JavaScript -->
+    <div id="next-page-data" 
+         data-next-url="{%- if paginate.next -%}{{ paginate.next.url }}{{ anchor }}{%- endif -%}"
+         data-current-page="{{ paginate.current_page }}"
+         data-total-pages="{{ paginate.pages }}"
+         style="display: none;">
+    </div>
   </div>
+
+  <style>
+    .infinite-scroll-wrapper{margin-top:3rem;text-align:center}
+    .infinite-scroll-loader{padding:2rem 0;opacity:0;transform:translateY(20px);transition:all .4s cubic-bezier(.4,0,.2,1)}
+    .infinite-scroll-loader.show{opacity:1;transform:translateY(0)}
+    .infinite-scroll-end{display:none!important;padding:3rem 0;opacity:0;transform:translateY(20px);transition:all .5s cubic-bezier(.4,0,.2,1)}
+    .infinite-scroll-end.collection-complete{display:block!important;opacity:1;transform:translateY(0)}
+    .loader-content{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1rem}
+    .elegant-dots{display:flex;gap:.8rem;align-items:center}
+    .elegant-dots .dot{width:8px;height:8px;background:linear-gradient(135deg, #d4af37, #ffd700);border-radius:50%;animation:elegantPulse 1.8s ease-in-out infinite;box-shadow:0 2px 8px rgba(212,175,55,.3);display:block}
+    .elegant-dots .dot:nth-child(1){animation-delay:0s}
+    .elegant-dots .dot:nth-child(2){animation-delay:.3s}
+    .elegant-dots .dot:nth-child(3){animation-delay:.6s}
+    @keyframes elegantPulse{
+    0%,100%,60%{transform:scale(1);opacity:.7}
+    30%{transform:scale(1.3);opacity:1}
+    }
+    .loading-text{margin:0;color:#8b7355;font-size:.95rem;font-weight:400;letter-spacing:.5px;font-family:Georgia,serif}
+    .end-content{display:flex;flex-direction:column;align-items:center;gap:1.5rem;max-width:400px;margin:0 auto}
+    .end-decoration{display:flex;align-items:center;justify-content:center;gap:1rem;width:100%;max-width:280px}
+    .luxury-line{flex:1;height:1px;background:linear-gradient(to right,transparent,#d4af37,transparent);display:block!important}
+    .end-diamond{color:#d4af37;font-size:1.2rem;animation:diamondShine 2s ease-in-out infinite}
+    @keyframes diamondShine{
+    0%,100%{opacity:.7;transform:scale(1)}
+    50%{opacity:1;transform:scale(1.1)}
+    }
+    .end-text{margin:0;color:#6b5b73;font-size:18px;font-weight:500;letter-spacing:.3px;font-family:Georgia,serif}
+    .end-subtitle{margin:0;color:#9b8aa3;font-size:14px;font-weight:400;font-style:italic;letter-spacing:.2px;font-family:Georgia,serif}
+    .product-fade-in{opacity:0;transform:translateY(15px);transition:all .4s cubic-bezier(.4,0,.2,1)}
+    .product-fade-in.animate{opacity:1;transform:translateY(0)}
+    .product-fade-in:nth-child(1){transition-delay:50ms}
+    .product-fade-in:nth-child(2){transition-delay:.1s}
+    .product-fade-in:nth-child(3){transition-delay:.15s}
+    .product-fade-in:nth-child(4){transition-delay:.2s}
+    .product-fade-in:nth-child(5){transition-delay:.25s}
+    .product-fade-in:nth-child(6){transition-delay:.3s}
+    .product-fade-in:nth-child(7){transition-delay:.35s}
+    .product-fade-in:nth-child(8){transition-delay:.4s}
+    @media (max-width:768px){
+    .infinite-scroll-wrapper{margin-top:2rem}
+    .elegant-dots .dot{width:6px;height:6px}
+    .loading-text{font-size:.85rem}
+    .end-text{font-size:1rem}
+    .end-subtitle{font-size:.8rem}
+    .infinite-scroll-loader{padding:1.5rem 0}
+    .infinite-scroll-end{padding:2rem 0}
+    }
+  </style>
+
+  <script>
+    // Global state management
+    window.infiniteScrollState = window.infiniteScrollState || {
+      cleanup: null,
+      loadedProductIds: new Set(),
+      isInitialized: false,
+      lastInitTime: 0,
+      currentUrl: window.location.href
+    };
+
+    function initInfiniteScroll() {
+      const currentTime = Date.now();
+      
+      // Prevent rapid reinitializations
+      if (window.infiniteScrollState.isInitialized && 
+          currentTime - window.infiniteScrollState.lastInitTime < 500) {
+        return;
+      }
+
+      // Clean up previous instance
+      if (window.infiniteScrollState.cleanup) {
+        window.infiniteScrollState.cleanup();
+      }
+
+      const productGrid = document.getElementById('product-grid');
+      const loader = document.getElementById('infinite-scroll-loader');
+      const endIndicator = document.getElementById('infinite-scroll-end');
+      const nextPageData = document.getElementById('next-page-data');
+      
+      if (!productGrid || !loader || !endIndicator || !nextPageData) {
+        setTimeout(initInfiniteScroll, 100);
+        return;
+      }
+
+      // Reset state for new page or URL change
+      const currentUrl = window.location.href;
+      const urlChanged = window.infiniteScrollState.currentUrl !== currentUrl;
+      window.infiniteScrollState.currentUrl = currentUrl;
+
+      const currentPage = parseInt(nextPageData.dataset.currentPage);
+      if (currentPage === 1 || urlChanged) {
+        window.infiniteScrollState.loadedProductIds.clear();
+      }
+
+      // Product ID management
+      function getProductId(productElement) {
+        return productElement.dataset.productId || 
+               productElement.dataset.id || 
+               productElement.getAttribute('data-product-handle') ||
+               productElement.id ||
+               productElement.querySelector('a[href*="/products/"]')?.href.split('/products/')[1]?.split('?')[0] ||
+               productElement.outerHTML.slice(0, 100);
+      }
+
+      function isProductDuplicate(productElement) {
+        const productId = getProductId(productElement);
+        return productId && window.infiniteScrollState.loadedProductIds.has(productId);
+      }
+
+      function markProductAsLoaded(productElement) {
+        const productId = getProductId(productElement);
+        if (productId) {
+          window.infiniteScrollState.loadedProductIds.add(productId);
+        }
+      }
+
+      // Build initial product set
+      const existingProducts = productGrid.querySelectorAll('[data-product-id], .product-card, .card-product, [class*="product"]');
+      existingProducts.forEach(product => {
+        markProductAsLoaded(product);
+      });
+
+      // State variables
+      loader.style.display = 'none';
+      loader.classList.remove('show');
+      endIndicator.style.display = 'none';
+      endIndicator.classList.remove('show');
+      
+      let isLoading = false;
+      let hasNextPage = nextPageData.dataset.nextUrl !== '';
+      let currentPageNum = currentPage;
+      const totalPages = parseInt(nextPageData.dataset.totalPages);
+      let observer = null;
+
+      // UI functions
+      function showLoader() {
+        if (loader && hasNextPage) {
+          loader.style.display = 'block';
+          loader.offsetHeight;
+          loader.classList.add('show');
+        }
+      }
+
+      function hideLoader() {
+        if (loader) {
+          loader.classList.remove('show');
+          setTimeout(() => {
+            if (loader) loader.style.display = 'none';
+          }, 400);
+        }
+      }
+
+      function showEndIndicator() {
+        if (endIndicator && !hasNextPage) {
+          endIndicator.classList.add('collection-complete');
+          endIndicator.style.display = 'block';
+          endIndicator.offsetHeight;
+          endIndicator.classList.add('show');
+        }
+      }
+
+      function animateNewProducts(newProducts) {
+        newProducts.forEach((product, index) => {
+          product.classList.add('product-fade-in');
+          setTimeout(() => {
+            product.classList.add('animate');
+          }, index * 15);
+        });
+      }
+      
+      // Wishlist initialization
+      function initWishlist() {
+        try {
+          if (typeof iWish !== 'undefined' && typeof iWish.init === 'function') {
+            iWish.init();
+          }
+          
+          document.dispatchEvent(new CustomEvent('iwish:reload'));
+          document.dispatchEvent(new CustomEvent('wishlist:init'));
+          
+          if (typeof iWishCounter === 'function') {
+            iWishCounter();
+          }
+          
+        } catch (error) {
+          console.error('Wishlist init error:', error);
+        }
+      }
+
+      // Load next page
+      async function loadNextPage() {
+        if (isLoading || !hasNextPage) return;
+
+        isLoading = true;
+        showLoader();
+
+        try {
+          const nextUrl = nextPageData.dataset.nextUrl;
+          const response = await fetch(nextUrl, {
+            method: 'GET',
+            headers: {
+              'X-Requested-With': 'XMLHttpRequest',
+              'Cache-Control': 'no-cache'
+            }
+          });
+          
+          const text = await response.text();
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = text;
+          
+          const newProductGrid = tempDiv.querySelector('#product-grid');
+          const allNewProducts = Array.from(newProductGrid.children);
+          const newNextPageData = tempDiv.querySelector('#next-page-data');
+          
+          // Filter duplicates
+          const uniqueNewProducts = allNewProducts.filter(product => 
+            !isProductDuplicate(product)
+          );
+          
+          if (uniqueNewProducts.length > 0) {
+            uniqueNewProducts.forEach(product => {
+              markProductAsLoaded(product);
+              productGrid.appendChild(product);
+            });
+
+            initWishlist();
+            animateNewProducts(uniqueNewProducts);
+
+            // Update pagination
+            currentPageNum++;
+            if (newNextPageData) {
+              nextPageData.dataset.nextUrl = newNextPageData.dataset.nextUrl || '';
+              nextPageData.dataset.currentPage = currentPageNum.toString();
+              hasNextPage = nextPageData.dataset.nextUrl !== '';
+            } else {
+              hasNextPage = false;
+            }
+
+            observeLastProducts();
+          } else {
+            hasNextPage = false;
+          }
+
+          if (!hasNextPage) {
+            showEndIndicator();
+          }
+
+        } catch (error) {
+          console.error('Error loading next page:', error);
+        } finally {
+          isLoading = false;
+          if (!hasNextPage) {
+            hideLoader();
+          }
+        }
+      }
+
+      // Scroll detection
+      function shouldLoadMore() {
+        const scrollTop = window.scrollY;
+        const windowHeight = window.innerHeight;
+        const documentHeight = document.body.offsetHeight;
+        const scrollPercentage = (scrollTop + windowHeight) / documentHeight;
+        return scrollPercentage > 0.4;
+      }
+
+      let scrollTimeout;
+      function handleScroll() {
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+          if (shouldLoadMore() && hasNextPage && !isLoading) {
+            loadNextPage();
+          }
+        }, 50);
+      }
+
+      // Intersection observer for better performance
+      function observeLastProducts() {
+        if (observer) {
+          observer.disconnect();
+        }
+        
+        const products = Array.from(productGrid.children);
+        if (products.length >= 2 && 'IntersectionObserver' in window) {
+          observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+              if (entry.isIntersecting && hasNextPage && !isLoading) {
+                loadNextPage();
+              }
+            });
+          }, {
+            root: null,
+            rootMargin: '300px',
+            threshold: 0
+          });
+
+          observer.observe(products[products.length - 2]);
+        }
+      }
+
+      // Event listeners
+      window.addEventListener('scroll', handleScroll, { passive: true });
+
+      // Initial setup
+      if (currentPageNum >= totalPages) {
+        showEndIndicator();
+      } else if (hasNextPage) {
+        showLoader();
+      }
+
+      // Update global state
+      window.infiniteScrollState.isInitialized = true;
+      window.infiniteScrollState.lastInitTime = currentTime;
+
+      // Cleanup function
+      window.infiniteScrollState.cleanup = function() {
+        window.removeEventListener('scroll', handleScroll);
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        if (scrollTimeout) {
+          clearTimeout(scrollTimeout);
+        }
+        window.infiniteScrollState.isInitialized = false;
+      };
+    }
+
+    // Initialize
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initInfiniteScroll);
+    } else {
+      initInfiniteScroll();
+    }
+
+    // Reinitialize after sort/filter
+    window.reinitInfiniteScroll = function() {
+      setTimeout(() => {
+        const nextPageData = document.getElementById('next-page-data');
+        if (nextPageData) {
+          const currentPage = parseInt(nextPageData.dataset.currentPage) || 1;
+          if (currentPage === 1) {
+            window.infiniteScrollState.loadedProductIds.clear();
+          }
+        }
+        initInfiniteScroll();
+      }, 300);
+    };
+
+    // URL change detection
+    let lastUrl = window.location.href;
+    function checkUrlChange() {
+      const currentUrl = window.location.href;
+      if (currentUrl !== lastUrl) {
+        lastUrl = currentUrl;
+        setTimeout(window.reinitInfiniteScroll, 100);
+      }
+    }
+
+    window.addEventListener('popstate', checkUrlChange);
+    setInterval(checkUrlChange, 500);
+
+    // Listen for collection events
+    document.addEventListener('facetsLoaded', () => {
+      setTimeout(window.reinitInfiniteScroll, 200);
+    });
+
+    document.addEventListener('collectionFiltered', () => {
+      setTimeout(window.reinitInfiniteScroll, 200);
+    });
+  </script>
 {%- endif -%}
+
+<div id="infinite-scroll-end" class="infinite-scroll-end" style="display: none;">
+  <div class="end-content">
+    <div class="end-decoration">
+      <div class="luxury-line"></div>
+      <div class="end-diamond">◆</div>
+      <div class="luxury-line"></div>
+    </div>
+    <p class="end-text">You've explored our complete collection</p>
+    <p class="end-subtitle">Every piece tells a story of elegance</p>
+  </div>
+</div>

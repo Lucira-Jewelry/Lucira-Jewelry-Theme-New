@@ -15,6 +15,7 @@
   {{ 'component-slider.css' | asset_url | stylesheet_tag }}
   {{ 'component-rating.css' | asset_url | stylesheet_tag }}
   {{ 'component-deferred-media.css' | asset_url | stylesheet_tag }}
+  
 
   {% unless product.has_only_default_variant %}
     {{ 'component-product-variant-picker.css' | asset_url | stylesheet_tag }}
@@ -207,6 +208,11 @@
                   <span class="visually-hidden">{{ 'products.product.sku' | t }}:</span>
                   {{- product.selected_or_first_available_variant.sku -}}
                 </p>
+              {% when 'promo_text' %}
+                <div class="product-promo-text">
+                  <div class="svg-wrapper">{{- 'icon-promo.svg' | inline_asset_content -}}</div>
+                  {{ block.settings.promo_message }}
+                </div>
               {%- when 'custom_liquid' -%}
                 {{ block.settings.custom_liquid }}
               {%- when 'collapsible_tab' -%}
@@ -485,6 +491,17 @@
                   section_id: section.id,
                   show_pickup_availability: true
                 -%}
+
+              {% render 'pdp-delivery-details' %}
+
+              {% unless product.price <= 1000000 %}
+                {% render 'comparison-table' %}
+              {% endunless %}
+              
+              {%- if product.description != blank -%}
+                {% render 'pdp-product-description'%}
+              {%- endif -%}
+
               {%- when 'rating' -%}
                 {%- if product.metafields.reviews.rating.value != blank -%}
                   <div class="rating-wrapper">
@@ -497,10 +514,11 @@
                         assign rating_decimal = 1
                       endif
                     %}
+
                     <div
                       class="rating"
                       role="img"
-                      aria-label="{{ 'accessibility.star_reviews_info' | t: rating_value: product.metafields.reviews.rating.value, rating_max: product.metafields.reviews.rating.value.scale_max }}"
+                      aria-label="{{ 'accessibility.star_reviews_info' | t: rating_value: product.metafields.reviews.rating.value.rating, rating_max: product.metafields.reviews.rating.value.scale_max }}"
                     >
                       <span
                         aria-hidden="true"
@@ -508,18 +526,10 @@
                         style="--rating: {{ product.metafields.reviews.rating.value.rating | floor }}; --rating-max: {{ product.metafields.reviews.rating.value.scale_max }}; --rating-decimal: {{ rating_decimal }};"
                       ></span>
                     </div>
-                    <p class="rating-text caption">
-                      <span aria-hidden="true">
-                        {{- product.metafields.reviews.rating.value }} /
-                        {{ product.metafields.reviews.rating.value.scale_max -}}
-                      </span>
-                    </p>
-                    <p class="rating-count caption">
-                      <span aria-hidden="true">({{ product.metafields.reviews.rating_count }})</span>
-                      <span class="visually-hidden">
-                        {{- product.metafields.reviews.rating_count }}
-                        {{ 'accessibility.total_reviews' | t -}}
-                      </span>
+
+                    <!-- Compact rating format -->
+                    <p class="rating-summary caption">
+                      <span>{{ product.metafields.reviews.rating.value.rating }}</span> ({{ product.metafields.reviews.rating_count }})
                     </p>
                   </div>
                 {%- endif -%}
@@ -681,6 +691,8 @@
             {{- 'icon-arrow.svg' | inline_asset_content -}}
           </a>
         </section>
+        {% render 'product-variant-picker-options', product: product, block: block, product_form_id: product_form_id %}
+        {% render 'notify-me' %}
       </div>
     </div>
 
@@ -788,6 +800,18 @@
       "type": "price",
       "name": "t:sections.main-product.blocks.price.name",
       "limit": 1
+    },
+    {
+      "type": "promo_text",
+      "name": "Promo text",
+      "settings": [
+        {
+          "type": "text",
+          "id": "promo_message",
+          "label": "Promo message",
+          "default": "Flat 100% OFF on Making Charges"
+        }
+      ]
     },
     {
       "type": "sku",
