@@ -1,3 +1,4 @@
+
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
@@ -153,27 +154,4 @@ $(document).ready(function () {
 
   setupBradAccordion();
   $(window).on("resize", setupBradAccordion);
-});
-
-
-$(document).ready(function(){
-  $('.pdp-match-shine-slider').slick({
-    slidesToShow: 3,
-    slidesToScroll: 1,
-    infinite: true,
-    centerMode: false,
-    centerPadding: '15%',
-    prevArrow: '<img class="pdp-match-shine-slider-btn" src="{{ 'plp-banner-left-arrow.svg' | asset_url }}" height="auto" width="auto" alt="prev">',
-    nextArrow: '<img class="pdp-match-shine-slider-btn" src="{{ 'plp-banner-right-arrow.svg' | asset_url }}" height="auto" width="auto" alt="next">',
-    responsive: [
-      {
-        breakpoint: 750,
-        settings: {
-          arrows: false,
-          slidesToShow: 1,
-          centerMode: true,
-        }
-      },
-    ]
-  });
 });
