@@ -1,4 +1,3 @@
-
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
