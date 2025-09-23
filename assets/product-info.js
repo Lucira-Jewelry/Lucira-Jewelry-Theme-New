@@ -429,33 +429,39 @@ if (!customElements.get('product-info')) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  const drawer = document.getElementById("variant-drawer");
+  const variantSelectsDrawer = document.querySelector(
+    "#variant-drawer variant-selects"
+  );
   const drawerPriceEl = document.getElementById("drawer-price");
 
-  if (!drawer || !drawerPriceEl) return;
+  if (!variantSelectsDrawer || !drawerPriceEl) return;
 
-  drawer.addEventListener("variant:change", function (event) {
+  // Listen for variant change from this variant-selects only
+  variantSelectsDrawer.addEventListener("variant:change", function (event) {
     const variant = event.detail?.variant;
     if (!variant) return;
 
-    const formattedPrice = new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(variant.price / 100);
+    // Format prices
+    const formatPrice = (amount) =>
+      new Intl.NumberFormat("en-IN", {
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }).format(amount / 100);
 
-    drawerPriceEl.textContent = formattedPrice;
-    drawerPriceEl.dataset.price = formattedPrice;
+    let html = `<span class="sale-price">${formatPrice(variant.price)}</span>`;
 
     if (variant.compare_at_price && variant.compare_at_price > variant.price) {
-      drawerPriceEl.innerHTML = `
-        <span class="sale-price">${formattedPrice}</span>
-        <s class="compare-price">${new Intl.NumberFormat("en-IN", {
-          style: "currency",
-          currency: "INR",
-          maximumFractionDigits: 0,
-        }).format(variant.compare_at_price / 100)}</s>
-      `;
+      html += ` <s class="compare-price">${formatPrice(
+        variant.compare_at_price
+      )}</s>`;
     }
+
+    // Update drawer price instantly
+    drawerPriceEl.innerHTML = html;
+    drawerPriceEl.dataset.price = variant.price;
   });
 });
+
+
+
