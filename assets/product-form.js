@@ -653,3 +653,27 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+
+document.addEventListener("DOMContentLoaded", function () {
+  const variantDrawer = document.querySelector("#variant-drawer");
+  if (!variantDrawer) return;
+
+  const variantSelects = variantDrawer.querySelector("variant-selects");
+  const drawerPriceEl = document.getElementById("drawer-price");
+
+  if (variantSelects && drawerPriceEl) {
+    variantSelects.addEventListener("variant:change", function (event) {
+      const variant = event.detail.variant;
+      if (!variant) return;
+
+      // Format price
+      const price = (variant.price / 100).toLocaleString("en-IN", {
+        style: "currency",
+        currency: "{{ shop.currency }}"
+      });
+
+      drawerPriceEl.textContent = price;
+      drawerPriceEl.setAttribute("data-price", price);
+    });
+  }
+});
