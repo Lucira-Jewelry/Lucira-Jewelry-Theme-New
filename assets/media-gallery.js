@@ -524,7 +524,20 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function handleCustomizeConfirm() {
     document.addEventListener('click', function(e) {
+      // Close drawer triggers reorder
       if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]')) {
+        setTimeout(() => {
+          const selectedColor = getSelectedColor();
+          if (selectedColor) {
+            console.log(`Customization drawer closed for color: ${selectedColor}`);
+            currentSelectedColor = selectedColor;
+            safeReorderByColor(selectedColor);
+          }
+        }, 250); // Wait for drawer animation
+      }
+
+      // Confirm button also triggers reorder after drawer closes
+      if (e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
         setTimeout(() => {
           const selectedColor = getSelectedColor();
           if (selectedColor) {
@@ -532,16 +545,11 @@ document.addEventListener("DOMContentLoaded", function () {
             currentSelectedColor = selectedColor;
             safeReorderByColor(selectedColor);
           }
-        }, 200);
-      }
-    });
-
-    document.addEventListener('click', function(e) {
-      if (e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
-        setTimeout(debouncedHandleColorChange, 200);
+        }, 250);
       }
     });
   }
+
 
   function cleanup() {
     // Remove event listeners
