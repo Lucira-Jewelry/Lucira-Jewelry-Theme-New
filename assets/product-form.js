@@ -655,25 +655,38 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const variantDrawer = document.querySelector("#variant-drawer");
-  if (!variantDrawer) return;
+  const drawer = document.querySelector("#variant-drawer");
+  if (!drawer) return;
 
-  const variantSelects = variantDrawer.querySelector("variant-selects");
-  const drawerPriceEl = document.getElementById("drawer-price");
+  const priceEl = drawer.querySelector("#drawer-price");
+  const variantJsonEl = drawer.querySelector("script[data-selected-variant]");
 
-  if (variantSelects && drawerPriceEl) {
-    variantSelects.addEventListener("variant:change", function (event) {
-      const variant = event.detail.variant;
-      if (!variant) return;
+  if (!priceEl || !variantJsonEl) return;
 
-      // Format price
-      const price = (variant.price / 100).toLocaleString("en-IN", {
-        style: "currency",
-        currency: "{{ shop.currency }}"
-      });
+  // Function to update price
+  function updateDrawerPrice(variant) {
+    if (!variant) return;
 
-      drawerPriceEl.textContent = price;
-      drawerPriceEl.setAttribute("data-price", price);
+    // Format price
+    const price = (variant.price / 100).toLocaleString("en-IN", {
+      style: "currency",
+      currency: "{{ shop.currency }}"
     });
+
+    priceEl.textContent = price;
+    priceEl.setAttribute("data-price", price);
   }
+
+  // Watch for changes to the JSON block
+  const observer = new MutationObserver(() => {
+    try {
+      const variantData = JSON.parse(variantJsonEl.textContent);
+      updateDrawerPrice(variantData);
+    } catch (e) {
+      console.warn("Variant JSON parse failed", e);
+    }
+  });
+
+  observer.observe(variantJsonEl, { childList: true, characterData: true });
 });
+
