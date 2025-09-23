@@ -49,3 +49,82 @@
   </div>
 </div>
 
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+  // Function to update price display
+  function updatePriceDisplay(variantId) {
+    const variant = window.productVariants.find(v => v.id == variantId);
+    
+    if (!variant) return;
+    
+    const priceElement = document.getElementById('customize-price-drawer-price');
+    const comparePriceElement = document.getElementById('customize-price-drawer-compare-price');
+    
+    if (priceElement) {
+      // Update price
+      priceElement.textContent = formatMoney(variant.price);
+      priceElement.setAttribute('data-price', variant.price);
+      
+      // Handle compare price
+      if (comparePriceElement) {
+        if (variant.compare_at_price && variant.compare_at_price > variant.price) {
+          comparePriceElement.textContent = formatMoney(variant.compare_at_price);
+          comparePriceElement.setAttribute('data-price', variant.compare_at_price);
+          comparePriceElement.style.display = 'inline';
+        } else {
+          comparePriceElement.style.display = 'none';
+        }
+      }
+    }
+  }
+  
+  // Format money function
+  function formatMoney(cents) {
+    const money = (cents / 100).toFixed(2);
+    return window.moneyFormat.replace('{{amount}}', money).replace('{{amount_no_decimals}}', Math.floor(cents / 100));
+  }
+  
+  // Listen for variant changes - multiple selectors to cover different themes
+  const selectors = [
+    'input[name="id"]',           // Radio buttons
+    'select[name="id"]',          // Select dropdown
+    '[data-variant-id]',          // Custom variant selectors
+    '.variant-input',             // Common class name
+    '.product-form__variants input', // Some themes
+    '.product-form__variants select' // Some themes
+  ];
+  
+  selectors.forEach(selector => {
+    const elements = document.querySelectorAll(selector);
+    elements.forEach(element => {
+      element.addEventListener('change', function(e) {
+        let variantId;
+        
+        if (this.type === 'radio' || this.tagName === 'SELECT') {
+          variantId = this.value;
+        } else if (this.dataset.variantId) {
+          variantId = this.dataset.variantId;
+        }
+        
+        if (variantId) {
+          updatePriceDisplay(parseInt(variantId));
+        }
+      });
+      
+      // Also listen for click events on buttons/links
+      element.addEventListener('click', function(e) {
+        if (this.dataset.variantId) {
+          updatePriceDisplay(parseInt(this.dataset.variantId));
+        }
+      });
+    });
+  });
+  
+  // Listen for custom variant change events (some themes dispatch these)
+  document.addEventListener('variant:change', function(e) {
+    if (e.detail && e.detail.variant) {
+      updatePriceDisplay(e.detail.variant.id);
+    }
+  });
+});
+</script>
