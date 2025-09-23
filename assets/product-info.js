@@ -428,3 +428,38 @@ if (!customElements.get('product-info')) {
   );
 }
 
+document.addEventListener("DOMContentLoaded", function () {
+  const drawer = document.getElementById("variant-drawer");
+  const drawerPriceEl = document.getElementById("drawer-price");
+
+  if (!drawer || !drawerPriceEl) return;
+
+  // Listen for Dawn's variant change event from <variant-selects>
+  drawer.addEventListener("variant:change", function (event) {
+    const variant = event.detail?.variant;
+    if (!variant) return;
+
+    // Format price
+    const formattedPrice = new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(variant.price / 100);
+
+    // Update drawer price instantly
+    drawerPriceEl.textContent = formattedPrice;
+    drawerPriceEl.dataset.price = formattedPrice;
+
+    // If compare-at price exists, optionally update here
+    if (variant.compare_at_price && variant.compare_at_price > variant.price) {
+      drawerPriceEl.innerHTML = `
+        <span class="sale-price">${formattedPrice}</span>
+        <s class="compare-price">${new Intl.NumberFormat("en-IN", {
+          style: "currency",
+          currency: "INR",
+          maximumFractionDigits: 0,
+        }).format(variant.compare_at_price / 100)}</s>
+      `;
+    }
+  });
+});
