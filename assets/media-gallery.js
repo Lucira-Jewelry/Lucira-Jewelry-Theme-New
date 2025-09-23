@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", function () {
     mediaList = document.querySelector('.product__media-list');
   }
 
-  // Debounce function for performance
+  // Debounce helper
   function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
@@ -196,19 +196,38 @@ document.addEventListener("DOMContentLoaded", function () {
     return null;
   }
 
+  // ✅ Fixed version — enforce slotPattern once
   function buildRepeatedPattern(buckets) {
-    const slotPattern = ["color", "code", "code", "color", "color", "code", "code", "color", "color", "code", "code", "color"];
+    const slotPattern = [
+      "color", "code", "code",
+      "color", "color", "code", "code",
+      "color", "color", "code", "code",
+      "color"
+    ];
+
     const ordered = [];
 
-    while (buckets.color.length || Object.values(buckets.codes).some(arr => arr.length)) {
-      for (const slot of slotPattern) {
-        let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-        if (node) {
-          node.style.display = 'block';
-          ordered.push(node);
-        }
+    // Apply the slotPattern once
+    for (const slot of slotPattern) {
+      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+      if (node) {
+        node.style.display = 'block';
+        ordered.push(node);
       }
     }
+
+    // Append leftovers
+    Object.values(buckets.codes).forEach(arr => {
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      });
+    });
+
+    buckets.color.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
 
     buckets.extras.forEach(node => {
       node.style.display = 'block';
@@ -225,41 +244,35 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!container) return;
 
     // Store current active slide index
-    const activeIndex = Array.from(container.children).findIndex(item => 
+    const activeIndex = Array.from(container.children).findIndex(item =>
       item.classList.contains('is-active')
     );
-    
+
     // Reorder items
     ordered.forEach(node => container.appendChild(node));
-    
+
     // Return the new index of the previously active slide
-    return ordered.findIndex(item => 
+    return ordered.findIndex(item =>
       activeIndex >= 0 && item === allItems[activeIndex]
     );
   }
 
   function createDotsNavigation() {
-    // Remove existing dots if any
     if (dotsContainer) {
       dotsContainer.remove();
       dotsContainer = null;
     }
-    
     if (!mediaList) return;
-    
-    // Get only visible slides
+
     const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
       .filter(slide => slide.style.display !== 'none');
-    
+
     totalSlides = slides.length;
-    
-    if (totalSlides <= 1) return; // No need for dots if only one slide
-    
-    // Create dots container
+    if (totalSlides <= 1) return;
+
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
-    
-    // Create dots for each visible slide
+
     for (let i = 0; i < totalSlides; i++) {
       const dot = document.createElement('span');
       dot.className = 'slider-dot';
@@ -267,33 +280,28 @@ document.addEventListener("DOMContentLoaded", function () {
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
     }
-    
-    // Add dots to the DOM
+
     mediaList.parentNode.appendChild(dotsContainer);
   }
 
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides) return;
-    
     currentSlide = index;
     if (!mediaList) return;
-    
+
     const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
       .filter(slide => slide.style.display !== 'none');
-    
-    // Update active class on slides
+
     slides.forEach((slide, i) => {
       slide.classList.toggle('is-active', i === index);
     });
-    
-    // Update dots
+
     if (dotsContainer) {
       dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
         dot.classList.toggle('active', i === index);
       });
     }
-    
-    // Scroll to the active slide
+
     if (slides[index]) {
       slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
     }
@@ -301,78 +309,45 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function initSliderNavigation() {
     if (!mediaList) return;
-    
-    // Hide default slider buttons
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) {
-      sliderButtons.style.display = 'none';
-    }
-    
-    // Create dots navigation
+    if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
-    
-    // Initialize swipe functionality for mobile
+
     let startX, currentX, isDragging = false;
-    
-    const handleTouchStart = (e) => {
-      startX = e.touches[0].clientX;
-      isDragging = true;
-    };
-    
-    const handleTouchMove = (e) => {
-      if (!isDragging) return;
-      currentX = e.touches[0].clientX;
-    };
-    
+
+    const handleTouchStart = e => { startX = e.touches[0].clientX; isDragging = true; };
+    const handleTouchMove = e => { if (isDragging) currentX = e.touches[0].clientX; };
     const handleTouchEnd = () => {
       if (!isDragging) return;
       isDragging = false;
-      
       const diff = startX - currentX;
-      if (Math.abs(diff) > 50) { // Minimum swipe distance
-        if (diff > 0 && currentSlide < totalSlides - 1) {
-          goToSlide(currentSlide + 1);
-        } else if (diff < 0 && currentSlide > 0) {
-          goToSlide(currentSlide - 1);
-        }
+      if (Math.abs(diff) > 50) {
+        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
+        else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
       }
     };
-    
-    const handleMouseDown = (e) => {
-      startX = e.clientX;
-      isDragging = true;
-    };
-    
-    const handleMouseMove = (e) => {
-      if (!isDragging) return;
-      currentX = e.clientX;
-    };
-    
+
+    const handleMouseDown = e => { startX = e.clientX; isDragging = true; };
+    const handleMouseMove = e => { if (isDragging) currentX = e.clientX; };
     const handleMouseUp = () => {
       if (!isDragging) return;
       isDragging = false;
-      
       const diff = startX - currentX;
-      if (Math.abs(diff) > 50) { // Minimum drag distance
-        if (diff > 0 && currentSlide < totalSlides - 1) {
-          goToSlide(currentSlide + 1);
-        } else if (diff < 0 && currentSlide > 0) {
-          goToSlide(currentSlide - 1);
-        }
+      if (Math.abs(diff) > 50) {
+        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
+        else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
       }
     };
-    
-    // Add event listeners
+
     mediaList.addEventListener('touchstart', handleTouchStart, { passive: true });
     mediaList.addEventListener('touchmove', handleTouchMove, { passive: true });
     mediaList.addEventListener('touchend', handleTouchEnd);
-    
+
     mediaList.addEventListener('mousedown', handleMouseDown);
     mediaList.addEventListener('mousemove', handleMouseMove);
     mediaList.addEventListener('mouseup', handleMouseUp);
     mediaList.addEventListener('mouseleave', handleMouseUp);
-    
-    // Store references for removal later
+
     mediaList._touchStartHandler = handleTouchStart;
     mediaList._touchMoveHandler = handleTouchMove;
     mediaList._touchEndHandler = handleTouchEnd;
@@ -383,22 +358,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function safeReorderByColor(targetColor) {
     if (!mediaList) return;
-
-    // Reorder by color
     const newActiveIndex = reorderByColor(targetColor);
-    
-    // Reset current slide to 0 when reordering
     currentSlide = 0;
-    
-    // Initialize slider navigation with dots
     initSliderNavigation();
-    
-    // If we have a valid active index, go to that slide
     if (newActiveIndex >= 0) {
       currentSlide = newActiveIndex;
       goToSlide(newActiveIndex);
     }
-    
     mediaList.setAttribute('data-media-reordered', 'true');
   }
 
@@ -409,91 +375,57 @@ document.addEventListener("DOMContentLoaded", function () {
       'fieldset[data-type="color"] input[type="radio"]:checked, ' +
       '.variant-input-wrapper input[type="radio"]:checked'
     );
-
     for (const input of colorInputs) {
       if (input.checked || input.tagName === 'SELECT') {
         const color = getColorFromAlt(input.value);
         if (color) return color;
       }
     }
-
     const selectedVariants = document.querySelectorAll(
       '[data-selected-value], .variant-input-wrapper .selected, ' +
       '.product-form__buttons [data-value], .variant-selector__button.selected'
     );
-
     for (const element of selectedVariants) {
       const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
       const color = getColorFromAlt(text);
       if (color) return color;
     }
-
     const urlParams = new URLSearchParams(window.location.search);
     const colorParam = urlParams.get('color') || urlParams.get('Color');
     if (colorParam) {
       const color = getColorFromAlt(colorParam);
       if (color) return color;
     }
-
     return "yellow";
   }
 
-  const debouncedHandleColorChange = debounce(function() {
+  const debouncedHandleColorChange = debounce(function () {
     const selectedColor = getSelectedColor();
     if (selectedColor && selectedColor !== currentSelectedColor) {
-      console.log(`Color changed from ${currentSelectedColor} to ${selectedColor}`);
       currentSelectedColor = selectedColor;
       safeReorderByColor(selectedColor);
     }
   }, 100);
 
   function setupVariantChangeListeners() {
-    document.addEventListener('change', function(e) {
-      const target = e.target;
-      if (target.name && target.name.toLowerCase().includes('color')) {
-        debouncedHandleColorChange();
-        return;
-      }
-
-      let colorFieldset = target.closest('fieldset[data-type="color"]');
-      if (!colorFieldset) {
-        document.querySelectorAll('fieldset').forEach(fs => {
-          const legend = fs.querySelector('legend');
-          if (legend && legend.textContent.toLowerCase().includes("color") && fs.contains(target)) {
-            colorFieldset = fs;
-          }
-        });
-      }
-
-      if (target.closest('.variant-input-wrapper, .product-form__input, .variant-selector')) {
-        debouncedHandleColorChange();
-      }
-    });
-
+    document.addEventListener('change', debouncedHandleColorChange);
     document.addEventListener('variant:change', debouncedHandleColorChange);
     document.addEventListener('variant:selected', debouncedHandleColorChange);
     window.addEventListener('popstate', debouncedHandleColorChange);
 
-    // Use a single observer for better performance
-    if (observer) {
-      observer.disconnect();
-    }
-    
-    observer = new MutationObserver(function(mutations) {
+    if (observer) observer.disconnect();
+    observer = new MutationObserver(function (mutations) {
       let shouldUpdate = false;
       for (const mutation of mutations) {
         if (mutation.type === 'attributes') {
-          const attributesOfInterest = ['data-selected-value', 'data-value', 'checked', 'selected'];
-          if (attributesOfInterest.includes(mutation.attributeName)) {
-            shouldUpdate = true;
-            break;
-          }
+          const attrs = ['data-selected-value', 'data-value', 'checked', 'selected'];
+          if (attrs.includes(mutation.attributeName)) { shouldUpdate = true; break; }
         }
         if (mutation.type === 'childList' && mutation.addedNodes.length) {
           for (const node of mutation.addedNodes) {
             if (node.nodeType === 1 &&
               (node.matches('.variant-input-wrapper, .product-form__input, .variant-selector') ||
-               node.querySelector('.variant-input-wrapper, .product-form__input, .variant-selector'))) {
+                node.querySelector('.variant-input-wrapper, .product-form__input, .variant-selector'))) {
               shouldUpdate = true;
               break;
             }
@@ -522,37 +454,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 
-  function handleCustomizeConfirm() {
-    document.addEventListener('click', function(e) {
-      // Close drawer triggers reorder
-      if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]')) {
-        setTimeout(() => {
-          const selectedColor = getSelectedColor();
-          if (selectedColor) {
-            console.log(`Customization drawer closed for color: ${selectedColor}`);
-            currentSelectedColor = selectedColor;
-            safeReorderByColor(selectedColor);
-          }
-        }, 250); // Wait for drawer animation
-      }
-
-      // Confirm button also triggers reorder after drawer closes
-      if (e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
-        setTimeout(() => {
-          const selectedColor = getSelectedColor();
-          if (selectedColor) {
-            console.log(`Customization confirmed for color: ${selectedColor}`);
-            currentSelectedColor = selectedColor;
-            safeReorderByColor(selectedColor);
-          }
-        }, 250);
-      }
-    });
-  }
-
-
   function cleanup() {
-    // Remove event listeners
     if (mediaList) {
       if (mediaList._touchStartHandler) {
         mediaList.removeEventListener('touchstart', mediaList._touchStartHandler);
@@ -564,14 +466,10 @@ document.addEventListener("DOMContentLoaded", function () {
         mediaList.removeEventListener('mouseleave', mediaList._mouseUpHandler);
       }
     }
-    
-    // Remove dots container
     if (dotsContainer) {
       dotsContainer.remove();
       dotsContainer = null;
     }
-    
-    // Disconnect observer
     if (observer) {
       observer.disconnect();
       observer = null;
@@ -580,45 +478,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function initialize() {
     if (isInitialized) return;
-    
-    // Cache DOM elements
     cacheDOMElements();
-
     currentSelectedColor = getSelectedColor();
-    console.log(`Initial color detected: ${currentSelectedColor}`);
-
     safeReorderByColor(currentSelectedColor);
     setupVariantChangeListeners();
-    handleCustomizeConfirm();
-
     isInitialized = true;
-
-    // Add performance marker
-    if (!document.querySelector('.product-media-reorder-initialized')) {
-      const marker = document.createElement('div');
-      marker.className = 'product-media-reorder-initialized';
-      marker.style.display = 'none';
-      document.body.appendChild(marker);
-    }
   }
 
-  // Initialize on load
   initialize();
 
-  // Reinitialize if section reloads
   if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', function() {
+    document.addEventListener('shopify:section:load', function () {
       cleanup();
       isInitialized = false;
       initialize();
     });
-    
     document.addEventListener('theme:loaded', initialize);
   }
 
-  // Fallback initialization
   setTimeout(initialize, 1000);
-  
-  // Cleanup on page unload
   window.addEventListener('beforeunload', cleanup);
 });
