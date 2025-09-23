@@ -46,6 +46,7 @@
     {%- endunless -%}
   </div>
 </div>
+
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const drawerPriceEl = document.getElementById('drawer-price');
@@ -53,17 +54,31 @@ document.addEventListener('DOMContentLoaded', function () {
 
   if (!drawerPriceEl || !variantSelectsEl) return;
 
+  // Function to format price
+  function formatPrice(price) {
+    // Use Shopify money format if available
+    if (typeof Shopify !== 'undefined' && Shopify.formatMoney) {
+      return Shopify.formatMoney(price, '{{ shop.money_format }}');
+    }
+    // Fallback
+    return '₹' + (price / 100).toFixed(0);
+  }
+
+  // Initialize with first available variant
+  const initialVariantScript = variantSelectsEl.querySelector('script[data-selected-variant]');
+  if (initialVariantScript) {
+    const variant = JSON.parse(initialVariantScript.innerHTML);
+    drawerPriceEl.textContent = formatPrice(variant.price);
+    drawerPriceEl.dataset.price = variant.price;
+  }
+
+  // Listen for variant changes
   variantSelectsEl.addEventListener('variantChange', (event) => {
     const variant = event.detail.variant;
-
     if (variant) {
-      // Update price text
-      drawerPriceEl.textContent = Shopify.formatMoney(variant.price, '{{ shop.money_format }}');
-      
-      // Optional: update data-price attribute
+      drawerPriceEl.textContent = formatPrice(variant.price);
       drawerPriceEl.dataset.price = variant.price;
     }
   });
 });
 </script>
-
