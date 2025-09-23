@@ -489,6 +489,10 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener('shopify:section:load', function() { cleanup(); isInitialized = false; initialize(); });
     document.addEventListener('theme:loaded', initialize);
   }
-  setTimeout(initialize, 1000);
+  setTimeout(() => {
+  if (!mediaList?.hasAttribute('data-media-reordered')) {
+      initialize();
+    }
+  }, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
