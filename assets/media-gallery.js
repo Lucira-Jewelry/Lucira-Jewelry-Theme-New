@@ -243,22 +243,14 @@ document.addEventListener("DOMContentLoaded", function () {
     const mediaList = getMediaList();
     if (!mediaList) return;
 
+    // Remove default slider buttons
+    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
+    if (sliderButtons) sliderButtons.style.display = 'none';
+
+    // Create dots navigation
     createDotsNavigation();
-
-    let startX, currentX, isDragging = false;
-    const handleStart = e => { startX = e.touches ? e.touches[0].clientX : e.clientX; isDragging = true; };
-    const handleMove = e => { if (!isDragging) return; currentX = e.touches ? e.touches[0].clientX : e.clientX; };
-    const handleEnd = () => { if (!isDragging) return; isDragging = false; const diff = startX - currentX; if (Math.abs(diff) > 50) { if (diff > 0) goToSlide(currentSlide + 1); else goToSlide(currentSlide - 1); } };
-
-    mediaList.addEventListener('touchstart', handleStart, { passive: true });
-    mediaList.addEventListener('touchmove', handleMove, { passive: true });
-    mediaList.addEventListener('touchend', handleEnd);
-    mediaList.addEventListener('mousedown', handleStart);
-    mediaList.addEventListener('mousemove', handleMove);
-    mediaList.addEventListener('mouseup', handleEnd);
-    mediaList.addEventListener('mouseleave', handleEnd);
-    mediaList._handlers = { handleStart, handleMove, handleEnd };
   }
+
 
   function safeReorderByColor(targetColor) {
     waitForMediaUpdate(() => {
