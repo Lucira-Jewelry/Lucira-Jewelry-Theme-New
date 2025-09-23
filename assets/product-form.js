@@ -654,30 +654,5 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-document.addEventListener("DOMContentLoaded", function () {
-  const drawer = document.getElementById("variant-drawer");
-  if (!drawer) return;
-
-  const variantSelects = drawer.querySelector("variant-selects");
-  const priceEl = drawer.querySelector("#drawer-price");
-
-  if (!variantSelects || !priceEl) return;
-
-  // Listen for the variant change event fired by THIS variant-selects
-  variantSelects.addEventListener("variant:change", function (event) {
-    const variant = event.detail && event.detail.variant;
-    if (!variant) return;
-
-    // Format price (₹ if you're in INR)
-    const formattedPrice = (variant.price / 100).toLocaleString("en-IN", {
-      style: "currency",
-      currency: "{{ shop.currency }}"
-    });
-
-    priceEl.textContent = formattedPrice;
-    priceEl.setAttribute("data-price", formattedPrice);
-  });
-});
-
 
 
