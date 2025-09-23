@@ -434,23 +434,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
   if (!drawer || !drawerPriceEl) return;
 
-  // Listen for Dawn's variant change event from <variant-selects>
   drawer.addEventListener("variant:change", function (event) {
     const variant = event.detail?.variant;
     if (!variant) return;
 
-    // Format price
     const formattedPrice = new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
       maximumFractionDigits: 0,
     }).format(variant.price / 100);
 
-    // Update drawer price instantly
     drawerPriceEl.textContent = formattedPrice;
     drawerPriceEl.dataset.price = formattedPrice;
 
-    // If compare-at price exists, optionally update here
     if (variant.compare_at_price && variant.compare_at_price > variant.price) {
       drawerPriceEl.innerHTML = `
         <span class="sale-price">${formattedPrice}</span>
