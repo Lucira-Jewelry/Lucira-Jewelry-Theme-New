@@ -655,38 +655,23 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const drawer = document.querySelector("#variant-drawer");
-  if (!drawer) return;
+  const priceEl = document.getElementById("drawer-price");
+  if (!priceEl) return;
 
-  const priceEl = drawer.querySelector("#drawer-price");
-  const variantJsonEl = drawer.querySelector("script[data-selected-variant]");
-
-  if (!priceEl || !variantJsonEl) return;
-
-  // Function to update price
-  function updateDrawerPrice(variant) {
+  // Shopify's variant:change event is fired on the document
+  document.addEventListener("variant:change", function (event) {
+    const variant = event.detail && event.detail.variant;
     if (!variant) return;
 
-    // Format price
-    const price = (variant.price / 100).toLocaleString("en-IN", {
+    // Convert cents → currency string
+    const formattedPrice = (variant.price / 100).toLocaleString("en-IN", {
       style: "currency",
       currency: "{{ shop.currency }}"
     });
 
-    priceEl.textContent = price;
-    priceEl.setAttribute("data-price", price);
-  }
-
-  // Watch for changes to the JSON block
-  const observer = new MutationObserver(() => {
-    try {
-      const variantData = JSON.parse(variantJsonEl.textContent);
-      updateDrawerPrice(variantData);
-    } catch (e) {
-      console.warn("Variant JSON parse failed", e);
-    }
+    priceEl.textContent = formattedPrice;
+    priceEl.setAttribute("data-price", formattedPrice);
   });
-
-  observer.observe(variantJsonEl, { childList: true, characterData: true });
 });
+
 
