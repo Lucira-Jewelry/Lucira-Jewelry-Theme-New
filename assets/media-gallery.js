@@ -126,7 +126,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let dotsContainer = null;
   let mediaList = null;
   let observer = null;
-  let isReordering = false; // ✅ guard to prevent multiple reorders
+  let isReordering = false;
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -157,7 +157,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const buckets = {
       color: [],
       codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
-      otherColors: [],
       extras: []
     };
 
@@ -174,7 +173,6 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
-        else buckets.extras.push(item);
       } else {
         item.style.display = 'none';
       }
@@ -202,10 +200,8 @@ document.addEventListener("DOMContentLoaded", function () {
       "color", "color", "code", "code",
       "color"
     ];
-
     const ordered = [];
 
-    // Apply the slotPattern once
     for (const slot of slotPattern) {
       let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
       if (node) {
@@ -214,7 +210,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    // Append leftover codes/colors/extras
     Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
     buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
     buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
@@ -275,36 +270,10 @@ document.addEventListener("DOMContentLoaded", function () {
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
-
-    let startX, currentX, isDragging = false;
-    const handleTouchStart = e => { startX = e.touches[0].clientX; isDragging = true; };
-    const handleTouchMove = e => { if (isDragging) currentX = e.touches[0].clientX; };
-    const handleTouchEnd = () => {
-      if (!isDragging) return; isDragging = false; const diff = startX - currentX;
-      if (Math.abs(diff) > 50) { if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1); else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1); }
-    };
-    const handleMouseDown = e => { startX = e.clientX; isDragging = true; };
-    const handleMouseMove = e => { if (isDragging) currentX = e.clientX; };
-    const handleMouseUp = () => { if (!isDragging) return; isDragging = false; const diff = startX - currentX; if (Math.abs(diff) > 50) { if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1); else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1); } };
-
-    mediaList.addEventListener('touchstart', handleTouchStart, { passive: true });
-    mediaList.addEventListener('touchmove', handleTouchMove, { passive: true });
-    mediaList.addEventListener('touchend', handleTouchEnd);
-    mediaList.addEventListener('mousedown', handleMouseDown);
-    mediaList.addEventListener('mousemove', handleMouseMove);
-    mediaList.addEventListener('mouseup', handleMouseUp);
-    mediaList.addEventListener('mouseleave', handleMouseUp);
-
-    mediaList._touchStartHandler = handleTouchStart;
-    mediaList._touchMoveHandler = handleTouchMove;
-    mediaList._touchEndHandler = handleTouchEnd;
-    mediaList._mouseDownHandler = handleMouseDown;
-    mediaList._mouseMoveHandler = handleMouseMove;
-    mediaList._mouseUpHandler = handleMouseUp;
   }
 
   function safeReorderByColor(targetColor) {
-    if (isReordering) return; // ✅ prevent multiple simultaneous reorders
+    if (isReordering) return;
     isReordering = true;
 
     if (!mediaList) { isReordering = false; return; }
@@ -313,8 +282,8 @@ document.addEventListener("DOMContentLoaded", function () {
     initSliderNavigation();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
 
-    // allow next reorder after a small delay
-    setTimeout(() => { isReordering = false; }, 500);
+    // Allow next reorder
+    setTimeout(() => { isReordering = false; }, 200);
 
     mediaList.setAttribute('data-media-reordered', 'true');
   }
@@ -349,12 +318,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
     currentSelectedColor = selectedColor;
 
-    // Delay the reorder slightly to let Shopify finish DOM updates
+    // ✅ Delay slightly to let Shopify finish DOM updates
     setTimeout(() => {
       safeReorderByColor(selectedColor);
-    }, 200); // 200ms delay usually works
+    }, 100); 
   }, 50);
-
 
   function setupVariantChangeListeners() {
     document.addEventListener('change', debouncedHandleColorChange);
@@ -362,52 +330,18 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener('variant:selected', debouncedHandleColorChange);
     window.addEventListener('popstate', debouncedHandleColorChange);
 
-    if (observer) observer.disconnect();
-    observer = new MutationObserver(mutations => {
-      let shouldUpdate = false;
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes') {
-          if (['data-selected-value', 'data-value', 'checked', 'selected'].includes(mutation.attributeName)) { shouldUpdate = true; break; }
-        }
-        if (mutation.type === 'childList' && mutation.addedNodes.length) {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === 1 &&
-              (node.matches('.variant-input-wrapper, .product-form__input, .variant-selector') ||
-                node.querySelector('.variant-input-wrapper, .product-form__input, .variant-selector'))) {
-              shouldUpdate = true; break;
-            }
-          }
-        }
-        if (shouldUpdate) break;
-      }
-      if (shouldUpdate) debouncedHandleColorChange();
-    });
-
-    const observeTargets = [
-      document.querySelector('.product-form'),
-      document.querySelector('[data-product-form]'),
-      document.querySelector('.variant-selector'),
-      document.querySelector('.product__info-wrapper'),
-      document.body
-    ].filter(Boolean);
-
-    observeTargets.forEach(target => {
-      observer.observe(target, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-selected-value', 'data-value', 'checked', 'selected'] });
-    });
+    // ✅ Observe mediaList container so that if Shopify re-renders, we reapply order
+    if (mediaList) {
+      if (observer) observer.disconnect();
+      observer = new MutationObserver(() => {
+        safeReorderByColor(currentSelectedColor);
+      });
+      observer.observe(mediaList, { childList: true, subtree: true });
+    }
   }
 
   function cleanup() {
-    if (mediaList && mediaList._touchStartHandler) {
-      mediaList.removeEventListener('touchstart', mediaList._touchStartHandler);
-      mediaList.removeEventListener('touchmove', mediaList._touchMoveHandler);
-      mediaList.removeEventListener('touchend', mediaList._touchEndHandler);
-      mediaList.removeEventListener('mousedown', mediaList._mouseDownHandler);
-      mediaList.removeEventListener('mousemove', mediaList._mouseMoveHandler);
-      mediaList.removeEventListener('mouseup', mediaList._mouseUpHandler);
-      mediaList.removeEventListener('mouseleave', mediaList._mouseUpHandler);
-    }
-    if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
-    if (observer) { observer.disconnect(); observer = null; }
+    if (observer) observer.disconnect();
   }
 
   function initialize() {
@@ -429,4 +363,5 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
+
 
