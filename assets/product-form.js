@@ -664,6 +664,8 @@ class CustomizeDrawerPriceManager {
 
     if (!this.sectionEl) return;
 
+    this.priceEl = this.sectionEl.querySelector("#drawer-price");
+
     this.numberFormatter = new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -679,25 +681,22 @@ class CustomizeDrawerPriceManager {
   init() {
     if (!this.sectionEl) return;
 
-    // Observe changes inside the variant-selects component
-    const observer = new MutationObserver(() => {
-      this.priceEl = this.sectionEl.querySelector("#drawer-price");
-      this.variantSelect = this.sectionEl.querySelector("select[name='id']");
-      if (this.variantSelect) {
-        this.variantSelect.removeEventListener("change", this.handleVariantChange);
-        this.variantSelect.addEventListener("change", this.handleVariantChange);
+    // Listen for Shopify variant change event
+    this.sectionEl.addEventListener("variant-change", this.handleVariantChange);
 
-        // Set initial price
-        this.updateDrawerPrice(this.variantSelect.value);
-      }
-    });
-
-    observer.observe(this.sectionEl, { childList: true, subtree: true });
+    // If already rendered, update price immediately
+    const select = this.sectionEl.querySelector("select[name='id']");
+    if (select) {
+      this.updateDrawerPrice(select.value);
+    }
   }
 
-  handleVariantChange() {
-    const variantId = this.variantSelect.value;
-    if (variantId && variantId !== this.currentVariantId) {
+  handleVariantChange(event) {
+    // event.detail.variantId is usually provided by Shopify's variant-selects
+    const variantId = event?.detail?.variantId || this.sectionEl.querySelector("select[name='id']")?.value;
+    if (!variantId) return;
+
+    if (variantId !== this.currentVariantId) {
       this.updateDrawerPrice(variantId);
       this.currentVariantId = variantId;
     }
@@ -715,8 +714,7 @@ class CustomizeDrawerPriceManager {
 
 // Initialize for each section
 document.addEventListener("DOMContentLoaded", function () {
-  const sections = document.querySelectorAll(".size-and-customization-section");
-  sections.forEach(section => {
+  document.querySelectorAll(".size-and-customization-section").forEach(section => {
     const sectionId = section.dataset.section;
     new CustomizeDrawerPriceManager(PriceGuideConfig, sectionId);
   });
