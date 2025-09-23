@@ -655,41 +655,6 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 
-document.addEventListener("DOMContentLoaded", function () {
-  const drawer = document.getElementById("variant-drawer");
-  if (!drawer) return;
-
-  const priceEl = drawer.querySelector("#drawer-price");
-  const variantJsonEl = drawer.querySelector("script[data-selected-variant]");
-
-  if (!priceEl || !variantJsonEl) return;
-
-  function updateDrawerPrice() {
-    try {
-      const variantData = JSON.parse(variantJsonEl.textContent);
-      if (!variantData) return;
-
-      const formattedPrice = (variantData.price / 100).toLocaleString("en-IN", {
-        style: "currency",
-        currency: "{{ shop.currency }}"
-      });
-
-      priceEl.textContent = formattedPrice;
-      priceEl.setAttribute("data-price", formattedPrice);
-    } catch (e) {
-      console.warn("Drawer price update failed", e);
-    }
-  }
-
-  // Run once on load
-  updateDrawerPrice();
-
-  // Watch for changes to the JSON block
-  const observer = new MutationObserver(updateDrawerPrice);
-  observer.observe(variantJsonEl, { childList: true, characterData: true });
-});
-
-
 
 
 
