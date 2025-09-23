@@ -1,6 +1,345 @@
+{% doc %}
+  @prompt
+    create a infinite text marque with text blocks
+{% enddoc %}
+{% assign ai_gen_id = block.id | replace: '_', '' | downcase %}
+
+{% style %}
+  .ai-text-marquee-{{ ai_gen_id }} {
+    width: 100%;
+    overflow: hidden;
+    background-color: {{ block.settings.background_color }};
+    padding: {{ block.settings.vertical_padding }}px 0;
+    position: relative;
+  }
+
+  .ai-text-marquee-track-{{ ai_gen_id }} {
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    animation: ai-marquee-scroll-{{ ai_gen_id }} {{ block.settings.animation_speed }}s linear infinite;
+    gap: {{ block.settings.text_spacing }}px;
+  }
+
+  .ai-text-marquee-item-{{ ai_gen_id }} {
+    font-size: {{ block.settings.font_size }}px;
+    color: {{ block.settings.text_color }};
+    font-weight: {{ block.settings.font_weight }};
+    text-transform: {{ block.settings.text_transform }};
+    letter-spacing: {{ block.settings.letter_spacing }}px;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    gap: {{ block.settings.text_spacing }}px;
+  }
+
+  .ai-text-marquee-separator-{{ ai_gen_id }} {
+    color: {{ block.settings.separator_color }};
+    font-size: {{ block.settings.separator_size }}px;
+    flex-shrink: 0;
+  }
+
+  @keyframes ai-marquee-scroll-{{ ai_gen_id }} {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
+  .ai-text-marquee-{{ ai_gen_id }}:hover .ai-text-marquee-track-{{ ai_gen_id }} {
+    animation-play-state: {{ block.settings.pause_on_hover | default: false | ternary: 'paused', 'running' }};
+  }
+
+  @media screen and (max-width: 749px) {
+    .ai-text-marquee-item-{{ ai_gen_id }} {
+      font-size: {{ block.settings.font_size | times: 0.8 }}px;
+    }
+    
+    .ai-text-marquee-separator-{{ ai_gen_id }} {
+      font-size: {{ block.settings.separator_size | times: 0.8 }}px;
+    }
+  }
+{% endstyle %}
+
+<text-marquee-{{ ai_gen_id }}
+  class="ai-text-marquee-{{ ai_gen_id }}"
+  {{ block.shopify_attributes }}
+>
+  <div class="ai-text-marquee-track-{{ ai_gen_id }}">
+    {% liquid
+      assign text_blocks = ''
+      for i in (1..5)
+        assign text_key = 'text_' | append: i
+        assign text_value = block.settings[text_key]
+        if text_value != blank
+          if text_blocks != blank
+            assign text_blocks = text_blocks | append: '|' | append: text_value
+          else
+            assign text_blocks = text_value
+          endif
+        endif
+      endfor
+      
+      assign text_array = text_blocks | split: '|'
+      assign separator = block.settings.separator | default: '•'
+    %}
+
+    {% if text_array.size > 0 %}
+      {% for text in text_array %}
+        <span class="ai-text-marquee-item-{{ ai_gen_id }}">{{ text }}</span>
+        {% unless forloop.last %}
+          <span class="ai-text-marquee-separator-{{ ai_gen_id }}">{{ separator }}</span>
+        {% endunless %}
+      {% endfor %}
+
+      <span class="ai-text-marquee-separator-{{ ai_gen_id }}">{{ separator }}</span>
+
+      {% for text in text_array %}
+        <span class="ai-text-marquee-item-{{ ai_gen_id }}">{{ text }}</span>
+        {% unless forloop.last %}
+          <span class="ai-text-marquee-separator-{{ ai_gen_id }}">{{ separator }}</span>
+        {% endunless %}
+      {% endfor %}
+    {% else %}
+      <span class="ai-text-marquee-item-{{ ai_gen_id }}">Add your text content in the block settings</span>
+    {% endif %}
+  </div>
+</text-marquee-{{ ai_gen_id }}>
+
+<script>
+  (function() {
+    class TextMarquee{{ ai_gen_id }} extends HTMLElement {
+      constructor() {
+        super();
+      }
+
+      connectedCallback() {
+        this.setupMarquee();
+      }
+
+      setupMarquee() {
+        const track = this.querySelector('.ai-text-marquee-track-{{ ai_gen_id }}');
+        if (!track) return;
+
+        const trackWidth = track.scrollWidth;
+        const containerWidth = this.offsetWidth;
+
+        if (trackWidth <= containerWidth * 2) {
+          this.duplicateContent();
+        }
+      }
+
+      duplicateContent() {
+        const track = this.querySelector('.ai-text-marquee-track-{{ ai_gen_id }}');
+        const items = track.innerHTML;
+        track.innerHTML = items + items;
+      }
+    }
+
+    customElements.define('text-marquee-{{ ai_gen_id }}', TextMarquee{{ ai_gen_id }});
+  })();
+</script>
+
 {% schema %}
- {
-   "name": "AI_Block",
-   "tag": "shopify-ai-generated-block"
- }
+{
+  "name": "Text marquee",
+  "tag": null,
+  "settings": [
+    {
+      "type": "header",
+      "content": "Text content"
+    },
+    {
+      "type": "text",
+      "id": "text_1",
+      "label": "Text 1",
+      "default": "Premium Quality Jewelry"
+    },
+    {
+      "type": "text",
+      "id": "text_2",
+      "label": "Text 2",
+      "default": "Free Shipping Worldwide"
+    },
+    {
+      "type": "text",
+      "id": "text_3",
+      "label": "Text 3",
+      "default": "Lifetime Warranty"
+    },
+    {
+      "type": "text",
+      "id": "text_4",
+      "label": "Text 4",
+      "default": "Handcrafted Excellence"
+    },
+    {
+      "type": "text",
+      "id": "text_5",
+      "label": "Text 5",
+      "default": "Certified Diamonds"
+    },
+    {
+      "type": "text",
+      "id": "separator",
+      "label": "Separator",
+      "default": "•"
+    },
+    {
+      "type": "header",
+      "content": "Style"
+    },
+    {
+      "type": "color",
+      "id": "background_color",
+      "label": "Background color",
+      "default": "#a68380"
+    },
+    {
+      "type": "color",
+      "id": "text_color",
+      "label": "Text color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "color",
+      "id": "separator_color",
+      "label": "Separator color",
+      "default": "#ffffff"
+    },
+    {
+      "type": "range",
+      "id": "font_size",
+      "min": 12,
+      "max": 48,
+      "step": 2,
+      "unit": "px",
+      "label": "Font size",
+      "default": 18
+    },
+    {
+      "type": "select",
+      "id": "font_weight",
+      "label": "Font weight",
+      "options": [
+        {
+          "value": "300",
+          "label": "Light"
+        },
+        {
+          "value": "400",
+          "label": "Normal"
+        },
+        {
+          "value": "500",
+          "label": "Medium"
+        },
+        {
+          "value": "600",
+          "label": "Semi bold"
+        },
+        {
+          "value": "700",
+          "label": "Bold"
+        }
+      ],
+      "default": "500"
+    },
+    {
+      "type": "select",
+      "id": "text_transform",
+      "label": "Text transform",
+      "options": [
+        {
+          "value": "none",
+          "label": "None"
+        },
+        {
+          "value": "uppercase",
+          "label": "Uppercase"
+        },
+        {
+          "value": "lowercase",
+          "label": "Lowercase"
+        },
+        {
+          "value": "capitalize",
+          "label": "Capitalize"
+        }
+      ],
+      "default": "uppercase"
+    },
+    {
+      "type": "range",
+      "id": "letter_spacing",
+      "min": 0,
+      "max": 5,
+      "step": 0.5,
+      "unit": "px",
+      "label": "Letter spacing",
+      "default": 1
+    },
+    {
+      "type": "range",
+      "id": "separator_size",
+      "min": 8,
+      "max": 32,
+      "step": 2,
+      "unit": "px",
+      "label": "Separator size",
+      "default": 16
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "vertical_padding",
+      "min": 8,
+      "max": 40,
+      "step": 2,
+      "unit": "px",
+      "label": "Vertical padding",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "text_spacing",
+      "min": 20,
+      "max": 100,
+      "step": 10,
+      "unit": "px",
+      "label": "Text spacing",
+      "default": 40
+    },
+    {
+      "type": "header",
+      "content": "Animation"
+    },
+    {
+      "type": "range",
+      "id": "animation_speed",
+      "min": 10,
+      "max": 60,
+      "step": 5,
+      "unit": "s",
+      "label": "Animation speed",
+      "default": 30
+    },
+    {
+      "type": "checkbox",
+      "id": "pause_on_hover",
+      "label": "Pause on hover",
+      "default": false
+    }
+  ],
+  "presets": [
+    {
+      "name": "Text marquee"
+    }
+  ]
+}
 {% endschema %}
