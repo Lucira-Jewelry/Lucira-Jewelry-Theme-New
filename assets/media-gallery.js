@@ -384,21 +384,20 @@ document.addEventListener("DOMContentLoaded", function () {
   function safeReorderByColor(targetColor) {
     if (!mediaList) return;
 
-    // Reorder by color
     const newActiveIndex = reorderByColor(targetColor);
-    
-    // Reset current slide to 0 when reordering
+
+    // Destroy existing dots and slider event listeners
+    if (dotsContainer) dotsContainer.remove();
     currentSlide = 0;
-    
-    // Initialize slider navigation with dots
+
+    // Re-init slider navigation
     initSliderNavigation();
-    
-    // If we have a valid active index, go to that slide
+
     if (newActiveIndex >= 0) {
       currentSlide = newActiveIndex;
       goToSlide(newActiveIndex);
     }
-    
+
     mediaList.setAttribute('data-media-reordered', 'true');
   }
 
