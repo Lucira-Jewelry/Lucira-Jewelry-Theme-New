@@ -120,17 +120,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const COLOR_TOKENS = ["white", "yellow", "rose"];
   const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v"];
   let currentSelectedColor = null;
-  let isInitialized = false;
   let currentSlide = 0;
-  let totalSlides = 0;
   let dotsContainer = null;
-  let mediaList = null;
   let observer = null;
-
-  // Cache DOM elements
-  function cacheDOMElements() {
-    mediaList = document.querySelector('.product__media-list');
-  }
 
   // Debounce function
   function debounce(func, wait) {
@@ -149,13 +141,14 @@ document.addEventListener("DOMContentLoaded", function () {
     return "";
   }
 
+  function getMediaList() {
+    return document.querySelector('.product__media-list');
+  }
+
   function classifyItemsByColor(targetColor) {
-    const items = Array.from(document.querySelectorAll(".product__media-item"));
-    const buckets = {
-      color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
-      extras: []
-    };
+    const mediaList = getMediaList();
+    const items = mediaList ? Array.from(mediaList.querySelectorAll(".product__media-item")) : [];
+    const buckets = { color: [], codes: { mq: [], ci: [], mh: [], mv: [], v360: [] }, extras: [] };
 
     items.forEach(item => {
       const alt = (item.querySelector("img")?.alt || "").toLowerCase();
@@ -170,18 +163,13 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
         else buckets.extras.push(item);
-      } else {
-        item.style.display = 'none';
-      }
+      } else item.style.display = 'none';
     });
 
     return { buckets, allItems: items };
   }
 
-  function takeColor(buckets) {
-    return buckets.color.length ? buckets.color.shift() : null;
-  }
-
+  function takeColor(buckets) { return buckets.color.length ? buckets.color.shift() : null; }
   function takeCode(buckets) {
     for (const key of ALWAYS_SHOW_CODES) {
       const k = key === "360v" ? "v360" : key;
@@ -191,60 +179,44 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function buildRepeatedPattern(buckets) {
-    const slotPattern = ["color", "code", "code", "color", "color", "code", "code", "color", "color", "code", "code", "color"];
+    const pattern = ["color", "code", "code", "color", "color", "code", "code", "color", "color", "code", "code", "color"];
     const ordered = [];
-
     while (buckets.color.length || Object.values(buckets.codes).some(arr => arr.length)) {
-      for (const slot of slotPattern) {
+      pattern.forEach(slot => {
         const node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-        if (node) {
-          node.style.display = 'block';
-          ordered.push(node);
-        }
-      }
+        if (node) { node.style.display = 'block'; ordered.push(node); }
+      });
     }
-
-    buckets.extras.forEach(node => {
-      node.style.display = 'block';
-      ordered.push(node);
-    });
-
+    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
     return ordered;
   }
 
   function reorderByColor(targetColor) {
+    const mediaList = getMediaList();
+    if (!mediaList) return -1;
+
     const { buckets, allItems } = classifyItemsByColor(targetColor);
     const ordered = buildRepeatedPattern(buckets);
     const container = allItems[0]?.parentNode;
-    if (!container) return;
+    if (!container) return -1;
 
-    const activeIndex = Array.from(container.children).findIndex(item =>
-      item.classList.contains('is-active')
-    );
+    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains('is-active'));
 
     ordered.forEach(node => container.appendChild(node));
-
-    return ordered.findIndex(item =>
-      activeIndex >= 0 && item === allItems[activeIndex]
-    );
+    return ordered.findIndex(item => activeIndex >= 0 && item === allItems[activeIndex]);
   }
 
   function createDotsNavigation() {
-    if (dotsContainer) {
-      dotsContainer.remove();
-      dotsContainer = null;
-    }
+    const mediaList = getMediaList();
     if (!mediaList) return;
+    if (dotsContainer) dotsContainer.remove();
 
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
-      .filter(slide => slide.style.display !== 'none');
-
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(s => s.style.display !== 'none');
     totalSlides = slides.length;
     if (totalSlides <= 1) return;
 
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
-
     slides.forEach((_, i) => {
       const dot = document.createElement('span');
       dot.className = 'slider-dot';
@@ -252,58 +224,31 @@ document.addEventListener("DOMContentLoaded", function () {
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
     });
-
     mediaList.parentNode.appendChild(dotsContainer);
   }
 
   function goToSlide(index) {
-    if (index < 0 || index >= totalSlides) return;
-    currentSlide = index;
+    const mediaList = getMediaList();
     if (!mediaList) return;
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(s => s.style.display !== 'none');
+    if (index < 0 || index >= slides.length) return;
 
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
-      .filter(slide => slide.style.display !== 'none');
-
-    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
-
-    if (dotsContainer) {
-      dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
-        dot.classList.toggle('active', i === index);
-      });
-    }
-
-    if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    currentSlide = index;
+    slides.forEach((s, i) => s.classList.toggle('is-active', i === index));
+    if (dotsContainer) dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
+    slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
   function initSliderNavigation() {
+    const mediaList = getMediaList();
     if (!mediaList) return;
-
-    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) sliderButtons.style.display = 'none';
 
     createDotsNavigation();
 
     let startX, currentX, isDragging = false;
-
-    const handleStart = e => {
-      startX = e.touches ? e.touches[0].clientX : e.clientX;
-      isDragging = true;
-    };
-
-    const handleMove = e => {
-      if (!isDragging) return;
-      currentX = e.touches ? e.touches[0].clientX : e.clientX;
-    };
-
-    const handleEnd = () => {
-      if (!isDragging) return;
-      isDragging = false;
-      const diff = startX - currentX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
-        else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
-      }
-    };
+    const handleStart = e => { startX = e.touches ? e.touches[0].clientX : e.clientX; isDragging = true; };
+    const handleMove = e => { if (!isDragging) return; currentX = e.touches ? e.touches[0].clientX : e.clientX; };
+    const handleEnd = () => { if (!isDragging) return; isDragging = false; const diff = startX - currentX; if (Math.abs(diff) > 50) { if (diff > 0) goToSlide(currentSlide + 1); else goToSlide(currentSlide - 1); } };
 
     mediaList.addEventListener('touchstart', handleStart, { passive: true });
     mediaList.addEventListener('touchmove', handleMove, { passive: true });
@@ -312,110 +257,52 @@ document.addEventListener("DOMContentLoaded", function () {
     mediaList.addEventListener('mousemove', handleMove);
     mediaList.addEventListener('mouseup', handleEnd);
     mediaList.addEventListener('mouseleave', handleEnd);
-
     mediaList._handlers = { handleStart, handleMove, handleEnd };
   }
 
-  function waitForMediaUpdate(callback, timeout = 1000) {
-    const start = Date.now();
-    function check() {
-      const mediaContainer = document.querySelector('.product__media-list');
-      const items = mediaContainer?.querySelectorAll('.product__media-item') || [];
-      if (items.length) callback();
-      else if (Date.now() - start < timeout) requestAnimationFrame(check);
-    }
-    check();
-  }
-
   function safeReorderByColor(targetColor) {
-    if (!mediaList) return;
-    const newActiveIndex = reorderByColor(targetColor);
-
-    if (dotsContainer) dotsContainer.remove();
-    currentSlide = 0;
-    initSliderNavigation();
-
-    if (newActiveIndex >= 0) {
-      currentSlide = newActiveIndex;
-      goToSlide(newActiveIndex);
-    }
-
-    mediaList.setAttribute('data-media-reordered', 'true');
+    waitForMediaUpdate(() => {
+      const newIndex = reorderByColor(targetColor);
+      if (dotsContainer) dotsContainer.remove();
+      currentSlide = 0;
+      initSliderNavigation();
+      if (newIndex >= 0) goToSlide(newIndex);
+    });
   }
 
   function getSelectedColor() {
-    const inputs = document.querySelectorAll(
-      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], ' +
-      'fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
-    );
-    for (const input of inputs) {
-      if (input.checked || input.tagName === 'SELECT') {
-        const color = getColorFromAlt(input.value);
-        if (color) return color;
-      }
-    }
-    const variants = document.querySelectorAll(
-      '[data-selected-value], .variant-input-wrapper .selected, ' +
-      '.product-form__buttons [data-value], .variant-selector__button.selected'
-    );
-    for (const el of variants) {
-      const text = el.textContent || el.getAttribute('data-value') || el.getAttribute('data-selected-value');
-      const color = getColorFromAlt(text);
-      if (color) return color;
-    }
+    const inputs = document.querySelectorAll('input[name*="color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked');
+    for (const input of inputs) if (input.checked || input.tagName === 'SELECT') return getColorFromAlt(input.value);
+    const variants = document.querySelectorAll('[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected');
+    for (const el of variants) { const val = el.textContent || el.getAttribute('data-value') || el.getAttribute('data-selected-value'); const color = getColorFromAlt(val); if (color) return color; }
     const urlParams = new URLSearchParams(window.location.search);
-    const colorParam = urlParams.get('color') || urlParams.get('Color');
-    if (colorParam) return getColorFromAlt(colorParam);
-    return "yellow";
+    return getColorFromAlt(urlParams.get('color') || urlParams.get('Color')) || 'yellow';
   }
 
-  const debouncedHandleColorChange = debounce(() => {
-    const selectedColor = getSelectedColor();
-    if (selectedColor && selectedColor !== currentSelectedColor) {
-      currentSelectedColor = selectedColor;
-      waitForMediaUpdate(() => safeReorderByColor(selectedColor));
-    }
-  }, 100);
+  const debouncedHandleColorChange = debounce(() => { currentSelectedColor = getSelectedColor(); safeReorderByColor(currentSelectedColor); }, 100);
 
   function setupVariantChangeListeners() {
-    const handleColorChange = debounce(() => {
-      const selectedColor = getSelectedColor();
-      if (selectedColor && selectedColor !== currentSelectedColor) {
-        currentSelectedColor = selectedColor;
-        waitForMediaUpdate(() => safeReorderByColor(selectedColor));
-      }
-    }, 100);
-
-    document.addEventListener('variant:change', () => setTimeout(handleColorChange, 50));
-    document.addEventListener('variant:selected', () => setTimeout(handleColorChange, 50));
-    document.addEventListener('change', (e) => {
-      if (e.target.name?.toLowerCase().includes('color')) setTimeout(handleColorChange, 50);
-    });
+    document.addEventListener('variant:change', () => setTimeout(debouncedHandleColorChange, 50));
+    document.addEventListener('variant:selected', () => setTimeout(debouncedHandleColorChange, 50));
+    document.addEventListener('change', e => { if (e.target.name?.toLowerCase().includes('color')) setTimeout(debouncedHandleColorChange, 50); });
 
     if (observer) observer.disconnect();
-    observer = new MutationObserver(() => setTimeout(handleColorChange, 50));
-    const container = document.querySelector('.product__media-list')?.parentNode;
+    observer = new MutationObserver(() => setTimeout(debouncedHandleColorChange, 50));
+    const container = getMediaList()?.parentNode;
     if (container) observer.observe(container, { childList: true, subtree: true });
   }
 
   function handleCustomizeConfirm() {
-    document.addEventListener('click', (e) => {
-      if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]')) {
-        setTimeout(() => {
-          const selectedColor = getSelectedColor();
-          if (selectedColor) {
-            currentSelectedColor = selectedColor;
-            waitForMediaUpdate(() => safeReorderByColor(selectedColor));
-          }
-        }, 200);
-      }
-      if (e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
+    document.addEventListener('click', e => {
+      if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]') ||
+          e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
         setTimeout(debouncedHandleColorChange, 200);
       }
     });
   }
 
   function cleanup() {
+    const mediaList = getMediaList();
     if (mediaList?._handlers) {
       const { handleStart, handleMove, handleEnd } = mediaList._handlers;
       mediaList.removeEventListener('touchstart', handleStart);
@@ -426,46 +313,30 @@ document.addEventListener("DOMContentLoaded", function () {
       mediaList.removeEventListener('mouseup', handleEnd);
       mediaList.removeEventListener('mouseleave', handleEnd);
     }
-    if (dotsContainer) {
-      dotsContainer.remove();
-      dotsContainer = null;
+    if (dotsContainer) dotsContainer.remove();
+    if (observer) observer.disconnect();
+  }
+
+  function waitForMediaUpdate(callback, timeout = 2000) {
+    const start = Date.now();
+    function check() {
+      if (getMediaList()?.querySelectorAll('.product__media-item').length) callback();
+      else if (Date.now() - start < timeout) requestAnimationFrame(check);
     }
-    if (observer) {
-      observer.disconnect();
-      observer = null;
-    }
+    check();
   }
 
   function initialize() {
-    if (isInitialized) return;
-
-    cacheDOMElements();
     currentSelectedColor = getSelectedColor();
-    waitForMediaUpdate(() => safeReorderByColor(currentSelectedColor));
+    safeReorderByColor(currentSelectedColor);
     setupVariantChangeListeners();
     handleCustomizeConfirm();
-
-    isInitialized = true;
-
-    if (!document.querySelector('.product-media-reorder-initialized')) {
-      const marker = document.createElement('div');
-      marker.className = 'product-media-reorder-initialized';
-      marker.style.display = 'none';
-      document.body.appendChild(marker);
-    }
   }
 
   initialize();
-
+  window.addEventListener('beforeunload', cleanup);
   if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', () => {
-      cleanup();
-      isInitialized = false;
-      initialize();
-    });
+    document.addEventListener('shopify:section:load', () => { cleanup(); initialize(); });
     document.addEventListener('theme:loaded', initialize);
   }
-
-  setTimeout(initialize, 1000);
-  window.addEventListener('beforeunload', cleanup);
 });
