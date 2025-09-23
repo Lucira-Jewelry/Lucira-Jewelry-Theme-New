@@ -660,10 +660,9 @@ class CustomizeDrawerPriceManager {
     this.config = config;
     this.sectionId = sectionId;
     this.sectionEl = document.getElementById(`variant-selects-${sectionId}`);
-    this.priceEl = this.sectionEl ? this.sectionEl.querySelector("#drawer-price") : null;
     this.currentVariantId = config.currentVariantId;
 
-    if (!this.priceEl) return;
+    if (!this.sectionEl) return;
 
     this.numberFormatter = new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -673,26 +672,31 @@ class CustomizeDrawerPriceManager {
     });
 
     this.handleVariantChange = this.handleVariantChange.bind(this);
+
     this.init();
   }
 
   init() {
     if (!this.sectionEl) return;
 
-    // Listen only for variant changes within this section
-    this.sectionEl.addEventListener("change", this.handleVariantChange);
+    // Observe changes inside the variant-selects component
+    const observer = new MutationObserver(() => {
+      this.priceEl = this.sectionEl.querySelector("#drawer-price");
+      this.variantSelect = this.sectionEl.querySelector("select[name='id']");
+      if (this.variantSelect) {
+        this.variantSelect.removeEventListener("change", this.handleVariantChange);
+        this.variantSelect.addEventListener("change", this.handleVariantChange);
 
-    // Run once on load
-    this.updateDrawerPrice(this.currentVariantId);
-  }
+        // Set initial price
+        this.updateDrawerPrice(this.variantSelect.value);
+      }
+    });
 
-  getCurrentVariantId() {
-    const variantSelect = this.sectionEl.querySelector("select[name='id']");
-    return variantSelect ? variantSelect.value : this.currentVariantId;
+    observer.observe(this.sectionEl, { childList: true, subtree: true });
   }
 
   handleVariantChange() {
-    const variantId = this.getCurrentVariantId();
+    const variantId = this.variantSelect.value;
     if (variantId && variantId !== this.currentVariantId) {
       this.updateDrawerPrice(variantId);
       this.currentVariantId = variantId;
@@ -701,20 +705,15 @@ class CustomizeDrawerPriceManager {
 
   updateDrawerPrice(variantId) {
     const variant = this.config.variantsData[variantId];
-    if (!variant) return;
+    if (!variant || !this.priceEl) return;
 
-    const formattedPrice = this.formatCurrency(variant.price / 100);
-
+    const formattedPrice = this.numberFormatter.format(Math.round(variant.price / 100));
     this.priceEl.textContent = formattedPrice;
     this.priceEl.setAttribute("data-price", formattedPrice);
   }
-
-  formatCurrency(price) {
-    return this.numberFormatter.format(Math.round(Number(price)));
-  }
 }
 
-// Initialize for each section (if multiple variant pickers)
+// Initialize for each section
 document.addEventListener("DOMContentLoaded", function () {
   const sections = document.querySelectorAll(".size-and-customization-section");
   sections.forEach(section => {
@@ -722,6 +721,7 @@ document.addEventListener("DOMContentLoaded", function () {
     new CustomizeDrawerPriceManager(PriceGuideConfig, sectionId);
   });
 });
+
 
 
 
