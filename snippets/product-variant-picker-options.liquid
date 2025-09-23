@@ -1,7 +1,6 @@
 <div class="drawer-overlay" id="drawer-overlay"></div>
 
 <div class="product-variant-drawer" id="variant-drawer">
-
   <div class="product-variant-drawer-wrapper">
     {%- unless product.has_only_default_variant -%}
       <variant-selects
@@ -11,37 +10,97 @@
       >
         <div class="product-variant-drawer-title-wrap">
           <div class="title-wrapper">
-            <span id="drawer-price" data-price="{{ product.selected_or_first_available_variant.price | money_without_trailing_zeros}}">
-              {{ product.selected_or_first_available_variant.price | money_without_trailing_zeros}}
+            <span id="drawer-price" 
+                  data-price="₹{{ product.selected_or_first_available_variant.price | divided_by: 100 | floor }}">
+              ₹{{ product.selected_or_first_available_variant.price | divided_by: 100 | floor }}
             </span>
           </div>
           <div class="close-button" id="close-drawer">
             <i class="fa-solid fa-xmark"></i>
           </div>
         </div>
+        
         <div class="product-variants-wrapper">
-            {%- for option in product.options_with_values -%}
-                <fieldset class="js product-form__input product-form__input--pill variant-type-{{ option.name | handle }}">
-                <legend class="form__label">
-                    {{ option.name }}: 
-                    <span data-selected-value>{{ option.selected_value }}</span>
-                </legend>
-                {% render 'product-variant-options',
-                    product: product,
-                    option: option,
-                    block: block,
-                    picker_type: 'button'
-                %}
-                </fieldset>
-            {%- endfor -%}
+          {%- for option in product.options_with_values -%}
+            <fieldset class="js product-form__input product-form__input--pill variant-type-{{ option.name | handle }}">
+              <legend class="form__label">
+                {{ option.name }}: 
+                <span data-selected-value>{{ option.selected_value }}</span>
+              </legend>
+              {% render 'product-variant-options',
+                  product: product,
+                  option: option,
+                  block: block,
+                  picker_type: 'button'
+              %}
+            </fieldset>
+          {%- endfor -%}
         </div>
 
         <div class="customize-button-wrapper">
           <button id="customize_close_drawer" class="customize-variants-button">Confirm Customization</button>
         </div>
+        
         <script type="application/json" data-selected-variant>
           {{ product.selected_or_first_available_variant | json }}
         </script>
+        
+        <!-- Price update script for rupees -->
+        <script>
+          (function() {
+            function updateDrawerPrice() {
+              const drawerPrice = document.querySelector('#drawer-price');
+              const variantScript = document.querySelector('script[data-selected-variant]');
+              
+              if (!drawerPrice || !variantScript) return;
+              
+              try {
+                const variant = JSON.parse(variantScript.textContent);
+                if (variant && variant.price) {
+                  const priceInRupees = Math.floor(variant.price / 100);
+                  const formattedPrice = '₹' + priceInRupees;
+                  
+                  drawerPrice.textContent = formattedPrice;
+                  drawerPrice.setAttribute('data-price', formattedPrice);
+                  
+                  // Visual feedback
+                  drawerPrice.style.transition = 'transform 0.2s ease';
+                  drawerPrice.style.transform = 'scale(1.05)';
+                  setTimeout(() => {
+                    drawerPrice.style.transform = 'scale(1)';
+                  }, 200);
+                }
+              } catch (e) {
+                console.error('Price update error:', e);
+              }
+            }
+            
+            // Listen for variant changes
+            document.addEventListener('click', function(e) {
+              if (e.target.closest('#variant-drawer')) {
+                setTimeout(updateDrawerPrice, 100);
+              }
+            });
+            
+            document.addEventListener('change', function(e) {
+              if (e.target.closest('#variant-drawer')) {
+                setTimeout(updateDrawerPrice, 100);
+              }
+            });
+            
+            // Watch for script changes
+            const variantScript = document.querySelector('script[data-selected-variant]');
+            if (variantScript) {
+              const observer = new MutationObserver(updateDrawerPrice);
+              observer.observe(variantScript, {
+                childList: true,
+                characterData: true,
+                subtree: true
+              });
+            }
+          })();
+        </script>
+        
       </variant-selects>
     {%- endunless -%}
   </div>
