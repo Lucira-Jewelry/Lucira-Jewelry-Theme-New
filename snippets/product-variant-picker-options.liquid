@@ -41,10 +41,6 @@
         <div class="customize-button-wrapper">
           <button id="customize_close_drawer" class="customize-variants-button">Confirm Customization</button>
         </div>
-         <script type="application/json" id="ProductJson-drawer-{{ section.id }}">
-          {{ product | json }}
-        </script>
-        
         <script type="application/json" data-selected-variant>
           {{ product.selected_or_first_available_variant | json }}
         </script>
@@ -52,84 +48,3 @@
     {%- endunless -%}
   </div>
 </div>
-
-<script>
-  // Variant selection for drawer
-class VariantSelectsDrawer extends HTMLElement {
-  constructor() {
-    super();
-    this.productData = JSON.parse(document.getElementById(`ProductJson-drawer-${this.dataset.section}`).innerHTML);
-    this.initializeEventListeners();
-  }
-
-  initializeEventListeners() {
-    this.addEventListener('change', this.onVariantChange.bind(this));
-  }
-
-  onVariantChange() {
-    this.updateVariant();
-  }
-
-  updateVariant() {
-    const selectedOptions = Array.from(this.querySelectorAll('input[type="radio"]:checked'), input => input.value);
-    const currentVariant = this.productData.variants.find(variant => {
-      return variant.options.every((option, index) => option === selectedOptions[index]);
-    });
-
-    if (currentVariant) {
-      this.updatePrice(currentVariant);
-      this.updateOptions(currentVariant);
-    }
-  }
-
-  updatePrice(variant) {
-    const priceElement = document.getElementById('customize-price-drawer-price');
-    const comparePriceElement = this.querySelector('.compare-at-price');
-    
-    if (priceElement) {
-      priceElement.textContent = this.formatMoney(variant.price);
-    }
-
-    if (variant.compare_at_price > variant.price) {
-      if (!comparePriceElement) {
-        const comparePrice = document.createElement('s');
-        comparePrice.className = 'compare-at-price';
-        priceElement.parentNode.insertBefore(comparePrice, priceElement);
-        comparePrice.textContent = this.formatMoney(variant.compare_at_price);
-      } else {
-        comparePriceElement.textContent = this.formatMoney(variant.compare_at_price);
-      }
-    } else if (comparePriceElement) {
-      comparePriceElement.remove();
-    }
-  }
-
-  updateOptions(variant) {
-    // Update selected value displays if needed
-    const selectedValueElements = this.querySelectorAll('[data-selected-value]');
-    variant.options.forEach((option, index) => {
-      if (selectedValueElements[index]) {
-        selectedValueElements[index].textContent = option;
-      }
-    });
-  }
-
-  formatMoney(price) {
-    return Shopify.formatMoney(price, window.money_format || '{{ shop.money_format }}');
-  }
-}
-
-// Register the custom element
-if (!customElements.get('variant-selects-drawer')) {
-  customElements.define('variant-selects-drawer', VariantSelectsDrawer);
-}
-
-// Initialize drawer variant selects
-document.addEventListener('DOMContentLoaded', () => {
-  const drawerVariantSelects = document.querySelector('#variant-drawer variant-selects');
-  if (drawerVariantSelects) {
-    drawerVariantSelects.__proto__ = VariantSelectsDrawer.prototype;
-    VariantSelectsDrawer.call(drawerVariantSelects);
-  }
-});
-</script>
