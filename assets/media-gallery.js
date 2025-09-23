@@ -448,79 +448,40 @@ document.addEventListener("DOMContentLoaded", function () {
   }, 100);
 
   function setupVariantChangeListeners() {
-    document.addEventListener('change', function(e) {
-      const target = e.target;
-      if (target.name && target.name.toLowerCase().includes('color')) {
-        debouncedHandleColorChange();
-        return;
-      }
-
-      let colorFieldset = target.closest('fieldset[data-type="color"]');
-      if (!colorFieldset) {
-        document.querySelectorAll('fieldset').forEach(fs => {
-          const legend = fs.querySelector('legend');
-          if (legend && legend.textContent.toLowerCase().includes("color") && fs.contains(target)) {
-            colorFieldset = fs;
-          }
-        });
-      }
-
-      if (target.closest('.variant-input-wrapper, .product-form__input, .variant-selector')) {
-        debouncedHandleColorChange();
-      }
-    });
-
-    document.addEventListener('variant:change', debouncedHandleColorChange);
-    document.addEventListener('variant:selected', debouncedHandleColorChange);
-    window.addEventListener('popstate', debouncedHandleColorChange);
-
-    // Use a single observer for better performance
-    if (observer) {
-      observer.disconnect();
+  // Debounced function for reorder
+  const handleColorChange = debounce(() => {
+    const selectedColor = getSelectedColor();
+    if (selectedColor && selectedColor !== currentSelectedColor) {
+      console.log(`Color changed from ${currentSelectedColor} to ${selectedColor}`);
+      currentSelectedColor = selectedColor;
+      safeReorderByColor(selectedColor);
     }
-    
-    observer = new MutationObserver(function(mutations) {
-      let shouldUpdate = false;
-      for (const mutation of mutations) {
-        if (mutation.type === 'attributes') {
-          const attributesOfInterest = ['data-selected-value', 'data-value', 'checked', 'selected'];
-          if (attributesOfInterest.includes(mutation.attributeName)) {
-            shouldUpdate = true;
-            break;
-          }
-        }
-        if (mutation.type === 'childList' && mutation.addedNodes.length) {
-          for (const node of mutation.addedNodes) {
-            if (node.nodeType === 1 &&
-              (node.matches('.variant-input-wrapper, .product-form__input, .variant-selector') ||
-               node.querySelector('.variant-input-wrapper, .product-form__input, .variant-selector'))) {
-              shouldUpdate = true;
-              break;
-            }
-          }
-        }
-        if (shouldUpdate) break;
-      }
-      if (shouldUpdate) debouncedHandleColorChange();
-    });
+  }, 100);
 
-    const observeTargets = [
-      document.querySelector('.product-form'),
-      document.querySelector('[data-product-form]'),
-      document.querySelector('.variant-selector'),
-      document.querySelector('.product__info-wrapper'),
-      document.body
-    ].filter(Boolean);
+  // Listen to variant events (Shopify)
+  document.addEventListener('variant:change', () => setTimeout(handleColorChange, 50));
+  document.addEventListener('variant:selected', () => setTimeout(handleColorChange, 50));
 
-    observeTargets.forEach(target => {
-      observer.observe(target, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-        attributeFilter: ['data-selected-value', 'data-value', 'checked', 'selected']
-      });
-    });
+  // Listen to color input changes
+  document.addEventListener('change', (e) => {
+    if (e.target.name && e.target.name.toLowerCase().includes('color')) {
+      setTimeout(handleColorChange, 50);
+    }
+  });
+
+  // MutationObserver to catch DOM replacements
+  if (observer) observer.disconnect();
+
+  observer = new MutationObserver(() => {
+    setTimeout(handleColorChange, 50);
+  });
+
+  const mediaContainer = document.querySelector('.product__media-list')?.parentNode;
+  if (mediaContainer) {
+    observer.observe(mediaContainer, { childList: true, subtree: true });
   }
+}
+
 
   function handleCustomizeConfirm() {
     document.addEventListener('click', function(e) {
