@@ -655,15 +655,20 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const priceEl = document.getElementById("drawer-price");
-  if (!priceEl) return;
+  const drawer = document.getElementById("variant-drawer");
+  if (!drawer) return;
 
-  // Shopify's variant:change event is fired on the document
-  document.addEventListener("variant:change", function (event) {
+  const variantSelects = drawer.querySelector("variant-selects");
+  const priceEl = drawer.querySelector("#drawer-price");
+
+  if (!variantSelects || !priceEl) return;
+
+  // Listen for the variant change event fired by THIS variant-selects
+  variantSelects.addEventListener("variant:change", function (event) {
     const variant = event.detail && event.detail.variant;
     if (!variant) return;
 
-    // Convert cents → currency string
+    // Format price (₹ if you're in INR)
     const formattedPrice = (variant.price / 100).toLocaleString("en-IN", {
       style: "currency",
       currency: "{{ shop.currency }}"
@@ -673,5 +678,6 @@ document.addEventListener("DOMContentLoaded", function () {
     priceEl.setAttribute("data-price", formattedPrice);
   });
 });
+
 
 
