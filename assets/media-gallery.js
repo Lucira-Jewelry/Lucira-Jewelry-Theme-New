@@ -448,33 +448,36 @@ document.addEventListener("DOMContentLoaded", function () {
   }, 100);
 
   function setupVariantChangeListeners() {
-  // Debounced function for reorder
-  const handleColorChange = debounce(() => {
-    const selectedColor = getSelectedColor();
-    if (selectedColor && selectedColor !== currentSelectedColor) {
-      console.log(`Color changed from ${currentSelectedColor} to ${selectedColor}`);
-      currentSelectedColor = selectedColor;
-      safeReorderByColor(selectedColor);
+      const handleVariantUpdate = () => {
+        const selectedColor = getSelectedColor();
+        if (selectedColor && selectedColor !== currentSelectedColor) {
+          console.log(`Color changed from ${currentSelectedColor} to ${selectedColor}`);
+          currentSelectedColor = selectedColor;
+          safeReorderByColor(selectedColor);
+        }
+      };
+
+      // Listen to Shopify variant change events
+      document.addEventListener('variant:change', () => setTimeout(handleVariantUpdate, 100));
+      document.addEventListener('variant:selected', () => setTimeout(handleVariantUpdate, 100));
+
+      // Listen to select inputs / radio buttons for color
+      document.addEventListener('change', (e) => {
+        if (e.target.name && e.target.name.toLowerCase().includes('color')) {
+          setTimeout(handleVariantUpdate, 100);
+        }
+      });
+
+    // MutationObserver for dynamic DOM updates
+    if (observer) observer.disconnect();
+    observer = new MutationObserver(() => setTimeout(handleVariantUpdate, 100));
+
+    const mediaContainer = document.querySelector('.product__media-list')?.parentNode;
+    if (mediaContainer) {
+      observer.observe(mediaContainer, { childList: true, subtree: true });
     }
-  }, 100);
+  }
 
-  // Listen to variant events (Shopify)
-  document.addEventListener('variant:change', () => setTimeout(handleColorChange, 50));
-  document.addEventListener('variant:selected', () => setTimeout(handleColorChange, 50));
-
-  // Listen to color input changes
-  document.addEventListener('change', (e) => {
-    if (e.target.name && e.target.name.toLowerCase().includes('color')) {
-      setTimeout(handleColorChange, 50);
-    }
-  });
-
-  // MutationObserver to catch DOM replacements
-  if (observer) observer.disconnect();
-
-  observer = new MutationObserver(() => {
-    setTimeout(handleColorChange, 50);
-  });
 
   const mediaContainer = document.querySelector('.product__media-list')?.parentNode;
   if (mediaContainer) {
