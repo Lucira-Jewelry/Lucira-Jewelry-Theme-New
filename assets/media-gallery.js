@@ -132,11 +132,12 @@ document.addEventListener("DOMContentLoaded", function () {
     mediaList = document.querySelector('.product__media-list');
   }
 
+  // Debounce function
   function debounce(func, wait) {
     let timeout;
     return function (...args) {
       clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), wait);
+      timeout = setTimeout(() => func.apply(this, args), wait);
     };
   }
 
@@ -157,8 +158,7 @@ document.addEventListener("DOMContentLoaded", function () {
     };
 
     items.forEach(item => {
-      const img = item.querySelector("img");
-      const alt = (img?.alt || "").toLowerCase();
+      const alt = (item.querySelector("img")?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
@@ -196,7 +196,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     while (buckets.color.length || Object.values(buckets.codes).some(arr => arr.length)) {
       for (const slot of slotPattern) {
-        let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+        const node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
         if (node) {
           node.style.display = 'block';
           ordered.push(node);
@@ -234,7 +234,6 @@ document.addEventListener("DOMContentLoaded", function () {
       dotsContainer.remove();
       dotsContainer = null;
     }
-
     if (!mediaList) return;
 
     const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
@@ -273,9 +272,7 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     }
 
-    if (slides[index]) {
-      slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
+    if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
   function initSliderNavigation() {
@@ -288,10 +285,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
     let startX, currentX, isDragging = false;
 
-    const handleTouchStart = e => { startX = e.touches[0].clientX; isDragging = true; };
-    const handleTouchMove = e => { if (!isDragging) return; currentX = e.touches[0].clientX; };
-    const handleTouchEnd = () => {
-      if (!isDragging) return; isDragging = false;
+    const handleStart = e => {
+      startX = e.touches ? e.touches[0].clientX : e.clientX;
+      isDragging = true;
+    };
+
+    const handleMove = e => {
+      if (!isDragging) return;
+      currentX = e.touches ? e.touches[0].clientX : e.clientX;
+    };
+
+    const handleEnd = () => {
+      if (!isDragging) return;
+      isDragging = false;
       const diff = startX - currentX;
       if (Math.abs(diff) > 50) {
         if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
@@ -299,42 +305,34 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     };
 
-    const handleMouseDown = e => { startX = e.clientX; isDragging = true; };
-    const handleMouseMove = e => { if (!isDragging) return; currentX = e.clientX; };
-    const handleMouseUp = () => {
-      if (!isDragging) return; isDragging = false;
-      const diff = startX - currentX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0 && currentSlide < totalSlides - 1) goToSlide(currentSlide + 1);
-        else if (diff < 0 && currentSlide > 0) goToSlide(currentSlide - 1);
-      }
-    };
+    mediaList.addEventListener('touchstart', handleStart, { passive: true });
+    mediaList.addEventListener('touchmove', handleMove, { passive: true });
+    mediaList.addEventListener('touchend', handleEnd);
+    mediaList.addEventListener('mousedown', handleStart);
+    mediaList.addEventListener('mousemove', handleMove);
+    mediaList.addEventListener('mouseup', handleEnd);
+    mediaList.addEventListener('mouseleave', handleEnd);
 
-    mediaList.addEventListener('touchstart', handleTouchStart, { passive: true });
-    mediaList.addEventListener('touchmove', handleTouchMove, { passive: true });
-    mediaList.addEventListener('touchend', handleTouchEnd);
+    mediaList._handlers = { handleStart, handleMove, handleEnd };
+  }
 
-    mediaList.addEventListener('mousedown', handleMouseDown);
-    mediaList.addEventListener('mousemove', handleMouseMove);
-    mediaList.addEventListener('mouseup', handleMouseUp);
-    mediaList.addEventListener('mouseleave', handleMouseUp);
-
-    mediaList._touchStartHandler = handleTouchStart;
-    mediaList._touchMoveHandler = handleTouchMove;
-    mediaList._touchEndHandler = handleTouchEnd;
-    mediaList._mouseDownHandler = handleMouseDown;
-    mediaList._mouseMoveHandler = handleMouseMove;
-    mediaList._mouseUpHandler = handleMouseUp;
+  function waitForMediaUpdate(callback, timeout = 1000) {
+    const start = Date.now();
+    function check() {
+      const mediaContainer = document.querySelector('.product__media-list');
+      const items = mediaContainer?.querySelectorAll('.product__media-item') || [];
+      if (items.length) callback();
+      else if (Date.now() - start < timeout) requestAnimationFrame(check);
+    }
+    check();
   }
 
   function safeReorderByColor(targetColor) {
     if (!mediaList) return;
-
     const newActiveIndex = reorderByColor(targetColor);
 
     if (dotsContainer) dotsContainer.remove();
     currentSlide = 0;
-
     initSliderNavigation();
 
     if (newActiveIndex >= 0) {
@@ -346,93 +344,92 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   function getSelectedColor() {
-    const colorInputs = document.querySelectorAll(
-      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
+    const inputs = document.querySelectorAll(
+      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], ' +
+      'fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
     );
-
-    for (const input of colorInputs) {
+    for (const input of inputs) {
       if (input.checked || input.tagName === 'SELECT') {
         const color = getColorFromAlt(input.value);
         if (color) return color;
       }
     }
-
-    const selectedVariants = document.querySelectorAll(
-      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
+    const variants = document.querySelectorAll(
+      '[data-selected-value], .variant-input-wrapper .selected, ' +
+      '.product-form__buttons [data-value], .variant-selector__button.selected'
     );
-
-    for (const element of selectedVariants) {
-      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
+    for (const el of variants) {
+      const text = el.textContent || el.getAttribute('data-value') || el.getAttribute('data-selected-value');
       const color = getColorFromAlt(text);
       if (color) return color;
     }
-
     const urlParams = new URLSearchParams(window.location.search);
     const colorParam = urlParams.get('color') || urlParams.get('Color');
     if (colorParam) return getColorFromAlt(colorParam);
-
     return "yellow";
   }
 
-  function handleColorUpdate() {
+  const debouncedHandleColorChange = debounce(() => {
     const selectedColor = getSelectedColor();
-    if (!selectedColor || selectedColor === currentSelectedColor) return;
-
-    currentSelectedColor = selectedColor;
-    console.log(`Color changed to: ${selectedColor}`);
-
-    // Use MutationObserver to wait for media DOM to be fully updated
-    const mediaContainer = document.querySelector('.product__media-list');
-    if (!mediaContainer) return;
-
-    if (observer) observer.disconnect();
-
-    observer = new MutationObserver((mutations, obs) => {
-      const visibleItems = mediaContainer.querySelectorAll('.product__media-item');
-      if (visibleItems.length > 0) {
-        safeReorderByColor(selectedColor);
-        obs.disconnect();
-      }
-    });
-
-    observer.observe(mediaContainer, { childList: true, subtree: true });
-  }
+    if (selectedColor && selectedColor !== currentSelectedColor) {
+      currentSelectedColor = selectedColor;
+      waitForMediaUpdate(() => safeReorderByColor(selectedColor));
+    }
+  }, 100);
 
   function setupVariantChangeListeners() {
-    document.addEventListener('variant:change', handleColorUpdate);
-    document.addEventListener('variant:selected', handleColorUpdate);
+    const handleColorChange = debounce(() => {
+      const selectedColor = getSelectedColor();
+      if (selectedColor && selectedColor !== currentSelectedColor) {
+        currentSelectedColor = selectedColor;
+        waitForMediaUpdate(() => safeReorderByColor(selectedColor));
+      }
+    }, 100);
 
-    document.addEventListener('change', e => {
-      if (e.target.name?.toLowerCase().includes('color')) handleColorUpdate();
+    document.addEventListener('variant:change', () => setTimeout(handleColorChange, 50));
+    document.addEventListener('variant:selected', () => setTimeout(handleColorChange, 50));
+    document.addEventListener('change', (e) => {
+      if (e.target.name?.toLowerCase().includes('color')) setTimeout(handleColorChange, 50);
     });
 
-    // Drawer close / confirm
-    document.addEventListener('click', e => {
-      if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]') ||
-          e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
-        handleColorUpdate();
+    if (observer) observer.disconnect();
+    observer = new MutationObserver(() => setTimeout(handleColorChange, 50));
+    const container = document.querySelector('.product__media-list')?.parentNode;
+    if (container) observer.observe(container, { childList: true, subtree: true });
+  }
+
+  function handleCustomizeConfirm() {
+    document.addEventListener('click', (e) => {
+      if (e.target.closest('#customize_close_drawer, .customize-close, [data-customize-close]')) {
+        setTimeout(() => {
+          const selectedColor = getSelectedColor();
+          if (selectedColor) {
+            currentSelectedColor = selectedColor;
+            waitForMediaUpdate(() => safeReorderByColor(selectedColor));
+          }
+        }, 200);
+      }
+      if (e.target.matches('[data-confirm], .confirm-customization, .apply-customization')) {
+        setTimeout(debouncedHandleColorChange, 200);
       }
     });
   }
 
   function cleanup() {
-    if (mediaList) {
-      if (mediaList._touchStartHandler) {
-        mediaList.removeEventListener('touchstart', mediaList._touchStartHandler);
-        mediaList.removeEventListener('touchmove', mediaList._touchMoveHandler);
-        mediaList.removeEventListener('touchend', mediaList._touchEndHandler);
-        mediaList.removeEventListener('mousedown', mediaList._mouseDownHandler);
-        mediaList.removeEventListener('mousemove', mediaList._mouseMoveHandler);
-        mediaList.removeEventListener('mouseup', mediaList._mouseUpHandler);
-        mediaList.removeEventListener('mouseleave', mediaList._mouseUpHandler);
-      }
+    if (mediaList?._handlers) {
+      const { handleStart, handleMove, handleEnd } = mediaList._handlers;
+      mediaList.removeEventListener('touchstart', handleStart);
+      mediaList.removeEventListener('touchmove', handleMove);
+      mediaList.removeEventListener('touchend', handleEnd);
+      mediaList.removeEventListener('mousedown', handleStart);
+      mediaList.removeEventListener('mousemove', handleMove);
+      mediaList.removeEventListener('mouseup', handleEnd);
+      mediaList.removeEventListener('mouseleave', handleEnd);
     }
-
     if (dotsContainer) {
       dotsContainer.remove();
       dotsContainer = null;
     }
-
     if (observer) {
       observer.disconnect();
       observer = null;
@@ -443,12 +440,10 @@ document.addEventListener("DOMContentLoaded", function () {
     if (isInitialized) return;
 
     cacheDOMElements();
-
     currentSelectedColor = getSelectedColor();
-    console.log(`Initial color detected: ${currentSelectedColor}`);
-
-    safeReorderByColor(currentSelectedColor);
+    waitForMediaUpdate(() => safeReorderByColor(currentSelectedColor));
     setupVariantChangeListeners();
+    handleCustomizeConfirm();
 
     isInitialized = true;
 
@@ -463,7 +458,7 @@ document.addEventListener("DOMContentLoaded", function () {
   initialize();
 
   if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', function () {
+    document.addEventListener('shopify:section:load', () => {
       cleanup();
       isInitialized = false;
       initialize();
