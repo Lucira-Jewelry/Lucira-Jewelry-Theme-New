@@ -345,11 +345,16 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const debouncedHandleColorChange = debounce(function () {
     const selectedColor = getSelectedColor();
-    if (selectedColor && selectedColor !== currentSelectedColor) {
-      currentSelectedColor = selectedColor;
+    if (!selectedColor || selectedColor === currentSelectedColor) return;
+
+    currentSelectedColor = selectedColor;
+
+    // Delay the reorder slightly to let Shopify finish DOM updates
+    setTimeout(() => {
       safeReorderByColor(selectedColor);
-    }
-  }, 100);
+    }, 200); // 200ms delay usually works
+  }, 50);
+
 
   function setupVariantChangeListeners() {
     document.addEventListener('change', debouncedHandleColorChange);
