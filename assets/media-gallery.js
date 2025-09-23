@@ -239,18 +239,6 @@ document.addEventListener("DOMContentLoaded", function () {
     slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
   }
 
-  function initSliderNavigation() {
-    const mediaList = getMediaList();
-    if (!mediaList) return;
-
-    // Remove default slider buttons
-    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) sliderButtons.style.display = 'none';
-
-    // Create dots navigation
-    createDotsNavigation();
-  }
-
 
   function safeReorderByColor(targetColor) {
     waitForMediaUpdate(() => {
