@@ -299,6 +299,36 @@ document.addEventListener('keydown', function(e) {
   }
 });
 
+const drawer = document.getElementById('product-passport-drawer');
+  const overlay = document.getElementById('passport-overlay');
+  const openBtn = document.getElementById('trace-badge');
+  const closeBtn = drawer.querySelector('.close-drawer');
+
+  function openDrawer() {
+    drawer.classList.add('active');
+    overlay.classList.add('active');
+    document.body.style.overflow = 'hidden'; // prevent background scroll
+  }
+
+  function closeDrawer() {
+    drawer.classList.remove('active');
+    overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  // open
+  openBtn.addEventListener('click', openDrawer);
+
+  // close
+  closeBtn.addEventListener('click', closeDrawer);
+  overlay.addEventListener('click', closeDrawer);
+
+  // escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && drawer.classList.contains('active')) {
+      closeDrawer();
+    }
+});
 
 // Enhanced Comparison Table Integration
 class ComparisonTableManager {
