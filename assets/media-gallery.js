@@ -147,13 +147,24 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const playVideo = (videoEl) => {
     if (!videoEl) return;
-    videoEl.pause();
-    videoEl.currentTime = 0;
+
+    // Ensure video is set to loop and muted
     videoEl.loop = true;
     videoEl.muted = true;
     videoEl.playsInline = true;
+
+    // Restart video if it ended
+    if (videoEl.ended) videoEl.currentTime = 0;
+
+    // Play video
     videoEl.play().catch(() => {});
+
+    // In case browser ends video without loop (safeguard)
+    videoEl.removeEventListener('ended', videoEl._loopHandler);
+    videoEl._loopHandler = () => { videoEl.currentTime = 0; videoEl.play(); };
+    videoEl.addEventListener('ended', videoEl._loopHandler);
   };
+
 
   const pauseAllMedia = () => {
     document.querySelectorAll(".product__media-item video").forEach(v => v.pause());
