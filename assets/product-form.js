@@ -292,43 +292,38 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Escape key support
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && drawer.classList.contains('active')) {
-    closeDrawer();
-  }
-});
+(function() {
+  const passportDrawer = document.getElementById('product-passport-drawer');
+  const passportOverlay = document.getElementById('passport-overlay');
+  const passportOpenBtn = document.getElementById('trace-badge');
+  const passportCloseBtn = passportDrawer.querySelector('.close-drawer');
 
-const drawer = document.getElementById('product-passport-drawer');
-  const overlay = document.getElementById('passport-overlay');
-  const openBtn = document.getElementById('trace-badge');
-  const closeBtn = drawer.querySelector('.close-drawer');
-
-  function openDrawer() {
-    drawer.classList.add('active');
-    overlay.classList.add('active');
-    document.body.style.overflow = 'hidden'; // prevent background scroll
+  function openPassportDrawer() {
+    passportDrawer.classList.add('active');
+    passportOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
   }
 
-  function closeDrawer() {
-    drawer.classList.remove('active');
-    overlay.classList.remove('active');
+  function closePassportDrawer() {
+    passportDrawer.classList.remove('active');
+    passportOverlay.classList.remove('active');
     document.body.style.overflow = '';
   }
 
   // open
-  openBtn.addEventListener('click', openDrawer);
+  passportOpenBtn.addEventListener('click', openPassportDrawer);
 
   // close
-  closeBtn.addEventListener('click', closeDrawer);
-  overlay.addEventListener('click', closeDrawer);
+  passportCloseBtn.addEventListener('click', closePassportDrawer);
+  passportOverlay.addEventListener('click', closePassportDrawer);
 
   // escape key
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && drawer.classList.contains('active')) {
-      closeDrawer();
+    if (e.key === 'Escape' && passportDrawer.classList.contains('active')) {
+      closePassportDrawer();
     }
-});
+  });
+})();
 
 // Enhanced Comparison Table Integration
 class ComparisonTableManager {
