@@ -368,57 +368,80 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  let mediaList = document.querySelector(".product__media-list");
   let currentVideo = null;
 
   // Play and loop a video element
-  const playVideo = (videoEl) => {
+  function playVideo(videoEl) {
     if (!videoEl) return;
     videoEl.loop = true;
     videoEl.muted = true;
     videoEl.playsInline = true;
     videoEl.currentTime = 0;
     videoEl.play().catch(() => {});
-    videoEl.removeEventListener('ended', videoEl._loopHandler);
+    
+    // Force loop in case browser ignores loop
+    videoEl.removeEventListener("ended", videoEl._loopHandler);
     videoEl._loopHandler = () => {
       videoEl.currentTime = 0;
       videoEl.play().catch(() => {});
     };
-    videoEl.addEventListener('ended', videoEl._loopHandler);
-  };
+    videoEl.addEventListener("ended", videoEl._loopHandler);
+  }
 
-  // Restart the active video
-  const restartActiveVideo = () => {
+  // Restart video for currently active media
+  function restartActiveVideo() {
     setTimeout(() => {
-      const activeItem = document.querySelector('.product__media-item.is-active');
+      const activeItem = document.querySelector(".product__media-item.is-active");
       if (!activeItem) return;
-      const videoEl = activeItem.querySelector('video');
+
+      // Play video
+      const videoEl = activeItem.querySelector("video");
       if (videoEl) {
         playVideo(videoEl);
         currentVideo = videoEl;
       }
-      const deferredMedia = activeItem.querySelector('.deferred-media');
-      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
-    }, 50); // short delay for Shopify DOM update
-  };
 
-  // Event delegation for drawer close
-  document.body.addEventListener('click', function(e){
-    if (e.target.closest('#customize_close_drawer')) {
+      // Load deferred 3D model if present
+      const deferredMedia = activeItem.querySelector(".deferred-media");
+      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
+    }, 50); // small delay to allow Shopify DOM updates
+  }
+
+  // Event delegation: drawer close button
+  document.body.addEventListener("click", (e) => {
+    if (e.target.closest("#customize_close_drawer")) {
       restartActiveVideo();
     }
   });
 
-  // Listen for variant changes
-  document.addEventListener('variant:change', restartActiveVideo);
-  document.addEventListener('variant:selected', restartActiveVideo);
+  // Variant change events
+  ["variant:change", "variant:selected"].forEach(evt =>
+    document.addEventListener(evt, restartActiveVideo)
+  );
 
-  // Observe media list for changes (Shopify re-renders)
+  // Observe DOM changes in media list
   const observer = new MutationObserver(() => {
     restartActiveVideo();
   });
-  if (mediaList) observer.observe(mediaList, { childList: true, subtree: true });
 
-  // Initial play
+  function observeMediaList() {
+    const mediaList = document.querySelector(".product__media-list");
+    if (!mediaList) return;
+    observer.disconnect();
+    observer.observe(mediaList, { childList: true, subtree: true });
+  }
+
+  // Initial setup
   restartActiveVideo();
+  observeMediaList();
+
+  // Shopify section load or theme load
+  document.addEventListener("shopify:section:load", () => {
+    restartActiveVideo();
+    observeMediaList();
+  });
+  document.addEventListener("theme:loaded", () => {
+    restartActiveVideo();
+    observeMediaList();
+  });
 });
