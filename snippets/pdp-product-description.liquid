@@ -1,6 +1,14 @@
 <div class="pdp-details-main">
   <div class="pdp-details-accordion">
 
+    {% comment %}
+      Ensure we always have the current variant reference
+    {% endcomment %}
+    {% assign variant = product.selected_or_first_available_variant %}
+
+    <!-- Debug: remove later -->
+    <!-- <pre>{{ variant.metafields.custom | json }}</pre> -->
+
     <!-- Product Information -->
     <div class="pdp-details-accordion-item">
       <input type="checkbox" id="pdp-details-accordion-item-1" />
@@ -59,12 +67,12 @@
       </div>
     </div>
 
-    <!-- Diamond Information (rendered server-side for initial variant) -->
+    <!-- Diamond Information -->
     {% assign diamond_count = 4 %}
     {% assign show_diamonds = false %}
     {% for i in (1..diamond_count) %}
-      {% assign type_key = 'diamond_' | append: i | append: '_type_' %}
-      {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+      {% assign type_key = 'diamond_' | append: i | append: '_type' %}
+      {% assign type_value = variant.metafields.custom[type_key] %}
       {% if type_value != blank %}
         {% assign show_diamonds = true %}
       {% endif %}
@@ -88,19 +96,19 @@
             </thead>
             <tbody id="diamond-table-body">
               {% for i in (1..diamond_count) %}
-                {% assign type_key = 'diamond_' | append: i | append: '_type_' %}
+                {% assign type_key = 'diamond_' | append: i | append: '_type' %}
                 {% assign shape_key = 'diamond_' | append: i | append: '_shape' %}
                 {% assign numbers_key = 'diamond_' | append: i | append: '_numbers' %}
                 {% assign setting_key = 'diamond_' | append: i | append: '_setting' %}
                 {% assign weight_key = 'diamond_' | append: i | append: '_weight' %}
                 {% assign clarity_key = 'diamond_' | append: i | append: '_clarity' %}
                 {% assign color_key = 'diamond_' | append: i | append: '_color' %}
-                {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+                {% assign type_value = variant.metafields.custom[type_key] %}
                 {% if type_value != blank %}
                   <tr>
-                    <td>{{ type_value }}/ {{ variant.metafields.custom[clarity_key] | metafield_text }} - {{ variant.metafields.custom[color_key] | metafield_text }}</td>
-                    <td>{{ variant.metafields.custom[numbers_key] | metafield_text }} - {{ variant.metafields.custom[shape_key] | metafield_text }}</td>
-                    <td>{{ variant.metafields.custom[setting_key] | metafield_text }}: {{ variant.metafields.custom[weight_key] | metafield_text }}ct</td>
+                    <td>{{ type_value }} / {{ variant.metafields.custom[clarity_key] }} - {{ variant.metafields.custom[color_key] }}</td>
+                    <td>{{ variant.metafields.custom[numbers_key] }} - {{ variant.metafields.custom[shape_key] }}</td>
+                    <td>{{ variant.metafields.custom[setting_key] }}: {{ variant.metafields.custom[weight_key] }}ct</td>
                   </tr>
                 {% endif %}
               {% endfor %}
@@ -110,12 +118,12 @@
       </div>
     {% endif %}
 
-    <!-- Gemstone Information (rendered server-side for initial variant) -->
+    <!-- Gemstone Information -->
     {% assign gemstone_count = 4 %}
     {% assign show_gemstones = false %}
     {% for i in (1..gemstone_count) %}
-      {% assign type_key = 'gemstone_' | append: i | append: '_type_' %}
-      {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+      {% assign type_key = 'gemstone_' | append: i | append: '_type' %}
+      {% assign type_value = variant.metafields.custom[type_key] %}
       {% if type_value != blank %}
         {% assign show_gemstones = true %}
       {% endif %}
@@ -139,19 +147,19 @@
             </thead>
             <tbody id="gemstone-table-body">
               {% for i in (1..gemstone_count) %}
-                {% assign type_key = 'gemstone_' | append: i | append: '_type_' %}
+                {% assign type_key = 'gemstone_' | append: i | append: '_type' %}
                 {% assign shape_key = 'gemstone_' | append: i | append: '_shape' %}
                 {% assign numbers_key = 'gemstone_' | append: i | append: '_numbers' %}
                 {% assign setting_key = 'gemstone_' | append: i | append: '_setting' %}
                 {% assign weight_key = 'gemstone_' | append: i | append: '_weight' %}
                 {% assign clarity_key = 'gemstone_' | append: i | append: '_clarity' %}
                 {% assign color_key = 'gemstone_' | append: i | append: '_color' %}
-                {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+                {% assign type_value = variant.metafields.custom[type_key] %}
                 {% if type_value != blank %}
                   <tr>
-                    <td>{{ variant.metafields.custom[color_key] | metafield_text }} - {{ type_value }}</td>
-                    <td>{{ variant.metafields.custom[numbers_key] | metafield_text }} - {{ variant.metafields.custom[shape_key] | metafield_text }}</td>
-                    <td>{{ variant.metafields.custom[setting_key] | metafield_text }}: {{ variant.metafields.custom[weight_key] | metafield_text }}ct</td>
+                    <td>{{ variant.metafields.custom[color_key] }} - {{ type_value }}</td>
+                    <td>{{ variant.metafields.custom[numbers_key] }} - {{ variant.metafields.custom[shape_key] }}</td>
+                    <td>{{ variant.metafields.custom[setting_key] }}: {{ variant.metafields.custom[weight_key] }}ct</td>
                   </tr>
                 {% endif %}
               {% endfor %}
@@ -163,184 +171,3 @@
 
   </div>
 </div>
-
-<script>
-  const variantSelector = document.querySelector("[name='id']");
-  const allVariantInformation = JSON.parse(document.getElementById("variant-metafields-information").textContent);
-
-  // Update SKU inside accordion
-  function updateAccordionContent(variantData) {
-    const skuSelectors = [
-      '.product__sku span:not(.visually-hidden-)',
-      '.product__sku span:last-child',
-      '.product__sku'
-    ];
-
-    let skuElement = null;
-    for (const selector of skuSelectors) {
-      skuElement = document.querySelector(selector);
-      if (skuElement) break;
-    }
-
-    if (skuElement && variantData.sku) {
-      skuElement.textContent = variantData.sku;
-    }
-
-    updateMetalInfoTable(variantData);
-    updateDiamondTable(variantData);
-    updateGemstoneTable(variantData);
-  }
-
-  // Update Metal Information Table
-  function updateMetalInfoTable(variantData) {
-    const metalTypeCell = document.getElementById('metal-type');
-    if (metalTypeCell) {
-      let metalTypeText = '';
-      if (variantData['metal_purity']) {
-        metalTypeText += variantData['metal_purity'] + ' - ';
-      }
-      if (variantData['metal_color']) {
-        metalTypeText += variantData['metal_color'];
-      }
-      metalTypeCell.innerText = metalTypeText;
-    }
-
-    const metalWeightCell = document.getElementById('metal-weight');
-    if (metalWeightCell) {
-      let metalWeightText = '';
-      if (variantData['metal_weight']) {
-        metalWeightText += 'Net Wt: ' + variantData['metal_weight'] + 'g';
-      }
-      if (variantData['gross_weight']) {
-        if (metalWeightText) metalWeightText += '<br>';
-        metalWeightText += 'Gross Wt: ' + variantData['gross_weight'] + 'g';
-      }
-      metalWeightCell.innerHTML = metalWeightText;
-    }
-
-    const metalDimensionsCell = document.getElementById('metal-dimensions');
-    if (metalDimensionsCell) {
-      let dimensionsText = '';
-      if (variantData['top_width']) {
-        dimensionsText += 'Width: ' + variantData['top_width'] + 'mm';
-      }
-      if (variantData['top_height']) {
-        if (dimensionsText) dimensionsText += '<br>';
-        dimensionsText += 'Height: ' + variantData['top_height'] + 'mm';
-      }
-      metalDimensionsCell.innerHTML = dimensionsText;
-    }
-  }
-
-  // Update Diamond Table
-  function updateDiamondTable(variantData) {
-    const diamondTableBody = document.getElementById('diamond-table-body');
-    if (!diamondTableBody) return;
-
-    diamondTableBody.innerHTML = '';
-
-    for (let i = 1; i <= 4; i++) {
-      const typeKey = `diamond_${i}_type_`;
-      const shapeKey = `diamond_${i}_shape`;
-      const numbersKey = `diamond_${i}_numbers`;
-      const settingKey = `diamond_${i}_setting`;
-      const weightKey = `diamond_${i}_weight`;
-      const clarityKey = `diamond_${i}_clarity`;
-      const colorKey = `diamond_${i}_color`;
-
-      if (variantData[typeKey]) {
-        const row = document.createElement('tr');
-
-        const typeCell = document.createElement('td');
-        let typeText = variantData[typeKey] || '';
-        if (variantData[clarityKey]) typeText += '/ ' + variantData[clarityKey];
-        if (variantData[colorKey]) typeText += '- ' + variantData[colorKey];
-        typeCell.innerText = typeText;
-
-        const shapeCell = document.createElement('td');
-        let shapeText = '';
-        if (variantData[numbersKey]) shapeText += variantData[numbersKey];
-        if (variantData[shapeKey]) {
-          if (shapeText) shapeText += ' - ';
-          shapeText += variantData[shapeKey];
-        }
-        shapeCell.innerText = shapeText;
-
-        const settingCell = document.createElement('td');
-        let settingText = '';
-        if (variantData[settingKey]) settingText += variantData[settingKey];
-        if (variantData[weightKey]) {
-          if (settingText) settingText += ': ';
-          settingText += variantData[weightKey] + 'ct';
-        }
-        settingCell.innerText = settingText;
-
-        row.appendChild(typeCell);
-        row.appendChild(shapeCell);
-        row.appendChild(settingCell);
-        diamondTableBody.appendChild(row);
-      }
-    }
-  }
-
-  // Update Gemstone Table
-  function updateGemstoneTable(variantData) {
-    const gemstoneTableBody = document.getElementById('gemstone-table-body');
-    if (!gemstoneTableBody) return;
-
-    gemstoneTableBody.innerHTML = '';
-
-    for (let i = 1; i <= 4; i++) {
-      const typeKey = `gemstone_${i}_type_`;
-      const shapeKey = `gemstone_${i}_shape`;
-      const numbersKey = `gemstone_${i}_numbers`;
-      const settingKey = `gemstone_${i}_setting`;
-      const weightKey = `gemstone_${i}_weight`;
-      const colorKey = `gemstone_${i}_color`;
-
-      if (variantData[typeKey]) {
-        const row = document.createElement('tr');
-
-        const typeCell = document.createElement('td');
-        let typeText = '';
-        if (variantData[colorKey]) typeText += variantData[colorKey] + ' - ';
-        typeText += variantData[typeKey];
-        typeCell.innerText = typeText;
-
-        const shapeCell = document.createElement('td');
-        let shapeText = '';
-        if (variantData[numbersKey]) shapeText += variantData[numbersKey];
-        if (variantData[shapeKey]) {
-          if (shapeText) shapeText += ' - ';
-          shapeText += variantData[shapeKey];
-        }
-        shapeCell.innerText = shapeText;
-
-        const settingCell = document.createElement('td');
-        let settingText = '';
-        if (variantData[settingKey]) settingText += variantData[settingKey];
-        if (variantData[weightKey]) {
-          if (settingText) settingText += ': ';
-          settingText += variantData[weightKey] + 'ct';
-        }
-        settingCell.innerText = settingText;
-
-        row.appendChild(typeCell);
-        row.appendChild(shapeCell);
-        row.appendChild(settingCell);
-        gemstoneTableBody.appendChild(row);
-      }
-    }
-  }
-
-  // Event listener for variant change
-  if (variantSelector) {
-    variantSelector.addEventListener('change', (event) => {
-      const selectedVariantId = event.target.value;
-      const variantData = allVariantInformation[selectedVariantId];
-      if (variantData) {
-        updateAccordionContent(variantData);
-      }
-    });
-  }
-</script>
