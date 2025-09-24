@@ -366,4 +366,3 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("shopify:section:load", () => { cleanup(); isInitialized = false; initialize(); });
   document.addEventListener("theme:loaded", initialize);
 });
-
