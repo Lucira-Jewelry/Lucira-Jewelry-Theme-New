@@ -154,28 +154,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const playVideo = (videoEl) => {
     if (!videoEl) return;
-
-    // Ensure video is set to loop and muted
     videoEl.loop = true;
     videoEl.muted = true;
     videoEl.playsInline = true;
 
-    // Restart video if it ended
     if (videoEl.ended) videoEl.currentTime = 0;
 
-    // Play video
     videoEl.play().catch(() => {});
 
-    // In case browser ends video without loop (safeguard)
-    videoEl.removeEventListener('ended', videoEl._loopHandler);
-    videoEl._loopHandler = () => { videoEl.currentTime = 0; videoEl.play(); };
-    videoEl.addEventListener('ended', videoEl._loopHandler);
+    // Ensure loop works even if browser ignores loop
+    videoEl.removeEventListener("ended", videoEl._loopHandler);
+    videoEl._loopHandler = () => {
+      videoEl.currentTime = 0;
+      videoEl.play().catch(() => {});
+    };
+    videoEl.addEventListener("ended", videoEl._loopHandler);
   };
-
 
   const pauseAllMedia = () => {
     document.querySelectorAll(".product__media-item video").forEach(v => v.pause());
-    document.querySelectorAll(".product__media-item .deferred-media").forEach(dm => dm.loadContent && dm.pause());
+    document.querySelectorAll(".product__media-item .deferred-media").forEach(dm => dm.pause && dm.pause());
   };
 
   const cacheDOM = () => {
@@ -245,32 +243,42 @@ document.addEventListener("DOMContentLoaded", function () {
   const createDotsNavigation = () => {
     if (!mediaList) return;
     if (dotsContainer) dotsContainer.remove();
+
     const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
     totalSlides = slides.length;
     if (totalSlides <= 1) return;
 
     dotsContainer = document.createElement("div");
     dotsContainer.className = "custom-slider-dots";
+
     slides.forEach((_, i) => {
       const dot = document.createElement("span");
       dot.className = "slider-dot" + (i === currentSlide ? " active" : "");
       dot.addEventListener("click", () => goToSlide(i));
       dotsContainer.appendChild(dot);
     });
+
     mediaList.parentNode.appendChild(dotsContainer);
   };
 
   const goToSlide = (index) => {
     if (!mediaList || index < 0 || index >= totalSlides) return;
     currentSlide = index;
+
     const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
     slides.forEach((s, i) => s.classList.toggle("is-active", i === index));
+
     if (dotsContainer) dotsContainer.querySelectorAll(".slider-dot").forEach((d, i) => d.classList.toggle("active", i === index));
+
     slides[index]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
 
     // Play active video
     const videoEl = slides[index].querySelector("video");
     if (videoEl) playVideo(videoEl);
+
+    // Load deferred media if exists
+    const deferredMedia = slides[index].querySelector(".deferred-media");
+    if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
   };
 
   const initSlider = () => {
@@ -283,10 +291,12 @@ document.addEventListener("DOMContentLoaded", function () {
   const safeReorderByColor = (targetColor) => {
     if (isReordering || !mediaList) return;
     isReordering = true;
+
     const newActiveIndex = reorderByColor(targetColor);
     currentSlide = 0;
     initSlider();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
+
     setTimeout(() => { isReordering = false; }, 200);
     mediaList.setAttribute("data-media-reordered", "true");
   };
@@ -311,8 +321,21 @@ document.addEventListener("DOMContentLoaded", function () {
     setTimeout(() => safeReorderByColor(selectedColor), 100);
   }, 50);
 
+  const restartActiveVideo = () => {
+    const activeItem = document.querySelector(".product__media-item.is-active");
+    if (!activeItem) return;
+
+    const videoEl = activeItem.querySelector("video");
+    if (videoEl) playVideo(videoEl);
+
+    const deferredMedia = activeItem.querySelector(".deferred-media");
+    if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
+  };
+
   const setupListeners = () => {
     ["change","variant:change","variant:selected","popstate"].forEach(evt => document.addEventListener(evt, handleColorChange));
+
+    // Observe media list for DOM updates
     if (mediaList) {
       if (observer) observer.disconnect();
       observer = new MutationObserver(() => safeReorderByColor(currentSelectedColor));
@@ -321,11 +344,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     // Restart videos on drawer close
     document.querySelectorAll(".customize-drawer-close").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const activeItem = document.querySelector(".product__media-item.is-active");
-        const videoEl = activeItem?.querySelector("video");
-        if (videoEl) playVideo(videoEl);
-      });
+      btn.addEventListener("click", restartActiveVideo);
     });
   };
 
@@ -347,4 +366,3 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("shopify:section:load", () => { cleanup(); isInitialized = false; initialize(); });
   document.addEventListener("theme:loaded", initialize);
 });
-
