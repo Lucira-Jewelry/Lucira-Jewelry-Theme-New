@@ -32,35 +32,46 @@
 
 {%- comment %} Set lazy load and column counts {% endcomment -%}
 
-{%- liquid
-  unless lazy_load == false
-    assign lazy = 'lazy'
-  endunless
+{%- comment -%}
+  Media container for product media (images, videos, external videos, 3D models)
+  Fixed autoplay and loop for videos.
+{%- endcomment -%}
 
-  assign desktop_columns = 1
-  if desktop_layout == 'columns' and media_count > 1
-    assign desktop_columns = 2
-  endif
+{%- comment -%} Lazy load setting {% endcomment -%}
+{% assign lazy = 'lazy' %}
+{% if lazy_load == false %}
+  {% assign lazy = '' %}
+{% endif %}
 
-  assign mobile_columns = 1
-  if mobile_layout == 'columns' and media_count > 1
-    assign mobile_columns = 2
-  endif
+{%- comment -%} Desktop & mobile columns {% endcomment -%}
+{% assign desktop_columns = 1 %}
+{% if desktop_layout == 'columns' and media_count > 1 %}
+  {% assign desktop_columns = 2 %}
+{% endif %}
 
-  if media.media_type == 'image'
-    assign image_class = 'image-magnify-' | append: section.settings.image_zoom
-  endif
+{% assign mobile_columns = 1 %}
+{% if mobile_layout == 'columns' and media_count > 1 %}
+  {% assign mobile_columns = 2 %}
+{% endif %}
 
-  if loop == true or loop == 'true'
-    assign loop_attr = 'loop'
-  else
-    assign loop_attr = ''
-  endif
--%}
+{%- comment -%} Image class for zoom {% endcomment -%}
+{% if media.media_type == 'image' %}
+  {% assign image_class = 'image-magnify-' | append: section.settings.image_zoom %}
+{% endif %}
 
-{%- comment %} Capture responsive sizes outside liquid block {% endcomment -%}
+{%- comment -%} Loop attribute for video {% endcomment -%}
+{% if loop == true or loop == 'true' %}
+  {% assign loop_attr = 'loop' %}
+{% else %}
+  {% assign loop_attr = '' %}
+{% endif %}
+
+{%- comment -%} Responsive sizes {% endcomment -%}
 {%- capture sizes -%}
-(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 100 | times: media_width | divided_by: desktop_columns | round }}px, (min-width: 990px) calc({{ media_width | times: 100 | divided_by: desktop_columns }}vw - 10rem), (min-width: 750px) calc((100vw - 11.5rem) / 2), calc(100vw / {{ mobile_columns }} - 4rem)
+(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 100 | times: media_width | divided_by: desktop_columns | round }}px,
+(min-width: 990px) calc({{ media_width | times: 100 | divided_by: desktop_columns }}vw - 10rem),
+(min-width: 750px) calc((100vw - 11.5rem) / 2),
+calc(100vw / {{ mobile_columns }} - 4rem)
 {%- endcapture -%}
 
 <div
@@ -90,12 +101,12 @@
           </span>
       {% endcase %}
     </span>
+
     {%- render 'loading-spinner' -%}
 
     <div class="product__media media media--transparent">
       {% if media.media_type == 'image' %}
-        {{
-          media.preview_image
+        {{ media.preview_image
           | image_url: width: 1946
           | image_tag:
             class: image_class,
@@ -118,8 +129,8 @@
     </button>
   </modal-opener>
 
-  {%- if media.media_type != 'image' -%}
-    {%- if media.media_type == 'model' -%}
+  {% if media.media_type != 'image' %}
+    {% if media.media_type == 'model' %}
       <product-model class="deferred-media media media--transparent" data-media-id="{{ media.id }}">
         <button id="Deferred-Poster-Modal-{{ media.id }}" class="deferred-media__poster" type="button">
           <span class="deferred-media__poster-button motion-reduce">
@@ -128,8 +139,7 @@
               {{- 'icon-3d-model.svg' | inline_asset_content -}}
             </span>
           </span>
-          {{
-            media.preview_image
+          {{ media.preview_image
             | image_url: width: 1946
             | image_tag:
               loading: lazy,
@@ -141,22 +151,35 @@
           {{ media | media_tag: image_size: '2048x', toggleable: true }}
         </template>
       </product-model>
-    {%- else -%}
+    {% else %}
       <div class="media media--transparent video-container" data-media-id="{{ media.id }}" data-media-type="{{ media.media_type }}">
-        {%- liquid
-          case media.media_type
-            when 'external_video'
-              assign video_class = 'js-' | append: media.host
-              if media.host == 'youtube'
-                echo '<iframe class="' | append: video_class | append: '" src="https://www.youtube.com/embed/' | append: media.external_id | append: '?autoplay=1&mute=1&loop=1&playlist=' | append: media.external_id | append: '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>'
-              else
-                echo media | external_video_url: autoplay: true, loop: true, mute: 1 | external_video_tag: class: video_class, loading: 'lazy'
-              endif
-            when 'video'
-              echo media | media_tag: image_size: '2048x', autoplay: true, loop: true, controls: false, preload: 'auto', muted: true, playsinline: true
-          endcase
-        -%}
+        {% case media.media_type %}
+          {% when 'external_video' %}
+            {% assign video_class = 'js-' | append: media.host %}
+            {% if media.host == 'youtube' %}
+              <iframe
+                class="{{ video_class }}"
+                src="https://www.youtube.com/embed/{{ media.external_id }}?autoplay=1&mute=1&loop=1&playlist={{ media.external_id }}&controls=0&modestbranding=1&playsinline=1"
+                frameborder="0"
+                allow="autoplay; encrypted-media"
+                allowfullscreen
+                allow="autoplay"
+              ></iframe>
+            {% else %}
+              {{ media | external_video_url: autoplay: true, loop: true, mute: 1 | external_video_tag: class: video_class }}
+            {% endif %}
+          {% when 'video' %}
+            {{ media | media_tag:
+              image_size: '2048x',
+              autoplay: 'autoplay',
+              loop: 'loop',
+              muted: 'muted',
+              playsinline: 'playsinline',
+              controls: false,
+              preload: 'auto'
+            }}
+        {% endcase %}
       </div>
-    {%- endif -%}
-  {%- endif -%}
+    {% endif %}
+  {% endif %}
 </div>
