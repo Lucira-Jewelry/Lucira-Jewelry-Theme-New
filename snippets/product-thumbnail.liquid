@@ -124,30 +124,128 @@
         </template>
       </product-model>
     {%- else -%}
+      {%- comment %} Direct video rendering without deferred loading {% endcomment %}
       <div class="media media--transparent video-container" data-media-id="{{ media.id }}" data-media-type="{{ media.media_type }}">
         {%- liquid
-          case media.media_type
-            when 'external_video'
-              assign video_class = 'js-' | append: media.host
-              if media.host == 'youtube'
-                assign youtube_url = media | external_video_url: autoplay: 1, loop: 1, playlist: media.external_id, mute: 1
-                assign youtube_url = youtube_url | replace: 'autoplay=0', 'autoplay=1'
-                unless youtube_url contains 'autoplay=1'
-                  assign youtube_url = youtube_url | append: '&autoplay=1'
-                endunless
-                echo media | external_video_tag: class: video_class, loading: 'lazy'
-              else
-                assign vimeo_url = media | external_video_url: autoplay: 1, loop: 1, mute: 1, background: 1
-                assign vimeo_url = vimeo_url | replace: 'autoplay=0', 'autoplay=1'
-                unless vimeo_url contains 'autoplay=1'
-                  assign vimeo_url = vimeo_url | append: '&autoplay=1'
-                endunless
-                echo media | external_video_tag: class: video_class, loading: 'lazy'
-              endif
-            when 'video'
-              echo media | media_tag: image_size: '2048x', autoplay: true, loop: true, controls: false, preload: 'auto', muted: true, playsinline: true
-          endcase
-        -%}
+        case media.media_type
+          when 'external_video'
+            assign video_class = 'js-' | append: media.host
+            if media.host == 'youtube'
+              assign youtube_id = media.external_id
+              assign preview_image = media.preview_image
+              assign alt_text = media.alt | escape
+            else
+              assign vimeo_id = media.external_id
+              assign preview_image = media.preview_image
+              assign alt_text = media.alt | escape
+            endif
+        endcase
+      -%}
+
+      {%- case media.media_type -%}
+        {%- when 'external_video' -%}
+          {%- if media.host == 'youtube' -%}
+            <div class="video-placeholder" data-video-type="youtube" data-video-id="{{ youtube_id }}">
+              <img 
+                src="{{ preview_image | image_url: width: 800 }}"
+                srcset="
+                  {{ preview_image | image_url: width: 400 }} 400w,
+                  {{ preview_image | image_url: width: 800 }} 800w,
+                  {{ preview_image | image_url: width: 1200 }} 1200w
+                "
+                sizes="(max-width: 750px) 100vw, 50vw"
+                loading="lazy"
+                alt="{{ alt_text }}"
+                class="video-preview-image"
+                width="{{ preview_image.width }}"
+                height="{{ preview_image.height }}"
+              >
+              <div class="video-loader" style="display:none;">
+                <iframe 
+                  data-src="https://www.youtube.com/embed/{{ youtube_id }}?autoplay=1&mute=1&loop=1&playlist={{ youtube_id }}&controls=0&modestbranding=1&rel=0&enablejsapi=1&playsinline=1"
+                  class="js-youtube lazy-video"
+                  loading="lazy"
+                  allow="autoplay; encrypted-media; accelerometer; gyroscope"
+                  frameborder="0" 
+                  allowfullscreen
+                  title="{{ alt_text }}"
+                ></iframe>
+              </div>
+            </div>
+          {%- else -%}
+            <div class="video-placeholder" data-video-type="vimeo" data-video-id="{{ vimeo_id }}">
+              <img 
+                src="{{ preview_image | image_url: width: 800 }}"
+                srcset="
+                  {{ preview_image | image_url: width: 400 }} 400w,
+                  {{ preview_image | image_url: width: 800 }} 800w,
+                  {{ preview_image | image_url: width: 1200 }} 1200w
+                "
+                sizes="(max-width: 750px) 100vw, 50vw"
+                loading="lazy"
+                alt="{{ alt_text }}"
+                class="video-preview-image"
+                width="{{ preview_image.width }}"
+                height="{{ preview_image.height }}"
+              >
+              <div class="video-loader" style="display:none;">
+                <iframe 
+                  data-src="https://player.vimeo.com/video/{{ vimeo_id }}?autoplay=1&muted=1&loop=1&background=1&autopause=0&transparent=0&quality=720p&playsinline=1"
+                  class="js-vimeo lazy-video"
+                  loading="lazy"
+                  allow="autoplay; encrypted-media"
+                  frameborder="0" 
+                  allowfullscreen
+                  title="{{ alt_text }}"
+                ></iframe>
+              </div>
+            </div>
+          {%- endif -%}
+        
+        {%- when 'video' -%}
+          <div class="video-placeholder" data-video-type="hosted" data-media-id="{{ media.id }}">
+            <img 
+              src="{{ media.preview_image | image_url: width: 800 }}"
+              srcset="
+                {{ media.preview_image | image_url: width: 400 }} 400w,
+                {{ media.preview_image | image_url: width: 800 }} 800w,
+                {{ media.preview_image | image_url: width: 1200 }} 1200w
+              "
+              sizes="(max-width: 750px) 100vw, 50vw"
+              loading="lazy"
+              alt="{{ media.alt | escape }}"
+              class="video-preview-image"
+              width="{{ media.preview_image.width }}"
+              height="{{ media.preview_image.height }}"
+            >
+            <div class="video-loader" style="display:none;">
+              <video 
+                class="product-video lazy-video"
+                autoplay
+                loop
+                muted
+                playsinline
+                preload="metadata"
+                data-media-id="{{ media.id }}"
+                poster="{{ media.preview_image | image_url: width: 800 }}"
+                style="width: 100%; height: auto;"
+              >
+                {%- for source in media.sources -%}
+                  <source src="{{ source.url }}" type="{{ source.mime_type }}">
+                {%- endfor -%}
+                Your browser does not support the video tag.
+              </video>
+            </div>
+          </div>
+        
+        {%- else -%}
+          {# Fallback for other media types (images) #}
+          {{ media | image_url: width: 1200 | image_tag:
+            loading: 'lazy',
+            sizes: sizes,
+            widths: '246, 493, 600, 713, 823, 990, 1100, 1206, 1346, 1426, 1646, 1946'
+          }}
+      {%- endcase -%}
       </div>
     {%- endif -%}
   {%- endif -%}
