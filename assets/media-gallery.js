@@ -394,54 +394,38 @@ document.addEventListener("DOMContentLoaded", function () {
       const activeItem = document.querySelector(".product__media-item.is-active");
       if (!activeItem) return;
 
-      // Play video
       const videoEl = activeItem.querySelector("video");
       if (videoEl) {
         playVideo(videoEl);
         currentVideo = videoEl;
       }
 
-      // Load deferred 3D model if present
       const deferredMedia = activeItem.querySelector(".deferred-media");
       if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
-    }, 50); // small delay to allow Shopify DOM updates
+    }, 50); // wait for Shopify DOM updates
   }
 
-  // Event delegation: drawer close button
-  document.body.addEventListener("click", (e) => {
+  // Use MutationObserver on body to catch all media list re-renders
+  const bodyObserver = new MutationObserver(() => {
+    restartActiveVideo();
+  });
+  bodyObserver.observe(document.body, { childList: true, subtree: true });
+
+  // Delegated events
+  document.body.addEventListener("click", e => {
     if (e.target.closest("#customize_close_drawer")) {
       restartActiveVideo();
     }
   });
 
-  // Variant change events
-  ["variant:change", "variant:selected"].forEach(evt =>
-    document.addEventListener(evt, restartActiveVideo)
-  );
-
-  // Observe DOM changes in media list
-  const observer = new MutationObserver(() => {
-    restartActiveVideo();
+  ["variant:change", "variant:selected", "popstate"].forEach(evt => {
+    document.addEventListener(evt, restartActiveVideo);
   });
 
-  function observeMediaList() {
-    const mediaList = document.querySelector(".product__media-list");
-    if (!mediaList) return;
-    observer.disconnect();
-    observer.observe(mediaList, { childList: true, subtree: true });
-  }
+  // Shopify section load
+  document.addEventListener("shopify:section:load", restartActiveVideo);
+  document.addEventListener("theme:loaded", restartActiveVideo);
 
-  // Initial setup
+  // Initial play
   restartActiveVideo();
-  observeMediaList();
-
-  // Shopify section load or theme load
-  document.addEventListener("shopify:section:load", () => {
-    restartActiveVideo();
-    observeMediaList();
-  });
-  document.addEventListener("theme:loaded", () => {
-    restartActiveVideo();
-    observeMediaList();
-  });
 });
