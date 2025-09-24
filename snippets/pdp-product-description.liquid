@@ -171,95 +171,162 @@ window.variantMetafields = {};
 {% endfor %}
 </script>
 
-
+<!-- =========================
+     JS: update on variant change
+     ========================= -->
 <script>
 (function(){
+  // small HTML escape helper
   function escapeHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
-  function clearAccordion() {
-    document.getElementById('Sku-{{ section.id }}').textContent = '';
-    document.getElementById('metal-type').textContent = '';
-    document.getElementById('metal-weight').innerHTML = '';
-    document.getElementById('metal-dimensions').innerHTML = '';
-    document.getElementById('diamond-table-body').innerHTML = '';
-    document.getElementById('gemstone-table-body').innerHTML = '';
+  function clearTables() {
+    var d = document.getElementById('diamond-table-body');
+    var g = document.getElementById('gemstone-table-body');
+    if (d) d.innerHTML = '';
+    if (g) g.innerHTML = '';
   }
 
   function updateAccordionForVariant(variantId) {
-    var data = window.variantMetafields[variantId];
-    if(!data) return clearAccordion();
+    if (!variantId) return;
+    var data = window.variantMetafields && window.variantMetafields[variantId];
+    if (!data) {
+      // no metafields for this variant -> clear
+      document.getElementById('metal-type').textContent = '';
+      document.getElementById('metal-weight').textContent = '';
+      document.getElementById('metal-dimensions').textContent = '';
+      clearTables();
+      // clear SKU
+      var skuEl = document.getElementById('Sku-{{ section.id }}');
+      if (skuEl) skuEl.textContent = '';
+      return;
+    }
 
     // SKU
-    document.getElementById('Sku-{{ section.id }}').textContent = data.sku || '';
+    var skuEl = document.getElementById('Sku-{{ section.id }}');
+    if (skuEl) {
+      skuEl.textContent = (data.sku || '');
+    }
 
     // Metal
-    document.getElementById('metal-type').textContent = [data.metal_purity, data.metal_color].filter(Boolean).join(' - ');
-    document.getElementById('metal-weight').innerHTML = 
-      (data.metal_weight ? 'Net Wt: '+data.metal_weight+'g<br>' : '') +
-      (data.gross_weight ? 'Gross Wt: '+data.gross_weight+'g' : '');
-    document.getElementById('metal-dimensions').innerHTML =
-      (data.top_width ? 'Width: '+data.top_width+'mm<br>' : '') +
-      (data.top_height ? 'Height: '+data.top_height+'mm' : '');
+    var metalType = '';
+    if (data.metal_purity) metalType += data.metal_purity;
+    if (data.metal_color) metalType += (metalType ? ' - ' : '') + data.metal_color;
+    document.getElementById('metal-type').textContent = metalType;
+
+    var metalWeight = '';
+    if (data.metal_weight) metalWeight += 'Net Wt: ' + data.metal_weight + 'g<br>';
+    if (data.gross_weight) metalWeight += 'Gross Wt: ' + data.gross_weight + 'g';
+    document.getElementById('metal-weight').innerHTML = metalWeight;
+
+    var metalDimensions = '';
+    if (data.top_width) metalDimensions += 'Width: ' + data.top_width + 'mm<br>';
+    if (data.top_height) metalDimensions += 'Height: ' + data.top_height + 'mm';
+    document.getElementById('metal-dimensions').innerHTML = metalDimensions;
 
     // Diamonds
     var diamondBody = document.getElementById('diamond-table-body');
-    if(diamondBody) {
-      diamondBody.innerHTML = (data.diamonds || []).filter(d => d.type).map(d => `
-        <tr>
-          <td>${escapeHtml(d.type)}${(d.clarity||d.color)?'/ '+escapeHtml(d.clarity)+'-'+escapeHtml(d.color):''}</td>
-          <td>${escapeHtml(d.numbers)} - ${escapeHtml(d.shape)}</td>
-          <td>${escapeHtml(d.setting)}: ${escapeHtml(d.weight)}ct</td>
-        </tr>
-      `).join('');
+    if (diamondBody) {
+      var html = '';
+      for (var i = 1; i <= 4; i++) {
+        var d = (data.diamonds && data.diamonds[String(i)]) || {};
+        if (d && d.type) {
+          var clarity = d.clarity || '';
+          var color = d.color || '';
+          var numbers = d.numbers || '';
+          var shape = d.shape || '';
+          var setting = d.setting || '';
+          var weight = d.weight || '';
+          var typeCell = escapeHtml(d.type) + ((clarity || color) ? ('/ ' + escapeHtml(clarity) + '-' + escapeHtml(color)) : '');
+          html += '<tr>';
+          html += '<td>' + typeCell + '</td>';
+          html += '<td>' + escapeHtml(numbers) + ' - ' + escapeHtml(shape) + '</td>';
+          html += '<td>' + escapeHtml(setting) + ': ' + escapeHtml(weight) + 'ct</td>';
+          html += '</tr>';
+        }
+      }
+      diamondBody.innerHTML = html;
     }
 
     // Gemstones
     var gemBody = document.getElementById('gemstone-table-body');
-    if(gemBody) {
-      gemBody.innerHTML = (data.gemstones || []).filter(g => g.type).map(g => `
-        <tr>
-          <td>${escapeHtml(g.color)} - ${escapeHtml(g.type)}</td>
-          <td>${escapeHtml(g.numbers)} - ${escapeHtml(g.shape)}</td>
-          <td>${escapeHtml(g.setting)}: ${escapeHtml(g.weight)}ct</td>
-        </tr>
-      `).join('');
+    if (gemBody) {
+      var html = '';
+      for (var i = 1; i <= 4; i++) {
+        var g = (data.gemstones && data.gemstones[String(i)]) || {};
+        if (g && g.type) {
+          html += '<tr>';
+          html += '<td>' + escapeHtml(g.color || '') + ' - ' + escapeHtml(g.type) + '</td>';
+          html += '<td>' + escapeHtml(g.numbers || '') + ' - ' + escapeHtml(g.shape || '') + '</td>';
+          html += '<td>' + escapeHtml(g.setting || '') + ': ' + escapeHtml(g.weight || '') + 'ct</td>';
+          html += '</tr>';
+        }
+      }
+      gemBody.innerHTML = html;
     }
   }
 
-  window.pushPromo = function(promoName){
-    var currentVariantId = document.querySelector('select[name="id"], input[name="id"]')?.value || '{{ variant.id }}';
-    var sku = window.variantMetafields[currentVariantId]?.sku || '';
+  // Push promo helper (for your labels)
+  window.pushPromo = function(promoName) {
+    var currentVariantId = null;
+    // First try to read the currently selected variant id from common selectors
+    var sel = document.querySelector('select[name="id"], input[name="id"]');
+    if (sel) currentVariantId = sel.value || sel.getAttribute('value');
+    // fallback to data stored on window (if your theme sets current variant elsewhere)
+    if (!currentVariantId && window.currentVariant && window.currentVariant.id) currentVariantId = window.currentVariant.id;
+    // fallback to server-warmed variant
+    if (!currentVariantId) currentVariantId = '{{ variant.id }}';
+
+    var sku = (window.variantMetafields && window.variantMetafields[currentVariantId] && window.variantMetafields[currentVariantId].sku) || '';
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: 'promoClick',
-      promoClick: { promo_id: sku, promo_name: '{{ product.title }}', creative_name: promoName }
+      promoClick: {
+        promo_id: sku,
+        promo_name: '{{ product.title }}',
+        creative_name: promoName
+      }
     });
   };
 
-  document.addEventListener('DOMContentLoaded', function(){
+  // Listen for variant changes
+  document.addEventListener('DOMContentLoaded', function() {
+    // initial render: use selected id if present, otherwise server-side variant id
+    var initialVariantId = '{{ variant.id }}';
     var sel = document.querySelector('select[name="id"], input[name="id"]');
-    var initialVariantId = sel?.value || '{{ variant.id }}';
+    if (sel && sel.value) initialVariantId = sel.value;
+
     updateAccordionForVariant(initialVariantId);
 
-    // Variant change listener
-    document.addEventListener('variant:change', e => {
-      var vid = e?.detail?.variant?.id;
-      if(vid) updateAccordionForVariant(vid);
+    // Theme event (Dawn etc.)
+    document.addEventListener('variant:change', function(e) {
+      var vid = e && e.detail && e.detail.variant && e.detail.variant.id;
+      if (vid) updateAccordionForVariant(vid);
     });
 
-    // Select / Swatch fallback
-    sel?.addEventListener('change', function(){ updateAccordionForVariant(this.value); });
-    document.body.addEventListener('click', function(e){
-      var vid = e.target?.dataset?.variantId || e.target?.getAttribute('data-variant-id');
-      if(vid) updateAccordionForVariant(vid);
+    // select fallback
+    var selector = document.querySelector('select[name="id"], input[name="id"]');
+    if (selector) {
+      selector.addEventListener('change', function() {
+        updateAccordionForVariant(this.value);
+      });
+    }
+
+    // swatch / clickable elements sometimes use data-variant-id
+    document.body.addEventListener('click', function(e) {
+      var el = e.target;
+      if (!el) return;
+      var vid = el.getAttribute && (el.getAttribute('data-variant-id') || el.dataset && el.dataset.variantId);
+      if (vid) {
+        updateAccordionForVariant(vid);
+      }
     });
   });
 })();
