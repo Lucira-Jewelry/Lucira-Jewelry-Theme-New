@@ -97,16 +97,9 @@ if (!customElements.get('media-gallery')) {
 
       playActiveMedia(activeItem) {
         window.pauseAllMedia();
-
-        // 3D deferred media
         const deferredMedia = activeItem.querySelector('.deferred-media');
         if (deferredMedia) deferredMedia.loadContent(false);
-
-        // Video
-        const videoEl = activeItem.querySelector('video');
-        if (videoEl) playVideo(videoEl);
       }
-
 
       preventStickyHeader() {
         this.stickyHeader = this.stickyHeader || document.querySelector('sticky-header');
@@ -135,73 +128,41 @@ document.addEventListener("DOMContentLoaded", function () {
   let observer = null;
   let isReordering = false;
 
-  // ----- Utility Functions -----
-  const debounce = (fn, delay) => {
-    let timer;
-    return (...args) => {
-      clearTimeout(timer);
-      timer = setTimeout(() => fn(...args), delay);
+  function cacheDOMElements() {
+    mediaList = document.querySelector('.product__media-list');
+  }
+
+  function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
     };
-  };
+  }
 
-  const getColorFromAlt = (text) => {
-    const alt = (text || "").toLowerCase();
-    if (alt.includes("white")) return "white";
-    if (alt.includes("yellow")) return "yellow";
-    if (alt.includes("rose")) return "rose";
+  function getColorFromAlt(text) {
+    const lower = (text || "").toLowerCase();
+    if (lower.includes("white")) return "white";
+    if (lower.includes("yellow")) return "yellow";
+    if (lower.includes("rose")) return "rose";
     return "";
-  };
+  }
 
-  const playVideo = (videoEl) => {
-    if (!videoEl) return;
-    
-    // Ensure video has proper attributes for autoplay
-    videoEl.loop = true;
-    videoEl.muted = true;
-    videoEl.playsInline = true;
-    videoEl.setAttribute('muted', 'true');
-    videoEl.setAttribute('playsinline', 'true');
-    
-    // Reset video if it's ended
-    if (videoEl.ended || videoEl.currentTime > 0) {
-      videoEl.currentTime = 0;
-    }
-
-    // Use a promise chain to handle autoplay properly
-    const playPromise = videoEl.play();
-    
-    if (playPromise !== undefined) {
-      playPromise.catch(error => {
-        console.log('Video autoplay failed, trying with user gesture fallback:', error);
-        // Add a click handler to start video on user interaction
-        const startOnInteraction = () => {
-          videoEl.play().catch(() => {});
-          document.removeEventListener('click', startOnInteraction);
-        };
-        document.addEventListener('click', startOnInteraction, { once: true });
-      });
-    }
-  };
-
-  const pauseAllMedia = () => {
-    document.querySelectorAll(".product__media-item video").forEach(v => {
-      v.pause();
-      v.currentTime = 0;
-    });
-    document.querySelectorAll(".product__media-item .deferred-media").forEach(dm => dm.pause && dm.pause());
-  };
-
-  const cacheDOM = () => {
-    mediaList = document.querySelector(".product__media-list");
-  };
-
-  // ----- Reorder Functions -----
-  const classifyItemsByColor = (targetColor) => {
+  function classifyItemsByColor(targetColor) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
-    const buckets = { color: [], codes: { mq: [], ci: [], mh: [], mv: [], v360: [] }, extras: [] };
+    const buckets = {
+      color: [],
+      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      extras: []
+    };
 
     items.forEach(item => {
-      const alt = (item.querySelector("img")?.alt || "").toLowerCase();
+      const img = item.querySelector("img");
+      const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
@@ -213,221 +174,194 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
-        item.style.display = "none";
+        item.style.display = 'none';
       }
     });
 
     return { buckets, allItems: items };
-  };
+  }
 
-  const takeColor = (buckets) => buckets.color.length ? buckets.color.shift() : null;
-  const takeCode = (buckets) => {
+  function takeColor(buckets) {
+    return buckets.color.length ? buckets.color.shift() : null;
+  }
+
+  function takeCode(buckets) {
     for (const key of ALWAYS_SHOW_CODES) {
       const k = key === "360v" ? "v360" : key;
       if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
     return null;
-  };
+  }
 
-  const buildPattern = (buckets) => {
-    const slotPattern = ["color","code","code","color","color","code","code","color","color","code","code","color"];
+  function buildRepeatedPattern(buckets) {
+    const slotPattern = [
+      "color", "code", "code",
+      "color", "color", "code", "code",
+      "color", "color", "code", "code",
+      "color"
+    ];
     const ordered = [];
-    slotPattern.forEach(slot => {
+
+    for (const slot of slotPattern) {
       let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-      if (node) { node.style.display = "block"; ordered.push(node); }
-    });
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = "block"; ordered.push(node); }));
-    buckets.color.forEach(node => { node.style.display = "block"; ordered.push(node); });
-    buckets.extras.forEach(node => { node.style.display = "block"; ordered.push(node); });
+      if (node) {
+        node.style.display = 'block';
+        ordered.push(node);
+      }
+    }
+
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
+    buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
+    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
+
     return ordered;
-  };
+  }
 
-  const reorderByColor = (targetColor) => {
-    if (!mediaList) return -1;
+  function reorderByColor(targetColor) {
     const { buckets, allItems } = classifyItemsByColor(targetColor);
-    const ordered = buildPattern(buckets);
+    const ordered = buildRepeatedPattern(buckets);
     const container = allItems[0]?.parentNode;
-    if (!container) return -1;
+    if (!container) return;
 
-    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains("is-active"));
+    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains('is-active'));
+
     ordered.forEach(node => container.appendChild(node));
+
     return ordered.findIndex(item => activeIndex >= 0 && item === allItems[activeIndex]);
-  };
+  }
 
-  // ----- Slider Functions -----
-  const createDotsNavigation = () => {
+  function createDotsNavigation() {
+    if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
     if (!mediaList) return;
-    if (dotsContainer) dotsContainer.remove();
 
-    const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
     totalSlides = slides.length;
     if (totalSlides <= 1) return;
 
-    dotsContainer = document.createElement("div");
-    dotsContainer.className = "custom-slider-dots";
+    dotsContainer = document.createElement('div');
+    dotsContainer.className = 'custom-slider-dots';
 
-    slides.forEach((_, i) => {
-      const dot = document.createElement("span");
-      dot.className = "slider-dot" + (i === currentSlide ? " active" : "");
-      dot.addEventListener("click", () => goToSlide(i));
+    for (let i = 0; i < totalSlides; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'slider-dot';
+      if (i === currentSlide) dot.classList.add('active');
+      dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
-    });
+    }
 
     mediaList.parentNode.appendChild(dotsContainer);
-  };
+  }
 
-  const goToSlide = (index) => {
-    if (!mediaList || index < 0 || index >= totalSlides) return;
-    
-    // Pause all videos first
-    pauseAllMedia();
-    
+  function goToSlide(index) {
+    if (index < 0 || index >= totalSlides) return;
     currentSlide = index;
-
-    const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
-    slides.forEach((s, i) => s.classList.toggle("is-active", i === index));
-
-    if (dotsContainer) dotsContainer.querySelectorAll(".slider-dot").forEach((d, i) => d.classList.toggle("active", i === index));
-
-    slides[index]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-
-    // Play active video with a small delay to ensure DOM is ready
-    setTimeout(() => {
-      const videoEl = slides[index].querySelector("video");
-      if (videoEl) {
-        // Ensure video attributes are set
-        videoEl.loop = true;
-        videoEl.muted = true;
-        videoEl.playsInline = true;
-        playVideo(videoEl);
-      }
-
-      // Handle external videos (YouTube/Vimeo)
-      const iframe = slides[index].querySelector("iframe");
-      if (iframe && iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com')) {
-        const src = iframe.src;
-        iframe.src = src.replace('autoplay=0', 'autoplay=1').split('?')[0] + '?autoplay=1&mute=1&loop=1';
-      }
-
-      const deferredMedia = slides[index].querySelector(".deferred-media");
-      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
-    }, 300);
-  };
-
-  const initSlider = () => {
     if (!mediaList) return;
-    createDotsNavigation();
-    goToSlide(currentSlide);
-  };
 
-  const safeReorderByColor = (targetColor) => {
-    if (isReordering || !mediaList) return;
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
+
+    if (dotsContainer) dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
+
+    if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+  }
+
+  function initSliderNavigation() {
+    if (!mediaList) return;
+    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
+    if (sliderButtons) sliderButtons.style.display = 'none';
+    createDotsNavigation();
+  }
+
+  function safeReorderByColor(targetColor) {
+    if (isReordering) return;
     isReordering = true;
 
+    if (!mediaList) { isReordering = false; return; }
     const newActiveIndex = reorderByColor(targetColor);
     currentSlide = 0;
-    initSlider();
-    if (newActiveIndex >= 0) { 
-      currentSlide = newActiveIndex; 
-      goToSlide(newActiveIndex); 
-    }
+    initSliderNavigation();
+    if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
 
+    // Allow next reorder
     setTimeout(() => { isReordering = false; }, 200);
-    mediaList.setAttribute("data-media-reordered", "true");
-  };
 
-  const getSelectedColor = () => {
-    const inputs = document.querySelectorAll(
-      'input[name*="Color"]:checked, select[name*="Color"], input[name*="color"]:checked, select[name*="color"]'
+    mediaList.setAttribute('data-media-reordered', 'true');
+  }
+
+  function getSelectedColor() {
+    const colorInputs = document.querySelectorAll(
+      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
     );
-    for (const input of inputs) {
-      const color = getColorFromAlt(input.value);
+    for (const input of colorInputs) {
+      if (input.checked || input.tagName === 'SELECT') {
+        const color = getColorFromAlt(input.value);
+        if (color) return color;
+      }
+    }
+    const selectedVariants = document.querySelectorAll(
+      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
+    );
+    for (const element of selectedVariants) {
+      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
+      const color = getColorFromAlt(text);
       if (color) return color;
     }
-    const urlColor = new URLSearchParams(window.location.search).get("color");
-    if (urlColor) return getColorFromAlt(urlColor);
+    const urlParams = new URLSearchParams(window.location.search);
+    const colorParam = urlParams.get('color') || urlParams.get('Color');
+    if (colorParam) return getColorFromAlt(colorParam);
     return "yellow";
-  };
+  }
 
-  const handleColorChange = debounce(() => {
+  const debouncedHandleColorChange = debounce(function () {
     const selectedColor = getSelectedColor();
     if (!selectedColor || selectedColor === currentSelectedColor) return;
+
     currentSelectedColor = selectedColor;
-    pauseAllMedia();
-    
-    setTimeout(() => safeReorderByColor(selectedColor), 100);
+
+    // ✅ Delay slightly to let Shopify finish DOM updates
+    setTimeout(() => {
+      safeReorderByColor(selectedColor);
+    }, 100); 
   }, 50);
 
-  const restartActiveVideo = () => {
-    setTimeout(() => {
-      const activeItem = document.querySelector(".product__media-item.is-active");
-      if (!activeItem) return;
-      pauseAllMedia();
+  function setupVariantChangeListeners() {
+    document.addEventListener('change', debouncedHandleColorChange);
+    document.addEventListener('variant:change', debouncedHandleColorChange);
+    document.addEventListener('variant:selected', debouncedHandleColorChange);
+    window.addEventListener('popstate', debouncedHandleColorChange);
 
-      const videoEl = activeItem.querySelector("video");
-      if (videoEl) {
-        videoEl.currentTime = 0;
-        playVideo(videoEl);
-      }
-
-      const iframe = activeItem.querySelector("iframe");
-      if (iframe && (iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com'))) {
-        const src = iframe.src;
-        iframe.src = src.replace('autoplay=0', 'autoplay=1').split('?')[0] + '?autoplay=1&mute=1&loop=1';
-      }
-
-      const deferredMedia = activeItem.querySelector(".deferred-media");
-      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
-    }, 500);
-
-  const setupListeners = () => {
-    ["change","variant:change","variant:selected","popstate"].forEach(evt => document.addEventListener(evt, handleColorChange));
-
+    // ✅ Observe mediaList container so that if Shopify re-renders, we reapply order
     if (mediaList) {
       if (observer) observer.disconnect();
       observer = new MutationObserver(() => {
-        if (!isReordering) {
-          safeReorderByColor(currentSelectedColor);
-        }
+        safeReorderByColor(currentSelectedColor);
       });
       observer.observe(mediaList, { childList: true, subtree: true });
     }
+  }
 
-    document.querySelectorAll(".customize-drawer-close").forEach(btn => {
-      btn.addEventListener("click", restartActiveVideo);
-    });
-    
-    const drawer = document.querySelector('.customize-drawer');
-    if (drawer) {
-      drawer.addEventListener('transitionend', restartActiveVideo);
-      drawer.addEventListener('animationend', restartActiveVideo);
-    }
-  };
+  function cleanup() {
+    if (observer) observer.disconnect();
+  }
 
-  const cleanup = () => { 
-    if (observer) observer.disconnect(); 
-  };
-
-  const initialize = () => {
+  function initialize() {
     if (isInitialized) return;
-    cacheDOM();
+    cacheDOMElements();
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
-    setupListeners();
+    setupVariantChangeListeners();
     isInitialized = true;
-  };
+  }
 
   initialize();
+
+  if (window.Shopify && window.Shopify.theme) {
+    document.addEventListener('shopify:section:load', () => { cleanup(); isInitialized = false; initialize(); });
+    document.addEventListener('theme:loaded', initialize);
+  }
+
   setTimeout(initialize, 1000);
-
-  window.addEventListener("beforeunload", cleanup);
-  document.addEventListener("shopify:section:load", () => { 
-    cleanup(); 
-    isInitialized = false; 
-    initialize(); 
-  });
-  document.addEventListener("theme:loaded", initialize);
+  window.addEventListener('beforeunload', cleanup);
 });
-
 
 
