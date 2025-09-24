@@ -292,38 +292,176 @@ document.addEventListener('click', function(e) {
   }
 });
 
-(function() {
-  const passportDrawer = document.getElementById('product-passport-drawer');
-  const passportOverlay = document.getElementById('passport-overlay');
-  const passportOpenBtn = document.getElementById('trace-badge');
-  const passportCloseBtn = passportDrawer.querySelector('.close-drawer');
+(function () {
+  if (!window.ShopifyIconCarousel) {
+    window.ShopifyIconCarousel = class {
+      constructor(container) {
+        this.container = container;
+        this.textContent = this.container.querySelector('.text-content');
+        this.icons = Array.from(this.container.querySelectorAll('.icon'));
+        this.currentIndex = 0;
+        this.isAnimating = false;
+        this.productId = this.container.dataset.productId;
+        this.items = [];
+        this.widthCache = {};
+        this.isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        this.hasBeenViewed = false;
 
-  function openPassportDrawer() {
-    passportDrawer.classList.add('active');
-    passportOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
+        this.icons.forEach((icon, i) => {
+          const tagType = icon.dataset.tagType || `tag-${i}`;
+          this.items.push({ iconClass: `.tag-icon-${i}`, text: icon.alt || `Tag ${i+1}`, tagType });
+        });
+
+        if (this.items.length > 0) this.init();
+      }
+
+      async init() {
+        await this.waitForDOMReady();
+        this.preCalculateWidths();
+        this.setInitialState();
+        this.setupScrollObserver();
+        this.setupInteraction();
+      }
+
+      waitForDOMReady() {
+        return new Promise(resolve => {
+          if (document.readyState === 'complete') resolve();
+          else window.addEventListener('load', resolve, { once: true });
+        });
+      }
+
+      preCalculateWidths() {
+        const measurer = document.createElement('div');
+        measurer.className = 'text-measurer';
+        document.body.appendChild(measurer);
+
+        this.items.forEach((item, i) => {
+          measurer.textContent = item.text;
+          measurer.offsetWidth; // force reflow
+          this.widthCache[i] = 36 + 7 + measurer.offsetWidth + 6 + 3; // icon + margin + text + padding + extra
+        });
+
+        document.body.removeChild(measurer);
+      }
+
+      setInitialState() {
+        const width = this.widthCache[0] || 50;
+        this.container.style.setProperty('--dynamic-width', width + 'px');
+        this.icons[0].classList.add('active');
+        this.textContent.textContent = this.items[0].text;
+      }
+
+      setupScrollObserver() {
+        const observer = new IntersectionObserver(entries => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !this.hasBeenViewed) {
+              this.hasBeenViewed = true;
+              this.startAnimation();
+            }
+          });
+        }, { threshold: 0.5, rootMargin: '0px 0px -50px 0px' });
+
+        observer.observe(this.container);
+      }
+
+      setupInteraction() {
+        if (this.isMobile) {
+          this.container.addEventListener('click', () => this.toggleMobile());
+        } else {
+          this.container.addEventListener('mouseenter', () => this.expandContainer());
+          this.container.addEventListener('mouseleave', () => this.collapseContainer());
+        }
+      }
+
+      expandContainer() {
+        if (this.isAnimating) return;
+        const width = this.widthCache[this.currentIndex];
+        this.container.style.setProperty('--dynamic-width', width + 'px');
+        this.container.classList.add('expanded');
+      }
+
+      collapseContainer() {
+        if (this.isAnimating) return;
+        this.container.classList.remove('expanded');
+        if (this.items.length > 1) setTimeout(() => this.nextItem(), 150);
+      }
+
+      toggleMobile() {
+        if (this.isAnimating) return;
+        if (!this.container.classList.contains('expanded')) {
+          this.expandContainer();
+          setTimeout(() => this.collapseContainer(), 2500);
+        } else this.nextItem();
+      }
+
+      async nextItem() {
+        const nextIndex = (this.currentIndex + 1) % this.items.length;
+        await this.switchIcon(nextIndex);
+        this.currentIndex = nextIndex;
+      }
+
+      async switchIcon(newIndex) {
+        if (this.items.length <= 1) return;
+
+        const current = this.icons[this.currentIndex];
+        const next = this.icons[newIndex];
+        if (!current || !next) return;
+
+        this.textContent.textContent = this.items[newIndex].text;
+        const width = this.widthCache[newIndex];
+        this.container.style.setProperty('--dynamic-width', width + 'px');
+
+        current.classList.remove('active');
+        current.classList.add('exit');
+        await this.wait(100);
+        current.classList.remove('exit');
+
+        next.classList.add('active', 'enter');
+        setTimeout(() => next.classList.remove('enter'), 200);
+      }
+
+      async startAnimation() {
+        let index = 0;
+        const maxCycles = Math.max(2, this.items.length * 2);
+        for (let count = 0; count < maxCycles; count++) {
+          await this.animateItem(index);
+          index = (index + 1) % this.items.length;
+        }
+      }
+
+      async animateItem(index) {
+        if (this.isAnimating) return;
+        this.isAnimating = true;
+        this.container.classList.add('animating');
+        await this.switchIcon(index);
+        const width = this.widthCache[index];
+        this.container.style.setProperty('--dynamic-width', width + 'px');
+        this.container.classList.add('expanded');
+        await this.wait(2000);
+        this.container.classList.remove('expanded');
+        await this.wait(400);
+        this.container.classList.remove('animating');
+        this.isAnimating = false;
+      }
+
+      wait(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+    };
   }
 
-  function closePassportDrawer() {
-    passportDrawer.classList.remove('active');
-    passportOverlay.classList.remove('active');
-    document.body.style.overflow = '';
+  function initCarousels() {
+    document.querySelectorAll('.carousel-container').forEach(c => {
+      if (!c.dataset.carouselInitialized) {
+        new ShopifyIconCarousel(c);
+        c.dataset.carouselInitialized = 'true';
+      }
+    });
   }
 
-  // open
-  passportOpenBtn.addEventListener('click', openPassportDrawer);
-
-  // close
-  passportCloseBtn.addEventListener('click', closePassportDrawer);
-  passportOverlay.addEventListener('click', closePassportDrawer);
-
-  // escape key
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && passportDrawer.classList.contains('active')) {
-      closePassportDrawer();
-    }
-  });
+  document.addEventListener('DOMContentLoaded', () => setTimeout(initCarousels, 50));
 })();
+
 
 // Enhanced Comparison Table Integration
 class ComparisonTableManager {
