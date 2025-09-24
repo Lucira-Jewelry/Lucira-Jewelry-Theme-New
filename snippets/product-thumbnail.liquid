@@ -25,6 +25,9 @@
   %}
 {% endcomment %}
 
+{% comment %}theme-check-disable ImgLazyLoading{% endcomment %}
+
+{%- comment %} Set lazy load and column counts {% endcomment -%}
 {%- liquid
   unless lazy_load == false
     assign lazy = 'lazy'
@@ -43,11 +46,25 @@
   if media.media_type == 'image'
     assign image_class = 'image-magnify-' | append: section.settings.image_zoom
   endif
+
+  if loop == true or loop == 'true'
+    assign loop_attr = 'loop'
+  else
+    assign loop_attr = ''
+  endif
 -%}
 
-{%- capture sizes -%}
+{%- comment %} Capture sizes separately outside the liquid block {% endcomment -%}
+ {%- capture sizes -%}
   (min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 100 | times: media_width | divided_by: desktop_columns | round }}px, (min-width: 990px) calc({{ media_width | times: 100 | divided_by: desktop_columns }}vw - 10rem), (min-width: 750px) calc((100vw - 11.5rem) / 2), calc(100vw / {{ mobile_columns }} - 4rem)
-{%- endcapture -%}
+ {%- endcapture -%}
+
+  {%- if loop == true or loop == 'true' -%}
+    assign loop_attr = 'loop'
+  {%- else -%}
+    assign loop_attr = ''
+  {%- endif -%}
+-%}
 
 <div
   class="product-media-container media-type-{{ media.media_type }} media-fit-{{ media_fit }} global-media-settings gradient{% if constrain_to_viewport %} constrain-height{% endif %}"
@@ -77,17 +94,21 @@
       {% endcase %}
     </span>
     {%- render 'loading-spinner' -%}
+
     <div class="product__media media media--transparent">
-      {{
-        media.preview_image
-        | image_url: width: 1946
-        | image_tag:
-          class: image_class,
-          loading: lazy,
-          sizes: sizes,
-          widths: '246, 493, 600, 713, 823, 990, 1100, 1206, 1346, 1426, 1646, 1946'
-      }}
+      {% if media.media_type == 'image' %}
+        {{
+          media.preview_image
+          | image_url: width: 1946
+          | image_tag:
+            class: image_class,
+            loading: lazy,
+            sizes: sizes,
+            widths: '246, 493, 600, 713, 823, 990, 1100, 1206, 1346, 1426, 1646, 1946'
+        }}
+      {% endif %}
     </div>
+
     <button
       class="product__media-toggle quick-add-hidden product__media-zoom-{{ section.settings.image_zoom }}"
       type="button"
@@ -124,14 +145,13 @@
         </template>
       </product-model>
     {%- else -%}
-      {%- comment %} Direct video rendering without deferred loading {% endcomment %}
       <div class="media media--transparent video-container" data-media-id="{{ media.id }}" data-media-type="{{ media.media_type }}">
         {%- liquid
           case media.media_type
             when 'external_video'
               assign video_class = 'js-' | append: media.host
               if media.host == 'youtube'
-                echo media | external_video_url: autoplay: true, loop: loop, playlist: media.external_id, mute: 1 | external_video_tag: class: video_class, loading: 'lazy'
+                echo '<iframe class="' | append: video_class | append: '" src="https://www.youtube.com/embed/' | append: media.external_id | append: '?autoplay=1&mute=1&loop=1&playlist=' | append: media.external_id | append: '" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>'
               else
                 echo media | external_video_url: autoplay: true, loop: loop, mute: 1 | external_video_tag: class: video_class, loading: 'lazy'
               endif
