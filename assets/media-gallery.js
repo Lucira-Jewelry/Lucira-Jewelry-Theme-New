@@ -305,12 +305,10 @@ document.addEventListener("DOMContentLoaded", function () {
       // Handle external videos (YouTube/Vimeo)
       const iframe = slides[index].querySelector("iframe");
       if (iframe && iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com')) {
-        // For external videos, we need to reload them to autoplay
         const src = iframe.src;
         iframe.src = src.replace('autoplay=0', 'autoplay=1').split('?')[0] + '?autoplay=1&mute=1&loop=1';
       }
 
-      // Load deferred media if exists
       const deferredMedia = slides[index].querySelector(".deferred-media");
       if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
     }, 300);
@@ -322,7 +320,6 @@ document.addEventListener("DOMContentLoaded", function () {
     goToSlide(currentSlide);
   };
 
-  // ----- Core Logic -----
   const safeReorderByColor = (targetColor) => {
     if (isReordering || !mediaList) return;
     isReordering = true;
@@ -356,30 +353,23 @@ document.addEventListener("DOMContentLoaded", function () {
     const selectedColor = getSelectedColor();
     if (!selectedColor || selectedColor === currentSelectedColor) return;
     currentSelectedColor = selectedColor;
-    
-    // Pause all media before reordering
     pauseAllMedia();
     
     setTimeout(() => safeReorderByColor(selectedColor), 100);
   }, 50);
 
   const restartActiveVideo = () => {
-    // Wait for any animations/transitions to complete
     setTimeout(() => {
       const activeItem = document.querySelector(".product__media-item.is-active");
       if (!activeItem) return;
-
-      // Pause all videos first
       pauseAllMedia();
 
       const videoEl = activeItem.querySelector("video");
       if (videoEl) {
-        // Reset and play the active video
         videoEl.currentTime = 0;
         playVideo(videoEl);
       }
 
-      // Handle external videos
       const iframe = activeItem.querySelector("iframe");
       if (iframe && (iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com'))) {
         const src = iframe.src;
@@ -388,17 +378,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const deferredMedia = activeItem.querySelector(".deferred-media");
       if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
-    }, 500); // Increased delay to ensure drawer is fully closed
-  };
+    }, 500);
 
   const setupListeners = () => {
     ["change","variant:change","variant:selected","popstate"].forEach(evt => document.addEventListener(evt, handleColorChange));
 
-    // Observe media list for DOM updates
     if (mediaList) {
       if (observer) observer.disconnect();
       observer = new MutationObserver(() => {
-        // Only trigger if we're not already reordering
         if (!isReordering) {
           safeReorderByColor(currentSelectedColor);
         }
@@ -406,12 +393,10 @@ document.addEventListener("DOMContentLoaded", function () {
       observer.observe(mediaList, { childList: true, subtree: true });
     }
 
-    // Restart videos on drawer close - improved event handling
     document.querySelectorAll(".customize-drawer-close").forEach(btn => {
       btn.addEventListener("click", restartActiveVideo);
     });
     
-    // Also listen for transition/animation end on the drawer itself
     const drawer = document.querySelector('.customize-drawer');
     if (drawer) {
       drawer.addEventListener('transitionend', restartActiveVideo);
