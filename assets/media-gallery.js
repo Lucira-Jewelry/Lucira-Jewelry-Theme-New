@@ -263,6 +263,14 @@ document.addEventListener("DOMContentLoaded", function () {
     if (dotsContainer) dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
 
     if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+    // ✅ Ensure video in active slide autoplay
+    const activeVideo = slides[index].querySelector('video');
+    if (activeVideo) {
+      activeVideo.loop = true;
+      activeVideo.muted = true;
+      activeVideo.play().catch(() => {});
+    }
   }
 
   function initSliderNavigation() {
@@ -270,6 +278,16 @@ document.addEventListener("DOMContentLoaded", function () {
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
+  }
+
+  function playAllVideos() {
+    if (!mediaList) return;
+    const videos = mediaList.querySelectorAll('video');
+    videos.forEach(video => {
+      video.loop = true;
+      video.muted = true; // required for autoplay
+      video.play().catch(() => {});
+    });
   }
 
   function safeReorderByColor(targetColor) {
@@ -282,8 +300,11 @@ document.addEventListener("DOMContentLoaded", function () {
     initSliderNavigation();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
 
-    // Allow next reorder
-    setTimeout(() => { isReordering = false; }, 200);
+    // ✅ Play all videos after reorder
+    setTimeout(() => {
+      playAllVideos();
+      isReordering = false;
+    }, 200);
 
     mediaList.setAttribute('data-media-reordered', 'true');
   }
@@ -318,7 +339,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     currentSelectedColor = selectedColor;
 
-    // ✅ Delay slightly to let Shopify finish DOM updates
     setTimeout(() => {
       safeReorderByColor(selectedColor);
     }, 100); 
@@ -330,7 +350,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener('variant:selected', debouncedHandleColorChange);
     window.addEventListener('popstate', debouncedHandleColorChange);
 
-    // ✅ Observe mediaList container so that if Shopify re-renders, we reapply order
     if (mediaList) {
       if (observer) observer.disconnect();
       observer = new MutationObserver(() => {
@@ -349,6 +368,7 @@ document.addEventListener("DOMContentLoaded", function () {
     cacheDOMElements();
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
+    playAllVideos(); // ✅ autoplay videos on init
     setupVariantChangeListeners();
     isInitialized = true;
   }
@@ -363,28 +383,3 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
-
-document.addEventListener("DOMContentLoaded", function() {
-  const closeButton = document.querySelector("#close-customize-drawer");
-  if (!closeButton) return;
-
-  closeButton.addEventListener("click", function() {
-    // Select all videos in product media wrapper
-    const videos = document.querySelectorAll(".product-media-container video");
-
-    videos.forEach(video => {
-      video.muted = true;   // ensure autoplay works
-      video.loop = true;    // enable loop
-      video.play().catch(err => console.log("Video play failed:", err));
-    });
-
-    // For YouTube iframes
-    const ytIframes = document.querySelectorAll(".product-media-container iframe[src*='youtube.com']");
-    ytIframes.forEach(iframe => {
-      // Reload the iframe with autoplay=1&loop=1&playlist=videoId
-      const src = iframe.src;
-      iframe.src = src.includes("autoplay=1") ? src : src + "&autoplay=1&loop=1&playlist=" + iframe.src.split("/embed/")[1];
-    });
-  });
-});
-
