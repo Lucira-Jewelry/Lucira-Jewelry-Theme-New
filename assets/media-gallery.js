@@ -124,7 +124,6 @@ if (!customElements.get('media-gallery')) {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-  // ----- Config -----
   const COLOR_TOKENS = ["white", "yellow", "rose"];
   const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v"];
   let currentSelectedColor = null;
@@ -135,7 +134,6 @@ document.addEventListener("DOMContentLoaded", function () {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
-  let userInteracted = false;
 
   // ----- Utility Functions -----
   const debounce = (fn, delay) => {
@@ -146,9 +144,6 @@ document.addEventListener("DOMContentLoaded", function () {
     };
   };
 
-  const isMobile = () => /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                         (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-
   const getColorFromAlt = (text) => {
     const alt = (text || "").toLowerCase();
     if (alt.includes("white")) return "white";
@@ -157,81 +152,50 @@ document.addEventListener("DOMContentLoaded", function () {
     return "";
   };
 
-  // ----- Video Functions -----
   const playVideo = (videoEl) => {
     if (!videoEl) return;
+    
+    // Ensure video has proper attributes for autoplay
     videoEl.loop = true;
     videoEl.muted = true;
     videoEl.playsInline = true;
+    videoEl.setAttribute('muted', 'true');
+    videoEl.setAttribute('playsinline', 'true');
+    
+    // Reset video if it's ended
+    if (videoEl.ended || videoEl.currentTime > 0) {
+      videoEl.currentTime = 0;
+    }
 
-    if (videoEl.ended) videoEl.currentTime = 0;
-    videoEl.play().catch(() => {});
-  };
-
-  const playAllVideos = () => {
-    document.querySelectorAll("video").forEach(v => {
-      if (v.paused) v.play().catch(() => {});
-    });
-  };
-
-  const initializeDeferredMedia = (container) => {
-    const deferred = container.querySelector(".deferred-media");
-    if (!deferred || deferred.classList.contains("loaded")) return;
-
-    const template = deferred.querySelector("template");
-    const poster = deferred.querySelector(".deferred-media__poster");
-
-    if (template) {
-      const content = template.content.cloneNode(true);
-      const video = content.querySelector("video");
-
-      if (video) {
-        video.muted = true;
-        video.volume = 0;
-        video.playsInline = true;
-        video.setAttribute("webkit-playsinline", "webkit-playsinline");
-        video.removeAttribute("controls");
-
-        if (userInteracted || !isMobile()) video.setAttribute("autoplay", "autoplay");
-
-        video.addEventListener("loadedmetadata", () => {
-          if (userInteracted || !isMobile()) video.play().catch(() => {
-            if (poster) poster.style.display = "block";
-          });
-          else if (poster) poster.style.display = "block";
-        });
-
-        // Lazy play via IntersectionObserver
-        if ('IntersectionObserver' in window) {
-          new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-              if (entry.isIntersecting && (userInteracted || !isMobile())) {
-                video.play().catch(() => {});
-              }
-            });
-          }, { threshold: 0.5 }).observe(video);
-        }
-      }
-
-      if (poster) poster.style.display = "none";
-      deferred.appendChild(content);
-      deferred.classList.add("loaded");
+    // Use a promise chain to handle autoplay properly
+    const playPromise = videoEl.play();
+    
+    if (playPromise !== undefined) {
+      playPromise.catch(error => {
+        console.log('Video autoplay failed, trying with user gesture fallback:', error);
+        // Add a click handler to start video on user interaction
+        const startOnInteraction = () => {
+          videoEl.play().catch(() => {});
+          document.removeEventListener('click', startOnInteraction);
+        };
+        document.addEventListener('click', startOnInteraction, { once: true });
+      });
     }
   };
 
-  const restartActiveVideo = () => {
-    const activeItem = document.querySelector(".product__media-item.is-active");
-    if (!activeItem) return;
-
-    initializeDeferredMedia(activeItem);
-
-    const videoEl = activeItem.querySelector("video");
-    if (videoEl && (userInteracted || !isMobile())) playVideo(videoEl);
+  const pauseAllMedia = () => {
+    document.querySelectorAll(".product__media-item video").forEach(v => {
+      v.pause();
+      v.currentTime = 0;
+    });
+    document.querySelectorAll(".product__media-item .deferred-media").forEach(dm => dm.pause && dm.pause());
   };
 
-  // ----- Media Reorder Functions -----
-  const cacheDOM = () => { mediaList = document.querySelector(".product__media-list"); };
+  const cacheDOM = () => {
+    mediaList = document.querySelector(".product__media-list");
+  };
 
+  // ----- Reorder Functions -----
   const classifyItemsByColor = (targetColor) => {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = { color: [], codes: { mq: [], ci: [], mh: [], mv: [], v360: [] }, extras: [] };
@@ -248,7 +212,9 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
-      } else item.style.display = "none";
+      } else {
+        item.style.display = "none";
+      }
     });
 
     return { buckets, allItems: items };
@@ -267,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const slotPattern = ["color","code","code","color","color","code","code","color","color","code","code","color"];
     const ordered = [];
     slotPattern.forEach(slot => {
-      const node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
       if (node) { node.style.display = "block"; ordered.push(node); }
     });
     Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = "block"; ordered.push(node); }));
@@ -286,19 +252,6 @@ document.addEventListener("DOMContentLoaded", function () {
     const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains("is-active"));
     ordered.forEach(node => container.appendChild(node));
     return ordered.findIndex(item => activeIndex >= 0 && item === allItems[activeIndex]);
-  };
-
-  const safeReorderByColor = (targetColor) => {
-    if (isReordering || !mediaList) return;
-    isReordering = true;
-
-    const newActiveIndex = reorderByColor(targetColor);
-    currentSlide = 0;
-    initSlider();
-    if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
-
-    setTimeout(() => { isReordering = false; restartActiveVideo(); }, 200);
-    mediaList.setAttribute("data-media-reordered", "true");
   };
 
   // ----- Slider Functions -----
@@ -325,20 +278,64 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const goToSlide = (index) => {
     if (!mediaList || index < 0 || index >= totalSlides) return;
+    
+    // Pause all videos first
+    pauseAllMedia();
+    
     currentSlide = index;
 
     const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
     slides.forEach((s, i) => s.classList.toggle("is-active", i === index));
 
     if (dotsContainer) dotsContainer.querySelectorAll(".slider-dot").forEach((d, i) => d.classList.toggle("active", i === index));
+
     slides[index]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
 
-    restartActiveVideo();
+    // Play active video with a small delay to ensure DOM is ready
+    setTimeout(() => {
+      const videoEl = slides[index].querySelector("video");
+      if (videoEl) {
+        // Ensure video attributes are set
+        videoEl.loop = true;
+        videoEl.muted = true;
+        videoEl.playsInline = true;
+        playVideo(videoEl);
+      }
+
+      // Handle external videos (YouTube/Vimeo)
+      const iframe = slides[index].querySelector("iframe");
+      if (iframe && iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com')) {
+        const src = iframe.src;
+        iframe.src = src.replace('autoplay=0', 'autoplay=1').split('?')[0] + '?autoplay=1&mute=1&loop=1';
+      }
+
+      const deferredMedia = slides[index].querySelector(".deferred-media");
+      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
+    }, 300);
   };
 
-  const initSlider = () => { createDotsNavigation(); goToSlide(currentSlide); };
+  const initSlider = () => {
+    if (!mediaList) return;
+    createDotsNavigation();
+    goToSlide(currentSlide);
+  };
 
-  // ----- Core Logic -----
+  const safeReorderByColor = (targetColor) => {
+    if (isReordering || !mediaList) return;
+    isReordering = true;
+
+    const newActiveIndex = reorderByColor(targetColor);
+    currentSlide = 0;
+    initSlider();
+    if (newActiveIndex >= 0) { 
+      currentSlide = newActiveIndex; 
+      goToSlide(newActiveIndex); 
+    }
+
+    setTimeout(() => { isReordering = false; }, 200);
+    mediaList.setAttribute("data-media-reordered", "true");
+  };
+
   const getSelectedColor = () => {
     const inputs = document.querySelectorAll(
       'input[name*="Color"]:checked, select[name*="Color"], input[name*="color"]:checked, select[name*="color"]'
@@ -356,29 +353,60 @@ document.addEventListener("DOMContentLoaded", function () {
     const selectedColor = getSelectedColor();
     if (!selectedColor || selectedColor === currentSelectedColor) return;
     currentSelectedColor = selectedColor;
+    pauseAllMedia();
+    
     setTimeout(() => safeReorderByColor(selectedColor), 100);
   }, 50);
+
+  const restartActiveVideo = () => {
+    setTimeout(() => {
+      const activeItem = document.querySelector(".product__media-item.is-active");
+      if (!activeItem) return;
+      pauseAllMedia();
+
+      const videoEl = activeItem.querySelector("video");
+      if (videoEl) {
+        videoEl.currentTime = 0;
+        playVideo(videoEl);
+      }
+
+      const iframe = activeItem.querySelector("iframe");
+      if (iframe && (iframe.src.includes('youtube.com/embed') || iframe.src.includes('player.vimeo.com'))) {
+        const src = iframe.src;
+        iframe.src = src.replace('autoplay=0', 'autoplay=1').split('?')[0] + '?autoplay=1&mute=1&loop=1';
+      }
+
+      const deferredMedia = activeItem.querySelector(".deferred-media");
+      if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
+    }, 500);
 
   const setupListeners = () => {
     ["change","variant:change","variant:selected","popstate"].forEach(evt => document.addEventListener(evt, handleColorChange));
 
     if (mediaList) {
       if (observer) observer.disconnect();
-      observer = new MutationObserver(() => safeReorderByColor(currentSelectedColor));
+      observer = new MutationObserver(() => {
+        if (!isReordering) {
+          safeReorderByColor(currentSelectedColor);
+        }
+      });
       observer.observe(mediaList, { childList: true, subtree: true });
     }
 
     document.querySelectorAll(".customize-drawer-close").forEach(btn => {
       btn.addEventListener("click", restartActiveVideo);
     });
-
-    // Track first user interaction
-    const markUserInteraction = () => { userInteracted = true; document.removeEventListener('click', markUserInteraction); document.removeEventListener('touchstart', markUserInteraction); playAllVideos(); };
-    document.addEventListener('click', markUserInteraction);
-    document.addEventListener('touchstart', markUserInteraction, { passive: true });
+    
+    const drawer = document.querySelector('.customize-drawer');
+    if (drawer) {
+      drawer.addEventListener('transitionend', restartActiveVideo);
+      drawer.addEventListener('animationend', restartActiveVideo);
+    }
   };
 
-  const cleanup = () => { if (observer) observer.disconnect(); };
+  const cleanup = () => { 
+    if (observer) observer.disconnect(); 
+  };
 
   const initialize = () => {
     if (isInitialized) return;
@@ -393,6 +421,11 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
 
   window.addEventListener("beforeunload", cleanup);
-  document.addEventListener("shopify:section:load", () => { cleanup(); isInitialized = false; initialize(); });
+  document.addEventListener("shopify:section:load", () => { 
+    cleanup(); 
+    isInitialized = false; 
+    initialize(); 
+  });
   document.addEventListener("theme:loaded", initialize);
 });
+
