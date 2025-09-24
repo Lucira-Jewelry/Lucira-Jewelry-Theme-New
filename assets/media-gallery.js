@@ -97,9 +97,16 @@ if (!customElements.get('media-gallery')) {
 
       playActiveMedia(activeItem) {
         window.pauseAllMedia();
+
+        // 3D deferred media
         const deferredMedia = activeItem.querySelector('.deferred-media');
         if (deferredMedia) deferredMedia.loadContent(false);
+
+        // Video
+        const videoEl = activeItem.querySelector('video');
+        if (videoEl) playVideo(videoEl);
       }
+
 
       preventStickyHeader() {
         this.stickyHeader = this.stickyHeader || document.querySelector('sticky-header');
