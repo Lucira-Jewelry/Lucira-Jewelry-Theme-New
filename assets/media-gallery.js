@@ -366,3 +366,41 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("shopify:section:load", () => { cleanup(); isInitialized = false; initialize(); });
   document.addEventListener("theme:loaded", initialize);
 });
+
+function restartActiveVideo() {
+  // Wait for DOM updates after variant change or drawer close
+  setTimeout(() => {
+    const activeItem = document.querySelector('.product__media-item.is-active');
+    if (!activeItem) return;
+
+    const videoEl = activeItem.querySelector('video');
+    if (videoEl) {
+      videoEl.loop = true;
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      videoEl.currentTime = 0;
+      videoEl.play().catch(() => {});
+
+      // Ensure loop works if browser ignores loop
+      videoEl.removeEventListener('ended', videoEl._loopHandler);
+      videoEl._loopHandler = () => {
+        videoEl.currentTime = 0;
+        videoEl.play().catch(() => {});
+      };
+      videoEl.addEventListener('ended', videoEl._loopHandler);
+    }
+
+    // Load deferred 3D media if exists
+    const deferredMedia = activeItem.querySelector('.deferred-media');
+    if (deferredMedia && deferredMedia.loadContent) deferredMedia.loadContent(false);
+  }, 100); // Delay to let Shopify finish re-render
+}
+
+// Listen for variant changes
+document.addEventListener('variant:change', restartActiveVideo);
+document.addEventListener('variant:selected', restartActiveVideo);
+
+// Listen for customize drawer close
+document.querySelectorAll('#customize_close_drawer').forEach(btn => {
+  btn.addEventListener('click', restartActiveVideo);
+});
