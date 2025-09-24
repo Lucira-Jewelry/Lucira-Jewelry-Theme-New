@@ -431,18 +431,26 @@ document.addEventListener("DOMContentLoaded", function () {
 
 document.addEventListener("DOMContentLoaded", function() {
   const closeButton = document.querySelector("#close-customize-drawer");
-  
   if (!closeButton) return;
 
   closeButton.addEventListener("click", function() {
-    // Select your video(s) inside the product media wrapper
+    // Select all videos in product media wrapper
     const videos = document.querySelectorAll(".product-media-container video");
 
     videos.forEach(video => {
-      video.loop = true;      // Enable looping
-      video.muted = true;     // Optional: autoplay often requires muted
+      video.muted = true;   // ensure autoplay works
+      video.loop = true;    // enable loop
       video.play().catch(err => console.log("Video play failed:", err));
+    });
+
+    // For YouTube iframes
+    const ytIframes = document.querySelectorAll(".product-media-container iframe[src*='youtube.com']");
+    ytIframes.forEach(iframe => {
+      // Reload the iframe with autoplay=1&loop=1&playlist=videoId
+      const src = iframe.src;
+      iframe.src = src.includes("autoplay=1") ? src : src + "&autoplay=1&loop=1&playlist=" + iframe.src.split("/embed/")[1];
     });
   });
 });
+
 
