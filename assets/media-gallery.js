@@ -429,3 +429,39 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("theme:loaded", initialize);
 });
 
+document.querySelectorAll(".customize-drawer-close").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const activeItem = document.querySelector(".product__media-item.is-active");
+    if (!activeItem) return;
+
+    // Initialize deferred media if not loaded
+    const deferred = activeItem.querySelector(".deferred-media");
+    const poster = deferred?.querySelector(".deferred-media__poster");
+    if (deferred && !deferred.classList.contains("loaded")) {
+      if (deferred.loadContent) deferred.loadContent(false);
+      deferred.classList.add("loaded");
+      if (poster) poster.style.display = "none";
+    }
+
+    // Play video if exists
+    const video = activeItem.querySelector("video");
+    if (video) {
+      video.muted = true;
+      video.playsInline = true;
+      video.loop = true;
+
+      // Only autoplay if user interacted or desktop
+      if (window.userInteracted || !/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        video.play().catch(() => {
+          if (poster) poster.style.display = "block"; // fallback
+        });
+      } else if (poster) {
+        poster.style.display = "block"; // show poster if autoplay blocked
+        poster.addEventListener("click", () => {
+          poster.style.display = "none";
+          video.play().catch(() => {});
+        }, { once: true });
+      }
+    }
+  });
+});
