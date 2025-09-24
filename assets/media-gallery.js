@@ -429,4 +429,20 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("theme:loaded", initialize);
 });
 
+document.addEventListener("DOMContentLoaded", function() {
+  const closeButton = document.querySelector("#close-customize-drawer");
+  
+  if (!closeButton) return;
+
+  closeButton.addEventListener("click", function() {
+    // Select your video(s) inside the product media wrapper
+    const videos = document.querySelectorAll(".product-media-container video");
+
+    videos.forEach(video => {
+      video.loop = true;      // Enable looping
+      video.muted = true;     // Optional: autoplay often requires muted
+      video.play().catch(err => console.log("Video play failed:", err));
+    });
+  });
+});
 
