@@ -128,41 +128,49 @@ document.addEventListener("DOMContentLoaded", function () {
   let observer = null;
   let isReordering = false;
 
-  function cacheDOMElements() {
-    mediaList = document.querySelector('.product__media-list');
-  }
-
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
+  // ----- Utility Functions -----
+  const debounce = (fn, delay) => {
+    let timer;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
     };
-  }
+  };
 
-  function getColorFromAlt(text) {
-    const lower = (text || "").toLowerCase();
-    if (lower.includes("white")) return "white";
-    if (lower.includes("yellow")) return "yellow";
-    if (lower.includes("rose")) return "rose";
+  const getColorFromAlt = (text) => {
+    const alt = (text || "").toLowerCase();
+    if (alt.includes("white")) return "white";
+    if (alt.includes("yellow")) return "yellow";
+    if (alt.includes("rose")) return "rose";
     return "";
-  }
+  };
 
-  function classifyItemsByColor(targetColor) {
+  const playVideo = (videoEl) => {
+    if (!videoEl) return;
+    videoEl.pause();
+    videoEl.currentTime = 0;
+    videoEl.loop = true;
+    videoEl.muted = true;
+    videoEl.playsInline = true;
+    videoEl.play().catch(() => {});
+  };
+
+  const pauseAllMedia = () => {
+    document.querySelectorAll(".product__media-item video").forEach(v => v.pause());
+    document.querySelectorAll(".product__media-item .deferred-media").forEach(dm => dm.loadContent && dm.pause());
+  };
+
+  const cacheDOM = () => {
+    mediaList = document.querySelector(".product__media-list");
+  };
+
+  // ----- Reorder Functions -----
+  const classifyItemsByColor = (targetColor) => {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
-    const buckets = {
-      color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
-      extras: []
-    };
+    const buckets = { color: [], codes: { mq: [], ci: [], mh: [], mv: [], v360: [] }, extras: [] };
 
     items.forEach(item => {
-      const img = item.querySelector("img");
-      const alt = (img?.alt || "").toLowerCase();
+      const alt = (item.querySelector("img")?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
@@ -174,194 +182,151 @@ document.addEventListener("DOMContentLoaded", function () {
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
-        item.style.display = 'none';
+        item.style.display = "none";
       }
     });
 
     return { buckets, allItems: items };
-  }
+  };
 
-  function takeColor(buckets) {
-    return buckets.color.length ? buckets.color.shift() : null;
-  }
-
-  function takeCode(buckets) {
+  const takeColor = (buckets) => buckets.color.length ? buckets.color.shift() : null;
+  const takeCode = (buckets) => {
     for (const key of ALWAYS_SHOW_CODES) {
       const k = key === "360v" ? "v360" : key;
       if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
     return null;
-  }
+  };
 
-  function buildRepeatedPattern(buckets) {
-    const slotPattern = [
-      "color", "code", "code",
-      "color", "color", "code", "code",
-      "color", "color", "code", "code",
-      "color"
-    ];
+  const buildPattern = (buckets) => {
+    const slotPattern = ["color","code","code","color","color","code","code","color","color","code","code","color"];
     const ordered = [];
-
-    for (const slot of slotPattern) {
+    slotPattern.forEach(slot => {
       let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-      if (node) {
-        node.style.display = 'block';
-        ordered.push(node);
-      }
-    }
-
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
-    buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
-    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
-
+      if (node) { node.style.display = "block"; ordered.push(node); }
+    });
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = "block"; ordered.push(node); }));
+    buckets.color.forEach(node => { node.style.display = "block"; ordered.push(node); });
+    buckets.extras.forEach(node => { node.style.display = "block"; ordered.push(node); });
     return ordered;
-  }
+  };
 
-  function reorderByColor(targetColor) {
+  const reorderByColor = (targetColor) => {
+    if (!mediaList) return -1;
     const { buckets, allItems } = classifyItemsByColor(targetColor);
-    const ordered = buildRepeatedPattern(buckets);
+    const ordered = buildPattern(buckets);
     const container = allItems[0]?.parentNode;
-    if (!container) return;
+    if (!container) return -1;
 
-    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains('is-active'));
-
+    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains("is-active"));
     ordered.forEach(node => container.appendChild(node));
-
     return ordered.findIndex(item => activeIndex >= 0 && item === allItems[activeIndex]);
-  }
+  };
 
-  function createDotsNavigation() {
-    if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
+  // ----- Slider Functions -----
+  const createDotsNavigation = () => {
     if (!mediaList) return;
-
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    if (dotsContainer) dotsContainer.remove();
+    const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
     totalSlides = slides.length;
     if (totalSlides <= 1) return;
 
-    dotsContainer = document.createElement('div');
-    dotsContainer.className = 'custom-slider-dots';
-
-    for (let i = 0; i < totalSlides; i++) {
-      const dot = document.createElement('span');
-      dot.className = 'slider-dot';
-      if (i === currentSlide) dot.classList.add('active');
-      dot.addEventListener('click', () => goToSlide(i));
+    dotsContainer = document.createElement("div");
+    dotsContainer.className = "custom-slider-dots";
+    slides.forEach((_, i) => {
+      const dot = document.createElement("span");
+      dot.className = "slider-dot" + (i === currentSlide ? " active" : "");
+      dot.addEventListener("click", () => goToSlide(i));
       dotsContainer.appendChild(dot);
-    }
-
+    });
     mediaList.parentNode.appendChild(dotsContainer);
-  }
+  };
 
-  function goToSlide(index) {
-    if (index < 0 || index >= totalSlides) return;
+  const goToSlide = (index) => {
+    if (!mediaList || index < 0 || index >= totalSlides) return;
     currentSlide = index;
+    const slides = Array.from(mediaList.querySelectorAll(".product__media-item")).filter(s => s.style.display !== "none");
+    slides.forEach((s, i) => s.classList.toggle("is-active", i === index));
+    if (dotsContainer) dotsContainer.querySelectorAll(".slider-dot").forEach((d, i) => d.classList.toggle("active", i === index));
+    slides[index]?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+
+    // Play active video
+    const videoEl = slides[index].querySelector("video");
+    if (videoEl) playVideo(videoEl);
+  };
+
+  const initSlider = () => {
     if (!mediaList) return;
-
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
-    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
-
-    if (dotsContainer) dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
-
-    if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-  }
-
-  function initSliderNavigation() {
-    if (!mediaList) return;
-    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
-  }
+    goToSlide(currentSlide);
+  };
 
-  function safeReorderByColor(targetColor) {
-    if (isReordering) return;
+  // ----- Core Logic -----
+  const safeReorderByColor = (targetColor) => {
+    if (isReordering || !mediaList) return;
     isReordering = true;
-
-    if (!mediaList) { isReordering = false; return; }
     const newActiveIndex = reorderByColor(targetColor);
     currentSlide = 0;
-    initSliderNavigation();
+    initSlider();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
-
-    // Allow next reorder
     setTimeout(() => { isReordering = false; }, 200);
+    mediaList.setAttribute("data-media-reordered", "true");
+  };
 
-    mediaList.setAttribute('data-media-reordered', 'true');
-  }
-
-  function getSelectedColor() {
-    const colorInputs = document.querySelectorAll(
-      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
+  const getSelectedColor = () => {
+    const inputs = document.querySelectorAll(
+      'input[name*="Color"]:checked, select[name*="Color"], input[name*="color"]:checked, select[name*="color"]'
     );
-    for (const input of colorInputs) {
-      if (input.checked || input.tagName === 'SELECT') {
-        const color = getColorFromAlt(input.value);
-        if (color) return color;
-      }
-    }
-    const selectedVariants = document.querySelectorAll(
-      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
-    );
-    for (const element of selectedVariants) {
-      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
-      const color = getColorFromAlt(text);
+    for (const input of inputs) {
+      const color = getColorFromAlt(input.value);
       if (color) return color;
     }
-    const urlParams = new URLSearchParams(window.location.search);
-    const colorParam = urlParams.get('color') || urlParams.get('Color');
-    if (colorParam) return getColorFromAlt(colorParam);
+    const urlColor = new URLSearchParams(window.location.search).get("color");
+    if (urlColor) return getColorFromAlt(urlColor);
     return "yellow";
-  }
+  };
 
-  const debouncedHandleColorChange = debounce(function () {
+  const handleColorChange = debounce(() => {
     const selectedColor = getSelectedColor();
     if (!selectedColor || selectedColor === currentSelectedColor) return;
-
     currentSelectedColor = selectedColor;
-
-    // ✅ Delay slightly to let Shopify finish DOM updates
-    setTimeout(() => {
-      safeReorderByColor(selectedColor);
-    }, 100); 
+    setTimeout(() => safeReorderByColor(selectedColor), 100);
   }, 50);
 
-  function setupVariantChangeListeners() {
-    document.addEventListener('change', debouncedHandleColorChange);
-    document.addEventListener('variant:change', debouncedHandleColorChange);
-    document.addEventListener('variant:selected', debouncedHandleColorChange);
-    window.addEventListener('popstate', debouncedHandleColorChange);
-
-    // ✅ Observe mediaList container so that if Shopify re-renders, we reapply order
+  const setupListeners = () => {
+    ["change","variant:change","variant:selected","popstate"].forEach(evt => document.addEventListener(evt, handleColorChange));
     if (mediaList) {
       if (observer) observer.disconnect();
-      observer = new MutationObserver(() => {
-        safeReorderByColor(currentSelectedColor);
-      });
+      observer = new MutationObserver(() => safeReorderByColor(currentSelectedColor));
       observer.observe(mediaList, { childList: true, subtree: true });
     }
-  }
 
-  function cleanup() {
-    if (observer) observer.disconnect();
-  }
+    // Restart videos on drawer close
+    document.querySelectorAll(".customize-drawer-close").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const activeItem = document.querySelector(".product__media-item.is-active");
+        const videoEl = activeItem?.querySelector("video");
+        if (videoEl) playVideo(videoEl);
+      });
+    });
+  };
 
-  function initialize() {
+  const cleanup = () => { if (observer) observer.disconnect(); };
+
+  const initialize = () => {
     if (isInitialized) return;
-    cacheDOMElements();
+    cacheDOM();
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
-    setupVariantChangeListeners();
+    setupListeners();
     isInitialized = true;
-  }
+  };
 
   initialize();
-
-  if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', () => { cleanup(); isInitialized = false; initialize(); });
-    document.addEventListener('theme:loaded', initialize);
-  }
-
   setTimeout(initialize, 1000);
-  window.addEventListener('beforeunload', cleanup);
-});
 
+  window.addEventListener("beforeunload", cleanup);
+  document.addEventListener("shopify:section:load", () => { cleanup(); isInitialized = false; initialize(); });
+  document.addEventListener("theme:loaded", initialize);
+});
 
