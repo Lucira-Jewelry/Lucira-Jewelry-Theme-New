@@ -1,4 +1,3 @@
-{% assign variant = product.selected_or_first_available_variant %}
 <div class="pdp-details-main">
   <div class="pdp-details-accordion">
 
@@ -165,162 +164,183 @@
   </div>
 </div>
 
-
-
 <script>
-(function(){
+  const variantSelector = document.querySelector("[name='id']");
+  const allVariantInformation = JSON.parse(document.getElementById("variant-metafields-information").textContent);
 
-  function escapeHtml(str) {
-    if (str === null || str === undefined) return '';
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
+  // Update SKU inside accordion
+  function updateAccordionContent(variantData) {
+    const skuSelectors = [
+      '.product__sku span:not(.visually-hidden-)',
+      '.product__sku span:last-child',
+      '.product__sku'
+    ];
 
-  function clearTables() {
-    var d = document.getElementById('diamond-table-body');
-    var g = document.getElementById('gemstone-table-body');
-    if (d) d.innerHTML = '';
-    if (g) g.innerHTML = '';
-  }
-
-  function updateAccordionForVariant(variantId) {
-    if (!variantId) return;
-    var data = window.variantMetafields && window.variantMetafields[variantId];
-    if (!data) {
-      // no metafields for this variant -> clear
-      document.getElementById('metal-type').textContent = '';
-      document.getElementById('metal-weight').textContent = '';
-      document.getElementById('metal-dimensions').textContent = '';
-      clearTables();
-      // clear SKU
-      var skuEl = document.getElementById('Sku-{{ section.id }}');
-      if (skuEl) skuEl.textContent = '';
-      return;
+    let skuElement = null;
+    for (const selector of skuSelectors) {
+      skuElement = document.querySelector(selector);
+      if (skuElement) break;
     }
 
-    // SKU
-    var skuEl = document.getElementById('Sku-{{ section.id }}');
-    if (skuEl) {
-      skuEl.textContent = (data.sku || '');
+    if (skuElement && variantData.sku) {
+      skuElement.textContent = variantData.sku;
     }
 
-    // Metal
-    var metalType = '';
-    if (data.metal_purity) metalType += data.metal_purity;
-    if (data.metal_color) metalType += (metalType ? ' - ' : '') + data.metal_color;
-    document.getElementById('metal-type').textContent = metalType;
+    updateMetalInfoTable(variantData);
+    updateDiamondTable(variantData);
+    updateGemstoneTable(variantData);
+  }
 
-    var metalWeight = '';
-    if (data.metal_weight) metalWeight += 'Net Wt: ' + data.metal_weight + 'g<br>';
-    if (data.gross_weight) metalWeight += 'Gross Wt: ' + data.gross_weight + 'g';
-    document.getElementById('metal-weight').innerHTML = metalWeight;
+  // Update Metal Information Table
+  function updateMetalInfoTable(variantData) {
+    const metalTypeCell = document.getElementById('metal-type');
+    if (metalTypeCell) {
+      let metalTypeText = '';
+      if (variantData['metal_purity']) {
+        metalTypeText += variantData['metal_purity'] + ' - ';
+      }
+      if (variantData['metal_color']) {
+        metalTypeText += variantData['metal_color'];
+      }
+      metalTypeCell.innerText = metalTypeText;
+    }
 
-    var metalDimensions = '';
-    if (data.top_width) metalDimensions += 'Width: ' + data.top_width + 'mm<br>';
-    if (data.top_height) metalDimensions += 'Height: ' + data.top_height + 'mm';
-    document.getElementById('metal-dimensions').innerHTML = metalDimensions;
+    const metalWeightCell = document.getElementById('metal-weight');
+    if (metalWeightCell) {
+      let metalWeightText = '';
+      if (variantData['metal_weight']) {
+        metalWeightText += 'Net Wt: ' + variantData['metal_weight'] + 'g';
+      }
+      if (variantData['gross_weight']) {
+        if (metalWeightText) metalWeightText += '<br>';
+        metalWeightText += 'Gross Wt: ' + variantData['gross_weight'] + 'g';
+      }
+      metalWeightCell.innerHTML = metalWeightText;
+    }
 
-    // Diamonds
-    var diamondBody = document.getElementById('diamond-table-body');
-    if (diamondBody) {
-      var html = '';
-      for (var i = 1; i <= 4; i++) {
-        var d = (data.diamonds && data.diamonds[String(i)]) || {};
-        if (d && d.type) {
-          var clarity = d.clarity || '';
-          var color = d.color || '';
-          var numbers = d.numbers || '';
-          var shape = d.shape || '';
-          var setting = d.setting || '';
-          var weight = d.weight || '';
-          var typeCell = escapeHtml(d.type) + ((clarity || color) ? ('/ ' + escapeHtml(clarity) + '-' + escapeHtml(color)) : '');
-          html += '<tr>';
-          html += '<td>' + typeCell + '</td>';
-          html += '<td>' + escapeHtml(numbers) + ' - ' + escapeHtml(shape) + '</td>';
-          html += '<td>' + escapeHtml(setting) + ': ' + escapeHtml(weight) + 'ct</td>';
-          html += '</tr>';
+    const metalDimensionsCell = document.getElementById('metal-dimensions');
+    if (metalDimensionsCell) {
+      let dimensionsText = '';
+      if (variantData['top_width']) {
+        dimensionsText += 'Width: ' + variantData['top_width'] + 'mm';
+      }
+      if (variantData['top_height']) {
+        if (dimensionsText) dimensionsText += '<br>';
+        dimensionsText += 'Height: ' + variantData['top_height'] + 'mm';
+      }
+      metalDimensionsCell.innerHTML = dimensionsText;
+    }
+  }
+
+  // Update Diamond Table
+  function updateDiamondTable(variantData) {
+    const diamondTableBody = document.getElementById('diamond-table-body');
+    if (!diamondTableBody) return;
+
+    diamondTableBody.innerHTML = '';
+
+    for (let i = 1; i <= 4; i++) {
+      const typeKey = `diamond_${i}_type_`;
+      const shapeKey = `diamond_${i}_shape`;
+      const numbersKey = `diamond_${i}_numbers`;
+      const settingKey = `diamond_${i}_setting`;
+      const weightKey = `diamond_${i}_weight`;
+      const clarityKey = `diamond_${i}_clarity`;
+      const colorKey = `diamond_${i}_color`;
+
+      if (variantData[typeKey]) {
+        const row = document.createElement('tr');
+
+        const typeCell = document.createElement('td');
+        let typeText = variantData[typeKey] || '';
+        if (variantData[clarityKey]) typeText += '/ ' + variantData[clarityKey];
+        if (variantData[colorKey]) typeText += '- ' + variantData[colorKey];
+        typeCell.innerText = typeText;
+
+        const shapeCell = document.createElement('td');
+        let shapeText = '';
+        if (variantData[numbersKey]) shapeText += variantData[numbersKey];
+        if (variantData[shapeKey]) {
+          if (shapeText) shapeText += ' - ';
+          shapeText += variantData[shapeKey];
         }
-      }
-      diamondBody.innerHTML = html;
-    }
+        shapeCell.innerText = shapeText;
 
-    // Gemstones
-    var gemBody = document.getElementById('gemstone-table-body');
-    if (gemBody) {
-      var html = '';
-      for (var i = 1; i <= 4; i++) {
-        var g = (data.gemstones && data.gemstones[String(i)]) || {};
-        if (g && g.type) {
-          html += '<tr>';
-          html += '<td>' + escapeHtml(g.color || '') + ' - ' + escapeHtml(g.type) + '</td>';
-          html += '<td>' + escapeHtml(g.numbers || '') + ' - ' + escapeHtml(g.shape || '') + '</td>';
-          html += '<td>' + escapeHtml(g.setting || '') + ': ' + escapeHtml(g.weight || '') + 'ct</td>';
-          html += '</tr>';
+        const settingCell = document.createElement('td');
+        let settingText = '';
+        if (variantData[settingKey]) settingText += variantData[settingKey];
+        if (variantData[weightKey]) {
+          if (settingText) settingText += ': ';
+          settingText += variantData[weightKey] + 'ct';
         }
+        settingCell.innerText = settingText;
+
+        row.appendChild(typeCell);
+        row.appendChild(shapeCell);
+        row.appendChild(settingCell);
+        diamondTableBody.appendChild(row);
       }
-      gemBody.innerHTML = html;
     }
   }
 
-  // Push promo helper (for your labels)
-  window.pushPromo = function(promoName) {
-    var currentVariantId = null;
-    // First try to read the currently selected variant id from common selectors
-    var sel = document.querySelector('select[name="id"], input[name="id"]');
-    if (sel) currentVariantId = sel.value || sel.getAttribute('value');
-    // fallback to data stored on window (if your theme sets current variant elsewhere)
-    if (!currentVariantId && window.currentVariant && window.currentVariant.id) currentVariantId = window.currentVariant.id;
-    // fallback to server-warmed variant
-    if (!currentVariantId) currentVariantId = '{{ variant.id }}';
+  // Update Gemstone Table
+  function updateGemstoneTable(variantData) {
+    const gemstoneTableBody = document.getElementById('gemstone-table-body');
+    if (!gemstoneTableBody) return;
 
-    var sku = (window.variantMetafields && window.variantMetafields[currentVariantId] && window.variantMetafields[currentVariantId].sku) || '';
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'promoClick',
-      promoClick: {
-        promo_id: sku,
-        promo_name: '{{ product.title }}',
-        creative_name: promoName
+    gemstoneTableBody.innerHTML = '';
+
+    for (let i = 1; i <= 4; i++) {
+      const typeKey = `gemstone_${i}_type_`;
+      const shapeKey = `gemstone_${i}_shape`;
+      const numbersKey = `gemstone_${i}_numbers`;
+      const settingKey = `gemstone_${i}_setting`;
+      const weightKey = `gemstone_${i}_weight`;
+      const colorKey = `gemstone_${i}_color`;
+
+      if (variantData[typeKey]) {
+        const row = document.createElement('tr');
+
+        const typeCell = document.createElement('td');
+        let typeText = '';
+        if (variantData[colorKey]) typeText += variantData[colorKey] + ' - ';
+        typeText += variantData[typeKey];
+        typeCell.innerText = typeText;
+
+        const shapeCell = document.createElement('td');
+        let shapeText = '';
+        if (variantData[numbersKey]) shapeText += variantData[numbersKey];
+        if (variantData[shapeKey]) {
+          if (shapeText) shapeText += ' - ';
+          shapeText += variantData[shapeKey];
+        }
+        shapeCell.innerText = shapeText;
+
+        const settingCell = document.createElement('td');
+        let settingText = '';
+        if (variantData[settingKey]) settingText += variantData[settingKey];
+        if (variantData[weightKey]) {
+          if (settingText) settingText += ': ';
+          settingText += variantData[weightKey] + 'ct';
+        }
+        settingCell.innerText = settingText;
+
+        row.appendChild(typeCell);
+        row.appendChild(shapeCell);
+        row.appendChild(settingCell);
+        gemstoneTableBody.appendChild(row);
       }
-    });
-  };
-
-  // Listen for variant changes
-  document.addEventListener('DOMContentLoaded', function() {
-    // initial render: use selected id if present, otherwise server-side variant id
-    var initialVariantId = '{{ variant.id }}';
-    var sel = document.querySelector('select[name="id"], input[name="id"]');
-    if (sel && sel.value) initialVariantId = sel.value;
-
-    updateAccordionForVariant(initialVariantId);
-
-    // Theme event (Dawn etc.)
-    document.addEventListener('variant:change', function(e) {
-      var vid = e && e.detail && e.detail.variant && e.detail.variant.id;
-      if (vid) updateAccordionForVariant(vid);
-    });
-
-    // select fallback
-    var selector = document.querySelector('select[name="id"], input[name="id"]');
-    if (selector) {
-      selector.addEventListener('change', function() {
-        updateAccordionForVariant(this.value);
-      });
     }
+  }
 
-    // swatch / clickable elements sometimes use data-variant-id
-    document.body.addEventListener('click', function(e) {
-      var el = e.target;
-      if (!el) return;
-      var vid = el.getAttribute && (el.getAttribute('data-variant-id') || el.dataset && el.dataset.variantId);
-      if (vid) {
-        updateAccordionForVariant(vid);
+  // Event listener for variant change
+  if (variantSelector) {
+    variantSelector.addEventListener('change', (event) => {
+      const selectedVariantId = event.target.value;
+      const variantData = allVariantInformation[selectedVariantId];
+      if (variantData) {
+        updateAccordionContent(variantData);
       }
     });
-  });
-})();
+  }
 </script>
