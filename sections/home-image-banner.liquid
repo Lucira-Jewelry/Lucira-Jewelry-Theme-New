@@ -2,36 +2,51 @@
   <div class="swiper home-image-banner-swiper">
     <div class="swiper-wrapper">
       {% for block in section.blocks %}
-        {% assign desktop_image = block.settings.slide_image | image_url: '1920x1080' %}
-        {% assign mobile_image = block.settings.mobile_slide_image | image_url: '768x432' %}
-        {% assign desktop_webp = block.settings.slide_image | image_url: '1920x1080', format: 'webp' %}
-        {% assign mobile_webp = block.settings.mobile_slide_image | image_url: '768x432', format: 'webp' %}
+        {% comment %} Debug: Show what images we have {% endcomment %}
+        {% assign desktop_image = block.settings.slide_image %}
+        {% assign mobile_image = block.settings.mobile_slide_image %}
+        
+        {% if desktop_image != blank %}
+          {% assign desktop_url = desktop_image | image_url: width: 1920 %}
+        {% else %}
+          {% assign desktop_url = '' %}
+        {% endif %}
+        
+        {% if mobile_image != blank %}
+          {% assign mobile_url = mobile_image | image_url: width: 768 %}
+        {% else %}
+          {% assign mobile_url = desktop_url %}
+        {% endif %}
 
-        <div class="swiper-slide banner-slide {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}"
-             id="{{ block.settings.slide_id }}"
+        <div class="swiper-slide banner-slide {{ section.settings.banner_height }}"
+             id="slide-{{ block.id }}"
              data-promo-id="{{ block.settings.dlv_promo_id }}"
              data-promo-name="{{ block.settings.dlv_promo_name }}"
-             {% if block.settings.slide_url %}onclick="window.location='{{ block.settings.slide_url }}'"{% endif %}
-             style="background-image: url('{{ desktop_image }}');">
+             data-desktop-image="{{ desktop_url }}"
+             data-mobile-image="{{ mobile_url }}"
+             {% if block.settings.slide_url %}data-slide-url="{{ block.settings.slide_url }}"{% endif %}>
           
-          <!-- Fallback image for better compatibility -->
-          {% if block.settings.slide_image %}
-            <img src="{{ desktop_image }}" 
-                 alt="{{ block.settings.slide_header | default: 'Banner slide' }}"
-                 class="banner-fallback-image"
-                 loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-                 style="display: none;">
+          {% comment %} Fallback: Direct img tag if background fails {% endcomment %}
+          {% if desktop_image != blank %}
+            <img src="{{ desktop_url }}" 
+                 alt="{{ block.settings.slide_header | default: 'Banner slide' | escape }}"
+                 class="banner-image-fallback"
+                 loading="{% if forloop.first %}eager{% else %}lazy{% endif %}">
+          {% else %}
+            <div class="banner-no-image">
+              <p>No image uploaded for this slide</p>
+            </div>
           {% endif %}
 
-          <div class="home-image-banner-slider-content {{ section.settings.content_position }}">
+          <div class="home-image-banner-slider-content {{ section.settings.content_position | default: 'mid-left' }}">
             <div class="banner-content-wrapper">
-              {% if block.settings.slide_header %}
+              {% if block.settings.slide_header != blank %}
                 <h2 class="home-image-banner-slider-content-header">{{ block.settings.slide_header }}</h2>
               {% endif %}
-              {% if block.settings.slide_subheader %}
+              {% if block.settings.slide_subheader != blank %}
                 <p class="banner-subheader">{{ block.settings.slide_subheader }}</p>
               {% endif %}
-              {% if block.settings.show_button and block.settings.slide_button_text %}
+              {% if block.settings.show_button and block.settings.slide_button_text != blank %}
                 <button class="home-image-banner-slider-content-button" type="button">
                   {{ block.settings.slide_button_text }}
                 </button>
@@ -42,33 +57,32 @@
       {% endfor %}
     </div>
 
-    <div class="swiper-pagination"></div>
-    <div class="swiper-button-prev" aria-label="Previous slide"></div>
-    <div class="swiper-button-next" aria-label="Next slide"></div>
+    {% if section.blocks.size > 1 %}
+      <div class="swiper-pagination"></div>
+      <div class="swiper-button-prev" aria-label="Previous slide"></div>
+      <div class="swiper-button-next" aria-label="Next slide"></div>
+    {% endif %}
   </div>
 </section>
 
-<!-- Preload first slide images -->
+{% comment %} Preload first slide {% endcomment %}
 {% assign first_slide = section.blocks[0] %}
-{% if first_slide.settings.slide_image %}
-  <link rel="preload" as="image" href="{{ first_slide.settings.slide_image | image_url: '1920x1080' }}" fetchpriority="high">
-{% endif %}
-{% if first_slide.settings.mobile_slide_image %}
-  <link rel="preload" as="image" href="{{ first_slide.settings.mobile_slide_image | image_url: '768x432' }}" media="(max-width: 768px)">
+{% if first_slide.settings.slide_image != blank %}
+  <link rel="preload" as="image" href="{{ first_slide.settings.slide_image | image_url: width: 1920 }}">
 {% endif %}
 
 <style>
-/* Base banner styles - prevent CLS */
+/* Base banner styles */
 .home-image-banner {
   position: relative;
   width: 100%;
   overflow: hidden;
+  background: #f5f5f5; /* Fallback background */
 }
 
 .home-image-banner-swiper {
   width: 100%;
   height: 100%;
-  position: relative;
 }
 
 .banner-slide {
@@ -77,36 +91,31 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  min-height: 400px; /* Prevent CLS with minimum height */
   overflow: hidden;
 }
 
-/* Banner height classes */
-.banner--small { min-height: 300px; }
-.banner--medium { min-height: 500px; }
-.banner--large { min-height: 700px; }
-
-@media screen and (max-width: 768px) {
-  .banner--small { min-height: 250px; }
-  .banner--medium-mobile { min-height: 350px; }
-  .banner--large-mobile { min-height: 450px; }
+/* Height classes */
+.banner--small { 
+  min-height: 300px; 
+  height: 300px;
+}
+.banner--medium { 
+  min-height: 500px; 
+  height: 500px;
+}
+.banner--large { 
+  min-height: 700px; 
+  height: 700px;
 }
 
-/* Optimized slide container */
-.banner-slide {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  min-height: 400px; /* Prevent CLS with minimum height */
-  overflow: hidden;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+/* Default height if no class */
+.banner-slide:not([class*="banner--"]) {
+  min-height: 500px;
+  height: 500px;
 }
 
-.banner-fallback-image {
+/* Image handling - both background and fallback */
+.banner-image-fallback {
   position: absolute;
   top: 0;
   left: 0;
@@ -114,65 +123,80 @@
   height: 100%;
   object-fit: cover;
   object-position: center;
+  z-index: 1;
 }
 
-/* Mobile background images */
-@media screen and (max-width: 768px) {
-  {% for block in section.blocks %}
-    {% assign mobile_image = block.settings.mobile_slide_image | image_url: '768x432' %}
-    {% if mobile_image and mobile_image != blank %}
-      #{{ block.settings.slide_id }} {
-        background-image: url('{{ mobile_image }}') !important;
-      }
-    {% endif %}
-  {% endfor %}
+.banner-no-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #e0e0e0;
+  color: #666;
+  font-size: 1.2rem;
 }
 
 /* Content positioning */
 .home-image-banner-slider-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
+  display: flex;
   padding: 2rem;
-  pointer-events: none;
+  z-index: 2;
 }
 
-.mid-left { justify-content: flex-start; align-items: center; }
-.mid-center { justify-content: center; align-items: center; }
-.mid-right { justify-content: flex-end; align-items: center; }
+.mid-left { 
+  justify-content: flex-start; 
+  align-items: center; 
+}
+.mid-center { 
+  justify-content: center; 
+  align-items: center; 
+}
+.mid-right { 
+  justify-content: flex-end; 
+  align-items: center; 
+}
 
 .banner-content-wrapper {
-  max-width: 60rem;
-  pointer-events: all;
+  max-width: 600px;
   color: #fff;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.7);
 }
 
 .home-image-banner-slider-content-header {
-  font-size: clamp(1.5rem, 4vw, 2.5rem);
+  font-size: clamp(1.5rem, 4vw, 3rem);
   margin: 0 0 1rem 0;
   font-weight: bold;
   line-height: 1.2;
 }
 
 .banner-subheader {
-  font-size: clamp(1rem, 2.5vw, 1.25rem);
+  font-size: clamp(1rem, 2.5vw, 1.5rem);
   margin: 0 0 2rem 0;
   line-height: 1.4;
+  opacity: 0.9;
 }
 
 .home-image-banner-slider-content-button {
   background: #a68380;
   color: white;
   text-transform: uppercase;
-  padding: 1rem 3rem;
-  border-radius: 12px;
+  padding: 1rem 2.5rem;
+  border-radius: 8px;
   border: none;
   cursor: pointer;
   font-weight: bold;
+  font-size: 0.9rem;
   transition: all 0.3s ease;
+  text-decoration: none;
   display: inline-block;
 }
 
@@ -181,10 +205,19 @@
   transform: translateY(-2px);
 }
 
-/* Mobile optimizations */
+/* Mobile styles */
 @media screen and (max-width: 768px) {
+  .banner--small { height: 250px; min-height: 250px; }
+  .banner--medium { height: 350px; min-height: 350px; }
+  .banner--large { height: 450px; min-height: 450px; }
+  
+  .banner-slide:not([class*="banner--"]) {
+    height: 350px;
+    min-height: 350px;
+  }
+  
   .home-image-banner-slider-content {
-    padding: 1.5rem;
+    padding: 1rem;
     align-items: center;
     justify-content: center;
   }
@@ -195,16 +228,20 @@
   }
   
   .banner-subheader {
-    display: none; /* Hide on mobile as requested */
+    display: none;
   }
   
   .home-image-banner-slider-content-button {
     padding: 0.75rem 2rem;
-    font-size: 0.9rem;
+    font-size: 0.8rem;
   }
 }
 
 /* Swiper customizations */
+.swiper-pagination {
+  bottom: 20px !important;
+}
+
 .swiper-pagination-bullet {
   background: rgba(255, 255, 255, 0.5);
   opacity: 1;
@@ -225,87 +262,121 @@
 
 .swiper-button-next:after,
 .swiper-button-prev:after {
-  font-size: 18px;
+  font-size: 16px;
 }
 
 @media screen and (max-width: 768px) {
   .swiper-button-next,
   .swiper-button-prev {
-    display: none; /* Hide navigation on mobile */
+    display: none;
   }
-}
-
-/* Loading state to prevent flash */
-.home-image-banner-swiper:not(.swiper-initialized) {
-  opacity: 0;
-}
-
-.home-image-banner-swiper.swiper-initialized {
-  opacity: 1;
-  transition: opacity 0.3s ease;
 }
 </style>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  // Check if Swiper is available
-  if (typeof Swiper === 'undefined') {
-    console.error('Swiper library not loaded');
-    return;
-  }
-
-  const swiperContainer = document.querySelector(".home-image-banner-swiper");
-  if (!swiperContainer) return;
-
-  const swiper = new Swiper(swiperContainer, {
-    loop: {{ section.blocks.size | default: 0 }} > 1,
-    autoplay: {{ section.settings.autoplay | default: false }} ? { 
-      delay: 5000, 
-      disableOnInteraction: false,
-      pauseOnMouseEnter: true
-    } : false,
-    pagination: { 
-      el: ".swiper-pagination", 
-      clickable: true,
-      dynamicBullets: true
-    },
-    navigation: { 
-      nextEl: ".swiper-button-next", 
-      prevEl: ".swiper-button-prev" 
-    },
-    lazy: {
-      loadPrevNext: true,
-      loadPrevNextAmount: 1,
-    },
-    speed: 600,
-    effect: 'fade',
-    fadeEffect: {
-      crossFade: true
-    },
-    a11y: {
-      enabled: true,
-      prevSlideMessage: 'Previous slide',
-      nextSlideMessage: 'Next slide',
-      paginationBulletMessage: 'Go to slide {{index}}'
-    },
-    on: {
-      init: function() {
-        // Trigger view event for first slide
-        const firstSlide = this.slides[this.activeIndex];
-        if (firstSlide && firstSlide.dataset.promoId) {
-          trackPromoView(firstSlide);
-        }
-      },
-      slideChange: function () {
-        const slideEl = this.slides[this.activeIndex];
-        if (slideEl && slideEl.dataset.promoId) {
-          trackPromoView(slideEl);
-        }
+  console.log('Banner script loading...');
+  
+  // Set background images via JavaScript for better reliability
+  const slides = document.querySelectorAll('.banner-slide');
+  slides.forEach(slide => {
+    const desktopImage = slide.dataset.desktopImage;
+    const mobileImage = slide.dataset.mobileImage;
+    
+    if (desktopImage) {
+      slide.style.backgroundImage = `url('${desktopImage}')`;
+      slide.style.backgroundSize = 'cover';
+      slide.style.backgroundPosition = 'center';
+      slide.style.backgroundRepeat = 'no-repeat';
+      
+      // Hide fallback image since background is working
+      const fallbackImg = slide.querySelector('.banner-image-fallback');
+      if (fallbackImg) {
+        fallbackImg.style.display = 'none';
       }
+      
+      console.log('Set background image:', desktopImage);
     }
   });
-
-  // GTM tracking functions
+  
+  // Mobile background images
+  function setMobileImages() {
+    if (window.innerWidth <= 768) {
+      slides.forEach(slide => {
+        const mobileImage = slide.dataset.mobileImage;
+        if (mobileImage && mobileImage !== slide.dataset.desktopImage) {
+          slide.style.backgroundImage = `url('${mobileImage}')`;
+        }
+      });
+    }
+  }
+  
+  setMobileImages();
+  window.addEventListener('resize', setMobileImages);
+  
+  // Initialize Swiper
+  if (typeof Swiper !== 'undefined') {
+    const swiperContainer = document.querySelector(".home-image-banner-swiper");
+    if (swiperContainer) {
+      const swiper = new Swiper(swiperContainer, {
+        loop: {{ section.blocks.size | default: 0 }} > 1,
+        autoplay: {{ section.settings.autoplay | default: false }} ? { 
+          delay: 5000, 
+          disableOnInteraction: false 
+        } : false,
+        pagination: { 
+          el: ".swiper-pagination", 
+          clickable: true 
+        },
+        navigation: { 
+          nextEl: ".swiper-button-next", 
+          prevEl: ".swiper-button-prev" 
+        },
+        speed: 800,
+        on: {
+          init: function() {
+            console.log('Swiper initialized');
+          },
+          slideChange: function () {
+            const slideEl = this.slides[this.activeIndex];
+            if (slideEl && slideEl.dataset.promoId) {
+              trackPromoView(slideEl);
+            }
+          }
+        }
+      });
+      
+      console.log('Swiper created successfully');
+    }
+  } else {
+    console.error('Swiper library not found. Please add Swiper CSS/JS to your theme.');
+  }
+  
+  // Click handlers
+  slides.forEach(slide => {
+    slide.addEventListener('click', function(e) {
+      if (e.target.tagName === 'BUTTON') return;
+      
+      const slideUrl = slide.dataset.slideUrl;
+      if (slideUrl) {
+        window.location.href = slideUrl;
+      }
+      
+      // Analytics tracking
+      if (slide.dataset.promoId && typeof window.dataLayer !== 'undefined') {
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: slide.dataset.promoId,
+            promo_name: slide.dataset.promoName,
+            creative_name: "homepage_banner_image",
+            promo_position: "homepage_top"
+          }
+        });
+      }
+    });
+  });
+  
   function trackPromoView(slideEl) {
     if (typeof window.dataLayer !== 'undefined') {
       window.dataLayer.push({
@@ -319,50 +390,6 @@ document.addEventListener("DOMContentLoaded", function() {
       });
     }
   }
-
-  function trackPromoClick(slideEl) {
-    if (typeof window.dataLayer !== 'undefined') {
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          promo_id: slideEl.dataset.promoId,
-          promo_name: slideEl.dataset.promoName,
-          creative_name: "homepage_banner_image",
-          promo_position: "homepage_top"
-        }
-      });
-    }
-  }
-
-  // Click tracking with proper event handling
-  document.querySelectorAll(".banner-slide").forEach(slide => {
-    slide.addEventListener("click", function(e) {
-      // Don't interfere with button clicks
-      if (e.target.tagName === 'BUTTON') return;
-      
-      trackPromoClick(slide);
-      
-      // Handle slide URL navigation
-      const slideUrl = slide.getAttribute('onclick');
-      if (slideUrl) {
-        const url = slideUrl.match(/window\.location='([^']+)'/);
-        if (url && url[1]) {
-          window.location.href = url[1];
-        }
-      }
-    });
-  });
-
-  // Button click tracking
-  document.querySelectorAll(".home-image-banner-slider-content-button").forEach(button => {
-    button.addEventListener("click", function(e) {
-      e.stopPropagation(); // Prevent slide click
-      const slide = button.closest('.banner-slide');
-      if (slide) {
-        trackPromoClick(slide);
-      }
-    });
-  });
 });
 </script>
 
@@ -373,7 +400,7 @@ document.addEventListener("DOMContentLoaded", function() {
     {
       "type": "select",
       "id": "banner_height",
-      "label": "Banner Height (Desktop)",
+      "label": "Banner Height",
       "options": [
         { "value": "banner--small", "label": "Small (300px)" },
         { "value": "banner--medium", "label": "Medium (500px)" },
@@ -383,23 +410,12 @@ document.addEventListener("DOMContentLoaded", function() {
     },
     {
       "type": "select",
-      "id": "banner_height_mobile",
-      "label": "Banner Height (Mobile)",
-      "options": [
-        { "value": "banner--small", "label": "Small (250px)" },
-        { "value": "banner--medium-mobile", "label": "Medium (350px)" },
-        { "value": "banner--large-mobile", "label": "Large (450px)" }
-      ],
-      "default": "banner--medium-mobile"
-    },
-    {
-      "type": "select",
       "id": "content_position",
       "label": "Content Position",
       "options": [
-        { "value": "mid-left", "label": "Middle Left" },
-        { "value": "mid-center", "label": "Middle Center" },
-        { "value": "mid-right", "label": "Middle Right" }
+        { "value": "mid-left", "label": "Left" },
+        { "value": "mid-center", "label": "Center" },
+        { "value": "mid-right", "label": "Right" }
       ],
       "default": "mid-left"
     },
@@ -407,8 +423,7 @@ document.addEventListener("DOMContentLoaded", function() {
       "type": "checkbox",
       "id": "autoplay",
       "label": "Enable Autoplay",
-      "default": false,
-      "info": "Slides will auto-advance every 5 seconds"
+      "default": false
     }
   ],
   "blocks": [
@@ -417,51 +432,29 @@ document.addEventListener("DOMContentLoaded", function() {
       "name": "Image Slide",
       "settings": [
         { 
-          "type": "text", 
-          "id": "slide_id", 
-          "label": "Slide ID",
-          "info": "Unique identifier for this slide" 
-        },
-        { 
-          "type": "text", 
-          "id": "dlv_promo_id", 
-          "label": "DLV Promo ID",
-          "info": "For analytics tracking" 
-        },
-        { 
-          "type": "text", 
-          "id": "dlv_promo_name", 
-          "label": "DLV Promo Name",
-          "info": "For analytics tracking" 
-        },
-        { 
           "type": "image_picker", 
           "id": "slide_image", 
-          "label": "Desktop Image",
-          "info": "Recommended: 1920x1080px" 
+          "label": "Desktop Image" 
         },
         { 
           "type": "image_picker", 
           "id": "mobile_slide_image", 
-          "label": "Mobile Image",
-          "info": "Recommended: 768x432px" 
+          "label": "Mobile Image (Optional)" 
         },
         { 
           "type": "url", 
           "id": "slide_url", 
-          "label": "Slide URL",
-          "info": "Where to redirect when slide is clicked" 
+          "label": "Link URL" 
         },
         { 
           "type": "text", 
           "id": "slide_header", 
-          "label": "Header Text" 
+          "label": "Headline" 
         },
         { 
           "type": "textarea", 
           "id": "slide_subheader", 
-          "label": "Subheader Text",
-          "info": "Hidden on mobile devices" 
+          "label": "Description" 
         },
         { 
           "type": "text", 
@@ -471,27 +464,24 @@ document.addEventListener("DOMContentLoaded", function() {
         { 
           "type": "checkbox", 
           "id": "show_button", 
-          "label": "Show Button",
-          "default": false 
+          "label": "Show Button" 
+        },
+        { 
+          "type": "text", 
+          "id": "dlv_promo_id", 
+          "label": "Promo ID (Analytics)" 
+        },
+        { 
+          "type": "text", 
+          "id": "dlv_promo_name", 
+          "label": "Promo Name (Analytics)" 
         }
       ]
     }
   ],
   "presets": [
     {
-      "name": "Home Image Banner",
-      "category": "Image",
-      "blocks": [
-        {
-          "type": "image_slide",
-          "settings": {
-            "slide_header": "Welcome to Our Store",
-            "slide_subheader": "Discover amazing products and exclusive deals",
-            "slide_button_text": "Shop Now",
-            "show_button": true
-          }
-        }
-      ]
+      "name": "Home Image Banner"
     }
   ]
 }
