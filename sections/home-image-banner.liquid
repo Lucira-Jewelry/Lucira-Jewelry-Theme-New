@@ -11,20 +11,17 @@
              id="{{ block.settings.slide_id }}"
              data-promo-id="{{ block.settings.dlv_promo_id }}"
              data-promo-name="{{ block.settings.dlv_promo_name }}"
-             {% if block.settings.slide_url %}onclick="window.location='{{ block.settings.slide_url }}'"{% endif %}>
+             {% if block.settings.slide_url %}onclick="window.location='{{ block.settings.slide_url }}'"{% endif %}
+             style="background-image: url('{{ desktop_image }}');">
           
-          <!-- Optimized responsive images -->
-          <picture class="banner-image">
-            <source media="(max-width: 768px)" srcset="{{ mobile_webp }}" type="image/webp">
-            <source media="(max-width: 768px)" srcset="{{ mobile_image }}">
-            <source srcset="{{ desktop_webp }}" type="image/webp">
+          <!-- Fallback image for better compatibility -->
+          {% if block.settings.slide_image %}
             <img src="{{ desktop_image }}" 
                  alt="{{ block.settings.slide_header | default: 'Banner slide' }}"
+                 class="banner-fallback-image"
                  loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
-                 fetchpriority="{% if forloop.first %}high{% else %}auto{% endif %}"
-                 width="1920" 
-                 height="1080">
-          </picture>
+                 style="display: none;">
+          {% endif %}
 
           <div class="home-image-banner-slider-content {{ section.settings.content_position }}">
             <div class="banner-content-wrapper">
@@ -54,8 +51,10 @@
 <!-- Preload first slide images -->
 {% assign first_slide = section.blocks[0] %}
 {% if first_slide.settings.slide_image %}
-  <link rel="preload" as="image" href="{{ first_slide.settings.slide_image | image_url: '1920x1080', format: 'webp' }}" fetchpriority="high">
-  <link rel="preload" as="image" href="{{ first_slide.settings.mobile_slide_image | image_url: '768x432', format: 'webp' }}" media="(max-width: 768px)">
+  <link rel="preload" as="image" href="{{ first_slide.settings.slide_image | image_url: '1920x1080' }}" fetchpriority="high">
+{% endif %}
+{% if first_slide.settings.mobile_slide_image %}
+  <link rel="preload" as="image" href="{{ first_slide.settings.mobile_slide_image | image_url: '768x432' }}" media="(max-width: 768px)">
 {% endif %}
 
 <style>
@@ -93,22 +92,40 @@
   .banner--large-mobile { min-height: 450px; }
 }
 
-/* Optimized image container */
-.banner-image {
+/* Optimized slide container */
+.banner-slide {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 400px; /* Prevent CLS with minimum height */
+  overflow: hidden;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.banner-fallback-image {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 1;
-}
-
-.banner-image img {
-  width: 100%;
-  height: 100%;
   object-fit: cover;
   object-position: center;
-  display: block;
+}
+
+/* Mobile background images */
+@media screen and (max-width: 768px) {
+  {% for block in section.blocks %}
+    {% assign mobile_image = block.settings.mobile_slide_image | image_url: '768x432' %}
+    {% if mobile_image and mobile_image != blank %}
+      #{{ block.settings.slide_id }} {
+        background-image: url('{{ mobile_image }}') !important;
+      }
+    {% endif %}
+  {% endfor %}
 }
 
 /* Content positioning */
