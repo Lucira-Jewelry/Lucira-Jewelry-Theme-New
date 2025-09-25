@@ -1,8 +1,6 @@
 <section class="home-image-banner {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}">
   <div class="home-image-banner-slider">
     {% for block in section.blocks %}
-      {% assign desktop_image = block.settings.slide_image | image_url %}
-      {% assign mobile_image = block.settings.mobile_slide_image | image_url %}
       <a
         id="{{ block.settings.slide_id }}"
         href="{{ block.settings.slide_url }}"
@@ -10,13 +8,22 @@
         data-promo-name="{{ block.settings.dlv_promo_name }}"
         onclick="handleGTMPromoBannerClick(event)"
         class="home-image-banner-slider-item"
-        style="
-          background-image: url('{{ desktop_image }}');
-          background-size: cover;
-          background-position: center;
-          background-repeat: no-repeat;
-        "
       >
+        <picture>
+          <source 
+            media="(max-width: 749px)" 
+            srcset="{{ block.settings.mobile_slide_image | image_url }}"
+          >
+          <img 
+            src="{{ block.settings.slide_image | image_url }}"
+            class="home-image-banner-image"
+            alt="{{ block.settings.slide_image.alt | escape }}"
+            fetchpriority="high"
+            width="{{ block.settings.slide_image.width }}"
+            height="{{ block.settings.slide_image.height }}"
+          >
+        </picture>
+
         <div class="home-image-banner-slider-content {{ section.settings.content_position }}">
           <div>
             <p class="home-image-banner-slider-content-header">{{ block.settings.slide_header }}</p>
@@ -29,18 +36,11 @@
           </div>
         </div>
       </a>
-
-      <style>
-      @media screen and (max-width: 749px) {
-        #{{ block.settings.slide_id }} {
-          background-image: url('{{ mobile_image }}') !important;
-        }
-      }
-      </style>
     {% endfor %}
   </div>
 </section>
 
+<!-- Preload first slide for LCP -->
 {% assign first_slide = section.blocks[0] %}
 <link rel="preload" as="image" href="{{ first_slide.settings.slide_image | image_url }}" fetchpriority="high">
 
@@ -58,7 +58,25 @@
   scroll-snap-align: start;
   position: relative;
   width: 100%;
-  min-height: 50vh; /* responsive height */
+  height: 100%;
+  min-height: 42rem; /* fallback default */
+}
+
+.banner--small { min-height: 42rem; }
+.banner--medium { min-height: 56rem; }
+.banner--large { min-height: 72rem; }
+
+@media screen and (max-width: 45em) {
+  .banner--small { min-height: 34rem; }
+  .banner--medium-mobile { min-height: 48rem; }
+  .banner--large-mobile { min-height: 64rem; }
+}
+
+.home-image-banner-slider-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .home-image-banner-slider-content {
@@ -70,52 +88,48 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  padding: 5%;
+  padding: 10rem;
   pointer-events: none;
 }
 
 .home-image-banner-slider-content > div {
   max-width: 60rem;
   pointer-events: all;
-  color: #fff;
 }
 
 .home-image-banner-slider-content-header {
-  font-size: 2rem;
+  font-size: 32px;
   margin: 0;
+  color: #fff;
 }
 
 .home-image-banner-slider-content-button {
   background: #a68380;
   text-transform: uppercase;
-  padding: 1rem 3rem;
+  padding: 1.2rem 5rem;
   border-radius: 12px;
   border: none;
   cursor: pointer;
 }
 
-@media screen and (max-width: 749px) {
-  .home-image-banner-slider-item {
-    min-height: 40vh;
-  }
+@media screen and (max-width: 45em) {
   .home-image-banner-slider-content {
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    padding: 2rem;
+    padding: 4rem 1.5rem;
   }
   .home-image-banner-slider-content > div {
-    max-width: 90%;
+    max-width: 100%;
     text-align: center;
   }
   .home-image-banner-slider-content > div > p {
     display: none;
   }
   .home-image-banner-slider-content-button {
-    padding: 0.6rem 2rem;
+    padding: 0.8rem 3rem;
   }
 }
 </style>
-
 
 <script defer>
 window.addEventListener("load", function () {
@@ -173,6 +187,77 @@ window.addEventListener("load", function () {
       if ($(slideElement).data("promo-id")) {
         handleGTMPromoBannerView(slideElement);
       }
+    });
+
+    // Recalculate slider on image load to prevent layout shifts
+    $slider.find("img").on("load", function () {
+      $slider.slick("setPosition");
+    });
+  });
+});
+</script>
+
+<script defer>
+window.addEventListener("load", function () {
+  jQuery(function ($) {
+    const $slider = $(".home-image-banner-slider");
+
+    $slider.slick({
+      slidesToShow: 1,
+      slidesToScroll: 1,
+      infinite: true,
+      dots: true,
+      autoplay: {{ section.settings.autoplay }},
+      prevArrow: `<img src="{{ 'home-image-banner-left.svg' | asset_url }}" class="home-image-banner-arrows" />`,
+      nextArrow: `<img src="{{ 'home-image-banner-right.svg' | asset_url }}" class="home-image-banner-arrows" />`,
+      customPaging: function (slider, i) {
+        return `<span class="home-image-banner-dot"></span>`;
+      }
+    });
+
+    // Track GTM banner view
+    function handleGTMPromoBannerView(slide) {
+      if (slide) {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoView",
+          promoView: {
+            promo_id: slide.dataset.promoId,
+            promo_name: slide.dataset.promoName,
+            creative_name: "homepage_banner",
+            promo_position: "homepage_top",
+          }
+        });
+      }
+    }
+
+    window.handleGTMPromoBannerClick = function (event) {
+      event.preventDefault();
+      const target = event.currentTarget;
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_id: target.id,
+          creative_name: "homepage_banner_image",
+          promo_position: "homepage_top"
+        }
+      });
+
+      window.location.assign(target.href);
+    };
+
+    $slider.on("init afterChange", function (event, slick, currentSlide) {
+      let slideElement = slick.$slides[currentSlide];
+      if ($(slideElement).data("promo-id")) {
+        handleGTMPromoBannerView(slideElement);
+      }
+    });
+
+    // Recalculate slider on image load to prevent layout shifts
+    $slider.find("img").on("load", function () {
+      $slider.slick("setPosition");
     });
   });
 });
