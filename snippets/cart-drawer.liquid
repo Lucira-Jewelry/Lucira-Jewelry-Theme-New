@@ -5,392 +5,78 @@
   {% render 'cart-drawer' %}
 {% endcomment %}
 
-<link rel="preload" href="{{ 'quantity-popover.css' | asset_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="{{ 'quantity-popover.css' | asset_url }}"></noscript>
-<link rel="preload" href="{{ 'component-card.css' | asset_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-<noscript><link rel="stylesheet" href="{{ 'component-card.css' | asset_url }}"></noscript>
+{{ 'quantity-popover.css' | asset_url | stylesheet_tag }}
+{{ 'component-card.css' | asset_url | stylesheet_tag }}
 
 <script src="{{ 'cart.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'quantity-popover.js' | asset_url }}" defer="defer"></script>
 
 <style>
-.drawer {
-visibility: hidden;
-}
+  .drawer {
+    visibility: hidden;
+  }
 </style>
 
 <cart-drawer class="drawer{% if cart == empty %} is-empty{% endif %}">
-{% if cart.item_count > 0 %}
-<div id="YouMayAlsoLikeSection" class="you-may-also-like-wrapper">
-<p class="you-may-also-like-header">You May Also Like</p>
-
-{% comment %} Initialize variables {% endcomment %}
-{% assign has_ring = false %}
-{% assign prefers_yellow = false %}
-{% assign all_matching_products = '' | split: ',' %}
-{% assign matching_products_available = false %}
-
-{% comment %} Analyze cart items and collect all matching products {% endcomment %}
-{%- for cart_item in cart.items -%}
-  {% assign product_type = cart_item.product.type | downcase %}
-  {% if product_type contains 'ring' %}
-    {% assign has_ring = true %}
-  {% endif %}
-
-  {% assign variant_title = cart_item.variant.title | downcase %}
-  {% if variant_title contains 'yellow' %}
-    {% assign prefers_yellow = true %}
-  {% endif %}
-
-  {% comment %} Process matching products metafield for each cart item {% endcomment %}
-  {% assign cart_item_matching_products = cart_item.product.metafields.custom.matching_product.value %}
-  {% if cart_item_matching_products != blank and cart_item_matching_products.size > 0 %}
-    {% assign matching_products_available = true %}
-
-    {% comment %} Convert product references to actual product objects {% endcomment %}
-    {% for product_ref in cart_item_matching_products %}
-      {% comment %} Extract product ID from GID {% endcomment %}
-      {% assign gid_parts = product_ref | split: '/' %}
-      {% assign product_id = gid_parts.last | times: 1 %}
-      {% assign resolved_product = all_products[product_id] %}
-
-      {% if resolved_product != blank %}
-        {% comment %} Check if product is not already in our collection {% endcomment %}
-        {% assign already_added = false %}
-        {% for existing_product in all_matching_products %}
-          {% if existing_product.id == resolved_product.id %}
-            {% assign already_added = true %}
-            {% break %}
-          {% endif %}
-        {% endfor %}
-
-        {% unless already_added %}
-          {% assign all_matching_products = all_matching_products | concat: resolved_product %}
-        {% endunless %}
-      {% endif %}
-    {% endfor %}
-  {% endif %}
-{%- endfor -%}
-
-{% comment %} Debug output (remove after testing) {% endcomment %}
-{% if matching_products_available %}
-  <!-- Debug: Found {{ all_matching_products.size }} unique matching products -->
-  <!-- Matching products: {{ all_matching_products | map: 'title' | join: ', ' }} -->
-{% else %}
-  <!-- Debug: No matching products found, using Bestsellers collection -->
-{% endif %}
-
-{% comment %} Decide which collection to use {% endcomment %}
-{% if matching_products_available and all_matching_products.size > 0 %}
-  {% assign recommended_collection_products = all_matching_products %}
-  {% assign use_matching_products = true %}
-{% else %}
-  {% assign recommended_collection_products = collections.Bestsellers.products %}
-  {% assign use_matching_products = false %}
-{% endif %}
-
-{% comment %} Display products {% endcomment %}
-{% if recommended_collection_products and recommended_collection_products.size > 0 %}
-  <div class="you-may-also-like-container">
-    <div class="matching-you-may-also-like-wrapper">
-      {%- assign shown_products = '' -%}
-      {%- for item in cart.items -%}
-        {%- assign product_matches = item.product.metafields.custom.matching_product.value -%}
-        {%- if product_matches -%}
-          {%- for matched_product in product_matches -%}
-            {%- unless matched_product.id == item.product.id or shown_products contains matched_product.id -%}
-              <div
-                class="you-may-also-like-item"
-                data-product-id="{{ matched_product.id }}"
-                data-product-handle="{{ matched_product.handle }}"
-              >
-                <a href="{{ matched_product.url }}">
-                  <div class="img-container-you-may-like">
-                    <img
-                      src="{{ matched_product.featured_image | img_url: '300x' }}"
-                      alt="{{ matched_product.title }}"
-                      class="you-may-also-like-image"
-                    >
-                  </div>
-                  <p class="you-may-also-like-title">{{ matched_product.title }}</p>
-                  <div class="you-may-also-like-price-container">
-                    {% if matched_product.compare_at_price > matched_product.price %}
-                      <span class="you-may-also-like-price">
-                        {{ matched_product.price | money }}
-                      </span>
-                      <del class="you-may-also-like-compare-price">
-                        {{ matched_product.compare_at_price | money }}
-                      </del>
-                    {% else %}
-                      <span class="you-may-also-like-price">
-                        {{ matched_product.price | money }}
-                      </span>
-                    {% endif %}
-                  </div>
+  
+  <div id="CartDrawer" class="cart-drawer">
+    <div id="CartDrawer-Overlay" class="cart-drawer__overlay"></div>
+    <div
+      class="drawer__inner gradient color-{{ settings.cart_color_scheme }}"
+      role="dialog"
+      aria-modal="true"
+      aria-label="{{ 'sections.cart.title' | t }}"
+      tabindex="-1"
+    >
+        {%- if cart == empty -%}
+          <div class="drawer__inner-empty">
+            <div class="cart-drawer__warnings center{% if settings.cart_drawer_collection != blank %} cart-drawer__warnings--has-collection{% endif %}">
+              <div class="cart-drawer__empty-content">
+                <h2 class="cart__empty-text">{{ 'sections.cart.empty' | t }}</h2>
+                
+                <a href="{{ routes.all_products_collection_url }}" class="button">
+                  {{ 'general.continue_shopping' | t }}
                 </a>
-                <button
-                  class="you-may-also-like-add-button"
-                  data-variant-id="{{ matched_product.variants.first.id }}"
-                  type="button"
-                >
-                  Add to Cart
-                </button>
+
+                {%- if shop.customer_accounts_enabled and customer == null -%}
+                  <p class="cart__login-title h3">{{ 'sections.cart.login.title' | t }}</p>
+                  <p class="cart__login-paragraph">
+                    {{ 'sections.cart.login.paragraph_html' | t: link: routes.account_login_url }}
+                  </p>
+                {%- endif -%}
               </div>
-              {%- assign shown_products = shown_products | append: matched_product.id | append: ',' -%}
-            {%- endunless -%}
-          {%- endfor -%}
-        {%- endif -%}
-      {%- endfor -%}
-    </div>
-    {% assign displayed_count = 0 %}
-    {% assign processed_product_ids = '' %}
-
-    {% for recommended_product in recommended_collection_products %}
-      {% comment %} Skip duplicates {% endcomment %}
-      {% assign product_id_string = recommended_product.id | append: ',' %}
-      {% unless processed_product_ids contains product_id_string %}
-        {% assign processed_product_ids = processed_product_ids | append: product_id_string %}
-
-        {% comment %} Check if product is already in cart {% endcomment %}
-        {% assign item_in_cart = false %}
-        {% for cart_item in cart.items %}
-          {% if cart_item.product.id == recommended_product.id %}
-            {% assign item_in_cart = true %}
-            {% break %}
-          {% endif %}
-        {% endfor %}
-
-        {% comment %} Apply filters only for bestsellers, not for matching products {% endcomment %}
-        {% assign exclude_product = false %}
-        {% unless use_matching_products %}
-          {% if has_ring and recommended_product.type contains 'Ring' %}
-            {% assign exclude_product = true %}
-          {% endif %}
-          {% if prefers_yellow and recommended_product.title contains 'White' %}
-            {% assign exclude_product = true %}
-          {% endif %}
-        {% endunless %}
-
-        {% unless item_in_cart or exclude_product %}
-          <div
-            class="you-may-also-like-item"
-            data-product-id="{{ recommended_product.id }}"
-            data-product-handle="{{ recommended_product.handle }}"
-          >
-            <a href="{{ recommended_product.url }}">
-              <div class="img-container-you-may-like">
-                <img
-                  src="{{ recommended_product.featured_image | img_url: '300x' }}"
-                  alt="{{ recommended_product.title }}"
-                  class="you-may-also-like-image"
-                >
-              </div>
-              <p class="you-may-also-like-title">{{ recommended_product.title }}</p>
-              <div class="you-may-also-like-price-container">
-                {% if recommended_product.compare_at_price > recommended_product.price %}
-                  <span class="you-may-also-like-price">
-                    {{ recommended_product.price | money }}
-                  </span>
-                  <del class="you-may-also-like-compare-price">
-                    {{ recommended_product.compare_at_price | money }}
-                  </del>
-                {% else %}
-                  <span class="you-may-also-like-price">
-                    {{ recommended_product.price | money }}
-                  </span>
-                {% endif %}
-              </div>
-            </a>
-            <button
-              class="you-may-also-like-add-button"
-              data-variant-id="{{ recommended_product.variants.first.id }}"
-              type="button"
-            >
-              Add to Cart
-            </button>
-          </div>
-          {% assign displayed_count = displayed_count | plus: 1 %}
-          {% if displayed_count >= 6 %}
-            {% break %}
-          {% endif %}
-        {% endunless %}
-      {% endunless %}
-    {% endfor %}
-
-    {% comment %} If we don't have enough matching products, fill with bestsellers {% endcomment %}
-    {% if use_matching_products and displayed_count < 6 %}
-      {% for bestseller_product in collections.Bestsellers.products %}
-        {% if displayed_count >= 6 %}
-          {% break %}
-        {% endif %}
-
-        {% comment %} Skip if already processed {% endcomment %}
-        {% assign product_id_string = bestseller_product.id | append: ',' %}
-        {% unless processed_product_ids contains product_id_string %}
-          {% assign processed_product_ids = processed_product_ids | append: product_id_string %}
-
-          {% comment %} Check if product is already in cart {% endcomment %}
-          {% assign item_in_cart = false %}
-          {% for cart_item in cart.items %}
-            {% if cart_item.product.id == bestseller_product.id %}
-              {% assign item_in_cart = true %}
-              {% break %}
-            {% endif %}
-          {% endfor %}
-
-          {% comment %} Apply bestseller filters {% endcomment %}
-          {% assign exclude_product = false %}
-          {% if has_ring and bestseller_product.type contains 'Ring' %}
-            {% assign exclude_product = true %}
-          {% endif %}
-          {% if prefers_yellow and bestseller_product.title contains 'White' %}
-            {% assign exclude_product = true %}
-          {% endif %}
-
-          {% unless item_in_cart or exclude_product %}
-            <div
-              class="you-may-also-like-item"
-              data-product-id="{{ bestseller_product.id }}"
-              data-product-handle="{{ bestseller_product.handle }}"
-            >
-              <a href="{{ bestseller_product.url }}">
-                <div class="img-container-you-may-like">
-                  <img
-                    src="{{ bestseller_product.featured_image | img_url: '300x' }}"
-                    alt="{{ bestseller_product.title }}"
-                    class="you-may-also-like-image"
-                  >
-                </div>
-                <p class="you-may-also-like-title">{{ bestseller_product.title }}</p>
-                <div class="you-may-also-like-price-container">
-                  {% if bestseller_product.compare_at_price > bestseller_product.price %}
-                    <span class="you-may-also-like-price">
-                      {{ bestseller_product.price | money }}
-                    </span>
-                    <del class="you-may-also-like-compare-price">
-                      {{ bestseller_product.compare_at_price | money }}
-                    </del>
-                  {% else %}
-                    <span class="you-may-also-like-price">
-                      {{ bestseller_product.price | money }}
-                    </span>
-                  {% endif %}
-                </div>
-              </a>
-              <button
-                class="you-may-also-like-add-button"
-                data-variant-id="{{ bestseller_product.variants.first.id }}"
-                type="button"
-              >
-                Add to Cart
-              </button>
             </div>
-            {% assign displayed_count = displayed_count | plus: 1 %}
-          {% endunless %}
-        {% endunless %}
-      {% endfor %}
-    {% endif %}
-  </div>
-{% endif %}
-</div>
-
-<style>
-img.item-certified { width: 44px; }
-.cart-certificate-item-wrapper {display: flex ; align-items: center; gap: 16px; font-size: 16px; font-weight: 500;}
-.cart-certificate-wrapper {display: flex ; align-items: center; gap: 40px; justify-content: center;    margin-bottom: 20px;}
-
-@media (max-width: 767px) {
-  .you-may-also-like-wrapper {
-    display: none !important;
-  }
-  img.item-certified {
-      width: 40px;
-  }
-  .cart-certificate-item-wrapper {font-size: 12px;}
-  .cart-certificate-wrapper { display: flex ; align-items: center; gap: 30px; justify-content: center; margin-bottom: 20px; }
-}
-
-@media (min-width: 768px) {
-  .you-may-also-like-wrapper {
-    opacity: 0;
-    transform: translateX(100%);
-    transition: transform 0.5s ease-out, opacity 0.3s ease-out;
-    visibility: hidden;
-  }
-  .you-may-also-like-wrapper.active {
-    opacity: 1;
-    transform: translateX(0);
-    visibility: visible;
-  }
-}
-</style>
-{% endif %}
-<div class="cart-drawer__overlay"></div>
-<div id="CartDrawer" class="cart-drawer cart-drawer">
-<div
-class="drawer__inner gradient color-{{ settings.cart_color_scheme }}"
-role="dialog"
-aria-modal="true"
-aria-label="{{ 'sections.cart.title' | t }}"
-tabindex="-1"
->
-{%- if cart == empty -%}
-  <div class="drawer__inner-empty">
-    <div class="cart-drawer__warnings center{% if settings.cart_drawer_collection != blank %} cart-drawer__warnings--has-collection{% endif %}">
-      <div class="cart-drawer__empty-content">
-        <lottie-player
-          id="empty-icon"
-          src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Empty_Box_Ani.json?v=1753190426"
-          background="transparent"
-          speed="1"
-          autoplay
-          loop
-        ></lottie-player>
-        <p class="cart__empty-text">{{ 'sections.cart.empty' | t }}</p>
-
-        <a href="{{ routes.all_products_collection_url }}" class="button">
-          {{ 'general.continue_shopping' | t }}
-        </a>
-
-        {%- if shop.customer_accounts_enabled and customer == null -%}
-          <p class="cart__login-title h3">{{ 'sections.cart.login.title' | t }}</p>
-          <p class="cart__login-paragraph">
-            {{ 'sections.cart.login.paragraph_html' | t: link: routes.account_login_url }}
-          </p>
+            {%- if settings.cart_drawer_collection != blank -%}
+              <div class="cart-drawer__collection">
+                {% render 'card-collection', card_collection: settings.cart_drawer_collection, columns: 1 %}
+              </div>
+            {%- endif -%}
+          </div>
         {%- endif -%}
+      <div class="drawer__header">
+        <h2 class="drawer__heading">{{ 'sections.cart.title' | t }}</h2>
+        <div
+          class="cart_drawer__close"
+          type="button"
+          onclick="this.closest('cart-drawer').close()"
+          aria-label="{{ 'accessibility.close' | t }}"
+        >
+          <img src="{{ 'mini_cart_close.svg' | asset_url }}" height="auto" width="auto">
+        </div>
       </div>
-    </div>
-    {%- if settings.cart_drawer_collection != blank -%}
-      <div class="cart-drawer__collection">
-        {% render 'card-collection', card_collection: settings.cart_drawer_collection, columns: 1 %}
-      </div>
-    {%- endif -%}
-  </div>
-{%- endif -%}
-<div class="drawer__header">
-  <p class="drawer__heading">MY CART</p>
-  <div
-    class="cart_drawer__close"
-    type="button"
-    onclick="this.closest('cart-drawer').close()"
-    aria-label="{{ 'accessibility.close' | t }}"
-  >
-    <img src="{{ 'mini_cart_close.svg' | asset_url }}" height="auto" width="auto">
-  </div>
-</div>
-<cart-drawer-items
-  {% if cart == empty %}
-    class=" is-empty"
-  {% endif %}
->
-  <form
-    action="{{ routes.cart_url }}"
-    id="CartDrawer-Form"
-    class="cart__contents cart-drawer__form"
-    method="post"
-  >
-    <div id="CartDrawer-CartItems" class="drawer__contents js-contents">
-      {%- if cart != empty -%}
+      <cart-drawer-items
+        {% if cart == empty %}
+          class=" is-empty"
+        {% endif %}
+      >
+        <form
+          action="{{ routes.cart_url }}"
+          id="CartDrawer-Form"
+          class="cart__contents cart-drawer__form"
+          method="post"
+        >
+          <div id="CartDrawer-CartItems" class="drawer__contents js-contents">
+            {%- if cart != empty -%}
         <div class="cart-certificate-wrapper">
           <div class="cart-certificate-item-wrapper">
             <img
@@ -774,428 +460,116 @@ tabindex="-1"
           </table>
         </div>
       {%- endif -%}
-      <p id="CartDrawer-LiveRegionText" class="visually-hidden" role="status"></p>
-      <p id="CartDrawer-LineItemStatus" class="visually-hidden" aria-hidden="true" role="status">
-        {{ 'accessibility.loading' | t }}
-      </p>
-    </div>
-    <div id="CartDrawer-CartErrors" role="alert"></div>
-  </form>
-  <!--
-    <div class="insurance-container-cart">
-      <div class="insurance-text-cart">
-        <input type="checkbox" value="1" data->
-        <p>Protect Your Investment With Optional Insurance For Added Security.</p>
-      </div>
-      <span class="insurance-price-cart"> ₹300 </span>
-    </div>
-  -->
-
-  <!-- <div>Order Summary</div> -->
-  {% if cart.item_count > 0 %}
-    <div class="you-may-also-like-wrapper-mobile">
-      <p class="you-may-also-like-header-mobile">You May Also Like</p>
-
-      {% assign has_ring = false %}
-      {% assign prefers_yellow = false %}
-
-      {%- for cart_item in cart.items -%}
-        {% assign product_type = cart_item.product.type | downcase %}
-        {% if product_type contains 'ring' %}
-          {% assign has_ring = true %}
-        {% endif %}
-
-        {% assign variant_title = cart_item.variant.title | downcase %}
-        {% if variant_title contains 'yellow' %}
-          {% assign prefers_yellow = true %}
-        {% endif %}
-      {%- endfor -%}
-
-      {% assign recommended_collection = collections.Bestsellers %}
-
-      {% if recommended_collection %}
-        <div class="you-may-also-like-container-mobile">
-          <div class="matching-you-may-also-like-wrapper">
-            {%- assign shown_products = '' -%}
-            {%- for item in cart.items -%}
-              {%- assign product_matches = item.product.metafields.custom.matching_product.value -%}
-              {%- if product_matches -%}
-                {%- for matched_product in product_matches -%}
-                  {%- unless matched_product.id == item.product.id
-                    or shown_products contains matched_product.id
-                  -%}
-                    <div
-                      class="you-may-also-like-item-mobile"
-                      data-product-id="{{ matched_product.id }}"
-                      data-product-handle="{{ matched_product.handle }}"
-                    >
-                      <a href="{{ matched_product.url }}">
-                        <div class="img-container-you-may-like-mobile">
-                          <img
-                            src="{{ matched_product.featured_image | img_url: '300x' }}"
-                            alt="{{ matched_product.title }}"
-                            class="you-may-also-like-image-mobile"
-                          >
-                        </div>
-                        <p class="you-may-also-like-title-mobile">{{ matched_product.title }}</p>
-                        <div class="you-may-also-like-price-container-mobile">
-                          {% if matched_product.compare_at_price > matched_product.price %}
-                            <span class="you-may-also-like-price-mobile">
-                              {{ matched_product.price | money }}
-                            </span>
-                            <del class="you-may-also-like-compare-price-mobile">
-                              {{ matched_product.compare_at_price | money }}
-                            </del>
-                          {% else %}
-                            <span class="you-may-also-like-price-mobile">
-                              {{ matched_product.price | money }}
-                            </span>
-                          {% endif %}
-                        </div>
-                      </a>
-                      <button
-                        class="you-may-also-like-add-button-mobile"
-                        data-variant-id="{{ matched_product.variants.first.id }}"
-                        type="button"
-                      >
-                        Add to Cart
-                      </button>
-                    </div>
-                    {%- assign shown_products = shown_products | append: matched_product.id | append: ',' -%}
-                  {%- endunless -%}
-                {%- endfor -%}
-              {%- endif -%}
-            {%- endfor -%}
+            <p id="CartDrawer-LiveRegionText" class="visually-hidden" role="status"></p>
+            <p id="CartDrawer-LineItemStatus" class="visually-hidden" aria-hidden="true" role="status">
+              {{ 'accessibility.loading' | t }}
+            </p>
           </div>
-          {% assign shown_count = 0 %}
-          {% for product in recommended_collection.products %}
-            {% assign product_in_cart = false %}
-            {% for cart_item in cart.items %}
-              {% if cart_item.product.id == product.id %}
-                {% assign product_in_cart = true %}
-                {% break %}
-              {% endif %}
-            {% endfor %}
+          <div id="CartDrawer-CartErrors" role="alert"></div>
+        </form>
+      </cart-drawer-items>
+      <div class="drawer__footer">
+        {%- if settings.show_cart_note -%}
+          <details id="Details-CartDrawer">
+            <summary>
+              <span class="summary__title">
+                {{ 'sections.cart.note' | t }}
+                {{- 'icon-caret.svg' | inline_asset_content -}}
+              </span>
+            </summary>
+            <cart-note class="cart__note field">
+              <label class="visually-hidden" for="CartDrawer-Note">{{ 'sections.cart.note' | t }}</label>
+              <textarea
+                id="CartDrawer-Note"
+                class="text-area text-area--resize-vertical field__input"
+                name="note"
+                placeholder="{{ 'sections.cart.note' | t }}"
+              >{{ cart.note }}</textarea>
+            </cart-note>
+          </details>
+        {%- endif -%}
 
-            {% assign skip_product = false %}
+        <!-- Start blocks -->
+        <!-- Subtotals -->
 
-            {% if has_ring and product.type contains 'Ring' %}
-              {% assign skip_product = true %}
-            {% endif %}
+        <div class="cart-drawer__footer" {{ block.shopify_attributes }}>
+          <div>
+            {%- if cart.cart_level_discount_applications.size > 0 -%}
+              <ul class="discounts list-unstyled" role="list" aria-label="{{ 'customer.order.discount' | t }}">
+                {%- for discount in cart.cart_level_discount_applications -%}
+                  <li class="discounts__discount discounts__discount--end">
+                    {{- 'icon-discount.svg' | inline_asset_content -}}
+                    {{ discount.title | escape }}
+                    (-{{ discount.total_allocated_amount | money }})
+                  </li>
+                {%- endfor -%}
+              </ul>
+            {%- endif -%}
+          </div>
 
-            {% if prefers_yellow and product.title contains 'White' %}
-              {% assign skip_product = true %}
-            {% endif %}
+          <div class="totals" role="status">
+            <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2>
+            <p class="totals__total-value">{{ cart.total_price | money_with_currency }}</p>
+          </div>
 
-            {% unless product_in_cart or skip_product %}
-              <div
-                class="you-may-also-like-item-mobile"
-                data-product-id="{{ product.id }}"
-                data-product-handle="{{ product.handle }}"
-              >
-                <a href="{{ product.url }}">
-                  <div class="img-container-you-may-like-mobile">
-                    <img
-                      src="{{ product.featured_image | img_url: '300x' }}"
-                      alt="{{ product.title }}"
-                      class="you-may-also-like-image-mobile"
-                    >
-                  </div>
-                  <p class="you-may-also-like-title-mobile">{{ product.title }}</p>
-                  <div class="you-may-also-like-price-container-mobile">
-                    {% if product.compare_at_price > product.price %}
-                      <span class="you-may-also-like-price-mobile">
-                        {{ product.price | money }}
-                      </span>
-                      <del class="you-may-also-like-compare-price-mobile">
-                        {{ product.compare_at_price | money }}
-                      </del>
-                    {% else %}
-                      <span class="you-may-also-like-price-mobile">
-                        {{ product.price | money }}
-                      </span>
-                    {% endif %}
-                  </div>
-                </a>
-                <button
-                  class="you-may-also-like-add-button-mobile"
-                  data-variant-id="{{ product.variants.first.id }}"
-                  type="button"
-                >
-                  Add to Cart
-                </button>
-              </div>
-              {% assign shown_count = shown_count | plus: 1 %}
-              {% if shown_count >= 6 %}
-                {% break %}
-              {% endif %}
-            {% endunless %}
-          {% endfor %}
+          <small class="tax-note caption-large rte">
+            {%- if cart.duties_included and cart.taxes_included -%}
+              {%- if shop.shipping_policy.body == blank -%}
+                {{ 'sections.cart.duties_and_taxes_included_shipping_at_checkout_without_policy' | t }}
+              {%- else -%}
+                {{
+                  'sections.cart.duties_and_taxes_included_shipping_at_checkout_with_policy_html'
+                  | t: link: shop.shipping_policy.url
+                }}
+              {%- endif -%}
+            {%- elsif cart.duties_included == false and cart.taxes_included -%}
+              {%- if shop.shipping_policy.body == blank -%}
+                {{ 'sections.cart.taxes_included_shipping_at_checkout_without_policy' | t }}
+              {%- else -%}
+                {{
+                  'sections.cart.taxes_included_shipping_at_checkout_with_policy_html'
+                  | t: link: shop.shipping_policy.url
+                }}
+              {%- endif -%}
+            {%- elsif cart.duties_included and cart.taxes_included == false -%}
+              {%- if shop.shipping_policy.body == blank -%}
+                {{ 'sections.cart.duties_included_taxes_at_checkout_shipping_at_checkout_without_policy' | t }}
+              {%- else -%}
+                {{
+                  'sections.cart.duties_included_taxes_at_checkout_shipping_at_checkout_with_policy_html'
+                  | t: link: shop.shipping_policy.url
+                }}
+              {%- endif -%}
+            {%- elsif cart.duties_included == false and cart.taxes_included == false -%}
+              {%- if shop.shipping_policy.body == blank -%}
+                {{ 'sections.cart.taxes_at_checkout_shipping_at_checkout_without_policy' | t }}
+              {%- else -%}
+                {{
+                  'sections.cart.taxes_at_checkout_shipping_at_checkout_with_policy_html'
+                  | t: link: shop.shipping_policy.url
+                }}
+              {%- endif -%}
+            {%- endif -%}
+          </small>
         </div>
-      {% endif %}
+
+        <!-- CTAs -->
+
+        <div class="cart__ctas" {{ block.shopify_attributes }}>
+          <button
+            type="submit"
+            id="CartDrawer-Checkout"
+            class="cart__checkout-button button"
+            name="checkout"
+            form="CartDrawer-Form"
+            {% if cart == empty %}
+              disabled
+            {% endif %}
+          >
+            {{ 'sections.cart.checkout' | t }}
+          </button>
+        </div>
+      </div>
     </div>
-  {% endif %}
-</cart-drawer-items>
-
-<div class="checkout-button" style="display : {% if cart.item_count == 0 %} none {% else %} block {% endif %}">
-  <div class="drawer__footer">
-    {%- if settings.show_cart_note -%}
-      <details id="Details-CartDrawer">
-        <summary>
-          <span class="summary__title">
-            {{ 'sections.cart.note' | t }}
-            {{- 'icon-caret.svg' | inline_asset_content -}}
-          </span>
-        </summary>
-        <cart-note class="cart__note field">
-          <label class="visually-hidden" for="CartDrawer-Note">{{ 'sections.cart.note' | t }}</label>
-          <textarea
-            id="CartDrawer-Note"
-            class="text-area text-area--resize-vertical field__input"
-            name="note"
-            placeholder="{{ 'sections.cart.note' | t }}"
-          >{{ cart.note }}</textarea>
-        </cart-note>
-      </details>
-    {%- endif -%}
-
-    <!-- Start blocks -->
-    <!-- Subtotals -->
-
-    <div class="cart-drawer__footer" {{ block.shopify_attributes }}>
-      <div>
-        {%- if cart.cart_level_discount_applications.size > 0 -%}
-          <ul class="discounts list-unstyled" role="list" aria-label="{{ 'customer.order.discount' | t }}">
-            {%- for discount in cart.cart_level_discount_applications -%}
-              <li class="discounts__discount discounts__discount--end">
-                {{- 'icon-discount.svg' | inline_asset_content -}}
-                {{ discount.title | escape }}
-                (-{{ discount.total_allocated_amount | money }})
-              </li>
-            {%- endfor -%}
-          </ul>
-        {%- endif -%}
-      </div>
-
-      <div class="totals">
-        <p class="totals__total">Items ({{ cart.item_count }})</p>
-        <p class="totals__total-value" style="color:#1A1A1A;">{{ cart.total_price | money_with_currency }}</p>
-      </div>
-
-      <div class="totals">
-        <p class="totals__total">Delivery</p>
-        <p class="totals__total-value"><span style="text-decoration:line-through">₹500</span> Free</p>
-      </div>
-
-      <div class="totals" role="status">
-        <!-- <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2> -->
-        <p class="totals__total">GRAND TOTAL</p>
-        <p class="totals__total-value" style="font-weight: 600; color:#1A1A1A;">
-          {{ cart.total_price | money_with_currency }}
-        </p>
-      </div>
-
-      <small class="tax-note caption-large rte">
-        {%- if cart.duties_included and cart.taxes_included -%}
-          {%- if shop.shipping_policy.body == blank -%}
-            {{ 'sections.cart.duties_and_taxes_included_shipping_at_checkout_without_policy' | t }}
-          {%- else -%}
-            {{
-              'sections.cart.duties_and_taxes_included_shipping_at_checkout_with_policy_html'
-              | t: link: shop.shipping_policy.url
-            }}
-          {%- endif -%}
-        {%- elsif cart.duties_included == false and cart.taxes_included -%}
-          {%- if shop.shipping_policy.body == blank -%}
-            {{ 'sections.cart.taxes_included_shipping_at_checkout_without_policy' | t }}
-          {%- else -%}
-            {{
-              'sections.cart.taxes_included_shipping_at_checkout_with_policy_html'
-              | t: link: shop.shipping_policy.url
-            }}
-          {%- endif -%}
-        {%- elsif cart.duties_included and cart.taxes_included == false -%}
-          {%- if shop.shipping_policy.body == blank -%}
-            {{ 'sections.cart.duties_included_taxes_at_checkout_shipping_at_checkout_without_policy' | t }}
-          {%- else -%}
-            {{
-              'sections.cart.duties_included_taxes_at_checkout_shipping_at_checkout_with_policy_html'
-              | t: link: shop.shipping_policy.url
-            }}
-          {%- endif -%}
-        {%- elsif cart.duties_included == false and cart.taxes_included == false -%}
-          {%- if shop.shipping_policy.body == blank -%}
-            {{ 'sections.cart.taxes_at_checkout_shipping_at_checkout_without_policy' | t }}
-          {%- else -%}
-            {{
-              'sections.cart.taxes_at_checkout_shipping_at_checkout_with_policy_html'
-              | t: link: shop.shipping_policy.url
-            }}
-          {%- endif -%}
-        {%- endif -%}
-      </small>
-    </div>
-
-    <!-- CTAs -->
   </div>
-
-  <div class="cart__ctas" {{ block.shopify_attributes }} style="width:100%;">
-    <div class="checkout-info" style="display: {% if cart == empty %} none {% else %} flex {% endif %};">
-      <p class="grand-total">
-        Grand Total: <strong style="font-weight:600;">{{ cart.total_price | money_with_currency }}</strong>
-      </p>
-      <p class="price-breakup" id="ViewPriceBreakup">View Price Breakup <i class="fa-solid fa-angle-up"></i></p>
-    </div>
-    
-      <button
-        type="button"
-        class="show-sotp-popup cart__checkout-button button unique-button desktop-show"
-        name="otp-checkout"
-        form="CartDrawer-Form"
-        {% if cart == empty %}
-          disabled
-        {% endif %}
-      >
-        PROCEED TO CHECKOUT
-      </button>
-      {% render 'gokwik-checkout' %}
-     
-  </div>
-</div>
-</div>
-</div>
 </cart-drawer>
-
-<script>
-document.addEventListener('click', function (e) {
-const viewPriceBreakupEl = e.target.closest('#ViewPriceBreakup');
-if (viewPriceBreakupEl) {
-const drawerFooter = document.querySelector('.drawer__footer');
-const icon = viewPriceBreakupEl.querySelector('i');
-
-if (drawerFooter) {
-  const isVisible = drawerFooter.getAttribute('data-visible') === 'true';
-
-  if (isVisible) {
-    // Collapse drawer
-    drawerFooter.style.maxHeight = drawerFooter.scrollHeight + 'px';
-    requestAnimationFrame(() => {
-      drawerFooter.style.maxHeight = '0px';
-    });
-    drawerFooter.setAttribute('data-visible', 'false');
-
-    // Set icon to angle-up (closed)
-    icon.classList.remove('fa-angle-down');
-    icon.classList.add('fa-angle-up');
-  } else {
-    // Expand drawer
-    drawerFooter.style.maxHeight = '0px';
-    requestAnimationFrame(() => {
-      drawerFooter.style.maxHeight = drawerFooter.scrollHeight + 'px';
-    });
-    drawerFooter.setAttribute('data-visible', 'true');
-
-    // Set icon to angle-down (opened)
-    icon.classList.remove('fa-angle-up');
-    icon.classList.add('fa-angle-down');
-  }
-}
-}
-});
-
-// Function to toggle recommendations visibility based on cart state
-function toggleRecommendations() {
-const recommendationsSection = document.querySelector('.you-may-also-like-wrapper');
-const cartDrawer = document.querySelector('cart-drawer');
-
-if (recommendationsSection && cartDrawer) {
-fetch('/cart.js')
-  .then((response) => response.json())
-  .then((cart) => {
-    if (cart.item_count > 0) {
-      cartDrawer.classList.remove('is-empty');
-      recommendationsSection.style.display = 'block';
-      // Add active class for desktop animation
-      setTimeout(() => {
-        recommendationsSection.classList.add('active');
-      }, 100);
-    } else {
-      cartDrawer.classList.add('is-empty');
-      recommendationsSection.style.display = 'none';
-      recommendationsSection.classList.remove('active');
-    }
-  })
-  .catch((error) => {
-    console.error('Error fetching cart:', error);
-  });
-}
-}
-
-// Call on page load to set initial state
-
-// Listen for cart updates from other parts of your theme
-document.addEventListener('cart:updated', toggleRecommendations);
-document.addEventListener('cart:changed', toggleRecommendations);
-
-// Listen for any cart drawer updates
-document.addEventListener('cart:refresh', toggleRecommendations);
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-const checkoutBtn = document.getElementById('CartDrawer-Checkout');
-
-if (!checkoutBtn) return;
-
-checkoutBtn.addEventListener('click', async function () {
-try {
-  const res = await fetch('/cart.js');
-  const cart = await res.json();
-
-  const currency = cart.currency || 'INR';
-  const grandTotal = cart.original_total_price / 100;
-  const totalValue = cart.total_price / 100;
-  const discountAmount = (cart.original_total_price - cart.total_price) / 100;
-  const totalQuantity = cart.item_count;
-  const uniqueProductCount = new Set(cart.items.map((item) => item.product_id)).size;
-
-  const lineItems = cart.items.map((item, index) => ({
-    id: item.product_id?.toString() || '',
-    sku: item.sku || '',
-    variant_id: item.variant_id?.toString() || '',
-    product_name: item.product_title,
-    product_type: item.product_type || 'Jewelry',
-    category: item.product_type || 'General',
-    sub_category: item.variant_title || '',
-    price: item.original_price / 100,
-    offer_price: item.final_price / 100,
-    quantity: item.quantity,
-    thumbnail_image: item.image || '',
-    index_position: index + 1,
-  }));
-
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: 'beginCheckout',
-    cart: {
-      currency: currency,
-      grand_total: grandTotal,
-      total_value: totalValue,
-      discount_amount: discountAmount,
-      total_quantity: totalQuantity,
-      total_product: uniqueProductCount,
-      coupon_code: cart.cart_level_discount_applications?.[0]?.code || '',
-      offer_detail: cart.cart_level_discount_applications?.[0]?.title || '',
-      items: lineItems,
-    },
-  });
-} catch (error) {
-  console.error('Failed to fetch cart or push beginCheckout:', error);
-}
-});
-});
-</script>
-<style>
-.cart-drawer .cart__checkout-button {
-display: none !important;
-}
-</style>
