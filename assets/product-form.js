@@ -991,23 +991,3 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
 // Select Engraving on Submit
-document.addEventListener("DOMContentLoaded", function () {
-  var engravingBtn = document.getElementById("engraving_drawer");
-
-  if (engravingBtn) {
-    engravingBtn.addEventListener("click", function () {
-      window.dataLayer = window.dataLayer || [];
-
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          product_id: "{{ product.id }}",
-          promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-          promo_name: "{{ product.title }}",
-          creative_name: "Add Engraving Clicked",
-          location_id: "{{ product.selected_or_first_available_variant.id }}"
-        }
-      });
-    });
-  }
-});
