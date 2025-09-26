@@ -992,7 +992,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 
                   document.addEventListener("DOMContentLoaded", function () {
-                    var engravingBtn = document.getElementById("openProductEngraBtn");
+                    var engravingBtn = document.getElementById("product_engraving_confirm_submit");
 
                     if (engravingBtn) {
                       engravingBtn.addEventListener("click", function () {
