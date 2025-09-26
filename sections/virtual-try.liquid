@@ -1,0 +1,98 @@
+
+
+<div id="virtual-tryon-section">
+  <h2>Try This Ornament Virtually</h2>
+  <video id="user-video" autoplay playsinline></video>
+  <canvas id="overlay-canvas"></canvas>
+</div>
+
+<script src="{{ 'three.min.js' | asset_url }}"></script>
+<script src="{{ 'GLTFLoader.js' | asset_url }}"></script>
+<script src="{{ '@mediapipe_face_mesh.js' | asset_url }}"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const video = document.getElementById("user-video");
+  const canvas = document.getElementById("overlay-canvas");
+  const ctx = canvas.getContext("2d");
+
+  // 1. Setup Webcam
+  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
+    video.srcObject = stream;
+  });
+
+  // 2. Resize canvas with video
+  video.addEventListener("loadeddata", () => {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+  });
+
+  // 3. Load Ornament (Image for simplicity)
+  const ornament = new Image();
+  ornament.src = "{{ section.settings.ornament_image | img_url: 'master' }}";
+
+  // 4. MediaPipe FaceMesh setup
+  const faceMesh = new FaceMesh({
+    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+  });
+  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true });
+  faceMesh.onResults(onResults);
+
+  async function onResults(results) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
+      const landmarks = results.multiFaceLandmarks[0];
+
+      // Example: Place earring at left ear landmark (point 234)
+      const leftEar = landmarks[234];
+      if (leftEar) {
+        const x = leftEar.x * canvas.width;
+        const y = leftEar.y * canvas.height;
+        ctx.drawImage(ornament, x - 30, y - 30, 60, 60); // Adjust size
+      }
+    }
+  }
+
+  // 5. Connect camera frames to MediaPipe
+  const camera = new Camera(video, {
+    onFrame: async () => {
+      await faceMesh.send({ image: video });
+    },
+    width: 640,
+    height: 480
+  });
+  camera.start();
+});
+</script>
+
+
+{% schema %}
+{
+  "name": "Virtual Try-On",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "ornament_image",
+      "label": "Overlay Ornament Image",
+      "info": "Upload a transparent PNG (e.g., earring, nose pin, necklace)."
+    },
+    {
+      "type": "url",
+      "id": "ornament_model",
+      "label": "3D Model (GLTF/GLB)",
+      "info": "Optional: Upload or link a 3D model for more realistic try-on."
+    }
+  ],
+  "presets": [
+    {
+      "name": "Virtual Try-On",
+      "category": "Product",
+      "settings": {
+        "ornament_image": "shopify:\/\/shop_images\/example-earring.png",
+        "ornament_model": ""
+      }
+    }
+  ]
+}
+{% endschema %}
