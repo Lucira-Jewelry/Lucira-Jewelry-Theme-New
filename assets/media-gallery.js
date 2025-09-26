@@ -26,6 +26,9 @@ if (!customElements.get('media-gallery')) {
           `[data-target="${event.detail.currentElement.dataset.mediaId}"]`
         );
         this.setActiveThumbnail(thumbnail);
+        
+        // ✅ Update custom dots when slide changes
+        window.updateDotsFromSlideChange?.(event.detail.currentElement);
       }
 
       setActiveMedia(mediaId, prepend) {
@@ -127,6 +130,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
+  let touchObserver = null; // ✅ For observing touch/swipe changes
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -264,7 +268,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
-    // ✅ Ensure video in active slide autoplay
     const activeVideo = slides[index].querySelector('video');
     if (activeVideo) {
       activeVideo.loop = true;
@@ -273,11 +276,88 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // ✅ Function to sync dots with active slide (called from media-gallery)
+  function updateDotsFromActiveSlide() {
+    if (!mediaList || !dotsContainer) return;
+    
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    const activeSlideIndex = slides.findIndex(slide => slide.classList.contains('is-active'));
+    
+    if (activeSlideIndex >= 0 && activeSlideIndex !== currentSlide) {
+      currentSlide = activeSlideIndex;
+      dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === activeSlideIndex);
+      });
+    }
+  }
+
+  // ✅ Global function for media-gallery to call
+  window.updateDotsFromSlideChange = function(currentElement) {
+    if (!mediaList || !currentElement) return;
+    
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    const activeIndex = slides.findIndex(slide => slide.contains(currentElement));
+    
+    if (activeIndex >= 0) {
+      currentSlide = activeIndex;
+      if (dotsContainer) {
+        dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
+          dot.classList.toggle('active', i === activeIndex);
+        });
+      }
+    }
+  };
+
+  // ✅ Set up touch/swipe observers
+  function setupTouchObservers() {
+    if (!mediaList) return;
+    
+    // Disconnect existing observer
+    if (touchObserver) touchObserver.disconnect();
+    
+    // Watch for class changes on slides (is-active)
+    touchObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          const target = mutation.target;
+          if (target.classList.contains('product__media-item') && target.classList.contains('is-active')) {
+            updateDotsFromActiveSlide();
+          }
+        }
+      });
+    });
+    
+    // Observe all media items for class changes
+    const mediaItems = mediaList.querySelectorAll('.product__media-item');
+    mediaItems.forEach(item => {
+      touchObserver.observe(item, { attributes: true, attributeFilter: ['class'] });
+    });
+  }
+
+  // ✅ Alternative: Listen for scroll events on the media container
+  function setupScrollListener() {
+    if (!mediaList) return;
+    
+    const debouncedScrollHandler = debounce(() => {
+      updateDotsFromActiveSlide();
+    }, 100);
+    
+    mediaList.addEventListener('scroll', debouncedScrollHandler);
+    
+    // Also listen on parent containers that might handle the scroll
+    const parentSlider = mediaList.closest('.slider-mobile-gutter, .grid, [class*="slider"]');
+    if (parentSlider && parentSlider !== mediaList) {
+      parentSlider.addEventListener('scroll', debouncedScrollHandler);
+    }
+  }
+
   function initSliderNavigation() {
     if (!mediaList) return;
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
+    setupTouchObservers(); // ✅ Set up touch observers
+    setupScrollListener(); // ✅ Set up scroll listener as fallback
   }
 
   function playAllVideos() {
@@ -285,7 +365,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const videos = mediaList.querySelectorAll('video');
     videos.forEach(video => {
       video.loop = true;
-      video.muted = true; // required for autoplay
+      video.muted = true;
       video.play().catch(() => {});
     });
   }
@@ -300,7 +380,6 @@ document.addEventListener("DOMContentLoaded", function () {
     initSliderNavigation();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
 
-    // ✅ Play all videos after reorder
     setTimeout(() => {
       playAllVideos();
       isReordering = false;
@@ -361,6 +440,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function cleanup() {
     if (observer) observer.disconnect();
+    if (touchObserver) touchObserver.disconnect(); // ✅ Cleanup touch observer
+    delete window.updateDotsFromSlideChange; // ✅ Cleanup global function
   }
 
   function initialize() {
@@ -368,7 +449,7 @@ document.addEventListener("DOMContentLoaded", function () {
     cacheDOMElements();
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
-    playAllVideos(); // ✅ autoplay videos on init
+    playAllVideos();
     setupVariantChangeListeners();
     isInitialized = true;
   }
