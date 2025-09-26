@@ -988,3 +988,25 @@ document.addEventListener("DOMContentLoaded", function () {
       console.log("✅ Price Breakup Click - dataLayer pushed:", productData);
     });
   });
+
+
+
+                  document.addEventListener("DOMContentLoaded", function () {
+                    var engravingBtn = document.getElementById("openProductEngraBtn");
+
+                    if (engravingBtn) {
+                      engravingBtn.addEventListener("click", function () {
+                        window.dataLayer = window.dataLayer || [];
+
+                        window.dataLayer.push({
+                          event: "promoClick",
+                          promoClick: {
+                            promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+                            promo_name: "{{ product.title }}",
+                            creative_name: "Add Engraving Clicked",
+                            location_id: "{{ product.selected_or_first_available_variant.id }}"
+                          }
+                        });
+                      });
+                    }
+                  });
