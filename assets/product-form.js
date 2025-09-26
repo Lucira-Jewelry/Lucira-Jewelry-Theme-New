@@ -950,8 +950,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
-  document.addEventListener("DOMContentLoaded", function () {
-    const priceBreakupElement = document.querySelector("#openPriceModalBtn"); // Replace with your actual selector
+document.addEventListener("DOMContentLoaded", function () {
+    const priceBreakupElement = document.querySelector("#price-breakup-button"); // Replace with your actual selector
 
     if (!priceBreakupElement) return;
 
