@@ -89,6 +89,26 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+document.addEventListener("DOMContentLoaded", function() {
+  document.querySelectorAll(".shape-link").forEach((link, index) => {
+    link.addEventListener("click", function() {
+      var shapeTitle = this.getAttribute("data-shape-title") || "Unknown Shape";
+      var shapeHref = this.getAttribute("href") || "N/A";
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_id: shapeTitle, // ✅ Shape Title as ID
+          promo_name: "Shop by Shape - " + shapeTitle,
+          creative_name: "Shape Grid Click",
+          location_id: shapeHref
+        }
+      });
+    });
+  });
+});
+
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
