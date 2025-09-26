@@ -89,6 +89,58 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+document.addEventListener('DOMContentLoaded', function () {
+  const carousel = document.getElementById('stl-carousel');
+
+  if (!carousel) return;
+
+  // Initialize Owl Carousel immediately
+  $(carousel).owlCarousel({
+    items: 3,
+    loop: false,
+    center: false,
+    margin: 20,
+    nav: false,
+    dots: false,
+    autoWidth: false,
+    mouseDrag: false,
+    touchDrag: false,
+    pullDrag: false,
+    freeDrag: false,
+    stagePadding: 0,
+    responsive: {
+      0: {
+        items: 1,
+        margin: 12,
+        center: true,
+        loop: true,
+        mouseDrag: true,
+        touchDrag: true,
+        pullDrag: true,
+        stagePadding: 50,
+      },
+      768: {
+        items: 3,
+        center: false,
+        loop: false,
+        mouseDrag: false,
+        touchDrag: false,
+        pullDrag: false,
+        stagePadding: 0,
+      },
+      1000: {
+        items: 3,
+        center: false,
+        loop: false,
+        mouseDrag: false,
+        touchDrag: false,
+        pullDrag: false,
+        stagePadding: 0,
+      },
+    },
+  });
+});
+
 document.addEventListener("DOMContentLoaded", function() {
   document.querySelectorAll(".shape-link").forEach((link, index) => {
     link.addEventListener("click", function() {
