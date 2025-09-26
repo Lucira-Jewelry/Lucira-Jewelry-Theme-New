@@ -1,71 +1,163 @@
-
-
 <div id="virtual-tryon-section">
-  <h2>Try This Ornament Virtually</h2>
-  <video id="user-video" autoplay playsinline></video>
-  <canvas id="overlay-canvas"></canvas>
+  <h2>Virtual Try-On</h2>
+  <button id="start-tryon-btn">Try-On Now</button>
+
+  <div id="tryon-area" style="display:none; margin-top:20px;">
+    <video id="user-video" autoplay playsinline></video>
+    <canvas id="overlay-canvas"></canvas>
+  </div>
 </div>
 
-<script src="{{ 'three.min.js' | asset_url }}"></script>
-<script src="{{ 'GLTFLoader.js' | asset_url }}"></script>
-<script src="{{ '@mediapipe_face_mesh.js' | asset_url }}"></script>
+<!-- Mediapipe -->
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js"></script>
 
 <script>
-document.addEventListener("DOMContentLoaded", async () => {
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("start-tryon-btn");
   const video = document.getElementById("user-video");
   const canvas = document.getElementById("overlay-canvas");
   const ctx = canvas.getContext("2d");
+  const tryonArea = document.getElementById("tryon-area");
 
-  // 1. Setup Webcam
-  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-    video.srcObject = stream;
-  });
-
-  // 2. Resize canvas with video
-  video.addEventListener("loadeddata", () => {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-  });
-
-  // 3. Load Ornament (Image for simplicity)
+  // Ornament image
   const ornament = new Image();
   ornament.src = "{{ section.settings.ornament_image | img_url: 'master' }}";
 
-  // 4. MediaPipe FaceMesh setup
-  const faceMesh = new FaceMesh({
-    locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
-  });
-  faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true });
-  faceMesh.onResults(onResults);
+  // Schema values
+  const ornamentType = "{{ section.settings.ornament_type }}";
+  const placement = "{{ section.settings.placement }}";
+  const size = parseInt("{{ section.settings.ornament_size }}", 10);
 
-  async function onResults(results) {
+  let camera, detector;
+
+  btn.addEventListener("click", async () => {
+    tryonArea.style.display = "block";
+
+    // Start webcam
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+
+    video.addEventListener("loadeddata", () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+    });
+
+    if (ornamentType === "face") {
+      setupFaceMesh();
+    } else if (ornamentType === "hand") {
+      setupHands();
+    } else if (ornamentType === "foot") {
+      setupPose();
+    }
+  });
+
+  // ---------------- FACE ORNAMENTS ----------------
+  function setupFaceMesh() {
+    detector = new FaceMesh({ locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` 
+    });
+    detector.setOptions({ maxNumFaces: 1, refineLandmarks: true });
+    detector.onResults(onFaceResults);
+
+    camera = new Camera(video, {
+      onFrame: async () => { await detector.send({ image: video }); },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  }
+
+  function onFaceResults(results) {
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    if (results.multiFaceLandmarks && results.multiFaceLandmarks.length > 0) {
-      const landmarks = results.multiFaceLandmarks[0];
+    if (results.multiFaceLandmarks.length > 0) {
+      const lm = results.multiFaceLandmarks[0];
+      let landmark;
 
-      // Example: Place earring at left ear landmark (point 234)
-      const leftEar = landmarks[234];
-      if (leftEar) {
-        const x = leftEar.x * canvas.width;
-        const y = leftEar.y * canvas.height;
-        ctx.drawImage(ornament, x - 30, y - 30, 60, 60); // Adjust size
+      if (placement === "ear_left") landmark = lm[234];
+      if (placement === "ear_right") landmark = lm[454];
+      if (placement === "nose") landmark = lm[1];
+      if (placement === "neck") landmark = lm[152];
+
+      if (landmark) {
+        const x = landmark.x * canvas.width;
+        const y = landmark.y * canvas.height;
+        ctx.drawImage(ornament, x - size/2, y - size/2, size, size);
       }
     }
   }
 
-  // 5. Connect camera frames to MediaPipe
-  const camera = new Camera(video, {
-    onFrame: async () => {
-      await faceMesh.send({ image: video });
-    },
-    width: 640,
-    height: 480
-  });
-  camera.start();
+  // ---------------- HAND ORNAMENTS ----------------
+  function setupHands() {
+    detector = new Hands({ locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` 
+    });
+    detector.setOptions({ maxNumHands: 1 });
+    detector.onResults(onHandResults);
+
+    camera = new Camera(video, {
+      onFrame: async () => { await detector.send({ image: video }); },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  }
+
+  function onHandResults(results) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    if (results.multiHandLandmarks.length > 0) {
+      const lm = results.multiHandLandmarks[0];
+      let landmark;
+
+      if (placement === "finger") landmark = lm[8]; // Index fingertip
+      if (placement === "wrist") landmark = lm[0]; // Wrist → bangle
+
+      if (landmark) {
+        const x = landmark.x * canvas.width;
+        const y = landmark.y * canvas.height;
+        ctx.drawImage(ornament, x - size/2, y - size/2, size, size);
+      }
+    }
+  }
+
+  // ---------------- FOOT ORNAMENTS ----------------
+  function setupPose() {
+    detector = new Pose({ locateFile: (file) =>
+      `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` 
+    });
+    detector.setOptions({ modelComplexity: 1 });
+    detector.onResults(onPoseResults);
+
+    camera = new Camera(video, {
+      onFrame: async () => { await detector.send({ image: video }); },
+      width: 640,
+      height: 480
+    });
+    camera.start();
+  }
+
+  function onPoseResults(results) {
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    if (results.poseLandmarks) {
+      let landmark;
+
+      if (placement === "ankle_left") landmark = results.poseLandmarks[27];
+      if (placement === "ankle_right") landmark = results.poseLandmarks[28];
+
+      if (landmark) {
+        const x = landmark.x * canvas.width;
+        const y = landmark.y * canvas.height;
+        ctx.drawImage(ornament, x - size/2, y - size/2, size, size);
+      }
+    }
+  }
 });
 </script>
-
 
 {% schema %}
 {
@@ -75,13 +167,44 @@ document.addEventListener("DOMContentLoaded", async () => {
       "type": "image_picker",
       "id": "ornament_image",
       "label": "Overlay Ornament Image",
-      "info": "Upload a transparent PNG (e.g., earring, nose pin, necklace)."
+      "info": "Upload a transparent PNG (earring, ring, bangle, payal, etc.)"
     },
     {
-      "type": "url",
-      "id": "ornament_model",
-      "label": "3D Model (GLTF/GLB)",
-      "info": "Optional: Upload or link a 3D model for more realistic try-on."
+      "type": "select",
+      "id": "ornament_type",
+      "label": "Ornament Type",
+      "options": [
+        { "value": "face", "label": "Face (ear, nose, neck)" },
+        { "value": "hand", "label": "Hand (ring, bangle)" },
+        { "value": "foot", "label": "Foot (payal, toe ring)" }
+      ],
+      "default": "face"
+    },
+    {
+      "type": "select",
+      "id": "placement",
+      "label": "Placement",
+      "options": [
+        { "value": "ear_left", "label": "Left Ear" },
+        { "value": "ear_right", "label": "Right Ear" },
+        { "value": "nose", "label": "Nose" },
+        { "value": "neck", "label": "Neck" },
+        { "value": "finger", "label": "Finger" },
+        { "value": "wrist", "label": "Wrist" },
+        { "value": "ankle_left", "label": "Left Ankle" },
+        { "value": "ankle_right", "label": "Right Ankle" }
+      ],
+      "default": "ear_left"
+    },
+    {
+      "type": "range",
+      "id": "ornament_size",
+      "min": 20,
+      "max": 200,
+      "step": 5,
+      "unit": "px",
+      "label": "Ornament Size",
+      "default": 60
     }
   ],
   "presets": [
@@ -89,8 +212,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       "name": "Virtual Try-On",
       "category": "Product",
       "settings": {
-        "ornament_image": "shopify:\/\/shop_images\/example-earring.png",
-        "ornament_model": ""
+        "ornament_image": "shopify:\/\/shop_images\/example-ornament.png",
+        "ornament_type": "face",
+        "placement": "ear_left",
+        "ornament_size": 60
       }
     }
   ]
