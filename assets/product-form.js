@@ -949,7 +949,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 
-
+// Price Breakup button Click datalayer
 document.addEventListener("DOMContentLoaded", function () {
     const priceBreakupElement = document.querySelector("#price-breakup-button"); // Replace with your actual selector
 
@@ -990,23 +990,23 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
 
+// Select Engraving on Submit
+document.addEventListener("DOMContentLoaded", function () {
+  var engravingBtn = document.getElementById("product_engraving_confirm_submit");
 
-                  document.addEventListener("DOMContentLoaded", function () {
-                    var engravingBtn = document.getElementById("product_engraving_confirm_submit");
+  if (engravingBtn) {
+    engravingBtn.addEventListener("click", function () {
+      window.dataLayer = window.dataLayer || [];
 
-                    if (engravingBtn) {
-                      engravingBtn.addEventListener("click", function () {
-                        window.dataLayer = window.dataLayer || [];
-
-                        window.dataLayer.push({
-                          event: "promoClick",
-                          promoClick: {
-                            promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-                            promo_name: "{{ product.title }}",
-                            creative_name: "Add Engraving Clicked",
-                            location_id: "{{ product.selected_or_first_available_variant.id }}"
-                          }
-                        });
-                      });
-                    }
-                  });
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+          promo_name: "{{ product.title }}",
+          creative_name: "Add Engraving Clicked",
+          location_id: "{{ product.selected_or_first_available_variant.id }}"
+        }
+      });
+    });
+  }
+});
