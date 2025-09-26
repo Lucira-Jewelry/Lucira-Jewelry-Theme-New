@@ -60,6 +60,35 @@ window.addEventListener("load", function () {
   };
 });
 
+document.addEventListener('DOMContentLoaded', function () {
+  // Select all banner tiles based on a shared class
+  const bannerTiles = document.querySelectorAll('.home-tile');
+
+  bannerTiles.forEach(function (tile) {
+    tile.addEventListener('click', function () {
+      // Find the promo name from the title inside the tile
+      const titleElement = tile.querySelector('.home-card-grid-title');
+      const promoName = titleElement ? titleElement.textContent.trim() : 'Unknown Promo';
+
+      // Construct the promo ID based on index or fallback
+      const index = Array.from(bannerTiles).indexOf(tile) + 1;
+      const promoId = `home-banner-${index}`;
+
+      const promoData = {
+        event: 'promoClick',
+        promoClick: {
+          promo_id: promoId,
+          creative_name: 'homepage_banner_image',
+          promo_name: promoName,
+        },
+      };
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push(promoData);
+    });
+  });
+});
+
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
