@@ -324,22 +324,3 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
-
-jQuery(document).ready(function () {
-  // Hide all accordion contents initially
-  jQuery(".accordion .accordion-content").hide();
-
-  // Toggle submenu on click
-  jQuery(".accordion-title").click(function (e) {
-    e.preventDefault(); // prevent link navigation if button
-    const content = jQuery(this).next(".accordion-content");
-    const icon = jQuery(this).find(".svg-wrapper");
-
-    // Slide toggle the clicked content
-    content.slideToggle(250);
-    jQuery(this).toggleClass("active");
-
-    // Rotate arrow
-    icon.toggleClass("rotate-180");
-  });
-});
