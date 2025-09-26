@@ -20,16 +20,7 @@
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
-{%- comment -%}
-  Sort the option values in ascending numerical order only for Size options
-{%- endcomment -%}
-{%- if option.name == 'Size' -%}
-  {%- assign sorted_values = option.values | sort -%}
-{%- else -%}
-  {%- assign sorted_values = option.values -%}
-{%- endif -%}
-
-{%- for value in sorted_values -%}
+{%- for value in option.values -%}
   {%- liquid
     assign swatch_focal_point = null
     if value.swatch.image
@@ -41,11 +32,13 @@
     else
       assign swatch_value = null
     endif
+
     assign option_disabled = true
     if value.available
       assign option_disabled = false
     endif
   -%}
+
   {%- capture input_id -%}
     {{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
   {%- endcapture -%}
@@ -65,15 +58,6 @@
     </span>
   {%- endcapture -%}
 
-  {%- comment -%}
-    Check if this should be the default selected option (12)
-    Also check if no option is currently selected and this is size 12
-  {%- endcomment -%}
-  {%- assign is_default_selected = false -%}
-  {%- if value == '12' and option.selected_value == blank -%}
-    {%- assign is_default_selected = true -%}
-  {%- endif -%}
-
   {%- if picker_type == 'swatch' -%}
     {%- capture help_text -%}
       <span class="visually-hidden">{{ value | escape }}</span>
@@ -86,7 +70,7 @@
       value: value | escape,
       swatch: value.swatch,
       product_form_id: product_form_id,
-      checked: value.selected or is_default_selected,
+      checked: value.selected,
       visually_disabled: option_disabled,
       shape: block.settings.swatch_shape,
       help_text: help_text,
@@ -99,80 +83,43 @@
       name="{{ input_name | escape }}"
       value="{{ value | escape }}"
       form="{{ product_form_id }}"
-      {% if value.selected or is_default_selected %}
-        checked
-      {% endif %}
-      {% if option_disabled %}
-        class="disabled"
-      {% endif %}
+      {% if value.selected %}checked{% endif %}
+      {% if option_disabled %}class="disabled"{% endif %}
       {{ input_dataset }}
     >
 
-    {% if option.name == 'Color' %}
-      <label
-        inventory-quantity="{{ product.selected_or_first_available_variant.inventory_quantity }}"
-        class="variant-product brad-sm Label-{{ value | handle }}"
-        for="{{ input_id }}"
-        style="width: 30%;"
-      >
-        <!-- Swatch Image -->
-        <span class="Variant_Product_color">
-          {% assign image_url = '' %}
-          {% assign bg_color = '' %}
-          {% if value contains 'Yellow Gold' %}
-            <span class="Variant_Color_Icon">
-              {{- 'yellow-color.svg' | inline_asset_content -}}
-            </span>
-          {% elsif value contains 'Rose Gold' %}
-            <span class="Variant_Color_Icon">
-              {{- 'rose-color.svg' | inline_asset_content -}}
-            </span>
-          {% elsif value contains 'White Gold' %}
-            <span class="Variant_Color_Icon">
-              {{- 'silver-color.svg' | inline_asset_content -}}
-            </span>
-          {% else %}
-            <span
-              style="display:inline-block;width:34px;height:34px;border-radius:50%;
-                    background-color:#ccc;margin-right:6px;border:3px solid #fff;
-                    box-shadow:0 .3rem .3rem #0000001a;box-sizing:border-box;">
-            </span>
-          {% endif %}
+    <label for="{{ input_id }}" class="variant-label">
+      {%- assign v = value | downcase -%}
+
+      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+        <span class="variant-swatch" aria-hidden="true">
+          {%- if v contains 'yellow' -%}
+            {{- 'yellow-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'rose' or v contains 'rose gold' -%}
+            {{- 'rose-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
+            {{- 'silver-color.svg' | inline_asset_content -}}
+          {%- endif -%}
         </span>
-        <!-- Swatch Name -->
-        <span class="Variant_Product_name">
-          {% if value contains '14KT' %}
-            <span>14KT</span> {{ value | remove: '14KT ' }}
-          {% elsif value contains '18KT' %}
-            <span>18KT</span> {{ value | remove: '18KT ' }}
-          {% elsif value contains '9KT' %}
-            <span>9KT</span> {{ value | remove: '9KT ' }}
-          {% elsif value contains '22KT' %}
-            <span>22KT</span> {{ value | remove: '22KT ' }}
-          {% else %}
-            {{ value }}
-          {% endif %}
-        </span>
-      </label>
-    {% endif %}
-    {% if option.name == 'Size' %}
-      <label
-        inventory-quantity="{{ product.selected_or_first_available_variant.inventory_quantity }}"
-        class="variant-product brad-sm brad-sm-size Label-{{ value | handle }}"
-        for="{{ input_id }}"
-        style="width: 22%; justify-content:center; align-items:center;"
-      >
-        <!-- Swatch Name -->
-        <span class="Variant_Product_size_name">
-          {{ value }}
-        </span>
-      </label>
-    {% endif %}
+      {%- endif -%}
+      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+      <span class="variant-text">
+        {%- assign parts = value | split: ' ' -%}
+        <span class="variant-karat">{{ parts[0] }}</span>
+        {{ parts[1] }} {{ parts[2] }}
+        {{ label_unavailable }}
+      </span>
+      {%- else -%}
+        <span class="variant-text"> {{ value }}{{ label_unavailable }} </span>
+      {%- endif -%}
+    </label>
+
+          
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
       id="{{ input_id }}"
       value="{{ value | escape }}"
-      {% if value.selected or is_default_selected %}
+      {% if value.selected %}
         selected="selected"
       {% endif %}
       {% if swatch_value and picker_type == 'swatch_dropdown' %}
