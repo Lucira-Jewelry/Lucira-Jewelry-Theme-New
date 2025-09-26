@@ -18,7 +18,7 @@
     </div>
 
     <!-- Metal Information -->
-    <div class="pdp-details-accordion-item" id="metal-section">
+    <div class="pdp-details-accordion-item">
       <input type="checkbox" id="pdp-details-accordion-item-2" />
       <label for="pdp-details-accordion-item-2" class="pdp-details-accordion-item-title" onclick="pushPromo('Metal Information')">
         Metal Information
@@ -45,7 +45,7 @@
     </div>
 
     <!-- Diamond Information -->
-    <div class="pdp-details-accordion-item" id="diamond-section">
+    <div class="pdp-details-accordion-item">
       <input type="checkbox" id="pdp-details-accordion-item-3" />
       <label for="pdp-details-accordion-item-3" class="pdp-details-accordion-item-title" onclick="pushPromo('Diamond Information')">
         Diamond Information
@@ -66,7 +66,7 @@
     </div>
 
     <!-- Gemstone Information -->
-    <div class="pdp-details-accordion-item" id="gemstone-section">
+    <div class="pdp-details-accordion-item">
       <input type="checkbox" id="pdp-details-accordion-item-4"/>
       <label for="pdp-details-accordion-item-4" class="pdp-details-accordion-item-title" onclick="pushPromo('Gemstone Information')">
         Gemstone Information
@@ -171,6 +171,7 @@ window.variantMetafields = {};
 {% endfor %}
 </script>
 
+
 <script>
 (function(){
   function escapeHtml(str) {
@@ -183,34 +184,13 @@ window.variantMetafields = {};
       .replace(/'/g,'&#39;');
   }
 
-  function hasValue(val) {
-    return val && val !== null && val !== undefined && val !== '' && String(val).trim() !== '';
-  }
-
   function clearAccordion() {
-    // Clear content
-    const skuEl = document.getElementById('Sku-{{ section.id }}');
-    const metalTypeEl = document.getElementById('metal-type');
-    const metalWeightEl = document.getElementById('metal-weight');
-    const metalDimensionsEl = document.getElementById('metal-dimensions');
-    const diamondBodyEl = document.getElementById('diamond-table-body');
-    const gemstoneBodyEl = document.getElementById('gemstone-table-body');
-
-    if (skuEl) skuEl.textContent = '';
-    if (metalTypeEl) metalTypeEl.textContent = '';
-    if (metalWeightEl) metalWeightEl.innerHTML = '';
-    if (metalDimensionsEl) metalDimensionsEl.innerHTML = '';
-    if (diamondBodyEl) diamondBodyEl.innerHTML = '';
-    if (gemstoneBodyEl) gemstoneBodyEl.innerHTML = '';
-
-    // Hide all sections initially
-    const metalSection = document.getElementById('metal-section');
-    const diamondSection = document.getElementById('diamond-section');
-    const gemstoneSection = document.getElementById('gemstone-section');
-
-    if (metalSection) metalSection.style.display = 'none';
-    if (diamondSection) diamondSection.style.display = 'none';
-    if (gemstoneSection) gemstoneSection.style.display = 'none';
+    document.getElementById('Sku-{{ section.id }}').textContent = '';
+    document.getElementById('metal-type').textContent = '';
+    document.getElementById('metal-weight').innerHTML = '';
+    document.getElementById('metal-dimensions').innerHTML = '';
+    document.getElementById('diamond-table-body').innerHTML = '';
+    document.getElementById('gemstone-table-body').innerHTML = '';
   }
 
   function updateAccordionForVariant(variantId) {
@@ -218,90 +198,39 @@ window.variantMetafields = {};
     if(!data) return clearAccordion();
 
     // SKU
-    const skuEl = document.getElementById('Sku-{{ section.id }}');
-    if (skuEl) skuEl.textContent = data.sku || '';
+    document.getElementById('Sku-{{ section.id }}').textContent = data.sku || '';
 
-    // Metal Section
-    const metalSection = document.getElementById('metal-section');
-    const metalTypeEl = document.getElementById('metal-type');
-    const metalWeightEl = document.getElementById('metal-weight');
-    const metalDimensionsEl = document.getElementById('metal-dimensions');
+    // Metal
+    document.getElementById('metal-type').textContent = [data.metal_purity, data.metal_color].filter(Boolean).join(' - ');
+    document.getElementById('metal-weight').innerHTML = 
+      (data.metal_weight ? 'Net Wt: '+data.metal_weight+'g<br>' : '') +
+      (data.gross_weight ? 'Gross Wt: '+data.gross_weight+'g' : '');
+    document.getElementById('metal-dimensions').innerHTML =
+      (data.top_width ? 'Width: '+data.top_width+'mm<br>' : '') +
+      (data.top_height ? 'Height: '+data.top_height+'mm' : '');
 
-    const hasMetal = hasValue(data.metal_purity) || hasValue(data.metal_color) || 
-                     hasValue(data.metal_weight) || hasValue(data.gross_weight) || 
-                     hasValue(data.top_width) || hasValue(data.top_height);
-
-    if (hasMetal && metalSection) {
-      metalSection.style.display = 'block';
-      
-      if (metalTypeEl) {
-        metalTypeEl.textContent = [data.metal_purity, data.metal_color].filter(hasValue).join(' - ');
-      }
-      
-      if (metalWeightEl) {
-        metalWeightEl.innerHTML = 
-          (hasValue(data.metal_weight) ? 'Net Wt: '+escapeHtml(data.metal_weight)+'g<br>' : '') +
-          (hasValue(data.gross_weight) ? 'Gross Wt: '+escapeHtml(data.gross_weight)+'g' : '');
-      }
-      
-      if (metalDimensionsEl) {
-        metalDimensionsEl.innerHTML =
-          (hasValue(data.top_width) ? 'Width: '+escapeHtml(data.top_width)+'mm<br>' : '') +
-          (hasValue(data.top_height) ? 'Height: '+escapeHtml(data.top_height)+'mm' : '');
-      }
-    } else if (metalSection) {
-      metalSection.style.display = 'none';
+    // Diamonds
+    var diamondBody = document.getElementById('diamond-table-body');
+    if(diamondBody) {
+      diamondBody.innerHTML = (data.diamonds || []).filter(d => d.type).map(d => `
+        <tr>
+          <td>${escapeHtml(d.type)}${(d.clarity||d.color)?'/ '+escapeHtml(d.clarity)+'-'+escapeHtml(d.color):''}</td>
+          <td>${escapeHtml(d.numbers)} - ${escapeHtml(d.shape)}</td>
+          <td>${escapeHtml(d.setting)}: ${escapeHtml(d.weight)}ct</td>
+        </tr>
+      `).join('');
     }
 
-    // Diamond Section
-    const diamondSection = document.getElementById('diamond-section');
-    const diamondBody = document.getElementById('diamond-table-body');
-    const validDiamonds = (data.diamonds || []).filter(d => hasValue(d.type));
-
-    if (validDiamonds.length > 0 && diamondSection && diamondBody) {
-      diamondSection.style.display = 'block';
-      diamondBody.innerHTML = validDiamonds.map(d => {
-        const clarityColor = [d.clarity, d.color].filter(hasValue).join('-');
-        const typeCell = escapeHtml(d.type) + (clarityColor ? ' / ' + escapeHtml(clarityColor) : '');
-        const pcsShape = [d.numbers, d.shape].filter(hasValue).join(' - ');
-        const settingWeight = [d.setting, hasValue(d.weight) ? d.weight + 'ct' : ''].filter(hasValue).join(': ');
-        
-        return `
-          <tr>
-            <td>${typeCell}</td>
-            <td>${escapeHtml(pcsShape)}</td>
-            <td>${escapeHtml(settingWeight)}</td>
-          </tr>
-        `;
-      }).join('');
-    } else if (diamondSection) {
-      diamondSection.style.display = 'none';
-      if (diamondBody) diamondBody.innerHTML = '';
-    }
-
-    // Gemstone Section
-    const gemstoneSection = document.getElementById('gemstone-section');
-    const gemstoneBody = document.getElementById('gemstone-table-body');
-    const validGemstones = (data.gemstones || []).filter(g => hasValue(g.type));
-
-    if (validGemstones.length > 0 && gemstoneSection && gemstoneBody) {
-      gemstoneSection.style.display = 'block';
-      gemstoneBody.innerHTML = validGemstones.map(g => {
-        const colorType = [g.color, g.type].filter(hasValue).join(' - ');
-        const numbersShape = [g.numbers, g.shape].filter(hasValue).join(' - ');
-        const settingWeight = [g.setting, hasValue(g.weight) ? g.weight + 'ct' : ''].filter(hasValue).join(': ');
-        
-        return `
-          <tr>
-            <td>${escapeHtml(colorType)}</td>
-            <td>${escapeHtml(numbersShape)}</td>
-            <td>${escapeHtml(settingWeight)}</td>
-          </tr>
-        `;
-      }).join('');
-    } else if (gemstoneSection) {
-      gemstoneSection.style.display = 'none';
-      if (gemstoneBody) gemstoneBody.innerHTML = '';
+    // Gemstones
+    var gemBody = document.getElementById('gemstone-table-body');
+    if(gemBody) {
+      gemBody.innerHTML = (data.gemstones || []).filter(g => g.type).map(g => `
+        <tr>
+          <td>${escapeHtml(g.color)} - ${escapeHtml(g.type)}</td>
+          <td>${escapeHtml(g.numbers)} - ${escapeHtml(g.shape)}</td>
+          <td>${escapeHtml(g.setting)}: ${escapeHtml(g.weight)}ct</td>
+        </tr>
+      `).join('');
     }
   }
 
@@ -318,9 +247,6 @@ window.variantMetafields = {};
   document.addEventListener('DOMContentLoaded', function(){
     var sel = document.querySelector('select[name="id"], input[name="id"]');
     var initialVariantId = sel?.value || '{{ variant.id }}';
-    
-    // Initialize with clear state first
-    clearAccordion();
     updateAccordionForVariant(initialVariantId);
 
     // Variant change listener
