@@ -25,23 +25,7 @@ document.addEventListener("DOMContentLoaded", function() {
   }
 });
 
-jQuery(document).ready(function () {
-  jQuery(".accordion .accordion-title").append(
-    "<i class='fa fa-plus accordion-icon' aria-hidden='true'></i>"
-  );
-  
-  jQuery(".accordion .accordion-title").click(function () {
-    const icon = jQuery(this).find(".accordion-icon");
-    
-    if (jQuery(this).hasClass("active")) {
-      jQuery(this).removeClass("active");
-    } else {
-      jQuery(this).addClass("active");
-    }
-    
-    jQuery(this).next(".accordion .accordion-content").slideToggle();
-  });
-});
+
 
 $(document).ready(function () {
   let initialized = false;
