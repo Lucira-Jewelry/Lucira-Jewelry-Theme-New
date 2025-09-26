@@ -1003,3 +1003,16 @@ function removeTrapFocus(elementToFocus = null) {
 function onKeyUpEscape(event) {
   // Implementation of escape key handler
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  document.querySelectorAll(".menu-drawer__submenu details").forEach(function (el) {
+    el.addEventListener("toggle", function () {
+      if (el.open) {
+        let siblings = el.parentElement.querySelectorAll(":scope > details");
+        siblings.forEach(function (sib) {
+          if (sib !== el) sib.removeAttribute("open");
+        });
+      }
+    });
+  });
+});
