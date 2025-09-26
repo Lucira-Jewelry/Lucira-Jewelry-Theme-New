@@ -241,16 +241,67 @@ document.addEventListener("DOMContentLoaded", function () {
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
 
-    for (let i = 0; i < totalSlides; i++) {
+    slides.forEach((_, i) => {
       const dot = document.createElement('span');
       dot.className = 'slider-dot';
       if (i === currentSlide) dot.classList.add('active');
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
-    }
+    });
 
     mediaList.parentNode.appendChild(dotsContainer);
   }
+
+  function goToSlide(index) {
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    if (index < 0 || index >= slides.length) return;
+
+    currentSlide = index;
+
+    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
+
+    if (dotsContainer) {
+      dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
+    }
+
+    slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+
+    // autoplay video in active slide
+    const activeVideo = slides[index].querySelector('video');
+    if (activeVideo) {
+      activeVideo.loop = true;
+      activeVideo.muted = true;
+      activeVideo.play().catch(() => {});
+    }
+  }
+
+  function safeReorderByColor(targetColor) {
+    if (isReordering) return;
+    isReordering = true;
+
+    if (!mediaList) { isReordering = false; return; }
+
+    const newActiveIndex = reorderByColor(targetColor); // reorder slides
+    currentSlide = 0;
+
+    createDotsNavigation(); // recreate dots after reorder
+
+    if (newActiveIndex >= 0) {
+      currentSlide = newActiveIndex;
+      goToSlide(newActiveIndex);
+    } else {
+      goToSlide(0);
+    }
+
+    // play all videos after reorder
+    setTimeout(() => {
+      playAllVideos();
+      isReordering = false;
+    }, 200);
+
+    mediaList.setAttribute('data-media-reordered', 'true');
+  }
+
 
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides) return;
