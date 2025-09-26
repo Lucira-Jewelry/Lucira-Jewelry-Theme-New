@@ -127,6 +127,8 @@ document.addEventListener("DOMContentLoaded", function () {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
+  let lastActiveSlide = null;
+  let swipeDetectionInterval = null;
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -264,7 +266,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
-    // ✅ Ensure video in active slide autoplay
     const activeVideo = slides[index].querySelector('video');
     if (activeVideo) {
       activeVideo.loop = true;
@@ -273,11 +274,138 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  // ✅ Main function to detect and sync active slide changes
+  function detectAndSyncActiveSlide() {
+    if (!mediaList || !dotsContainer) return;
+    
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    if (slides.length === 0) return;
+
+    // Method 1: Check for is-active class
+    let activeSlideIndex = slides.findIndex(slide => slide.classList.contains('is-active'));
+    
+    // Method 2: Check which slide is most visible in viewport
+    if (activeSlideIndex === -1) {
+      const container = mediaList;
+      const containerRect = container.getBoundingClientRect();
+      const containerCenter = containerRect.left + containerRect.width / 2;
+      
+      let closestIndex = 0;
+      let closestDistance = Infinity;
+      
+      slides.forEach((slide, index) => {
+        const slideRect = slide.getBoundingClientRect();
+        const slideCenter = slideRect.left + slideRect.width / 2;
+        const distance = Math.abs(slideCenter - containerCenter);
+        
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+      
+      activeSlideIndex = closestIndex;
+    }
+
+    // Method 3: Check scroll position as fallback
+    if (activeSlideIndex === -1) {
+      const scrollLeft = mediaList.scrollLeft;
+      const slideWidth = slides[0]?.offsetWidth || 0;
+      if (slideWidth > 0) {
+        activeSlideIndex = Math.round(scrollLeft / slideWidth);
+      }
+    }
+
+    // Update dots if active slide changed
+    if (activeSlideIndex >= 0 && activeSlideIndex !== currentSlide && activeSlideIndex < totalSlides) {
+      currentSlide = activeSlideIndex;
+      
+      // Update dot indicators
+      dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === activeSlideIndex);
+      });
+      
+      // Update slide active states
+      slides.forEach((slide, i) => {
+        slide.classList.toggle('is-active', i === activeSlideIndex);
+      });
+
+      console.log('✅ Synced dots - Active slide:', activeSlideIndex); // Debug log
+    }
+  }
+
+  // ✅ Set up multiple detection methods
+  function setupSwipeDetection() {
+    if (!mediaList) return;
+
+    // Method 1: Intersection Observer (most reliable for visibility)
+    const intersectionObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+          const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+          const slideIndex = slides.indexOf(entry.target);
+          if (slideIndex >= 0 && slideIndex !== currentSlide) {
+            currentSlide = slideIndex;
+            if (dotsContainer) {
+              dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => {
+                dot.classList.toggle('active', i === slideIndex);
+              });
+            }
+          }
+        }
+      });
+    }, {
+      root: mediaList,
+      threshold: 0.5
+    });
+
+    // Observe all visible slides
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
+    slides.forEach(slide => intersectionObserver.observe(slide));
+
+    // Method 2: Scroll events
+    const handleScroll = debounce(() => {
+      detectAndSyncActiveSlide();
+    }, 100);
+    
+    mediaList.addEventListener('scroll', handleScroll);
+
+    // Method 3: Touch events
+    let startX = 0;
+    let endX = 0;
+
+    mediaList.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchend', (e) => {
+      endX = e.changedTouches[0].clientX;
+      const diff = startX - endX;
+      
+      if (Math.abs(diff) > 50) { // Minimum swipe distance
+        setTimeout(() => {
+          detectAndSyncActiveSlide();
+        }, 100);
+      }
+    }, { passive: true });
+
+    // Method 4: Periodic check (fallback)
+    if (swipeDetectionInterval) clearInterval(swipeDetectionInterval);
+    swipeDetectionInterval = setInterval(() => {
+      detectAndSyncActiveSlide();
+    }, 500);
+
+    // Store observer for cleanup
+    if (observer) observer.disconnect();
+    observer = intersectionObserver;
+  }
+
   function initSliderNavigation() {
     if (!mediaList) return;
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
+    setupSwipeDetection(); // ✅ Set up comprehensive swipe detection
   }
 
   function playAllVideos() {
@@ -285,7 +413,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const videos = mediaList.querySelectorAll('video');
     videos.forEach(video => {
       video.loop = true;
-      video.muted = true; // required for autoplay
+      video.muted = true;
       video.play().catch(() => {});
     });
   }
@@ -300,11 +428,11 @@ document.addEventListener("DOMContentLoaded", function () {
     initSliderNavigation();
     if (newActiveIndex >= 0) { currentSlide = newActiveIndex; goToSlide(newActiveIndex); }
 
-    // ✅ Play all videos after reorder
     setTimeout(() => {
       playAllVideos();
+      detectAndSyncActiveSlide(); // ✅ Sync after reorder
       isReordering = false;
-    }, 200);
+    }, 300);
 
     mediaList.setAttribute('data-media-reordered', 'true');
   }
@@ -361,6 +489,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function cleanup() {
     if (observer) observer.disconnect();
+    if (swipeDetectionInterval) clearInterval(swipeDetectionInterval);
   }
 
   function initialize() {
@@ -368,7 +497,7 @@ document.addEventListener("DOMContentLoaded", function () {
     cacheDOMElements();
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
-    playAllVideos(); // ✅ autoplay videos on init
+    playAllVideos();
     setupVariantChangeListeners();
     isInitialized = true;
   }
