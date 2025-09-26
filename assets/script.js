@@ -1,3 +1,64 @@
+window.addEventListener("load", function () {
+  const swiper = new Swiper(".home-image-banner-swiper", {
+    loop: true,
+    autoplay: {{ section.settings.autoplay | json }} ? {
+      delay: 5000, // 5s between slides
+      disableOnInteraction: false
+    } : false,
+    pagination: {
+      el: ".swiper-pagination",
+      clickable: true,
+    },
+    navigation: {
+      nextEl: ".swiper-button-next",
+      prevEl: ".swiper-button-prev",
+    },
+    on: {
+      init: function () {
+        trackPromoView(this.slides[this.activeIndex]);
+      },
+      slideChange: function () {
+        trackPromoView(this.slides[this.activeIndex]);
+      }
+    }
+  });
+
+  // GTM Banner View Tracking
+  function trackPromoView(slide) {
+    if (!slide) return;
+    const target = slide.querySelector("a");
+    if (target && target.dataset.promoId) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoView",
+        promoView: {
+          promo_id: target.dataset.promoId,
+          promo_name: target.dataset.promoName,
+          creative_name: "homepage_banner",
+          promo_position: "homepage_top",
+        }
+      });
+    }
+  }
+
+  // GTM Banner Click Tracking
+  window.handleGTMPromoBannerClick = function (event) {
+    event.preventDefault();
+    const target = event.currentTarget;
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: target.id,
+        creative_name: "homepage_banner_image",
+        promo_position: "homepage_top"
+      }
+    });
+
+    window.location.assign(target.href);
+  };
+});
 
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
