@@ -330,11 +330,12 @@ jQuery(document).ready(function () {
   jQuery(".accordion .accordion-content").hide();
 
   // Toggle submenu on click
-  jQuery(".accordion .accordion-title").click(function () {
+  jQuery(".accordion-title").click(function (e) {
+    e.preventDefault(); // prevent link navigation if button
     const content = jQuery(this).next(".accordion-content");
     const icon = jQuery(this).find(".svg-wrapper");
 
-    // Slide toggle
+    // Slide toggle the clicked content
     content.slideToggle(250);
     jQuery(this).toggleClass("active");
 
