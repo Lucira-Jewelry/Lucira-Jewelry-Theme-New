@@ -27,8 +27,8 @@ document.addEventListener("DOMContentLoaded", () => {
   ornament.src = "{{ section.settings.ornament_image | img_url: 'master' }}";
 
   // Schema values
-  const ornamentType = "{{ section.settings.ornament_type }}";
-  const placement = "{{ section.settings.placement }}";
+  const ornamentType = "{{ section.settings.ornament_type }}"; // face, hand, foot
+  const placement = "{{ section.settings.placement }}"; // finger, wrist, ear_left, etc.
   const size = parseInt("{{ section.settings.ornament_size }}", 10);
 
   let camera, detector;
@@ -40,12 +40,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     video.srcObject = stream;
 
-    video.addEventListener("loadeddata", () => {
+    // Set canvas size when video metadata loads
+    video.addEventListener("loadedmetadata", () => {
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
     });
 
-    // Wait until ornament is loaded
+    // Wait for ornament image to load
     ornament.onload = () => {
       if (ornamentType === "face") setupFaceMesh();
       else if (ornamentType === "hand") setupHands();
@@ -55,8 +56,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------------- FACE ORNAMENTS ----------------
   function setupFaceMesh() {
-    detector = new FaceMesh({ locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}` 
+    detector = new FaceMesh({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
     detector.setOptions({ maxNumFaces: 1, refineLandmarks: true });
     detector.onResults(onFaceResults);
@@ -91,8 +92,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------------- HAND ORNAMENTS ----------------
   function setupHands() {
-    detector = new Hands({ locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}` 
+    detector = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
     detector.setOptions({ maxNumHands: 1 });
     detector.onResults(onHandResults);
@@ -112,23 +113,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const lm = results.multiHandLandmarks[0];
       let landmark;
 
-      switch (placement) {
-        case "finger": 
-          landmark = lm[5]; // Index finger MCP (base joint)
-          break;
-        case "middle_finger":
-          landmark = lm[9]; // Middle finger MCP
-          break;
-        case "ring_finger":
-          landmark = lm[13]; // Ring finger MCP
-          break;
-        case "pinky_finger":
-          landmark = lm[17]; // Pinky finger MCP
-          break;
-        case "wrist":
-          landmark = lm[0]; // Wrist → bangle
-          break;
-      }
+      // Ring placement logic
+      if (placement === "finger") landmark = lm[5]; // Index finger MCP
+      else if (placement === "wrist") landmark = lm[0];  // Wrist
 
       if (landmark) {
         const x = landmark.x * canvas.width;
@@ -140,8 +127,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ---------------- FOOT ORNAMENTS ----------------
   function setupPose() {
-    detector = new Pose({ locateFile: (file) =>
-      `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}` 
+    detector = new Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
     detector.setOptions({ modelComplexity: 1 });
     detector.onResults(onPoseResults);
@@ -161,7 +148,7 @@ document.addEventListener("DOMContentLoaded", () => {
       let landmark;
 
       if (placement === "ankle_left") landmark = results.poseLandmarks[27];
-      if (placement === "ankle_right") landmark = results.poseLandmarks[28];
+      else if (placement === "ankle_right") landmark = results.poseLandmarks[28];
 
       if (landmark) {
         const x = landmark.x * canvas.width;
@@ -227,8 +214,8 @@ document.addEventListener("DOMContentLoaded", () => {
       "category": "Product",
       "settings": {
         "ornament_image": "shopify:\/\/shop_images\/example-ornament.png",
-        "ornament_type": "face",
-        "placement": "ear_left",
+        "ornament_type": "hand",
+        "placement": "finger",
         "ornament_size": 60
       }
     }
