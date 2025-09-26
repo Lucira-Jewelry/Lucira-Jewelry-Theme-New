@@ -850,3 +850,100 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 })();
 
+document.addEventListener("DOMContentLoaded", function () {
+  const engravingInput = document.getElementById("lucira_engraving_text");
+  const previewText = document.getElementById("engraving-preview-text");
+  const fontOptions = document.querySelectorAll(".lucira_engraving_font_option");
+  const saveButton = document.getElementById("product_engraving_confirm_submit");
+  const savedWrapper = document.getElementById("engraving-saved-wrapper");
+
+  // Hidden input to store selected font
+  let fontInput = document.createElement("input");
+  fontInput.type = "hidden";
+  fontInput.name = "properties[EngravingFont]";
+  engravingInput.closest("form")?.appendChild(fontInput);
+
+  // Default font (first active option)
+  const activeOption = document.querySelector(".lucira_engraving_font_option.active");
+  if (activeOption) {
+    previewText.style.fontFamily = activeOption.dataset.font;
+    fontInput.value = activeOption.dataset.font;
+  }
+
+  // Update preview text as user types
+  engravingInput.addEventListener("input", function () {
+    previewText.textContent = this.value;
+  });
+
+  // Insert symbols at cursor
+  function insertAtCursor(input, text) {
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.setSelectionRange(start + text.length, start + text.length);
+    input.focus();
+  }
+
+  window.EngravingAddSymbol = function (symbol) {
+    insertAtCursor(engravingInput, symbol);
+    engravingInput.dispatchEvent(new Event("input"));
+  };
+
+  fontOptions.forEach(option => {
+    option.addEventListener("click", () => {
+      fontOptions.forEach(opt => opt.classList.remove("active"));
+      option.classList.add("active");
+      const font = option.dataset.font;
+
+      previewText.style.fontFamily = font; // Apply selected font to preview
+      fontInput.value = font; // Store in hidden input
+    });
+  });
+
+  saveButton.addEventListener("click", (e) => {
+    e.preventDefault();
+
+    const engravingValue = engravingInput.value.trim();
+    const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
+
+    engravingInput.value = engravingValue;
+    fontInput.value = selectedFont;
+
+    if (engravingValue) {
+      savedWrapper.style.display = "flex";
+      savedWrapper.innerHTML = `
+        <p><strong>Saved Engraving:</strong></p>
+        <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
+          ${engravingValue}
+        </div>
+      `;
+    } else {
+      savedWrapper.style.display = "block";
+      savedWrapper.innerHTML = `<p style="color:red;">No engraving text entered</p>`;
+    }
+
+    saveButton.textContent = "Saved ✓";
+    setTimeout(() => (saveButton.textContent = "SAVE"), 2000);
+  });
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  const input = document.getElementById('lucira_engraving_text');
+  const allowedChars = /^[A-Za-z0-9❤∞]*$/; // only letters, numbers, ❤️, ∞
+  
+  input.addEventListener('input', function() {
+    // Remove any disallowed characters
+    if (!allowedChars.test(input.value)) {
+      input.value = input.value.split('').filter(c => allowedChars.test(c)).join('');
+    }
+
+    // Enforce maxlength in case of pasted content
+    if (input.value.length > 8) {
+      input.value = input.value.slice(0, 8);
+    }
+
+    // Optional: update preview text
+    const preview = document.getElementById('engraving-preview-text');
+    if (preview) preview.textContent = input.value;
+  });
+});
