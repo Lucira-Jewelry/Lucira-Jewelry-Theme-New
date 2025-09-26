@@ -2,10 +2,13 @@
   <h2>Virtual Try-On</h2>
   <button id="start-tryon-btn">Try-On Now</button>
 
-  <div id="tryon-area" style="display:none; margin-top:20px;">
-    <video id="user-video" autoplay playsinline></video>
-    <canvas id="overlay-canvas"></canvas>
+  <div id="tryon-area" style="display:none; margin-top:20px; position:relative;">
+    <video id="user-video" autoplay playsinline style="width:100%; max-width:640px;"></video>
+    <canvas id="overlay-canvas" style="position:absolute; top:0; left:0; width:100%; max-width:640px;"></canvas>
   </div>
+  
+  <!-- Debug info -->
+  <div id="debug-info" style="margin-top:10px; color:red; font-size:12px;"></div>
 </div>
 
 <!-- Mediapipe -->
@@ -21,140 +24,271 @@ document.addEventListener("DOMContentLoaded", () => {
   const canvas = document.getElementById("overlay-canvas");
   const ctx = canvas.getContext("2d");
   const tryonArea = document.getElementById("tryon-area");
+  const debugInfo = document.getElementById("debug-info");
 
-  // Ornament image
+  // Debug logging
+  function debugLog(message) {
+    debugInfo.innerHTML += message + '<br>';
+    console.log(message);
+  }
+
+  // Ornament image with error handling
   const ornament = new Image();
-  ornament.src = "{{ section.settings.ornament_image | img_url: 'master' }}";
+  ornament.crossOrigin = "anonymous";
+  
+  // Get image URL from Shopify schema
+  const ornamentImageUrl = "{{ section.settings.ornament_image | img_url: 'master' }}";
+  debugLog("Ornament URL: " + ornamentImageUrl);
+  
+  ornament.src = ornamentImageUrl;
 
   // Schema values
-  const ornamentType = "{{ section.settings.ornament_type }}"; // face, hand, foot
-  const placement = "{{ section.settings.placement }}"; // finger, wrist, ear_left, etc.
+  const ornamentType = "{{ section.settings.ornament_type }}";
+  const placement = "{{ section.settings.placement }}";
   const size = parseInt("{{ section.settings.ornament_size }}", 10);
 
+  debugLog(`Type: ${ornamentType}, Placement: ${placement}, Size: ${size}`);
+
   let camera, detector;
+  let isOrnamentLoaded = false;
+
+  // Handle ornament image loading
+  ornament.onload = function() {
+    debugLog("Ornament image loaded successfully");
+    isOrnamentLoaded = true;
+  };
+
+  ornament.onerror = function() {
+    debugLog("ERROR: Failed to load ornament image");
+    isOrnamentLoaded = false;
+  };
 
   btn.addEventListener("click", async () => {
+    debugLog("Try-On button clicked");
     tryonArea.style.display = "block";
 
-    // Start webcam
-    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-    video.srcObject = stream;
+    try {
+      // Start webcam
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { width: 640, height: 480 } 
+      });
+      video.srcObject = stream;
+      debugLog("Webcam access granted");
 
-    // Set canvas size when video metadata loads
-    video.addEventListener("loadedmetadata", () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-    });
+      // Set canvas size when video metadata loads
+      video.addEventListener("loadedmetadata", () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        debugLog(`Video dimensions: ${video.videoWidth}x${video.videoHeight}`);
+        debugLog(`Canvas dimensions: ${canvas.width}x${canvas.height}`);
+        
+        // Start detection after video is ready
+        startDetection();
+      });
 
-    // Wait for ornament image to load
-    ornament.onload = () => {
-      if (ornamentType === "face") setupFaceMesh();
-      else if (ornamentType === "hand") setupHands();
-      else if (ornamentType === "foot") setupPose();
-    };
+    } catch (error) {
+      debugLog("ERROR accessing webcam: " + error.message);
+    }
   });
+
+  function startDetection() {
+    if (!isOrnamentLoaded) {
+      debugLog("Waiting for ornament image to load...");
+      // Retry after a delay
+      setTimeout(startDetection, 500);
+      return;
+    }
+
+    debugLog("Starting detection for: " + ornamentType);
+    
+    if (ornamentType === "face") setupFaceMesh();
+    else if (ornamentType === "hand") setupHands();
+    else if (ornamentType === "foot") setupPose();
+    else debugLog("ERROR: Unknown ornament type");
+  }
 
   // ---------------- FACE ORNAMENTS ----------------
   function setupFaceMesh() {
+    debugLog("Setting up face mesh detection");
+    
     detector = new FaceMesh({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
     });
-    detector.setOptions({ maxNumFaces: 1, refineLandmarks: true });
+    
+    detector.setOptions({ 
+      maxNumFaces: 1, 
+      refineLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    
     detector.onResults(onFaceResults);
 
     camera = new Camera(video, {
-      onFrame: async () => { await detector.send({ image: video }); },
+      onFrame: async () => { 
+        try {
+          await detector.send({ image: video }); 
+        } catch (error) {
+          debugLog("Face detection error: " + error.message);
+        }
+      },
       width: 640,
       height: 480
     });
+    
     camera.start();
+    debugLog("Face detection started");
   }
 
   function onFaceResults(results) {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    // Clear canvas first
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
+      return; // No faces detected
+    }
 
-    if (results.multiFaceLandmarks.length > 0) {
-      const lm = results.multiFaceLandmarks[0];
-      let landmark;
+    const lm = results.multiFaceLandmarks[0];
+    let landmarkIndex = -1;
 
-      if (placement === "ear_left") landmark = lm[234];
-      else if (placement === "ear_right") landmark = lm[454];
-      else if (placement === "nose") landmark = lm[1];
-      else if (placement === "neck") landmark = lm[152];
+    // Face landmark indices
+    if (placement === "ear_left") landmarkIndex = 234;
+    else if (placement === "ear_right") landmarkIndex = 454;
+    else if (placement === "nose") landmarkIndex = 1;
+    else if (placement === "neck") landmarkIndex = 152;
 
-      if (landmark) {
-        const x = landmark.x * canvas.width;
-        const y = landmark.y * canvas.height;
-        ctx.drawImage(ornament, x - size/2, y - size/2, size, size);
-      }
+    if (landmarkIndex !== -1 && lm[landmarkIndex]) {
+      const landmark = lm[landmarkIndex];
+      const x = landmark.x * canvas.width;
+      const y = landmark.y * canvas.height;
+      
+      debugLog(`Face landmark found at: ${x.toFixed(1)}, ${y.toFixed(1)}`);
+      
+      // Draw ornament with proper scaling
+      const drawSize = Math.max(size, 10); // Ensure minimum size
+      ctx.drawImage(ornament, x - drawSize/2, y - drawSize/2, drawSize, drawSize);
     }
   }
 
   // ---------------- HAND ORNAMENTS ----------------
   function setupHands() {
+    debugLog("Setting up hand detection");
+    
     detector = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`
     });
-    detector.setOptions({ maxNumHands: 1 });
+    
+    detector.setOptions({ 
+      maxNumHands: 2,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    
     detector.onResults(onHandResults);
 
     camera = new Camera(video, {
-      onFrame: async () => { await detector.send({ image: video }); },
+      onFrame: async () => { 
+        try {
+          await detector.send({ image: video }); 
+        } catch (error) {
+          debugLog("Hand detection error: " + error.message);
+        }
+      },
       width: 640,
       height: 480
     });
+    
     camera.start();
+    debugLog("Hand detection started");
   }
 
   function onHandResults(results) {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (!results.multiHandLandmarks || results.multiHandLandmarks.length === 0) {
+      return;
+    }
 
-    if (results.multiHandLandmarks.length > 0) {
-      const lm = results.multiHandLandmarks[0];
-      let landmark;
+    const lm = results.multiHandLandmarks[0];
+    let landmarkIndex = -1;
 
-      // Ring placement logic
-      if (placement === "finger") landmark = lm[5]; // Index finger MCP
-      else if (placement === "wrist") landmark = lm[0];  // Wrist
+    // Hand landmark indices
+    if (placement === "finger") landmarkIndex = 8; // Index finger tip (better for rings)
+    else if (placement === "wrist") landmarkIndex = 0; // Wrist
 
-      if (landmark) {
-        const x = landmark.x * canvas.width;
-        const y = landmark.y * canvas.height;
-        ctx.drawImage(ornament, x - size/2, y - size/2 + (placement === "wrist" ? 5 : 0), size, size);
-      }
+    if (landmarkIndex !== -1 && lm[landmarkIndex]) {
+      const landmark = lm[landmarkIndex];
+      const x = landmark.x * canvas.width;
+      const y = landmark.y * canvas.height;
+      
+      debugLog(`Hand landmark found at: ${x.toFixed(1)}, ${y.toFixed(1)}`);
+      
+      const drawSize = Math.max(size, 10);
+      
+      // Adjust position for wrist
+      let yOffset = 0;
+      if (placement === "wrist") yOffset = 10;
+      
+      ctx.drawImage(ornament, x - drawSize/2, y - drawSize/2 + yOffset, drawSize, drawSize);
     }
   }
 
   // ---------------- FOOT ORNAMENTS ----------------
   function setupPose() {
+    debugLog("Setting up pose detection");
+    
     detector = new Pose({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
-    detector.setOptions({ modelComplexity: 1 });
+    
+    detector.setOptions({ 
+      modelComplexity: 1,
+      smoothLandmarks: true,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+    
     detector.onResults(onPoseResults);
 
     camera = new Camera(video, {
-      onFrame: async () => { await detector.send({ image: video }); },
+      onFrame: async () => { 
+        try {
+          await detector.send({ image: video }); 
+        } catch (error) {
+          debugLog("Pose detection error: " + error.message);
+        }
+      },
       width: 640,
       height: 480
     });
+    
     camera.start();
+    debugLog("Pose detection started");
   }
 
   function onPoseResults(results) {
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    if (!results.poseLandmarks) {
+      return;
+    }
 
-    if (results.poseLandmarks) {
-      let landmark;
+    let landmarkIndex = -1;
 
-      if (placement === "ankle_left") landmark = results.poseLandmarks[27];
-      else if (placement === "ankle_right") landmark = results.poseLandmarks[28];
+    // Pose landmark indices
+    if (placement === "ankle_left") landmarkIndex = 27;
+    else if (placement === "ankle_right") landmarkIndex = 28;
 
-      if (landmark) {
-        const x = landmark.x * canvas.width;
-        const y = landmark.y * canvas.height;
-        ctx.drawImage(ornament, x - size/2, y - size/2, size, size);
-      }
+    if (landmarkIndex !== -1 && results.poseLandmarks[landmarkIndex]) {
+      const landmark = results.poseLandmarks[landmarkIndex];
+      const x = landmark.x * canvas.width;
+      const y = landmark.y * canvas.height;
+      
+      debugLog(`Pose landmark found at: ${x.toFixed(1)}, ${y.toFixed(1)}`);
+      
+      const drawSize = Math.max(size, 10);
+      ctx.drawImage(ornament, x - drawSize/2, y - drawSize/2, drawSize, drawSize);
     }
   }
 });
@@ -211,13 +345,7 @@ document.addEventListener("DOMContentLoaded", () => {
   "presets": [
     {
       "name": "Virtual Try-On",
-      "category": "Product",
-      "settings": {
-        "ornament_image": "shopify:\/\/shop_images\/example-ornament.png",
-        "ornament_type": "hand",
-        "placement": "finger",
-        "ornament_size": 60
-      }
+      "category": "Product"
     }
   ]
 }
