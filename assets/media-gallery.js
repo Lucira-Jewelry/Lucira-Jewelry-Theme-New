@@ -434,3 +434,43 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
+
+function setupSwipeSync() {
+  if (!mediaList) return;
+
+  let startX = 0;
+  let isDragging = false;
+
+  mediaList.addEventListener('touchstart', e => {
+    startX = e.touches[0].clientX;
+    isDragging = true;
+  });
+
+  mediaList.addEventListener('touchmove', e => {
+    if (!isDragging) return;
+    const diffX = e.touches[0].clientX - startX;
+    // optional: detect swipe threshold here if needed
+  });
+
+  mediaList.addEventListener('touchend', () => {
+    isDragging = false;
+
+    // determine visible slide in viewport
+    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(s => s.style.display !== 'none');
+    let closestIndex = 0;
+    let closestDistance = Infinity;
+
+    slides.forEach((slide, i) => {
+      const rect = slide.getBoundingClientRect();
+      const distance = Math.abs(rect.left + rect.width / 2 - window.innerWidth / 2);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = i;
+      }
+    });
+
+    if (closestIndex !== currentSlide) {
+      goToSlide(closestIndex); // updates dots and active slide
+    }
+  });
+}
