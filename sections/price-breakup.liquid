@@ -183,161 +183,40 @@
     }
 
     renderPriceBreakdown(data) {
-      // Update all product detail + breakdown sections
-      this.updateProductDetails(data.selectedVariant);
-      this.updateMetalSection(data.metalData, data.variantConfig);
-      this.updateDiamondSection(data.diamondData, data.variantConfig);
-      this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
-      this.updateMakingSection(data.makingData, data.variantConfig);
-      this.updateTotalSection(data.totalData, data.variantConfig);
-      this.updateVariantTitles(data.selectedVariant);
-      this.updateProductPrices(data.selectedVariant);
+    this.updateProductDetails(data.selectedVariant);
+    this.updateMetalSection(data.metalData, data.variantConfig);
+    this.updateDiamondSection(data.diamondData, data.variantConfig);
+    this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
+    this.updateMakingSection(data.makingData, data.variantConfig);
+    this.updateTotalSection(data.totalData, data.variantConfig);
+    this.updateVariantTitles(data.selectedVariant);
+    this.updateProductPrices(data.selectedVariant);
 
-      // ✅ Update hidden inputs so values go into line item properties
-      this.updateHiddenInputs(data);
-    }
+    // ✅ NEW: update hidden inputs every time we render
+    this.updateHiddenInputs(data);
+  }
 
-    updateHiddenInputs(data) {
-      console.log('[updateHiddenInputs] Starting with data:', data);
-      
-      const setVal = (id, val) => {
-        // Try multiple ways to find the element
-        let el = document.getElementById(id);
-        
-        // If not found by ID, try by name attribute
-        if (!el) {
-          el = document.querySelector(`input[name*="${id.replace('prop-', '')}"]`);
-        }
-        
-        // If still not found, try searching in all forms
-        if (!el) {
-          el = document.querySelector(`form input[id="${id}"]`);
-        }
-        
-        if (el) {
-          const formattedVal = (val !== null && val !== undefined) ? String(val) : '';
-          el.value = formattedVal;
-          console.log(`✅ Set ${id}: ${formattedVal}`);
-          
-          // Trigger change event to ensure form validation
-          el.dispatchEvent(new Event('change', { bubbles: true }));
-        } else {
-          console.error(`❌ Element not found: ${id}`);
-          // List all available input IDs for debugging
-          const allInputs = Array.from(document.querySelectorAll('input[type="hidden"]'));
-          console.log('Available hidden inputs:', allInputs.map(inp => inp.id || inp.name));
-        }
-      };
+  updateHiddenInputs(data) {
+    const setVal = (id, val) => {
+      const el = document.getElementById(id);
+      if (el) el.value = val;
+    };
 
-      try {
-        // Metal data
-        if (data.metalData) {
-          setVal('prop-gold-price-per-gram', data.metalData.pricePerGram);
-          setVal('prop-gold-weight', data.metalData.weight);
-          setVal('prop-gold-price', data.metalData.totalCost);
-        }
+    // Metal
+    setVal('prop-gold-price-per-gram', data.metalData.pricePerGram);
+    setVal('prop-gold-weight', data.metalData.weight);
+    setVal('prop-gold-price', data.metalData.totalCost);
 
-        // Making charges
-        if (data.makingData) {
-          setVal('prop-making-charges', data.makingData.totalCost);
-        }
+    // Making
+    setVal('prop-making-charges', data.makingData.totalCost);
 
-        // Diamond charges
-        if (data.diamondData) {
-          setVal('prop-diamond-charges', data.diamondData.totalCost);
-        }
+    // Diamonds
+    setVal('prop-diamond-charges', data.diamondData.totalCost);
 
-        // Totals
-        if (data.totalData) {
-          setVal('prop-gst', data.totalData.taxes);
-          setVal('prop-final-price', data.totalData.finalPrice);
-        }
-        
-        console.log('[updateHiddenInputs] Completed successfully');
-      } catch (error) {
-        console.error('[updateHiddenInputs] Error:', error);
-      }
-    }
-
-    // Add this method to ensure inputs are populated when drawer opens
-    onDrawerOpen() {
-      this.isDrawerOpen = true;
-      
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
-        const variantId = this.getCurrentVariantId();
-        console.log('[onDrawerOpen] Calculating for variant:', variantId);
-        this.updatePriceBreakdown(variantId);
-      }, 100);
-    }
-
-    // Also add this method to handle form submission and ensure values are set
-    ensureHiddenInputsPopulated() {
-      // Check if we have cached data for current variant
-      const variantId = this.getCurrentVariantId();
-      const cacheKey = `breakdown_${variantId}`;
-      
-      if (this.cache.has(cacheKey)) {
-        console.log('[ensureHiddenInputsPopulated] Using cached data');
-        const cachedData = this.cache.get(cacheKey);
-        this.updateHiddenInputs(cachedData);
-      } else if (this.config.variantConfigs[variantId]) {
-        console.log('[ensureHiddenInputsPopulated] Calculating fresh data');
-        const variantConfig = this.config.variantConfigs[variantId];
-        const selectedVariant = this.config.variantsData[variantId];
-        const calculationData = this.batchCalculateData(variantConfig, selectedVariant);
-        this.updateHiddenInputs(calculationData);
-      }
-    }
-
-    updateHiddenInputs(data) {
-      const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.value = val || '';
-          console.log(`Setting ${id}:`, val); // Debug log
-        } else {
-          console.warn(`Element not found: ${id}`); // Debug log
-        }
-      };
-
-      // Metal
-      setVal('prop-gold-price-per-gram', data.metalData.pricePerGram);
-      setVal('prop-gold-weight', data.metalData.weight);
-      setVal('prop-gold-price', data.metalData.totalCost);
-
-      // Making
-      setVal('prop-making-charges', data.makingData.totalCost);
-
-      // Diamonds
-      setVal('prop-diamond-charges', data.diamondData.totalCost);
-
-      // Totals
-      setVal('prop-gst', data.totalData.taxes);
-      setVal('prop-final-price', data.totalData.finalPrice);
-    }
-
-    updateHiddenInputs(data) {
-      const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
-      };
-
-      // Metal
-      setVal('prop-gold-price-per-gram', data.metalData.pricePerGram);
-      setVal('prop-gold-weight', data.metalData.weight);
-      setVal('prop-gold-price', data.metalData.totalCost);
-
-      // Making
-      setVal('prop-making-charges', data.makingData.totalCost);
-
-      // Diamonds
-      setVal('prop-diamond-charges', data.diamondData.totalCost);
-
-      // Totals
-      setVal('prop-gst', data.totalData.taxes);
-      setVal('prop-final-price', data.totalData.finalPrice);
-    }
+    // Totals
+    setVal('prop-gst', data.totalData.taxes);
+    setVal('prop-final-price', data.totalData.finalPrice);
+  }
 
     init() {
       console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
@@ -367,45 +246,6 @@
       
       // Listen for drawer open events
       this.setupDrawerOpenListener();
-      
-      // ✅ CRITICAL: Listen for form submissions to ensure inputs are populated
-      this.setupFormSubmissionListener();
-    }
-
-    setupFormSubmissionListener() {
-      // Find the product form
-      const productForm = document.querySelector('form[data-type="add-to-cart-form"]');
-      
-      if (productForm) {
-        productForm.addEventListener('submit', (e) => {
-          console.log('[Form Submit] Ensuring hidden inputs are populated...');
-          
-          // Ensure inputs are populated before submission
-          this.ensureHiddenInputsPopulated();
-          
-          // Log current input values for debugging
-          const inputs = [
-            'prop-gold-price-per-gram',
-            'prop-gold-weight', 
-            'prop-gold-price',
-            'prop-making-charges',
-            'prop-diamond-charges',
-            'prop-gst',
-            'prop-final-price'
-          ];
-          
-          inputs.forEach(id => {
-            const input = document.getElementById(id);
-            if (input) {
-              console.log(`Form submit - ${id}:`, input.value);
-            }
-          });
-        }, { passive: false });
-        
-        console.log('[setupFormSubmissionListener] Added form submit listener');
-      } else {
-        console.warn('[setupFormSubmissionListener] Product form not found');
-      }
     }
 
     setupDrawerListeners() {
