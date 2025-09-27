@@ -992,3 +992,79 @@ function share() {
     console.log("Web Share API not supported.");
   }
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+  // Parse the variant metafields JSON
+  const metafieldsData = JSON.parse(
+    document.getElementById("variant-metafields-information").textContent
+  );
+
+  // Find selectors
+  const variantSelect = document.querySelector('select[name="id"]');
+  const inputs = {
+    goldPerGram: document.querySelector('#prop-gold-price-per-gram'),
+    goldWeight: document.querySelector('#prop-gold-weight'),
+    goldPrice: document.querySelector('#prop-gold-price'),
+    making: document.querySelector('#prop-making-charges'),
+    diamond: document.querySelector('#prop-diamond-charges'),
+    gst: document.querySelector('#prop-gst'),
+    final: document.querySelector('#prop-final-price')
+  };
+  const modalEls = {
+    goldValue: document.querySelector('#modal-gold-value'),
+    diamondValue: document.querySelector('#modal-diamond-value'),
+    makingValue: document.querySelector('#modal-making-value'),
+    gstValue: document.querySelector('#modal-gst-value'),
+    totalValue: document.querySelector('#modal-total-value')
+  };
+
+  function updateBreakup(variantId) {
+    const data = metafieldsData[variantId];
+    if (!data) return;
+
+    // Read numbers safely
+    const goldWeight = parseFloat(data.net_weight || 0);
+    const goldRate = parseFloat(data.gold_rate || 0);
+    const diamondCarat = parseFloat(data.diamont_carat || 0);
+    const diamondRate = parseFloat(data.diamond_rate || 0);
+    const diamond1Carat = parseFloat(data.diamont_1_carat || 0);
+    const diamond1Rate = parseFloat(data.diamond_1_rate || 0);
+    const makingWeight = parseFloat(data.net_weight_total || 0);
+    const makingRate = parseFloat(data.making_charges_gram || 0);
+    const gstRate = parseFloat(data.gst || 0);
+
+    // Calculations
+    const goldPrice = goldWeight * goldRate;
+    const diamondPrice = (diamondCarat * diamondRate) + (diamond1Carat * diamond1Rate);
+    const makingPrice = makingWeight * makingRate;
+    const subtotal = goldPrice + diamondPrice + makingPrice;
+    const gstValue = (subtotal * gstRate) / 100;
+    const finalPrice = subtotal + gstValue;
+
+    // Update hidden inputs
+    inputs.goldPerGram.value = goldRate;
+    inputs.goldWeight.value = goldWeight;
+    inputs.goldPrice.value = goldPrice.toFixed(2);
+    inputs.making.value = makingPrice.toFixed(2);
+    inputs.diamond.value = diamondPrice.toFixed(2);
+    inputs.gst.value = gstValue.toFixed(2);
+    inputs.final.value = finalPrice.toFixed(2);
+
+    // Update modal table
+    if (modalEls.goldValue) modalEls.goldValue.textContent = `Rs. ${goldPrice.toFixed(2)}`;
+    if (modalEls.diamondValue) modalEls.diamondValue.textContent = `Rs. ${diamondPrice.toFixed(2)}`;
+    if (modalEls.makingValue) modalEls.makingValue.textContent = `Rs. ${makingPrice.toFixed(2)}`;
+    if (modalEls.gstValue) modalEls.gstValue.textContent = `Rs. ${gstValue.toFixed(2)}`;
+    if (modalEls.totalValue) modalEls.totalValue.textContent = `Rs. ${finalPrice.toFixed(2)}`;
+  }
+
+  // Listen for variant change
+  if (variantSelect) {
+    variantSelect.addEventListener("change", function () {
+      updateBreakup(this.value);
+    });
+    // Initialize on page load
+    updateBreakup(variantSelect.value);
+  }
+});
+
