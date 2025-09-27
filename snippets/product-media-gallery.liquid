@@ -1,6 +1,8 @@
 {% comment %}
-  Product Media Gallery using GLightbox
-  Supports images, videos, 3D models, thumbnails, overlay, and mobile slider
+  Full Product Media Gallery with GLightbox
+  - Supports images, Shopify videos, external videos (YouTube/Vimeo)
+  - Slider + thumbnails
+  - GLightbox overlay with proper background
 {% endcomment %}
 
 {%- liquid
@@ -37,96 +39,26 @@
 <media-gallery
   id="MediaGallery-{{ section.id }}"
   role="region"
-  {% if section.settings.enable_sticky_info %}
-    class="product__column-sticky"
-  {% endif %}
+  {% if section.settings.enable_sticky_info %} class="product__column-sticky" {% endif %}
   aria-label="{{ 'products.product.media.gallery_viewer' | t }}"
   data-desktop-layout="{{ section.settings.gallery_layout }}"
 >
   <div id="GalleryStatus-{{ section.id }}" class="visually-hidden" role="status"></div>
 
   <slider-component id="GalleryViewer-{{ section.id }}" class="slider-mobile-gutter">
-    <a class="skip-to-content-link button visually-hidden quick-add-hidden" href="#ProductInfo-{{ section.id }}">
-      {{ 'accessibility.skip_to_product_info' | t }}
-    </a>
+    <ul id="Slider-Gallery-{{ section.id }}" class="product__media-list contains-media grid grid--peek list-unstyled slider slider--mobile" role="list">
 
-    <ul
-      id="Slider-Gallery-{{ section.id }}"
-      class="product__media-list contains-media grid grid--peek list-unstyled slider slider--mobile"
-      role="list"
-    >
-      {%- if product.selected_or_first_available_variant.featured_media != null -%}
-        {%- assign featured_media = product.selected_or_first_available_variant.featured_media -%}
-        <li
-          id="Slide-{{ section.id }}-{{ featured_media.id }}"
-          class="product__media-item grid__item slider__slide is-active{% if single_media_visible %} product__media-item--single{% endif %}{% if featured_media.media_type != 'image' %} product__media-item--full{% endif %}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--fade-in{% endif %}"
-          data-media-id="{{ section.id }}-{{ featured_media.id }}"
-          data-color="{{ featured_media.alt | downcase }}"
-        >
-          {%- assign media_position = 1 -%}
-          {% assign media_url = featured_media.preview_image | img_url: 'master' %}
-          {% if featured_media.media_type == 'image' %}
-            <a href="{{ media_url }}" class="glightbox" data-gallery="product-{{ product.id }}">
-              {% render 'product-thumbnail',
-                media: featured_media,
-                media_count: media_count,
-                position: media_position,
-                desktop_layout: section.settings.gallery_layout,
-                mobile_layout: section.settings.mobile_thumbnails,
-                loop: section.settings.enable_video_looping,
-                modal_id: section.id,
-                xr_button: true,
-                media_width: media_width,
-                media_fit: section.settings.media_fit,
-                constrain_to_viewport: section.settings.constrain_to_viewport,
-                lazy_load: false
-              %}
-            </a>
-          {% else %}
-            {% render 'product-thumbnail',
-              media: featured_media,
-              media_count: media_count,
-              position: media_position,
-              desktop_layout: section.settings.gallery_layout,
-              mobile_layout: section.settings.mobile_thumbnails,
-              loop: section.settings.enable_video_looping,
-              modal_id: section.id,
-              xr_button: true,
-              media_width: media_width,
-              media_fit: section.settings.media_fit,
-              constrain_to_viewport: section.settings.constrain_to_viewport,
-              lazy_load: false
-            %}
-          {% endif %}
-        </li>
-      {%- endif -%}
+      {%- assign media_position = 0 -%}
 
       {%- for media in product.media -%}
-        {% if media_position >= limit
-          or media_position >= 1
-          and section.settings.hide_variants
-          and variant_images contains media.src
-        %}
-          {% continue %}
-        {% endif %}
+        {%- assign media_position = media_position | plus: 1 -%}
 
-        {%- unless media.id == product.selected_or_first_available_variant.featured_media.id -%}
-          <li
-            id="Slide-{{ section.id }}-{{ media.id }}"
-            class="product__media-item grid__item slider__slide{% if single_media_visible %} product__media-item--single{% endif %}{% if product.selected_or_first_available_variant.featured_media == nil and forloop.index == 1 %} is-active{% endif %}{% if media.media_type != 'image' %} product__media-item--full{% endif %}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--fade-in{% endif %}"
-            data-media-id="{{ section.id }}-{{ media.id }}"
-            data-color="{{ media.alt | downcase }}"
-          >
-            {%- liquid
-              assign media_position = media_position | default: 0 | plus: 1
-              assign lazy_load = false
-              if media_position > 1
-                assign lazy_load = true
-              endif
-            -%}
-            {% assign media_url = media.preview_image | img_url: 'master' %}
+        {%- unless section.settings.hide_variants and variant_images contains media.src -%}
+          <li id="Slide-{{ section.id }}-{{ media.id }}" class="product__media-item grid__item slider__slide{% if single_media_visible %} product__media-item--single{% endif %}" data-media-id="{{ section.id }}-{{ media.id }}" data-color="{{ media.alt | downcase }}">
+            
+            {% comment %} Determine media type and GLightbox attributes {% endcomment %}
             {% if media.media_type == 'image' %}
-              <a href="{{ media_url }}" class="glightbox" data-gallery="product-{{ product.id }}">
+              <a href="{{ media | image_url: 'master' }}" class="glightbox" data-gallery="product-{{ product.id }}" data-type="image" data-title="{{ media.alt }}">
                 {% render 'product-thumbnail',
                   media: media,
                   media_count: media_count,
@@ -139,28 +71,54 @@
                   media_width: media_width,
                   media_fit: section.settings.media_fit,
                   constrain_to_viewport: section.settings.constrain_to_viewport,
-                  lazy_load: lazy_load
+                  lazy_load: media_position > 1
                 %}
               </a>
-            {% else %}
-              {% render 'product-thumbnail',
-                media: media,
-                media_count: media_count,
-                position: media_position,
-                desktop_layout: section.settings.gallery_layout,
-                mobile_layout: section.settings.mobile_thumbnails,
-                loop: section.settings.enable_video_looping,
-                modal_id: section.id,
-                xr_button: true,
-                media_width: media_width,
-                media_fit: section.settings.media_fit,
-                constrain_to_viewport: section.settings.constrain_to_viewport,
-                lazy_load: lazy_load
-              %}
+
+            {% elsif media.media_type == 'video' %}
+              {% assign video_url = media.video_sources[0].url %}
+              <a href="{{ video_url }}" class="glightbox" data-gallery="product-{{ product.id }}" data-type="video" data-title="{{ media.alt }}">
+                {% render 'product-thumbnail',
+                  media: media,
+                  media_count: media_count,
+                  position: media_position,
+                  desktop_layout: section.settings.gallery_layout,
+                  mobile_layout: section.settings.mobile_thumbnails,
+                  loop: section.settings.enable_video_looping,
+                  modal_id: section.id,
+                  xr_button: true,
+                  media_width: media_width,
+                  media_fit: section.settings.media_fit,
+                  constrain_to_viewport: section.settings.constrain_to_viewport,
+                  lazy_load: media_position > 1
+                %}
+              </a>
+
+            {% elsif media.media_type == 'external_video' %}
+              {% assign ext_url = media.external_video.url %}
+              {% assign provider = media.external_video.host %}
+              <a href="{{ ext_url }}" class="glightbox" data-gallery="product-{{ product.id }}" data-type="video" data-source="{{ provider }}" data-title="{{ media.alt }}">
+                {% render 'product-thumbnail',
+                  media: media,
+                  media_count: media_count,
+                  position: media_position,
+                  desktop_layout: section.settings.gallery_layout,
+                  mobile_layout: section.settings.mobile_thumbnails,
+                  loop: section.settings.enable_video_looping,
+                  modal_id: section.id,
+                  xr_button: true,
+                  media_width: media_width,
+                  media_fit: section.settings.media_fit,
+                  constrain_to_viewport: section.settings.constrain_to_viewport,
+                  lazy_load: media_position > 1
+                %}
+              </a>
             {% endif %}
+
           </li>
         {%- endunless -%}
       {%- endfor -%}
+
     </ul>
 
     <div class="slider-buttons quick-add-hidden{% if hide_mobile_slider %} small-hide{% endif %}">
@@ -177,33 +135,24 @@
         <span class="svg-wrapper">{{- 'icon-caret.svg' | inline_asset_content -}}</span>
       </button>
     </div>
-
-    <div class="custom-share-icon mobile-show">
-      <div>
-        <div class="product-share product_share" onclick="share()" id="product_share">
-          {{ 'icon-share-product.svg' | inline_asset_content }}
-        </div>
-      </div>
-    </div>
   </slider-component>
 </media-gallery>
 
 <div class="hulk-wishlist-icon-wrap mobile-show">
-  <div class="iwish-app-block-product">
-    <a class="iWishAdd st-1" href="#" data-variant="{{ product.variants.first.id }}" data-product="{{ product.id }}" data-pTitle="{{ product.title | escape }}"></a>
-  </div>
+  <div class="iwish-app-block-product"><a class="iWishAdd st-1" href="#" data-variant="{{ product.variants.first.id }}" data-product="{{ product.id }}" data-pTitle="{{ product.title | escape }}"></a></div>
 </div>
 
-{% comment %}
-  Initialize GLightbox
-{% endcomment %}
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const lightbox = GLightbox({
-      selector: '.glightbox',
-      touchNavigation: true,
-      loop: true,
-      autoplayVideos: false
-    });
+document.addEventListener('DOMContentLoaded', function () {
+  GLightbox({
+    selector: '.glightbox',
+    touchNavigation: true,
+    loop: true,
+    autoplayVideos: true,
+    plyr: {
+      css: 'https://cdn.plyr.io/3.7.8/plyr.css',
+      js: 'https://cdn.plyr.io/3.7.8/plyr.js'
+    }
   });
+});
 </script>
