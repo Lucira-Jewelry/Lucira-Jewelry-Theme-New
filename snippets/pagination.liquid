@@ -1,12 +1,23 @@
 {% comment %}
-  Fixed infinite scroll pagination - resolves issues after sort/filter operations
+  Renders ultra-fast infinite scroll pagination for products. Must be used within paginate tags.
+
+  Preloads content instantly so users never wait. Fixed duplicate prevention.
+
+  Usage:
+  {% paginate results by 2 %}
+    {% render 'infinite-scroll-pagination', paginate: paginate, anchor: '#yourID' %}
+  {% endpaginate %}
+
+  Accepts:
+  - paginate: {Object}
+  - anchor: {String} (optional)
 {% endcomment %}
 
 {{ 'component-pagination.css' | asset_url | stylesheet_tag }}
 
 {%- if paginate.parts.size > 0 -%}
   <div class="infinite-scroll-wrapper">
-    <!-- Loading indicator -->
+    <!-- Loading indicator (elegant dots for luxury) -->
     <div id="infinite-scroll-loader" class="infinite-scroll-loader" style="display: none;">
       <div class="loader-content">
         <div class="elegant-dots">
@@ -18,7 +29,7 @@
       </div>
     </div>
 
-    <!-- End of products indicator -->
+    <!-- End of products indicator - MOVED INSIDE THE IF CONDITION -->
     <div id="infinite-scroll-end" class="infinite-scroll-end" style="display: none;">
       <div class="end-content">
         <div class="end-decoration">
@@ -40,7 +51,6 @@
     </div>
   </div>
 
-  <!-- Include your existing CSS styles here -->
   <style>
     .infinite-scroll-wrapper {
       margin-top: 3rem;
@@ -91,7 +101,6 @@
       border-radius: 50%;
       animation: elegantPulse 1.8s ease-in-out infinite;
       box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
-      display: block !important;
     }
 
     .elegant-dots .dot:nth-child(1) { animation-delay: 0s; }
@@ -139,7 +148,6 @@
       flex: 1;
       height: 1px;
       background: linear-gradient(to right, transparent, #d4af37, transparent);
-      display: block !important;
     }
 
     .end-diamond {
@@ -178,6 +186,7 @@
       font-family: 'Georgia', serif;
     }
 
+    /* Product animations */
     .product-fade-in {
       opacity: 0;
       transform: translateY(15px);
@@ -189,6 +198,7 @@
       transform: translateY(0);
     }
 
+    /* Staggered animation delays */
     .product-fade-in:nth-child(1) { transition-delay: 0.05s; }
     .product-fade-in:nth-child(2) { transition-delay: 0.1s; }
     .product-fade-in:nth-child(3) { transition-delay: 0.15s; }
@@ -211,134 +221,40 @@
 
   <script>
     (function() {
-      // Improved global state management
+      // Global state management
       window.infiniteScrollState = window.infiniteScrollState || {
         cleanup: null,
         loadedProductIds: new Set(),
         isInitialized: false,
         lastInitTime: 0,
         currentUrl: window.location.href,
-        currentSearchParams: new URLSearchParams(window.location.search).toString(),
         observer: null,
-        scrollHandler: null,
-        mutationObserver: null,
-        isLoading: false,
-        hasNextPage: true
+        scrollTimeout: null
       };
 
-      function debugLog(message, data = {}) {
-        console.log(`[InfiniteScroll] ${message}`, data);
-      }
-
-      function completeCleanup() {
-        const state = window.infiniteScrollState;
-        
-        if (state.scrollHandler) {
-          window.removeEventListener('scroll', state.scrollHandler);
-          state.scrollHandler = null;
-        }
-        
-        if (state.observer) {
-          state.observer.disconnect();
-          state.observer = null;
-        }
-        
-        if (state.mutationObserver) {
-          state.mutationObserver.disconnect();
-          state.mutationObserver = null;
-        }
-        
-        state.isInitialized = false;
-        state.isLoading = false;
-        
-        debugLog('Complete cleanup performed');
-      }
-
-      function hasUrlOrParamsChanged() {
-        const currentUrl = window.location.href;
-        const currentSearchParams = new URLSearchParams(window.location.search).toString();
-        const state = window.infiniteScrollState;
-        
-        const urlChanged = state.currentUrl !== currentUrl;
-        const paramsChanged = state.currentSearchParams !== currentSearchParams;
-        
-        if (urlChanged || paramsChanged) {
-          state.currentUrl = currentUrl;
-          state.currentSearchParams = currentSearchParams;
-          debugLog('URL/params changed', { urlChanged, paramsChanged });
-          return true;
-        }
-        
-        return false;
-      }
-
-      function resetUIElements() {
-        const loader = document.getElementById('infinite-scroll-loader');
-        const endIndicator = document.getElementById('infinite-scroll-end');
-        
-        if (loader) {
-          loader.style.display = 'none';
-          loader.classList.remove('show');
-        }
-        
-        if (endIndicator) {
-          endIndicator.style.display = 'none';
-          endIndicator.classList.remove('show');
-        }
-        
-        debugLog('UI elements reset');
-      }
-
-      function waitForElement(selector, timeout = 5000) {
-        return new Promise((resolve) => {
-          const element = document.querySelector(selector);
-          if (element) {
-            resolve(element);
-            return;
-          }
-
-          const observer = new MutationObserver((mutations, obs) => {
-            const element = document.querySelector(selector);
-            if (element) {
-              obs.disconnect();
-              resolve(element);
-            }
-          });
-
-          observer.observe(document.body, {
-            childList: true,
-            subtree: true
-          });
-
-          setTimeout(() => {
-            observer.disconnect();
-            resolve(null);
-          }, timeout);
-        });
-      }
-
-      async function initInfiniteScroll() {
-        debugLog('Starting initialization...');
+      function initInfiniteScroll() {
+        console.log('Initializing infinite scroll...');
         
         const currentTime = Date.now();
-        const state = window.infiniteScrollState;
         
         // Prevent rapid reinitializations
-        if (state.isInitialized && currentTime - state.lastInitTime < 1000) {
-          debugLog('Skipping rapid reinitialization');
+        if (window.infiniteScrollState.isInitialized && 
+            currentTime - window.infiniteScrollState.lastInitTime < 500) {
+          console.log('Skipping rapid reinitialization');
           return;
         }
 
-        // Complete cleanup of previous instance
-        completeCleanup();
-        
-        // Wait for essential elements
-        const productGrid = await waitForElement('#product-grid', 3000);
-        const nextPageData = await waitForElement('#next-page-data', 3000);
+        // Clean up previous instance
+        if (window.infiniteScrollState.cleanup) {
+          window.infiniteScrollState.cleanup();
+        }
+
+        const productGrid = document.getElementById('product-grid');
         const loader = document.getElementById('infinite-scroll-loader');
         const endIndicator = document.getElementById('infinite-scroll-end');
+        const nextPageData = document.getElementById('next-page-data');
         
-        debugLog('Elements found:', {
+        console.log('Elements found:', {
           productGrid: !!productGrid,
           loader: !!loader,
           endIndicator: !!endIndicator,
@@ -346,91 +262,71 @@
         });
         
         if (!productGrid || !loader || !endIndicator || !nextPageData) {
-          debugLog('Missing critical elements, aborting');
+          console.log('Missing elements, retrying...');
+          setTimeout(initInfiniteScroll, 200);
           return;
         }
 
-        // Reset state for new page/filter
-        if (hasUrlOrParamsChanged()) {
-          state.loadedProductIds.clear();
-          debugLog('Cleared product IDs due to URL change');
-        }
+        // Reset state for new page or URL change
+        const currentUrl = window.location.href;
+        const urlChanged = window.infiniteScrollState.currentUrl !== currentUrl;
+        window.infiniteScrollState.currentUrl = currentUrl;
 
-        resetUIElements();
-
-        // Get pagination data
         const currentPage = parseInt(nextPageData.dataset.currentPage) || 1;
         const totalPages = parseInt(nextPageData.dataset.totalPages) || 1;
-        let nextUrl = nextPageData.dataset.nextUrl || '';
+        const nextUrl = nextPageData.dataset.nextUrl || '';
         
-        debugLog('Pagination data:', { currentPage, totalPages, nextUrl });
+        console.log('Page data:', { currentPage, totalPages, nextUrl, urlChanged });
 
-        // Product management functions
-        function getProductIdentifier(productElement) {
+        if (currentPage === 1 || urlChanged) {
+          window.infiniteScrollState.loadedProductIds.clear();
+        }
+
+        // Product ID management
+        function getProductId(productElement) {
           return productElement.dataset.productId || 
                  productElement.dataset.id || 
-                 productElement.dataset.productHandle ||
                  productElement.getAttribute('data-product-handle') ||
                  productElement.id ||
                  productElement.querySelector('a[href*="/products/"]')?.href.split('/products/')[1]?.split('?')[0] ||
-                 Array.from(productElement.classList).find(c => c.includes('product')) ||
-                 productElement.innerHTML.slice(0, 50);
+                 productElement.outerHTML.slice(0, 100);
         }
 
         function isProductDuplicate(productElement) {
-          const id = getProductIdentifier(productElement);
-          const isDuplicate = id && state.loadedProductIds.has(id);
-          if (isDuplicate) {
-            debugLog('Found duplicate product:', id);
-          }
-          return isDuplicate;
+          const productId = getProductId(productElement);
+          return productId && window.infiniteScrollState.loadedProductIds.has(productId);
         }
 
         function markProductAsLoaded(productElement) {
-          const id = getProductIdentifier(productElement);
-          if (id) {
-            state.loadedProductIds.add(id);
+          const productId = getProductId(productElement);
+          if (productId) {
+            window.infiniteScrollState.loadedProductIds.add(productId);
           }
         }
 
-        // Build initial product set from current page
-        const productSelectors = [
-          '[data-product-id]', 
-          '.product-card', 
-          '.card-product', 
-          '[class*="product"]', 
-          '.grid-item',
-          '.product',
-          '.product-item'
-        ];
-        
-        let existingProducts = [];
-        for (const selector of productSelectors) {
-          existingProducts = productGrid.querySelectorAll(selector);
-          if (existingProducts.length > 0) break;
-        }
-        
-        debugLog('Found existing products:', existingProducts.length);
+        // Build initial product set
+        const existingProducts = productGrid.querySelectorAll('[data-product-id], .product-card, .card-product, [class*="product"], .grid-item');
+        console.log('Found existing products:', existingProducts.length);
         
         existingProducts.forEach(product => {
           markProductAsLoaded(product);
         });
 
         // State variables
-        state.isLoading = false;
-        state.hasNextPage = nextUrl !== '' && currentPage < totalPages;
+        loader.style.display = 'none';
+        loader.classList.remove('show');
+        endIndicator.style.display = 'none';
+        endIndicator.classList.remove('show', 'collection-complete');
+        
+        let isLoading = false;
+        let hasNextPage = nextUrl !== '';
         let currentPageNum = currentPage;
 
-        debugLog('Initial state:', { 
-          hasNextPage: state.hasNextPage, 
-          currentPageNum, 
-          totalPages,
-          loadedProductsCount: state.loadedProductIds.size 
-        });
+        console.log('Initial state:', { hasNextPage, currentPageNum, totalPages });
 
         // UI functions
         function showLoader() {
-          if (loader && state.hasNextPage && !state.isLoading) {
+          if (loader && hasNextPage) {
             loader.style.display = 'block';
             requestAnimationFrame(() => {
               loader.classList.add('show');
@@ -448,7 +344,7 @@
         }
 
         function showEndIndicator() {
-          if (endIndicator && !state.hasNextPage) {
+          if (endIndicator && !hasNextPage) {
             endIndicator.style.display = 'block';
             requestAnimationFrame(() => {
               endIndicator.classList.add('show');
@@ -461,48 +357,42 @@
             product.classList.add('product-fade-in');
             setTimeout(() => {
               product.classList.add('animate');
-            }, index * 50); // Slightly longer delay for smoother effect
+            }, index * 15);
           });
         }
         
-        // Initialize wishlist and other components
-        function reinitializeComponents() {
+        // Wishlist initialization
+        function initWishlist() {
           try {
-            // iWish wishlist
             if (typeof iWish !== 'undefined' && typeof iWish.init === 'function') {
               iWish.init();
             }
             
-            // Custom events
             document.dispatchEvent(new CustomEvent('iwish:reload'));
             document.dispatchEvent(new CustomEvent('wishlist:init'));
-            document.dispatchEvent(new CustomEvent('infiniteScroll:newProducts'));
             
             if (typeof iWishCounter === 'function') {
               iWishCounter();
             }
             
-            debugLog('Components reinitialized');
           } catch (error) {
-            debugLog('Component init error:', error);
+            console.error('Wishlist init error:', error);
           }
         }
 
-        // Load next page function
+        // Load next page
         async function loadNextPage() {
-          if (state.isLoading || !state.hasNextPage) {
-            debugLog('Cannot load next page:', { 
-              isLoading: state.isLoading, 
-              hasNextPage: state.hasNextPage 
-            });
-            return false;
+          if (isLoading || !hasNextPage) {
+            console.log('Cannot load next page:', { isLoading, hasNextPage });
+            return;
           }
 
-          debugLog('Loading next page...', { currentPageNum, nextUrl });
-          state.isLoading = true;
+          console.log('Loading next page...');
+          isLoading = true;
           showLoader();
 
           try {
+            const nextUrl = nextPageData.dataset.nextUrl;
             const response = await fetch(nextUrl, {
               method: 'GET',
               headers: {
@@ -512,93 +402,71 @@
             });
             
             if (!response.ok) {
-              throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+              throw new Error(`HTTP ${response.status}`);
             }
             
             const text = await response.text();
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = text;
             
-            // Find new products
             const newProductGrid = tempDiv.querySelector('#product-grid');
             if (!newProductGrid) {
-              debugLog('No product grid found in response');
-              state.hasNextPage = false;
-              return false;
+              console.error('No product grid found in response');
+              hasNextPage = false;
+              return;
             }
             
             const allNewProducts = Array.from(newProductGrid.children);
             const newNextPageData = tempDiv.querySelector('#next-page-data');
             
-            debugLog('Response analysis:', { 
-              totalProducts: allNewProducts.length,
-              hasNewPageData: !!newNextPageData 
-            });
+            console.log('Found new products:', allNewProducts.length);
             
-            // Filter out duplicates
+            // Filter duplicates
             const uniqueNewProducts = allNewProducts.filter(product => 
               !isProductDuplicate(product)
             );
             
-            debugLog('Filtered products:', { 
-              unique: uniqueNewProducts.length,
-              total: allNewProducts.length 
-            });
+            console.log('Unique new products:', uniqueNewProducts.length);
             
             if (uniqueNewProducts.length > 0) {
-              // Add products to grid
               uniqueNewProducts.forEach(product => {
                 markProductAsLoaded(product);
                 productGrid.appendChild(product);
               });
 
-              // Reinitialize components
-              setTimeout(() => {
-                reinitializeComponents();
-                animateNewProducts(uniqueNewProducts);
-              }, 100);
+              initWishlist();
+              animateNewProducts(uniqueNewProducts);
 
-              // Update pagination state
+              // Update pagination
               currentPageNum++;
               if (newNextPageData) {
-                const newNextUrl = newNextPageData.dataset.nextUrl || '';
-                const newTotalPages = parseInt(newNextPageData.dataset.totalPages) || totalPages;
-                
-                nextPageData.dataset.nextUrl = newNextUrl;
+                nextPageData.dataset.nextUrl = newNextPageData.dataset.nextUrl || '';
                 nextPageData.dataset.currentPage = currentPageNum.toString();
-                nextUrl = newNextUrl;
-                
-                state.hasNextPage = newNextUrl !== '' && currentPageNum < newTotalPages;
+                hasNextPage = nextPageData.dataset.nextUrl !== '';
               } else {
-                state.hasNextPage = false;
+                hasNextPage = false;
               }
 
-              debugLog('Updated pagination:', { 
-                currentPageNum, 
-                hasNextPage: state.hasNextPage,
-                nextUrl: nextUrl.slice(0, 50) + '...'
-              });
+              console.log('Updated state:', { currentPageNum, hasNextPage });
 
-              // Re-observe new products
-              setTimeout(() => observeLastProducts(), 200);
-              
-              return true;
+              // Re-observe after adding new products
+              setTimeout(() => observeLastProducts(), 100);
             } else {
-              debugLog('No new unique products, ending pagination');
-              state.hasNextPage = false;
-              return false;
+              console.log('No unique products found, ending pagination');
+              hasNextPage = false;
+            }
+
+            if (!hasNextPage) {
+              showEndIndicator();
             }
 
           } catch (error) {
-            debugLog('Load error:', error);
-            state.hasNextPage = false;
-            return false;
+            console.error('Error loading next page:', error);
+            hasNextPage = false;
           } finally {
-            state.isLoading = false;
-            hideLoader();
-            
-            if (!state.hasNextPage) {
-              showEndIndicator();
+            isLoading = false;
+            if (!hasNextPage) {
+              hideLoader();
             }
           }
         }
@@ -607,201 +475,187 @@
         function shouldLoadMore() {
           const scrollTop = window.scrollY || document.documentElement.scrollTop;
           const windowHeight = window.innerHeight;
-          const documentHeight = Math.max(
-            document.body.scrollHeight, 
-            document.documentElement.scrollHeight
-          );
-          
+          const documentHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
           const scrollPercentage = (scrollTop + windowHeight) / documentHeight;
-          const shouldLoad = scrollPercentage > 0.8; // Trigger earlier for better UX
-          
-          if (shouldLoad) {
-            debugLog('Scroll trigger activated', { scrollPercentage: scrollPercentage.toFixed(2) });
-          }
-          
-          return shouldLoad;
+          return scrollPercentage > 0.75;
         }
 
-        // Improved scroll handler with debouncing
-        let scrollTimeout;
         function handleScroll() {
-          if (scrollTimeout) {
-            clearTimeout(scrollTimeout);
+          if (window.infiniteScrollState.scrollTimeout) {
+            clearTimeout(window.infiniteScrollState.scrollTimeout);
           }
           
-          scrollTimeout = setTimeout(() => {
-            if (shouldLoadMore() && state.hasNextPage && !state.isLoading) {
+          window.infiniteScrollState.scrollTimeout = setTimeout(() => {
+            if (shouldLoadMore() && hasNextPage && !isLoading) {
               loadNextPage();
             }
-          }, 150); // Slightly longer debounce for better performance
+          }, 100);
         }
 
-        // Intersection observer for last products
+        // Intersection observer for better performance
         function observeLastProducts() {
-          if (state.observer) {
-            state.observer.disconnect();
+          if (window.infiniteScrollState.observer) {
+            window.infiniteScrollState.observer.disconnect();
           }
           
           const products = Array.from(productGrid.children);
-          if (products.length >= 2 && 'IntersectionObserver' in window) {
-            state.observer = new IntersectionObserver((entries) => {
+          if (products.length >= 3 && 'IntersectionObserver' in window) {
+            window.infiniteScrollState.observer = new IntersectionObserver((entries) => {
               entries.forEach(entry => {
-                if (entry.isIntersecting && state.hasNextPage && !state.isLoading) {
-                  debugLog('Intersection observer triggered');
+                if (entry.isIntersecting && hasNextPage && !isLoading) {
+                  console.log('Intersection triggered loading');
                   loadNextPage();
                 }
               });
             }, {
               root: null,
-              rootMargin: '800px 0px', // Increased margin for earlier loading
+              rootMargin: '500px 0px',
               threshold: 0.1
             });
 
-            // Observe last few products
-            const observeCount = Math.min(4, products.length);
-            const startIndex = Math.max(0, products.length - observeCount);
-            
-            for (let i = startIndex; i < products.length; i++) {
+            // Observe multiple products for better detection
+            const observeCount = Math.min(3, products.length);
+            for (let i = products.length - observeCount; i < products.length; i++) {
               if (products[i]) {
-                state.observer.observe(products[i]);
+                window.infiniteScrollState.observer.observe(products[i]);
               }
             }
             
-            debugLog('Observing products:', { 
-              count: observeCount, 
-              total: products.length,
-              startIndex 
-            });
+            console.log('Observing', observeCount, 'products out of', products.length);
           }
         }
 
-        // Set up event listeners
-        state.scrollHandler = handleScroll;
-        window.addEventListener('scroll', state.scrollHandler, { passive: true });
+        // Event listeners
+        const scrollHandler = handleScroll;
+        window.addEventListener('scroll', scrollHandler, { passive: true });
 
-        // Initialize based on current state
+        // Initial setup
         if (currentPageNum >= totalPages) {
-          debugLog('All pages already loaded');
-          state.hasNextPage = false;
+          console.log('All pages loaded, showing end indicator');
           showEndIndicator();
-        } else if (state.hasNextPage) {
-          debugLog('Setting up observers and initial load check');
-          
-          // Set up intersection observer
+        } else if (hasNextPage) {
+          console.log('Has next page, setting up observers');
+          // Start observing immediately
           setTimeout(() => {
             observeLastProducts();
-            
-            // For pages with few products, show a brief loader hint
-            if (existingProducts.length < 8) {
+            // Show loader briefly if few products
+            if (productGrid.children.length < 12) {
               showLoader();
-              setTimeout(() => {
-                if (!state.isLoading) hideLoader();
-              }, 2000);
+              setTimeout(hideLoader, 2000);
             }
           }, 500);
         }
 
-        // Mark as initialized
-        state.isInitialized = true;
-        state.lastInitTime = currentTime;
-        state.cleanup = completeCleanup;
-        
-        debugLog('Initialization complete', {
-          hasNextPage: state.hasNextPage,
-          currentPage: currentPageNum,
-          totalPages: totalPages,
-          productsLoaded: state.loadedProductIds.size
-        });
+        // Update global state
+        window.infiniteScrollState.isInitialized = true;
+        window.infiniteScrollState.lastInitTime = currentTime;
+
+        // Cleanup function
+        window.infiniteScrollState.cleanup = function() {
+          console.log('Cleaning up infinite scroll');
+          window.removeEventListener('scroll', scrollHandler);
+          if (window.infiniteScrollState.observer) {
+            window.infiniteScrollState.observer.disconnect();
+            window.infiniteScrollState.observer = null;
+          }
+          if (window.infiniteScrollState.scrollTimeout) {
+            clearTimeout(window.infiniteScrollState.scrollTimeout);
+            window.infiniteScrollState.scrollTimeout = null;
+          }
+          window.infiniteScrollState.isInitialized = false;
+        };
       }
 
-      // Enhanced reinitialization function
-      window.reinitInfiniteScroll = function(delay = 800) {
-        debugLog('Reinitializing infinite scroll', { delay });
-        
-        completeCleanup();
-        
-        setTimeout(() => {
-          // Additional cleanup and reset
-          const state = window.infiniteScrollState;
-          state.loadedProductIds.clear();
-          state.currentUrl = window.location.href;
-          state.currentSearchParams = new URLSearchParams(window.location.search).toString();
-          
-          resetUIElements();
-          
-          // Wait a bit more before reinit to ensure DOM is stable
-          setTimeout(initInfiniteScroll, 300);
-        }, delay);
-      };
-
-      // Event listeners for collection changes
-      const collectionEvents = [
-        'facetsLoaded',
-        'collectionFiltered', 
-        'collectionSorted',
-        'ajaxProductsLoaded',
-        'DOMContentLoaded'
-      ];
-
-      collectionEvents.forEach(eventName => {
-        document.addEventListener(eventName, () => {
-          debugLog(`Event received: ${eventName}`);
-          setTimeout(() => window.reinitInfiniteScroll(), 600);
-        });
-      });
-
-      // Enhanced URL change detection
-      let lastUrl = window.location.href;
-      let lastSearch = window.location.search;
-      
-      function checkForChanges() {
-        const currentUrl = window.location.href;
-        const currentSearch = window.location.search;
-        
-        if (currentUrl !== lastUrl || currentSearch !== lastSearch) {
-          debugLog('URL or search params changed');
-          lastUrl = currentUrl;
-          lastSearch = currentSearch;
-          setTimeout(() => window.reinitInfiniteScroll(), 400);
+      // Initialize based on DOM state
+      function tryInitialize() {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(initInfiniteScroll, 100);
+          });
+        } else {
+          // DOM is already loaded
+          setTimeout(initInfiniteScroll, 100);
         }
       }
 
-      // Listen for various navigation events
-      window.addEventListener('popstate', checkForChanges);
-      window.addEventListener('pushstate', checkForChanges);
-      window.addEventListener('replacestate', checkForChanges);
-      
-      // Periodic check as fallback
-      setInterval(checkForChanges, 2000);
+      // Reinitialize after sort/filter
+      window.reinitInfiniteScroll = function() {
+        console.log('Reinitializing infinite scroll');
+        
+        // Clean up immediately
+        if (window.infiniteScrollState.cleanup) {
+          window.infiniteScrollState.cleanup();
+        }
+        
+        setTimeout(() => {
+          const nextPageData = document.getElementById('next-page-data');
+          if (nextPageData) {
+            // Always reset loaded IDs when filter/sort happens
+            window.infiniteScrollState.loadedProductIds.clear();
+            window.infiniteScrollState.currentUrl = window.location.href;
+            window.infiniteScrollState.isInitialized = false;
+
+            // Make sure loader + end indicator reset
+            const loader = document.getElementById('infinite-scroll-loader');
+            const endIndicator = document.getElementById('infinite-scroll-end');
+            if (loader) {
+              loader.style.display = 'none';
+              loader.classList.remove('show');
+            }
+            if (endIndicator) {
+              endIndicator.style.display = 'none';
+              endIndicator.classList.remove('show', 'collection-complete');
+            }
+          }
+
+          // Call fresh init with longer delay
+          setTimeout(initInfiniteScroll, 200);
+        }, 600);
+      };
+
+      // URL change detection
+      let lastUrl = window.location.href;
+      function checkUrlChange() {
+        const currentUrl = window.location.href;
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          setTimeout(window.reinitInfiniteScroll, 300);
+        }
+      }
+
+      window.addEventListener('popstate', checkUrlChange);
+      setInterval(checkUrlChange, 1000);
+
+      // Listen for collection events
+      document.addEventListener('facetsLoaded', () => {
+        setTimeout(window.reinitInfiniteScroll, 400);
+      });
+
+      document.addEventListener('collectionFiltered', () => {
+        setTimeout(window.reinitInfiniteScroll, 400);
+      });
 
       // Enhanced DOM change detection
       setTimeout(() => {
         const productGrid = document.getElementById('product-grid');
         if (productGrid) {
           const gridObserver = new MutationObserver((mutations) => {
-            let shouldReinit = false;
-            
             mutations.forEach((mutation) => {
               if (mutation.type === 'childList' && mutation.target === productGrid) {
-                // Check if this was a significant change (filter/sort)
-                const addedNodes = Array.from(mutation.addedNodes);
-                const removedNodes = Array.from(mutation.removedNodes);
+                // Check if this was a filter/sort operation (complete replacement)
+                const hasDataAttributes = Array.from(productGrid.children).some(child => 
+                  child.dataset.productId || child.classList.contains('product-card') || 
+                  child.classList.contains('card-product') || child.classList.contains('grid-item')
+                );
                 
-                // If many products were replaced at once, it's likely a filter/sort
-                if (removedNodes.length > 2 || 
-                   (addedNodes.length > 0 && removedNodes.length > 0)) {
-                  shouldReinit = true;
-                  debugLog('Significant product grid change detected');
+                if (hasDataAttributes && productGrid.children.length > 0) {
+                  console.log('Product grid changed, reinitializing');
+                  setTimeout(window.reinitInfiniteScroll, 500);
                 }
               }
             });
-            
-            if (shouldReinit) {
-              setTimeout(() => window.reinitInfiniteScroll(), 700);
-            }
           });
           
-          window.infiniteScrollState.mutationObserver = gridObserver;
           gridObserver.observe(productGrid, { 
             childList: true, 
             subtree: false 
@@ -809,15 +663,8 @@
         }
       }, 1000);
 
-      // Initialize when DOM is ready
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => {
-          setTimeout(initInfiniteScroll, 200);
-        });
-      } else {
-        setTimeout(initInfiniteScroll, 200);
-      }
-
+      // Initialize
+      tryInitialize();
     })();
   </script>
 {%- endif -%}
