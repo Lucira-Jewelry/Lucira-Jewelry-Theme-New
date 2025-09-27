@@ -182,7 +182,7 @@
         this.init();
     }
 
-    // ✅ FIXED: Ensure this method is called in the right place
+    // ✅ CORRECTED: Single updateHiddenInputs method
     updateHiddenInputs(data) {
         if (!data) return;
         
@@ -191,8 +191,10 @@
         const setVal = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
-                el.value = val || '';
-                console.log(`Set ${id} to:`, val);
+                // Convert to string and ensure it's a valid number
+                const numVal = Number(val) || 0;
+                el.value = numVal.toString();
+                console.log(`Set ${id} to:`, numVal);
             } else {
                 console.warn(`Element with id ${id} not found`);
             }
@@ -200,19 +202,19 @@
 
         try {
             // Metal data
-            setVal('prop-gold-price-per-gram', data.metalData?.pricePerGram || 0);
-            setVal('prop-gold-weight', data.metalData?.weight || 0);
-            setVal('prop-gold-price', data.metalData?.totalCost || 0);
+            setVal('prop-gold-price-per-gram', data.metalData?.pricePerGram);
+            setVal('prop-gold-weight', data.metalData?.weight);
+            setVal('prop-gold-price', data.metalData?.totalCost);
 
             // Making charges
-            setVal('prop-making-charges', data.makingData?.totalCost || 0);
+            setVal('prop-making-charges', data.makingData?.totalCost);
 
             // Diamonds
-            setVal('prop-diamond-charges', data.diamondData?.totalCost || 0);
+            setVal('prop-diamond-charges', data.diamondData?.totalCost);
 
             // Totals
-            setVal('prop-gst', data.totalData?.taxes || 0);
-            setVal('prop-final-price', data.totalData?.finalPrice || 0);
+            setVal('prop-gst', data.totalData?.taxes);
+            setVal('prop-final-price', data.totalData?.finalPrice);
             
             console.log('[Live Gold Price Editor] Hidden inputs updated successfully');
         } catch (error) {
@@ -220,11 +222,12 @@
         }
     }
 
+    // ✅ CORRECTED: Single init method
     init() {
         console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
         this.setupEventListeners();
         
-        // ✅ FIXED: Always initialize hidden inputs with current variant data
+        // ✅ Always initialize hidden inputs with current variant data
         const initialVariantId = this.config.currentVariantId;
         this.updatePriceBreakdown(initialVariantId);
         
@@ -237,124 +240,20 @@
         this.isInitialized = true;
     }
 
-    // ✅ FIXED: Modified to ensure hidden inputs are updated
-    updatePriceBreakdown(variantId) {
-        // Check cache first
-        const cacheKey = `breakdown_${variantId}`;
-        if (this.cache.has(cacheKey)) {
-            const cachedData = this.cache.get(cacheKey);
-            this.renderPriceBreakdown(cachedData);
-            // ✅ Ensure hidden inputs are updated even with cached data
-            this.updateHiddenInputs(cachedData);
-            this.currentVariantId = variantId;
-            return;
-        }
-
-        try {
-            const variantConfig = this.config.variantConfigs[variantId];
-            const selectedVariant = this.config.variantsData[variantId];
-
-            if (!variantConfig) {
-                console.warn('[Live Gold Price Editor] No configuration found for variant:', variantId);
-                return;
-            }
-
-            // Calculate all data in batch
-            const calculationData = this.batchCalculateData(variantConfig, selectedVariant);
-            
-            // Cache the result
-            this.cache.set(cacheKey, calculationData);
-            
-            // Render the data
-            this.renderPriceBreakdown(calculationData);
-            // ✅ Ensure hidden inputs are updated with new data
-            this.updateHiddenInputs(calculationData);
-            this.currentVariantId = variantId;
-
-        } catch (error) {
-            console.error('[Live Gold Price Editor] Error updating price breakdown:', error);
-            this.showError(error.message);
-        }
-    }
-
-    // ✅ FIXED: Modified renderPriceBreakdown to include hidden inputs update
-    renderPriceBreakdown(data) {
-        this.updateProductDetails(data.selectedVariant);
-        this.updateMetalSection(data.metalData, data.variantConfig);
-        this.updateDiamondSection(data.diamondData, data.variantConfig);
-        this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
-        this.updateMakingSection(data.makingData, data.variantConfig);
-        this.updateTotalSection(data.totalData, data.variantConfig);
-        this.updateVariantTitles(data.selectedVariant);
-        this.updateProductPrices(data.selectedVariant);
-        
-        // ✅ Hidden inputs are now updated in updatePriceBreakdown method
-        // to ensure they're updated for both cached and new calculations
-    }
-
-    handleVariantChange() {
-        // Process even if drawer is closed to keep hidden inputs updated
-        const variantId = this.getCurrentVariantId();
-        
-        // Avoid unnecessary recalculations
-        if (variantId === this.currentVariantId) return;
-        
-        if (variantId && this.config.variantConfigs[variantId]) {
-            console.log('[Live Gold Price Editor] Variant changed to:', variantId);
-            this.updatePriceBreakdown(variantId);
-        }
-    }
-
-    updateHiddenInputs(data) {
-      const setVal = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.value = val;
-      };
-
-      // Metal
-      setVal('prop-gold-price-per-gram', data.metalData.pricePerGram);
-      setVal('prop-gold-weight', data.metalData.weight);
-      setVal('prop-gold-price', data.metalData.totalCost);
-
-      // Making
-      setVal('prop-making-charges', data.makingData.totalCost);
-
-      // Diamonds
-      setVal('prop-diamond-charges', data.diamondData.totalCost);
-
-      // Totals
-      setVal('prop-gst', data.totalData.taxes);
-      setVal('prop-final-price', data.totalData.finalPrice);
-    }
-
-    init() {
-      console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
-      this.setupEventListeners();
-      
-      // Only calculate if drawer is initially open
-      const drawer = document.getElementById('price-drawer');
-      if (drawer && drawer.classList.contains('active')) {
-        this.isDrawerOpen = true;
-        this.updatePriceBreakdown(this.config.currentVariantId);
-      }
-      
-      this.isInitialized = true;
-    }
-
     setupEventListeners() {
-      // Use passive listeners where possible
-      document.addEventListener('change', this.handleDocumentChange.bind(this), { passive: true });
-      
-      // Only add popstate if needed
-      if (window.history.length > 1) {
-        window.addEventListener('popstate', this.handleVariantChange, { passive: true });
-      }
+        // Listen for variant changes regardless of drawer state
+        document.addEventListener('change', this.handleDocumentChange.bind(this), { passive: true });
+        
+        // Only add popstate if needed
+        if (window.history.length > 1) {
+            window.addEventListener('popstate', this.handleVariantChange, { passive: true });
+        }
 
-      // Drawer-specific listeners (only if drawer exists)
-      this.setupDrawerListeners();
-      
-      // Listen for drawer open events
-      this.setupDrawerOpenListener();
+        // Drawer-specific listeners (only if drawer exists)
+        this.setupDrawerListeners();
+        
+        // Listen for drawer open events
+        this.setupDrawerOpenListener();
     }
 
     setupDrawerListeners() {
@@ -409,12 +308,10 @@
     }
 
     handleDocumentChange(e) {
-      // Only process if drawer is open
-      if (!this.isDrawerOpen) return;
-      
-      if (e.target.name === 'id' || e.target.classList.contains('variant-selector')) {
-        this.handleVariantChange();
-      }
+        // Process variant changes even if drawer is closed to keep hidden inputs updated
+        if (e.target.name === 'id' || e.target.classList.contains('variant-selector') || e.target.closest('[data-product-select]')) {
+            this.handleVariantChange();
+        }
     }
 
     handleKeydown(e) {
@@ -435,54 +332,57 @@
       return url.searchParams.get("variant") || this.config.currentVariantId;
     }
 
+    // ✅ CORRECTED: Handle variant changes regardless of drawer state
     handleVariantChange() {
-      // Only process if drawer is open
-      if (!this.isDrawerOpen) return;
-      
-      const variantId = this.getCurrentVariantId();
-      
-      // Avoid unnecessary recalculations
-      if (variantId === this.currentVariantId) return;
-      
-      if (variantId && this.config.variantConfigs[variantId]) {
-        console.log('[Live Gold Price Editor] Variant changed to:', variantId);
-        this.updatePriceBreakdown(variantId);
-      }
+        const variantId = this.getCurrentVariantId();
+        
+        // Avoid unnecessary recalculations
+        if (variantId === this.currentVariantId) return;
+        
+        if (variantId && this.config.variantConfigs[variantId]) {
+            console.log('[Live Gold Price Editor] Variant changed to:', variantId);
+            this.updatePriceBreakdown(variantId);
+        }
     }
 
+    // ✅ CORRECTED: Ensure hidden inputs are updated in all scenarios
     updatePriceBreakdown(variantId) {
-      // Check cache first
-      const cacheKey = `breakdown_${variantId}`;
-      if (this.cache.has(cacheKey)) {
-        const cachedData = this.cache.get(cacheKey);
-        this.renderPriceBreakdown(cachedData);
-        this.currentVariantId = variantId;
-        return;
-      }
-
-      try {
-        const variantConfig = this.config.variantConfigs[variantId];
-        const selectedVariant = this.config.variantsData[variantId];
-
-        if (!variantConfig) {
-          console.warn('[Live Gold Price Editor] No configuration found for variant:', variantId);
-          return;
+        // Check cache first
+        const cacheKey = `breakdown_${variantId}`;
+        if (this.cache.has(cacheKey)) {
+            const cachedData = this.cache.get(cacheKey);
+            this.renderPriceBreakdown(cachedData);
+            // ✅ Ensure hidden inputs are updated even with cached data
+            this.updateHiddenInputs(cachedData);
+            this.currentVariantId = variantId;
+            return;
         }
 
-        // Calculate all data in batch
-        const calculationData = this.batchCalculateData(variantConfig, selectedVariant);
-        
-        // Cache the result
-        this.cache.set(cacheKey, calculationData);
-        
-        // Render the data
-        this.renderPriceBreakdown(calculationData);
-        this.currentVariantId = variantId;
+        try {
+            const variantConfig = this.config.variantConfigs[variantId];
+            const selectedVariant = this.config.variantsData[variantId];
 
-      } catch (error) {
-        console.error('[Live Gold Price Editor] Error updating price breakdown:', error);
-        this.showError(error.message);
-      }
+            if (!variantConfig) {
+                console.warn('[Live Gold Price Editor] No configuration found for variant:', variantId);
+                return;
+            }
+
+            // Calculate all data in batch
+            const calculationData = this.batchCalculateData(variantConfig, selectedVariant);
+            
+            // Cache the result
+            this.cache.set(cacheKey, calculationData);
+            
+            // Render the data
+            this.renderPriceBreakdown(calculationData);
+            // ✅ Ensure hidden inputs are updated with new data
+            this.updateHiddenInputs(calculationData);
+            this.currentVariantId = variantId;
+
+        } catch (error) {
+            console.error('[Live Gold Price Editor] Error updating price breakdown:', error);
+            this.showError(error.message);
+        }
     }
 
     batchCalculateData(variantConfig, selectedVariant) {
@@ -504,19 +404,16 @@
       };
     }
 
+    // ✅ CORRECTED: Only update UI, hidden inputs are handled separately
     renderPriceBreakdown(data) {
-      // Use document fragment for batch DOM updates
-      const fragment = document.createDocumentFragment();
-      
-      // Update all sections in batch
-      this.updateProductDetails(data.selectedVariant);
-      this.updateMetalSection(data.metalData, data.variantConfig);
-      this.updateDiamondSection(data.diamondData, data.variantConfig);
-      this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
-      this.updateMakingSection(data.makingData, data.variantConfig);
-      this.updateTotalSection(data.totalData, data.variantConfig);
-      this.updateVariantTitles(data.selectedVariant);
-      this.updateProductPrices(data.selectedVariant);
+        this.updateProductDetails(data.selectedVariant);
+        this.updateMetalSection(data.metalData, data.variantConfig);
+        this.updateDiamondSection(data.diamondData, data.variantConfig);
+        this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
+        this.updateMakingSection(data.makingData, data.variantConfig);
+        this.updateTotalSection(data.totalData, data.variantConfig);
+        this.updateVariantTitles(data.selectedVariant);
+        this.updateProductPrices(data.selectedVariant);
     }
 
     calculateMetalPricing(variantConfig) {
@@ -640,7 +537,7 @@
       };
     }
 
-    // Optimized UI Update Methods
+    // UI Update Methods (unchanged)
     updateProductDetails(selectedVariant) {
       const imageElement = document.getElementById('price-drawer-image');
       if (imageElement) {
@@ -663,7 +560,7 @@
         const priceContainer = document.getElementById('price-drawer-prices');
         if (!priceContainer) return;
 
-        const price = selectedVariant.price / 100; // convert paise → rupees
+        const price = selectedVariant.price / 100;
         const compareAtPrice = selectedVariant.compare_at_price / 100;
 
         if (compareAtPrice && compareAtPrice > price) {
@@ -860,7 +757,6 @@
       return this.numberFormatter.format(Math.round(Number(price)));
     }
 
-
     debounce(func, wait) {
       return (...args) => {
         clearTimeout(this.debounceTimer);
@@ -914,10 +810,24 @@
     // DOM is already loaded
     initializePriceGuide();
   }
-  
 
-  // Optional: Add event listener for drawer opening if you have a specific trigger
-  // document.addEventListener('priceDrawerOpen', initializePriceGuide);
+  // Debug function to check hidden inputs
+  function debugHiddenInputs() {
+    const inputs = [
+        'prop-gold-price-per-gram',
+        'prop-gold-weight', 
+        'prop-gold-price',
+        'prop-making-charges',
+        'prop-diamond-charges',
+        'prop-gst',
+        'prop-final-price'
+    ];
+    
+    inputs.forEach(id => {
+        const el = document.getElementById(id);
+        console.log(`${id}:`, el ? el.value : 'NOT FOUND');
+    });
+  }
 </script>
 
 
