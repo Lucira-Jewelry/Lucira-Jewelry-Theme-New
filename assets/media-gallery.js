@@ -278,7 +278,9 @@ document.addEventListener("DOMContentLoaded", function () {
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
+    setupScrollSync(); // ✅ keep dots in sync with swipe
   }
+
 
   function playAllVideos() {
     if (!mediaList) return;
@@ -383,3 +385,48 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
+
+function setupScrollSync() {
+  if (!mediaList) return;
+
+  const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
+    .filter(slide => slide.style.display !== 'none');
+
+  if (!slides.length) return;
+
+  const observerOptions = {
+    root: mediaList, // scroll container
+    threshold: 0.6   // 60% visible = active
+  };
+
+  const io = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const newIndex = slides.indexOf(entry.target);
+        if (newIndex !== currentSlide) {
+          currentSlide = newIndex;
+
+          // ✅ Update active state
+          slides.forEach((slide, i) =>
+            slide.classList.toggle('is-active', i === newIndex)
+          );
+          if (dotsContainer) {
+            dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) =>
+              dot.classList.toggle('active', i === newIndex)
+            );
+          }
+
+          // ✅ Autoplay video if in view
+          const activeVideo = entry.target.querySelector('video');
+          if (activeVideo) {
+            activeVideo.loop = true;
+            activeVideo.muted = true;
+            activeVideo.play().catch(() => {});
+          }
+        }
+      }
+    });
+  }, observerOptions);
+
+  slides.forEach(slide => io.observe(slide));
+}
