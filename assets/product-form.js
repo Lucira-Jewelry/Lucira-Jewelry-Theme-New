@@ -948,7 +948,7 @@ function initEngraving() {
     }
   };
 
-  window.bradProdEngravAddSymbol = function (symbol) {
+  window.ProductEngravAddSymbol = function (symbol) {
     EngravingAddSymbol(symbol);
   };
 
