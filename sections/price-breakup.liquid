@@ -50,16 +50,10 @@
             <p class="product-sku" id="price-drawer-sku">SKU: {{ product.selected_or_first_available_variant.sku }}</p>
             <div class="product-prices" id="price-drawer-prices">
               {% if product.compare_at_price > product.price %}
-                <span class="price sale" id="price-drawer-price">
-                  {{ product.price | money_with_currency }}
-                </span>
-                <del class="compare-price" id="price-drawer-compare-price">
-                  {{ product.compare_at_price | money_with_currency }}
-                </del>
+                <span class="price sale" id="price-drawer-price" data-price="{{ product.price }}"></span>
+                <del class="compare-price" id="price-drawer-compare-price" data-price="{{ product.compare_at_price }}"></del>
               {% else %}
-                <span class="price" id="price-drawer-sale-price">
-                  {{ product.price | money_with_currency }}
-                </span>
+                <span class="price" id="price-drawer-sale-price" data-price="{{ product.price }}"></span>
               {% endif %}
             </div>
           </div>
@@ -171,13 +165,13 @@
         this.debounceTimer = null;
         this.currentVariantId = null;
         
-        // ✅ REMOVED: Old numberFormatter - no longer needed
-        // this.numberFormatter = new Intl.NumberFormat('en-IN', {
-        //     style: 'currency',
-        //     currency: 'INR',
-        //     maximumFractionDigits: 0,
-        //     minimumFractionDigits: 0
-        // });
+        // Performance optimizations
+        this.numberFormatter = new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            maximumFractionDigits: 0,
+            minimumFractionDigits: 0
+        });
         
         // Pre-bind methods to avoid recreation
         this.handleVariantChange = this.debounce(this.handleVariantChange.bind(this), 100);
@@ -197,7 +191,7 @@
         const setVal = (id, val) => {
             const el = document.getElementById(id);
             if (el) {
-                // Store the raw numeric value (not formatted)
+                // Convert to string and ensure it's a valid number
                 const numVal = Number(val) || 0;
                 el.value = numVal.toString();
                 console.log(`Set ${id} to:`, numVal);
@@ -225,8 +219,8 @@
             console.log('[Live Gold Price Editor] Hidden inputs updated successfully');
         } catch (error) {
             console.error('[Live Gold Price Editor] Error updating hidden inputs:', error);
+        }
     }
-}
 
     // ✅ CORRECTED: Single init method
     init() {
@@ -566,22 +560,22 @@
         const priceContainer = document.getElementById('price-drawer-prices');
         if (!priceContainer) return;
 
-        const price = selectedVariant.price; // Already in paise
-        const compareAtPrice = selectedVariant.compare_at_price; // Already in paise
+        const price = selectedVariant.price / 100;
+        const compareAtPrice = selectedVariant.compare_at_price / 100;
 
         if (compareAtPrice && compareAtPrice > price) {
             priceContainer.innerHTML = `
             <span class="price sale" id="price-drawer-price">
-                ${this.formatCurrency(price / 100)}
+                ${this.formatCurrency(price)}
             </span>
             <del class="compare-price" id="price-drawer-compare-price">
-                ${this.formatCurrency(compareAtPrice / 100)}
+                ${this.formatCurrency(compareAtPrice)}
             </del>
             `;
         } else {
             priceContainer.innerHTML = `
             <span class="price" id="price-drawer-sale-price">
-                ${this.formatCurrency(price / 100)}
+                ${this.formatCurrency(price)}
             </span>
             `;
         }
@@ -760,7 +754,7 @@
     }
 
     formatCurrency(price) {
-      return '₹' + Math.round(Number(price)).toLocaleString('en-IN');
+      return this.numberFormatter.format(Math.round(Number(price)));
     }
 
     debounce(func, wait) {
