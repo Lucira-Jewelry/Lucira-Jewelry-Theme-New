@@ -884,10 +884,8 @@ function initEngraving() {
     fontInput.type = "hidden";
     fontInput.name = "properties[EngravingFont]";
     fontInput.id = "hidden-engraving-font";
-    fontInput.value = ""; // keep empty
     mainForm.appendChild(fontInput);
   }
-
 
   if (mainForm && !textInput) {
     textInput = document.createElement("input");
@@ -908,7 +906,7 @@ function initEngraving() {
     if (fontInput) fontInput.value = defaultFont;
   }
 
-  // Update preview text only (do NOT sync hidden input)
+  // Update preview text and sync with hidden input
   engravingInput.addEventListener("input", function () {
     // Validate characters
     if (!allowedChars.test(this.value)) {
@@ -920,46 +918,74 @@ function initEngraving() {
       this.value = this.value.slice(0, 8);
     }
 
-    // Update preview text only
+    // Update preview
     previewText.textContent = this.value;
+    
+    // ✅ FIXED: Sync with hidden input in real-time
+    if (textInput) {
+      textInput.value = this.value;
+    }
+  });
+
+  // Insert symbols at cursor
+  function insertAtCursor(input, text) {
+    const start = input.selectionStart;
+    const end = input.selectionEnd;
+    input.value = input.value.slice(0, start) + text + input.value.slice(end);
+    input.setSelectionRange(start + text.length, start + text.length);
+    input.focus();
+    
+    // Trigger input event to update preview and hidden inputs
+    input.dispatchEvent(new Event("input"));
+  }
+
+  // Global symbol functions
+  window.EngravingAddSymbol = function (symbol) {
+    if (engravingInput.value.length + symbol.length <= 8) {
+      insertAtCursor(engravingInput, symbol);
+    } else {
+      alert('Maximum 8 characters reached');
+    }
+  };
+
+  window.bradProdEngravAddSymbol = function (symbol) {
+    EngravingAddSymbol(symbol);
+  };
+
+  // Font selection
+  fontOptions.forEach(option => {
+    option.addEventListener("click", () => {
+      fontOptions.forEach(opt => opt.classList.remove("active"));
+      option.classList.add("active");
+      const font = option.dataset.font;
+
+      // Apply selected font to preview
+      previewText.style.fontFamily = font;
+      
+      // ✅ FIXED: Store in hidden input immediately
+      if (fontInput) {
+        fontInput.value = font;
+      }
+
+      console.log('Font selected:', font);
     });
+  });
 
-    // Font selection: apply preview only
-    fontOptions.forEach(option => {
-      option.addEventListener("click", () => {
-        fontOptions.forEach(opt => opt.classList.remove("active"));
-        option.classList.add("active");
+  // Save button functionality
+  if (saveButton) {
+    saveButton.addEventListener("click", (e) => {
+      e.preventDefault();
 
-        const font = option.dataset.font;
-        previewText.style.fontFamily = font;
+      const engravingValue = engravingInput.value.trim();
+      const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
 
-        // ✅ Do NOT sync hidden input here
-        console.log('Font selected (preview only):', font);
-      });
-    });
+      // ✅ FIXED: Ensure hidden inputs are updated
+      if (textInput) textInput.value = engravingValue;
+      if (fontInput) fontInput.value = selectedFont;
 
-    // Save button: only here we populate hidden inputs
-    if (saveButton) {
-      saveButton.addEventListener("click", (e) => {
-        e.preventDefault();
-
-        const engravingValue = engravingInput.value.trim();
-        const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
-
-        if (!engravingValue) {
-          if (savedWrapper) {
-            savedWrapper.style.display = "block";
-            savedWrapper.innerHTML = `<p style="color:red;">No engraving text entered</p>`;
-          }
-          return;
-        }
-
-        // ✅ Update hidden inputs only on save
-        if (textInput) textInput.value = engravingValue;
-        if (fontInput) fontInput.value = selectedFont;
-
-        // Show confirmation
-        if (savedWrapper) {
+      // Show confirmation
+      if (savedWrapper) {
+        if (engravingValue) {
           savedWrapper.style.display = "flex";
           savedWrapper.innerHTML = `
             <p><strong>Saved Engraving:</strong></p>
@@ -967,148 +993,84 @@ function initEngraving() {
               ${engravingValue}
             </div>
           `;
+        } else {
+          savedWrapper.style.display = "block";
+          savedWrapper.innerHTML = `<p style="color:red;">No engraving text entered</p>`;
         }
+      }
 
-        // Visual feedback
-        saveButton.textContent = "Saved ✓";
-        setTimeout(() => {
-          saveButton.textContent = "SAVE";
-          closeEngravingDrawer();
-        }, 2000);
+      // Visual feedback
+      saveButton.textContent = "Saved ✓";
+      setTimeout(() => {
+        saveButton.textContent = "SAVE";
+        closeEngravingDrawer();
+      }, 2000);
 
-        console.log('Engraving saved:', {
-          text: engravingValue,
-          font: selectedFont
-        });
+      console.log('Engraving saved:', {
+        text: engravingValue,
+        font: selectedFont
       });
-    }
-
-
-    // Insert symbols at cursor
-    function insertAtCursor(input, text) {
-      const start = input.selectionStart;
-      const end = input.selectionEnd;
-      input.value = input.value.slice(0, start) + text + input.value.slice(end);
-      input.setSelectionRange(start + text.length, start + text.length);
-      input.focus();
-      
-      // Trigger input event to update preview and hidden inputs
-      input.dispatchEvent(new Event("input"));
-    }
-
-    // Global symbol functions
-    window.EngravingAddSymbol = function (symbol) {
-      if (engravingInput.value.length + symbol.length <= 8) {
-        insertAtCursor(engravingInput, symbol);
-      } else {
-        alert('Maximum 8 characters reached');
-      }
-    };
-
-    window.bradProdEngravAddSymbol = function (symbol) {
-      EngravingAddSymbol(symbol);
-    };
-
-    // Save button functionality
-    if (saveButton) {
-      saveButton.addEventListener("click", (e) => {
-        e.preventDefault();
-
-        const engravingValue = engravingInput.value.trim();
-        const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
-
-        // ✅ FIXED: Ensure hidden inputs are updated
-        if (textInput) textInput.value = engravingValue;
-        if (fontInput) fontInput.value = selectedFont;
-
-        // Show confirmation
-        if (savedWrapper) {
-          if (engravingValue) {
-            savedWrapper.style.display = "flex";
-            savedWrapper.innerHTML = `
-              <p><strong>Saved Engraving:</strong></p>
-              <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
-                ${engravingValue}
-              </div>
-            `;
-          } else {
-            savedWrapper.style.display = "block";
-            savedWrapper.innerHTML = `<p style="color:red;">No engraving text entered</p>`;
-          }
-        }
-
-        // Visual feedback
-        saveButton.textContent = "Saved ✓";
-        setTimeout(() => {
-          saveButton.textContent = "SAVE";
-          closeEngravingDrawer();
-        }, 2000);
-
-        console.log('Engraving saved:', {
-          text: engravingValue,
-          font: selectedFont
-        });
-      });
-    }
-
-    // Close functionality
-    if (closeButton) {
-      closeButton.addEventListener("click", closeEngravingDrawer);
-    }
-
-    if (overlay) {
-      overlay.addEventListener("click", closeEngravingDrawer);
-    }
-
-    // Drawer functions
-    window.openEngravingDrawer = function() {
-      const drawer = document.getElementById("engraving-drawer");
-      if (drawer && overlay) {
-        drawer.classList.add("active");
-        overlay.classList.add("active");
-      }
-    };
-
-    function closeEngravingDrawer() {
-      const drawer = document.getElementById("engraving-drawer");
-      if (drawer && overlay) {
-        drawer.classList.remove("active");
-        overlay.classList.remove("active");
-      }
-    }
-
-    // Debug function
-    window.debugEngravingInputs = function() {
-      const hiddenText = document.querySelector('input[name="properties[EngravingText]"]');
-      const hiddenFont = document.querySelector('input[name="properties[EngravingFont]"]');
-      
-      console.log('=== ENGRAVING DEBUG ===');
-      console.log('Visible Text:', engravingInput.value);
-      console.log('Preview Text:', previewText.textContent);
-      console.log('Selected Font:', document.querySelector('.lucira_engraving_font_option.active')?.dataset.font);
-      console.log('Hidden Text Input:', hiddenText ? hiddenText.value : 'NOT FOUND');
-      console.log('Hidden Font Input:', hiddenFont ? hiddenFont.value : 'NOT FOUND');
-      console.log('=====================');
-    };
-
-    // Load existing engraving data if any
-    function loadExistingEngraving() {
-      if (textInput && textInput.value) {
-        engravingInput.value = textInput.value;
-        previewText.textContent = textInput.value;
-      }
-      if (fontInput && fontInput.value) {
-        const fontToSelect = Array.from(fontOptions).find(opt => opt.dataset.font === fontInput.value);
-        if (fontToSelect) {
-          fontOptions.forEach(opt => opt.classList.remove("active"));
-          fontToSelect.classList.add("active");
-          previewText.style.fontFamily = fontInput.value;
-        }
-      }
-    }
-
-    loadExistingEngraving();
+    });
   }
+
+  // Close functionality
+  if (closeButton) {
+    closeButton.addEventListener("click", closeEngravingDrawer);
+  }
+
+  if (overlay) {
+    overlay.addEventListener("click", closeEngravingDrawer);
+  }
+
+  // Drawer functions
+  window.openEngravingDrawer = function() {
+    const drawer = document.getElementById("engraving-drawer");
+    if (drawer && overlay) {
+      drawer.classList.add("active");
+      overlay.classList.add("active");
+    }
+  };
+
+  function closeEngravingDrawer() {
+    const drawer = document.getElementById("engraving-drawer");
+    if (drawer && overlay) {
+      drawer.classList.remove("active");
+      overlay.classList.remove("active");
+    }
+  }
+
+  // Debug function
+  window.debugEngravingInputs = function() {
+    const hiddenText = document.querySelector('input[name="properties[EngravingText]"]');
+    const hiddenFont = document.querySelector('input[name="properties[EngravingFont]"]');
+    
+    console.log('=== ENGRAVING DEBUG ===');
+    console.log('Visible Text:', engravingInput.value);
+    console.log('Preview Text:', previewText.textContent);
+    console.log('Selected Font:', document.querySelector('.lucira_engraving_font_option.active')?.dataset.font);
+    console.log('Hidden Text Input:', hiddenText ? hiddenText.value : 'NOT FOUND');
+    console.log('Hidden Font Input:', hiddenFont ? hiddenFont.value : 'NOT FOUND');
+    console.log('=====================');
+  };
+
+  // Load existing engraving data if any
+  function loadExistingEngraving() {
+    if (textInput && textInput.value) {
+      engravingInput.value = textInput.value;
+      previewText.textContent = textInput.value;
+    }
+    if (fontInput && fontInput.value) {
+      const fontToSelect = Array.from(fontOptions).find(opt => opt.dataset.font === fontInput.value);
+      if (fontToSelect) {
+        fontOptions.forEach(opt => opt.classList.remove("active"));
+        fontToSelect.classList.add("active");
+        previewText.style.fontFamily = fontInput.value;
+      }
+    }
+  }
+
+  loadExistingEngraving();
+}
 
 
 //customise button clicked datalayer
