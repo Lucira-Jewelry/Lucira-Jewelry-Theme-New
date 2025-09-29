@@ -43,6 +43,26 @@ jQuery(document).ready(function () {
   });
 });
 
+jQuery(document).ready(function () {
+  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").append(
+    "<i class='fa fa-angle-down accordion-icon' aria-hidden='true'></i>"
+  );
+  
+  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").click(function () {
+    const icon = jQuery(this).find(".accordion-icon");
+    
+    if (jQuery(this).hasClass("active")) {
+      jQuery(this).removeClass("active");
+      icon.removeClass("fa-angle-up").addClass("fa-angle-down");
+    } else {
+      jQuery(this).addClass("active");
+      icon.removeClass("fa-angle-down").addClass("fa-angle-up");
+    }
+    
+    jQuery(this).next(".pdp-details-accordion-item-content").slideToggle();
+  });
+});
+
 $(document).ready(function () {
   let initialized = false;
 
