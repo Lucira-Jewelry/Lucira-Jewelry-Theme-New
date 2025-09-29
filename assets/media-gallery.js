@@ -127,6 +127,11 @@ document.addEventListener("DOMContentLoaded", function () {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
+  
+  // Swipe detection variables
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let isSwiping = false;
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -252,6 +257,12 @@ document.addEventListener("DOMContentLoaded", function () {
     mediaList.parentNode.appendChild(dotsContainer);
   }
 
+  function updateDots() {
+    if (!dotsContainer) return;
+    const dots = dotsContainer.querySelectorAll('.slider-dot');
+    dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
+  }
+
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides) return;
     currentSlide = index;
@@ -260,7 +271,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
     slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
 
-    if (dotsContainer) dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) => dot.classList.toggle('active', i === index));
+    updateDots();
 
     if (slides[index]) slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
 
@@ -273,14 +284,53 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
+  function nextSlide() {
+    goToSlide((currentSlide + 1) % totalSlides);
+  }
+
+  function prevSlide() {
+    goToSlide((currentSlide - 1 + totalSlides) % totalSlides);
+  }
+
+  function setupSwipeDetection() {
+    if (!mediaList) return;
+    
+    mediaList.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+      isSwiping = true;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchmove', (e) => {
+      if (!isSwiping) return;
+      touchEndX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchend', (e) => {
+      if (!isSwiping) return;
+      isSwiping = false;
+      
+      const swipeThreshold = 50; // minimum swipe distance in pixels
+      const diff = touchStartX - touchEndX;
+      
+      if (Math.abs(diff) > swipeThreshold) {
+        if (diff > 0) {
+          // Swipe left - next slide
+          nextSlide();
+        } else {
+          // Swipe right - previous slide
+          prevSlide();
+        }
+      }
+    }, { passive: true });
+  }
+
   function initSliderNavigation() {
     if (!mediaList) return;
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     createDotsNavigation();
-    setupScrollSync(); // ✅ keep dots in sync with swipe
+    setupSwipeDetection();
   }
-
 
   function playAllVideos() {
     if (!mediaList) return;
@@ -363,6 +413,11 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function cleanup() {
     if (observer) observer.disconnect();
+    if (mediaList) {
+      mediaList.removeEventListener('touchstart', () => {});
+      mediaList.removeEventListener('touchmove', () => {});
+      mediaList.removeEventListener('touchend', () => {});
+    }
   }
 
   function initialize() {
@@ -385,48 +440,3 @@ document.addEventListener("DOMContentLoaded", function () {
   setTimeout(initialize, 1000);
   window.addEventListener('beforeunload', cleanup);
 });
-
-function setupScrollSync() {
-  if (!mediaList) return;
-
-  const slides = Array.from(mediaList.querySelectorAll('.product__media-item'))
-    .filter(slide => slide.style.display !== 'none');
-
-  if (!slides.length) return;
-
-  const observerOptions = {
-    root: mediaList, // scroll container
-    threshold: 0.6   // 60% visible = active
-  };
-
-  const io = new IntersectionObserver(entries => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const newIndex = slides.indexOf(entry.target);
-        if (newIndex !== currentSlide) {
-          currentSlide = newIndex;
-
-          // ✅ Update active state
-          slides.forEach((slide, i) =>
-            slide.classList.toggle('is-active', i === newIndex)
-          );
-          if (dotsContainer) {
-            dotsContainer.querySelectorAll('.slider-dot').forEach((dot, i) =>
-              dot.classList.toggle('active', i === newIndex)
-            );
-          }
-
-          // ✅ Autoplay video if in view
-          const activeVideo = entry.target.querySelector('video');
-          if (activeVideo) {
-            activeVideo.loop = true;
-            activeVideo.muted = true;
-            activeVideo.play().catch(() => {});
-          }
-        }
-      }
-    });
-  }, observerOptions);
-
-  slides.forEach(slide => io.observe(slide));
-}
