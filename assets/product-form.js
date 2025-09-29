@@ -884,8 +884,10 @@ function initEngraving() {
     fontInput.type = "hidden";
     fontInput.name = "properties[EngravingFont]";
     fontInput.id = "hidden-engraving-font";
+    fontInput.value = ""; // keep empty
     mainForm.appendChild(fontInput);
   }
+
 
   if (mainForm && !textInput) {
     textInput = document.createElement("input");
@@ -1006,25 +1008,6 @@ function initEngraving() {
     window.bradProdEngravAddSymbol = function (symbol) {
       EngravingAddSymbol(symbol);
     };
-
-    // Font selection
-    fontOptions.forEach(option => {
-      option.addEventListener("click", () => {
-        fontOptions.forEach(opt => opt.classList.remove("active"));
-        option.classList.add("active");
-        const font = option.dataset.font;
-
-        // Apply selected font to preview
-        previewText.style.fontFamily = font;
-        
-        // ✅ FIXED: Store in hidden input immediately
-        if (fontInput) {
-          fontInput.value = font;
-        }
-
-        console.log('Font selected:', font);
-      });
-    });
 
     // Save button functionality
     if (saveButton) {
