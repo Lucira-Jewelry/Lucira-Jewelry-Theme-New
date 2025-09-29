@@ -979,24 +979,25 @@ function initEngraving() {
       const engravingValue = engravingInput.value.trim();
       const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
 
-      // ✅ FIXED: Ensure hidden inputs are updated
+      // ✅ Validation: require BOTH text and font
+      if (!engravingValue || !selectedFont) {
+        alert("Please enter engraving text and choose a font before saving.");
+        return;
+      }
+
+      // ✅ Ensure hidden inputs are updated
       if (textInput) textInput.value = engravingValue;
       if (fontInput) fontInput.value = selectedFont;
 
       // Show confirmation
       if (savedWrapper) {
-        if (engravingValue) {
-          savedWrapper.style.display = "flex";
-          savedWrapper.innerHTML = `
-            <p><strong>Saved Engraving:</strong></p>
-            <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
-              ${engravingValue}
-            </div>
-          `;
-        } else {
-          savedWrapper.style.display = "block";
-          savedWrapper.innerHTML = `<p style="color:red;">No engraving text entered</p>`;
-        }
+        savedWrapper.style.display = "flex";
+        savedWrapper.innerHTML = `
+          <p><strong>Saved Engraving:</strong></p>
+          <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
+            ${engravingValue}
+          </div>
+        `;
       }
 
       // Visual feedback
