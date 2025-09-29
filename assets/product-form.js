@@ -1116,4 +1116,3 @@ function share() {
     console.log("Web Share API not supported.");
   }
 }
-
