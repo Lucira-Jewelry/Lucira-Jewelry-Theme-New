@@ -1071,6 +1071,59 @@ function initEngraving() {
   }
 
   loadExistingEngraving();
+
+  function toggleSaveButton() {
+    const engravingValue = engravingInput.value.trim();
+    const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
+    if (engravingValue && selectedFont) {
+      saveButton.disabled = false;
+      saveButton.classList.remove("disabled");
+    } else {
+      saveButton.disabled = true;
+      saveButton.classList.add("disabled");
+    }
+  }
+
+  // Run check whenever text changes
+  engravingInput.addEventListener("input", toggleSaveButton);
+
+  // Run check whenever font is selected
+  fontOptions.forEach(option => {
+    option.addEventListener("click", toggleSaveButton);
+  });
+
+  // Initialize on page load
+  toggleSaveButton();
+
+  // Save button functionality
+  if (saveButton) {
+    saveButton.addEventListener("click", (e) => {
+      e.preventDefault();
+
+      const engravingValue = engravingInput.value.trim();
+      const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
+
+      // ✅ at this point, both values are guaranteed
+      if (textInput) textInput.value = engravingValue;
+      if (fontInput) fontInput.value = selectedFont;
+
+      if (savedWrapper) {
+        savedWrapper.style.display = "flex";
+        savedWrapper.innerHTML = `
+          <p><strong>Saved Engraving:</strong></p>
+          <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
+            ${engravingValue}
+          </div>
+        `;
+      }
+
+      saveButton.textContent = "Saved ✓";
+      setTimeout(() => {
+        saveButton.textContent = "SAVE";
+        closeEngravingDrawer();
+      }, 2000);
+    });
+  }
 }
 
 
