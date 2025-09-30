@@ -118,7 +118,7 @@ if (!customElements.get('media-gallery')) {
 
 document.addEventListener("DOMContentLoaded", function () {
   const COLOR_TOKENS = ["white", "yellow", "rose"];
-  const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v"];
+  const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v", "plt"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
