@@ -161,7 +161,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      codes: { mq: [], ci: [], mh: [], mv: [], v360: [], plt: [] },
       extras: []
     };
 
