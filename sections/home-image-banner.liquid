@@ -15,18 +15,26 @@
               <!-- Mobile Image Source -->
               <source 
                 media="(max-width: 749px)" 
-                srcset="{{ block.settings.mobile_slide_image | image_url }}"
-                {% if forloop.first %}
-                  fetchpriority="high"
-                {% else %}
-                  fetchpriority="auto"
-                {% endif %}
+                srcset="
+                  {{ block.settings.mobile_slide_image | image_url: width: 375 }} 375w,
+                  {{ block.settings.mobile_slide_image | image_url: width: 750 }} 750w,
+                  {{ block.settings.mobile_slide_image | image_url: width: 1125 }} 1125w
+                "
+                sizes="100vw"
                 width="{{ block.settings.mobile_slide_image.width }}"
                 height="{{ block.settings.mobile_slide_image.height }}"
+                {% if forloop.first %}fetchpriority="high"{% else %}fetchpriority="auto"{% endif %}
               >
+
               <!-- Desktop Image (default) -->
               <img 
-                src="{{ block.settings.slide_image | image_url }}"
+                src="{{ block.settings.slide_image | image_url: width: 1920 }}"
+                srcset="
+                  {{ block.settings.slide_image | image_url: width: 640 }} 640w,
+                  {{ block.settings.slide_image | image_url: width: 1280 }} 1280w,
+                  {{ block.settings.slide_image | image_url: width: 1920 }} 1920w
+                "
+                sizes="100vw"
                 class="home-image-banner-image"
                 alt="{{ block.settings.slide_image.alt | escape }}"
                 width="{{ block.settings.slide_image.width }}"
@@ -38,6 +46,7 @@
                 {% else %}
                   loading="lazy"
                   fetchpriority="auto"
+                  decoding="async"
                 {% endif %}
               >
             </picture>
@@ -70,14 +79,16 @@
   {% assign first_slide = section.blocks.first %}
   <!-- Preload desktop image -->
   <link rel="preload" as="image" 
-        href="{{ first_slide.settings.slide_image | image_url }}" 
-        imagesrcset="{{ first_slide.settings.slide_image | image_url }}"
+        href="{{ first_slide.settings.slide_image | image_url: width: 1920 }}" 
+        width="{{ first_slide.settings.slide_image.width }}"
+        height="{{ first_slide.settings.slide_image.height }}"
         fetchpriority="high">
   <!-- Preload mobile image -->
   <link rel="preload" as="image" 
-        href="{{ first_slide.settings.mobile_slide_image | image_url }}" 
+        href="{{ first_slide.settings.mobile_slide_image | image_url: width: 750 }}" 
         media="(max-width: 749px)"
-        imagesrcset="{{ first_slide.settings.mobile_slide_image | image_url }}"
+        width="{{ first_slide.settings.mobile_slide_image.width }}"
+        height="{{ first_slide.settings.mobile_slide_image.height }}"
         fetchpriority="high">
 {% endif %}
 
@@ -85,7 +96,7 @@
   .home-image-banner-swiper{width:100%;height:100%}
   .home-image-banner-swiper .swiper-slide{display:flex;justify-content:center;align-items:center}
   .home-image-banner-slider-item{position:relative;width:100%;height:100%;display:block;overflow:hidden}
-  .home-image-banner-image{width:100%;height:100%;object-fit:cover;display:block}
+  .home-image-banner-image{width:100%;height:100%;object-fit:cover;display:block;content-visibility:auto}
   .home-image-banner-slider-content{position:absolute;top:0;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:flex-start;padding:10rem;pointer-events:none}
   .home-image-banner-slider-content>div{max-width:60rem;pointer-events:all}
   .home-image-banner-slider-content-header{font-size:32px;margin:0;color:#fff}
@@ -97,11 +108,6 @@
   .home-image-banner .swiper-button-next i, .home-image-banner .swiper-button-prev i {display: none;}
   .home-image-banner .swiper-button-prev {left: 20px;}
   .home-image-banner .swiper-button-next {right: 20px;}
-  
-  /* LCP Optimization */
-  .home-image-banner-image {
-    content-visibility: auto;
-  }
   
   @media only screen and (max-width:767px){
     .home-image-banner .swiper-button-prev {display: none;}
@@ -120,28 +126,17 @@ window.addEventListener("load", function () {
   const swiper = new Swiper(".home-image-banner-swiper", {
     loop: true,
     autoplay: {{ section.settings.autoplay | json }} ? {
-      delay: 5000, // 5s between slides
+      delay: 5000,
       disableOnInteraction: false
     } : false,
-    pagination: {
-      el: ".swiper-pagination",
-      clickable: true,
-    },
-    navigation: {
-      nextEl: ".swiper-button-next",
-      prevEl: ".swiper-button-prev",
-    },
+    pagination: { el: ".swiper-pagination", clickable: true },
+    navigation: { nextEl: ".swiper-button-next", prevEl: ".swiper-button-prev" },
     on: {
-      init: function () {
-        trackPromoView(this.slides[this.activeIndex]);
-      },
-      slideChange: function () {
-        trackPromoView(this.slides[this.activeIndex]);
-      }
+      init: function () { trackPromoView(this.slides[this.activeIndex]); },
+      slideChange: function () { trackPromoView(this.slides[this.activeIndex]); }
     }
   });
 
-  // GTM Banner View Tracking
   function trackPromoView(slide) {
     if (!slide) return;
     const target = slide.querySelector("a");
@@ -159,11 +154,9 @@ window.addEventListener("load", function () {
     }
   }
 
-  // GTM Banner Click Tracking
   window.handleGTMPromoBannerClick = function (event) {
     event.preventDefault();
     const target = event.currentTarget;
-
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: "promoClick",
@@ -174,11 +167,7 @@ window.addEventListener("load", function () {
         promo_position: "homepage_top"
       }
     });
-
-    // Short timeout to ensure GTM event fires before navigation
-    setTimeout(() => {
-      window.location.assign(target.href);
-    }, 100);
+    setTimeout(() => { window.location.assign(target.href); }, 100);
   };
 });
 </script>
