@@ -25,39 +25,39 @@
   });
 
   // Product click tracking
-  window.handleGTMProductCardClick = function (event) {
-    event.preventDefault();
-    const target = event.currentTarget;
-    const d = target.dataset;
+  // window.handleGTMProductCardClick = function (event) {
+  //   event.preventDefault();
+  //   const target = event.currentTarget;
+  //   const d = target.dataset;
 
-    dataLayer.push({
-      event: "productClick",
-      products: {
-        productId: d.productId,
-        variantId: d.variantId,
-        sku: d.sku,
-        productName: d.productName,
-        productType: d.productType,
-        productCategory: d.productCategory,
-        category: d.category,
-        subCategory: d.subCategory,
-        productUrl: d.productUrl,
-        thumbnailImage: d.thumbnailImage,
-        purity: d.purity,
-        price: d.price,
-        offerPrice: d.offerPrice,
-        expectedDeliveryDate: d.expectedDeliveryDate,
-        couponCode: d.couponCode,
-        makingCharges: d.makingCharges,
-        numberOfReview: d.numberOfReview,
-        rating: d.rating,
-        indexPosition: d.indexPosition
-      }
-    });
+  //   dataLayer.push({
+  //     event: "productClick",
+  //     products: {
+  //       productId: d.productId,
+  //       variantId: d.variantId,
+  //       sku: d.sku,
+  //       productName: d.productName,
+  //       productType: d.productType,
+  //       productCategory: d.productCategory,
+  //       category: d.category,
+  //       subCategory: d.subCategory,
+  //       productUrl: d.productUrl,
+  //       thumbnailImage: d.thumbnailImage,
+  //       purity: d.purity,
+  //       price: d.price,
+  //       offerPrice: d.offerPrice,
+  //       expectedDeliveryDate: d.expectedDeliveryDate,
+  //       couponCode: d.couponCode,
+  //       makingCharges: d.makingCharges,
+  //       numberOfReview: d.numberOfReview,
+  //       rating: d.rating,
+  //       indexPosition: d.indexPosition
+  //     }
+  //   });
 
-    // Faster redirect (no blocking timeout)
-    requestAnimationFrame(() => { window.location.href = target.href; });
-  };
+  //   // Faster redirect (no blocking timeout)
+  //   requestAnimationFrame(() => { window.location.href = target.href; });
+  // };
 
   // Add to cart (stub)
   window.handleGTMAddToCartSubmit = function () {
