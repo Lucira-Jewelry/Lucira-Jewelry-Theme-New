@@ -49,15 +49,20 @@
   assign valid_tags = "Rings,Earrings,Necklaces,Bracelets,Pendants,Nosepins" | split: ","
   assign matched_tag = ""
 
+  # Find first matched tag normalized
   for tag in current_product_tags
-    if valid_tags contains tag
-      assign matched_tag = tag
+    assign cleaned_tag = tag | strip | downcase
+    for valid_tag in valid_tags
+      assign cleaned_valid_tag = valid_tag | strip | downcase
+      if cleaned_tag == cleaned_valid_tag
+        assign matched_tag = valid_tag
+        break
+      endif
+    endfor
+    if matched_tag != ""
       break
     endif
   endfor
-
-  assign related_products = blank
-  assign related_products_array = blank
 
   assign products_to_display = section.settings.products_to_show
   if products_to_display > 8
@@ -70,7 +75,7 @@
   assign use_slider = true
 -%}
 
-{%- if selected_collection and matched_tag != blank -%}
+{% if selected_collection and matched_tag != blank %}
   <div class="color-{{ section.settings.color_scheme }} isolate gradient">
     <div
       class="collection you-may-also-like-collection{% if section.settings.quick_add == 'bulk' %} collection-quick-add-bulk{% endif %} section-{{ section.id }}-padding{% if section.settings.full_width %}  collection--full-width{% endif %}"
@@ -111,7 +116,16 @@
         {% assign displayed_count = 0 %}
         
         {%- for related_product in selected_collection.products -%}
-          {% if related_product.tags contains matched_tag and related_product.id != product.id and displayed_count < products_to_display %}
+          {% assign tag_match_found = false %}
+          {% for tag in related_product.tags %}
+            {% assign clean_tag = tag | strip | downcase %}
+            {% assign clean_matched_tag = matched_tag | strip | downcase %}
+              {% if clean_tag == clean_matched_tag %}
+                {% assign tag_match_found = true %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          {% if tag_match_found and related_product.id != product.id and displayed_count < products_to_display %}
             {%- if use_slider -%}
               <div class="swiper-slide">
             {%- else -%}
@@ -201,7 +215,7 @@
       {%- endif -%}
     </div>
   </div>
-{%- endif -%}
+{% endif %}
 
 
 {%- if use_slider -%}
