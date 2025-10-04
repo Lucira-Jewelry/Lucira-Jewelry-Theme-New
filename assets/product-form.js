@@ -785,7 +785,8 @@ document.addEventListener("DOMContentLoaded", function () {
         promo_id: productSku,
         promo_name: productTitle,
         creative_name: "pincodeEntered",
-        promo_position: pincode
+        promo_position: pincode,
+        pincode: pincode
       };
 
       window.dataLayer = window.dataLayer || [];
