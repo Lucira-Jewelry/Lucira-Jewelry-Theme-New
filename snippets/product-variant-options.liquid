@@ -143,21 +143,13 @@
         </span>
 
       {%- elsif option.name == 'Size' -%}
-        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
-
-        <span class="variant-text" style="display: inline-block !important;">
+        <span class="variant-text" style="display: inline-block !important;" data-size-value="{{ value }}">
           {{ value }}
-          <span class="Variant_Stock_Status">
-            {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
-              <span class="stock-active">In Stock</span>
-            {% else %}
-              
-            {% endif %}
+          <span class="Variant_Stock_Status" data-size-stock="{{ value }}">
+            {%- comment -%}Stock status will be updated dynamically{%- endcomment -%}
           </span>
           {{ label_unavailable }}
         </span>
-
 
       {%- else -%}
         <span class="variant-text">
@@ -190,3 +182,59 @@
     </option>
   {%- endif -%}
 {%- endfor -%}
+
+{%- comment -%}Add variant data for JavaScript{%- endcomment -%}
+<script type="application/json" id="variant-stock-data-{{ section.id }}">
+  {
+    "variants": [
+      {%- for variant in product.variants -%}
+        {
+          "option1": {{ variant.option1 | json }},
+          "option2": {{ variant.option2 | json }},
+          "available": {{ variant.available | json }},
+          "inventory_quantity": {{ variant.inventory_quantity | json }}
+        }{% unless forloop.last %},{% endunless %}
+      {%- endfor -%}
+    ]
+  }
+</script>
+
+<script>
+(function() {
+  const sectionId = '{{ section.id }}';
+  const variantData = JSON.parse(document.getElementById('variant-stock-data-' + sectionId).textContent);
+  
+  function updateSizeStockStatus(selectedColor) {
+    document.querySelectorAll('[data-size-stock]').forEach(function(stockEl) {
+      const sizeValue = stockEl.getAttribute('data-size-stock');
+      
+      // Find matching variant
+      const matchingVariant = variantData.variants.find(function(v) {
+        return v.option1 === selectedColor && v.option2 === sizeValue;
+      });
+      
+      // Update stock status
+      if (matchingVariant && matchingVariant.available && matchingVariant.inventory_quantity > 0) {
+        stockEl.innerHTML = '<span class="stock-active">In Stock</span>';
+      } else {
+        stockEl.innerHTML = '';
+      }
+    });
+  }
+  
+  // Listen for color changes
+  document.querySelectorAll('input[name="Color-1"]').forEach(function(input) {
+    input.addEventListener('change', function() {
+      if (this.checked) {
+        updateSizeStockStatus(this.value);
+      }
+    });
+  });
+  
+  // Initialize on page load
+  const checkedColor = document.querySelector('input[name="Color-1"]:checked');
+  if (checkedColor) {
+    updateSizeStockStatus(checkedColor.value);
+  }
+})();
+</script>
