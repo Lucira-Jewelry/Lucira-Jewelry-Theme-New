@@ -1,10 +1,25 @@
+{% comment %}
+  Renders product variant options
+
+  Accepts:
+  - product: {Object} product object.
+  - option: {Object} current product_option object.
+  - block: {Object} block object.
+  - picker_type: {String} type of picker to dispay
+
+
+  Usage:
+  {% render 'product-variant-options',
+    product: product,
+    option: option,
+    block: block
+    picker_type: picker_type
+  %}
+{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
-{%- comment -%}
-  Sort the option values in ascending numerical order only for Size options
-{%- endcomment -%}
 {%- if option.name == 'Size' -%}
   {%- assign sorted_values = option.values | sort -%}
 {%- else -%}
@@ -23,11 +38,13 @@
     else
       assign swatch_value = null
     endif
+
     assign option_disabled = true
     if value.available
       assign option_disabled = false
     endif
   -%}
+
   {%- capture input_id -%}
     {{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
   {%- endcapture -%}
@@ -47,10 +64,6 @@
     </span>
   {%- endcapture -%}
 
-  {%- comment -%}
-    Check if this should be the default selected option (12)
-    Also check if no option is currently selected and this is size 12
-  {%- endcomment -%}
   {%- assign is_default_selected = false -%}
   {%- if value == '12' and option.selected_value == blank -%}
     {%- assign is_default_selected = true -%}
@@ -88,74 +101,88 @@
         class="disabled"
       {% endif %}
       {{ input_dataset }}
+      {% if option.name == 'Color' %}
+        onchange="updateSizeStockStatus(this.value)"
+      {% endif %}
     >
 
-    {% if option.name == 'Color' %}
-      {% assign color_in_stock = false %}
-      {% for v in product.variants %}
-        {% if v.option1 == value and v.available and v.inventory_quantity > 0 %}
-          {% assign color_in_stock = true %}
-          {% break %}
-        {% endif %}
-      {% endfor %}
+    <label for="{{ input_id }}" class="variant-label">
+      {%- assign v = value | downcase -%}
 
-      <label
-        class="variant-product brad-sm Label-{{ value | handle }}"
-        for="{{ input_id }}"
-        style="width: 30%;"
-      >
-        <!-- Swatch Image -->
-        <span class="Variant_Product_color">
-          {% if value contains 'Yellow Gold' %}
-            <span class="Variant_Color_Icon">{{ 'yellow-color.svg' | inline_asset_content }}</span>
-          {% elsif value contains 'Rose Gold' %}
-            <span class="Variant_Color_Icon">{{ 'rose-color.svg' | inline_asset_content }}</span>
-          {% elsif value contains 'White Gold' %}
-            <span class="Variant_Color_Icon">{{ 'silver-color.svg' | inline_asset_content }}</span>
-          {% else %}
-            <span style="display:inline-block;width:34px;height:34px;border-radius:50%;background-color:#ccc;margin-right:6px;border:3px solid #fff;box-shadow:0 .3rem .3rem #0000001a;box-sizing:border-box;"></span>
+      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+        <span class="variant-swatch" aria-hidden="true">
+          {%- if v contains 'yellow' -%}
+            {{- 'yellow-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'rose' or v contains 'rose gold' -%}
+            {{- 'rose-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
+            {{- 'silver-color.svg' | inline_asset_content -}}
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+
+      {%- if option.name == 'Color' -%}
+        {% assign color_in_stock = false %}
+        {% for variant in product.variants %}
+          {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
+            {% assign color_in_stock = true %}
+            {% break %}
           {% endif %}
+        {% endfor %}
+
+        <span class="variant-text">
+          {%- assign parts = value | split: ' ' -%}
+          <span class="variant-karat">{{ parts[0] }}</span>
+          {{ parts[1] }}
+          {{ parts[2] }}
+          <span class="Variant_Stock_Status">
+            {% if color_in_stock %}
+              <span class="stock-active">In Stock</span>
+            {% else %}
+              Make to Order
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
         </span>
 
-        <!-- Swatch Name -->
-        <span class="Variant_Product_name">{{ value }}</span>
+      {%- elsif option.name == 'Size' -%}
+        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
 
-        <!-- Stock Status -->
-        <span class="Variant_Stock_Status">
-          {% if color_in_stock %}
-            <span class="stock-active">In Stock</span>
-          {% else %}
-            Make to Order
-          {% endif %}
+        <span class="variant-text" style="display: inline-block !important;">
+          {{ value }}
+          <span class="Variant_Stock_Status" data-size="{{ value }}">
+            {% if current_variant and current_variant.available %}
+              {% if current_variant.inventory_quantity > 0 %}
+                <span class="stock-active">In Stock</span>
+              {% endif %}
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
         </span>
-      </label>
-    {% endif %}
+        
+        {%- comment -%}Store variant data for each color-size combination{%- endcomment -%}
+        {% for variant in product.variants %}
+          {% if variant.option2 == value %}
+            <script>
+              if (!window.variantStockData) window.variantStockData = {};
+              if (!window.variantStockData['{{ variant.option1 }}']) window.variantStockData['{{ variant.option1 }}'] = {};
+              window.variantStockData['{{ variant.option1 }}']['{{ variant.option2 }}'] = {
+                available: {{ variant.available }},
+                inventory: {{ variant.inventory_quantity | default: 0 }}
+              };
+            </script>
+          {% endif %}
+        {% endfor %}
 
-    {% if option.name == 'Size' %}
-    {% comment %}
-      For size, check the currently selected color (option1) + this size (option2)
-    {% endcomment %}
-    {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-    {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
 
-    <label
-      class="variant-product brad-sm brad-sm-size Label-{{ value | handle }}"
-      for="{{ input_id }}"
-      style="width: 31%; justify-content:center; align-items:center;"
-    >
-      <!-- Swatch Name -->
-      <span class="Variant_Product_size_name">{{ value }}</span>
-
-      <!-- Stock Status -->
-      <span class="Variant_Stock_Status">
-        {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
-          <span class="stock-active">In Stock</span>
-        {% else %}
-          Make to Order
-        {% endif %}
-      </span>
+      {%- else -%}
+        <span class="variant-text">
+          {{ value }}
+          {{ label_unavailable }}
+        </span>
+      {%- endif -%}
     </label>
-  {% endif %}
 
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
