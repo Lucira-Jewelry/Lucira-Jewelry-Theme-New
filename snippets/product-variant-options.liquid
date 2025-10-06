@@ -1,25 +1,10 @@
-{% comment %}
-  Renders product variant options
-
-  Accepts:
-  - product: {Object} product object.
-  - option: {Object} current product_option object.
-  - block: {Object} block object.
-  - picker_type: {String} type of picker to dispay
-
-
-  Usage:
-  {% render 'product-variant-options',
-    product: product,
-    option: option,
-    block: block
-    picker_type: picker_type
-  %}
-{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
+{%- comment -%}
+  Sort the option values in ascending numerical order only for Size options
+{%- endcomment -%}
 {%- if option.name == 'Size' -%}
   {%- assign sorted_values = option.values | sort -%}
 {%- else -%}
@@ -46,7 +31,7 @@
   -%}
 
   {%- capture input_id -%}
-    {{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
+    {{ section.id }}-{{ option.position }}-{{ forloop.index0 }}
   {%- endcapture -%}
 
   {%- capture input_name -%}
@@ -87,6 +72,7 @@
       help_text: help_text,
       additional_props: input_dataset
     %}
+
   {%- elsif picker_type == 'button' -%}
     <input
       type="radio"
@@ -94,86 +80,75 @@
       name="{{ input_name | escape }}"
       value="{{ value | escape }}"
       form="{{ product_form_id }}"
-      {% if value.selected %}
-        checked
-      {% endif %}
-      {% if option_disabled %}
-        class="disabled"
-      {% endif %}
+      {% if value.selected or is_default_selected %}checked{% endif %}
+      {% if option_disabled %}class="disabled"{% endif %}
       {{ input_dataset }}
     >
 
-    <label for="{{ input_id }}" class="variant-label">
-      {%- assign v = value | downcase -%}
+    {% if option.name == 'Color' %}
+      {% assign color_in_stock = false %}
+      {% for v in product.variants %}
+        {% if v.option1 == value and v.available and v.inventory_quantity > 0 %}
+          {% assign color_in_stock = true %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
 
-      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
-        <span class="variant-swatch" aria-hidden="true">
-          {%- if v contains 'yellow' -%}
-            {{- 'yellow-color.svg' | inline_asset_content -}}
-          {%- elsif v contains 'rose' or v contains 'rose gold' -%}
-            {{- 'rose-color.svg' | inline_asset_content -}}
-          {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
-            {{- 'silver-color.svg' | inline_asset_content -}}
-          {%- endif -%}
-        </span>
-      {%- endif -%}
-
-      {%- if option.name == 'Color' -%}
-        {% assign color_in_stock = false %}
-        {% for variant in product.variants %}
-          {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
-            {% assign color_in_stock = true %}
-            {% break %}
+      <label
+        class="variant-product brad-sm Label-{{ value | handle }}"
+        for="{{ input_id }}"
+        style="width: 30%;"
+      >
+        <span class="Variant_Product_color">
+          {% if value contains 'Yellow Gold' %}
+            <span class="Variant_Color_Icon">{{ 'yellow-color.svg' | inline_asset_content }}</span>
+          {% elsif value contains 'Rose Gold' %}
+            <span class="Variant_Color_Icon">{{ 'rose-color.svg' | inline_asset_content }}</span>
+          {% elsif value contains 'White Gold' %}
+            <span class="Variant_Color_Icon">{{ 'silver-color.svg' | inline_asset_content }}</span>
+          {% else %}
+            <span style="display:inline-block;width:34px;height:34px;border-radius:50%;background-color:#ccc;margin-right:6px;border:3px solid #fff;box-shadow:0 .3rem .3rem #0000001a;box-sizing:border-box;"></span>
           {% endif %}
-        {% endfor %}
-
-        <span class="variant-text">
-          {%- assign parts = value | split: ' ' -%}
-          <span class="variant-karat">{{ parts[0] }}</span>
-          {{ parts[1] }}
-          {{ parts[2] }}
-          <span class="Variant_Stock_Status">
-            {% if color_in_stock %}
-              <span class="stock-active">In Stock</span>
-            {% else %}
-              Make to Order
-            {% endif %}
-          </span>
-          {{ label_unavailable }}
         </span>
 
-      {%- elsif option.name == 'Size' -%}
-        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+        <span class="Variant_Product_name">{{ value }}</span>
 
-        <span class="variant-text" style="display: inline-block !important;">
-          {{ value }}
-          <span class="Variant_Stock_Status">
-            {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
-              <span class="stock-active">In Stock</span>
-            {% else %}
-              
-            {% endif %}
-          </span>
-          {{ label_unavailable }}
+        <span class="Variant_Stock_Status">
+          {% if color_in_stock %}
+            <span class="stock-active">In Stock</span>
+          {% else %}
+            Make to Order
+          {% endif %}
         </span>
+      </label>
+    {% endif %}
 
+    {% if option.name == 'Size' %}
+      {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+      {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
 
-      {%- else -%}
-        <span class="variant-text">
-          {{ value }}
-          {{ label_unavailable }}
+      <label
+        class="variant-product brad-sm brad-sm-size Label-{{ value | handle }}"
+        for="{{ input_id }}"
+        style="width: 31%; justify-content:center; align-items:center;"
+      >
+        <span class="Variant_Product_size_name">{{ value }}</span>
+
+        <span class="Variant_Stock_Status">
+          {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
+            <span class="stock-active">In Stock</span>
+          {% else %}
+            Make to Order
+          {% endif %}
         </span>
-      {%- endif -%}
-    </label>
+      </label>
+    {% endif %}
 
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
       id="{{ input_id }}"
       value="{{ value | escape }}"
-      {% if value.selected %}
-        selected="selected"
-      {% endif %}
+      {% if value.selected or is_default_selected %}selected="selected"{% endif %}
       {% if swatch_value and picker_type == 'swatch_dropdown' %}
         data-option-swatch-value="{{ swatch_value }}"
         {% if swatch_focal_point %}
@@ -182,53 +157,72 @@
       {% endif %}
       {{ input_dataset }}
     >
-      {% if option_disabled -%}
+      {% if option_disabled %}
         {{- 'products.product.value_unavailable' | t: option_value: value -}}
-      {%- else -%}
+      {% else %}
         {{- value -}}
-      {%- endif %}
+      {% endif %}
     </option>
   {%- endif -%}
 {%- endfor -%}
 
-<script>
-  function removeLeadingZeros() {
-    document.querySelectorAll('.Variant_Product_size_name').forEach(label => {
-      let text = label.textContent.trim();
-      if (/^0\d+$/.test(text)) {
-        label.textContent = text.replace(/^0+/, '');
-      }
-    });
+<style>
+  .product .product-form__input--pill input[type=radio]:checked+label {
+    background-color: #ffffff !important;
+    color: #000 !important;
+    border: 2px solid #AB8A87 !important;
+    transition: .3s;
   }
+  .product .product-form__input--pill input[type=radio]+label {
+    padding:.5rem .5rem;
+    height:100px;
+    font-weight:500;
+    border:.5px solid #cfcfcf;
+    background-color:#fff!important;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+  }
+  .Variant_Product_size_name {
+    font-size:16px;
+    font-weight:600;
+    text-align:center;
+    justify-content:center;
+  }
+  span.Variant_Stock_Status {
+    position: absolute;
+    bottom: -9px;
+    background: #fff !important;
+    padding: 4px 10px;
+    font-size: 10px;
+    border-radius: 8px;
+  }
+  span.Variant_Stock_Status .stock-active {color: #008000;}
+</style>
 
-  // Run on page load
-  document.addEventListener('DOMContentLoaded', () => {
-    removeLeadingZeros();
-  });
-
-  // Run every time Shopify triggers a variant change
-  document.addEventListener('variant:change', () => {
-    removeLeadingZeros();
-  });
-
-  // Run when a section reloads
-  document.addEventListener('shopify:section:load', () => {
-    removeLeadingZeros();
-  });
-
-  // Use event delegation for clicks on size radio buttons
-  document.body.addEventListener('change', e => {
-    if (e.target.matches('input[name*="Size"]')) {
-      removeLeadingZeros();
+<script>
+function removeLeadingZeros() {
+  const sizeLabels = document.querySelectorAll('.Variant_Product_size_name');
+  sizeLabels.forEach(function(label) {
+    const currentText = label.textContent.trim();
+    if (/^0\d+$/.test(currentText)) {
+      label.textContent = currentText.replace(/^0+/, '');
     }
   });
+}
 
-  // Use a MutationObserver on the form container to catch any dynamic re-render
+document.addEventListener('DOMContentLoaded', function() {
+  removeLeadingZeros();
+
+  const observer = new MutationObserver(() => setTimeout(removeLeadingZeros, 50));
   const productForm = document.querySelector('form[id*="product-form"], .product-form, .product__form');
-  if (productForm) {
-    const observer = new MutationObserver(() => removeLeadingZeros());
-    observer.observe(productForm, { childList: true, subtree: true });
-  }
+  observer.observe(productForm || document.body, { childList: true, subtree: true, characterData: true });
+
+  document.addEventListener('variant:change', () => setTimeout(removeLeadingZeros, 100));
+  document.addEventListener('shopify:section:load', () => setTimeout(removeLeadingZeros, 100));
+
+  setInterval(removeLeadingZeros, 500);
+});
 </script>
-
-
