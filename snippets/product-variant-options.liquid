@@ -1,21 +1,3 @@
-{% comment %}
-  Renders product variant options
-
-  Accepts:
-  - product: {Object} product object.
-  - option: {Object} current product_option object.
-  - block: {Object} block object.
-  - picker_type: {String} type of picker to dispay
-
-
-  Usage:
-  {% render 'product-variant-options',
-    product: product,
-    option: option,
-    block: block
-    picker_type: picker_type
-  %}
-{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
@@ -94,7 +76,7 @@
       name="{{ input_name | escape }}"
       value="{{ value | escape }}"
       form="{{ product_form_id }}"
-      {% if value.selected %}
+      {% if value.selected or is_default_selected %}
         checked
       {% endif %}
       {% if option_disabled %}
@@ -103,61 +85,72 @@
       {{ input_dataset }}
     >
 
-    <label for="{{ input_id }}" class="variant-label">
-      {%- assign v = value | downcase -%}
+    {% if option.name == 'Color' %}
+      {% assign color_in_stock = false %}
+      {% for v in product.variants %}
+        {% if v.option1 == value and v.available and v.inventory_quantity > 0 %}
+          {% assign color_in_stock = true %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
 
-      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
-        <span class="variant-swatch" aria-hidden="true">
-          {%- if v contains 'yellow' -%}
-            {{- 'yellow-color.svg' | inline_asset_content -}}
-          {%- elsif v contains 'rose' or v contains 'rose gold' -%}
-            {{- 'rose-color.svg' | inline_asset_content -}}
-          {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
-            {{- 'silver-color.svg' | inline_asset_content -}}
-          {%- endif -%}
-        </span>
-      {%- endif -%}
-
-      {%- if option.name == 'Color' -%}
-        {% assign color_in_stock = false %}
-        {% for variant in product.variants %}
-          {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
-            {% assign color_in_stock = true %}
-            {% break %}
+      <label
+        class="variant-product brad-sm Label-{{ value | handle }}"
+        for="{{ input_id }}"
+        style="width: 30%;"
+      >
+        <!-- Swatch Image -->
+        <span class="Variant_Product_color">
+          {% if value contains 'Yellow Gold' %}
+            <span class="Variant_Color_Icon">{{ 'yellow-color.svg' | inline_asset_content }}</span>
+          {% elsif value contains 'Rose Gold' %}
+            <span class="Variant_Color_Icon">{{ 'rose-color.svg' | inline_asset_content }}</span>
+          {% elsif value contains 'White Gold' %}
+            <span class="Variant_Color_Icon">{{ 'silver-color.svg' | inline_asset_content }}</span>
+          {% else %}
+            <span style="display:inline-block;width:34px;height:34px;border-radius:50%;background-color:#ccc;margin-right:6px;border:3px solid #fff;box-shadow:0 .3rem .3rem #0000001a;box-sizing:border-box;"></span>
           {% endif %}
-        {% endfor %}
-
-        <span class="variant-text">
-          {%- assign parts = value | split: ' ' -%}
-          <span class="variant-karat">{{ parts[0] }}</span>
-          {{ parts[1] }}
-          {{ parts[2] }}
-          <span class="Variant_Stock_Status">
-            {% if color_in_stock %}
-              <span class="stock-active">In Stock</span>
-            {% else %}
-              Make to Order
-            {% endif %}
-          </span>
-          {{ label_unavailable }}
         </span>
 
-      {%- elsif option.name == 'Size' -%}
-        <span class="variant-text" style="display: inline-block !important;" data-size-value="{{ value }}">
-          {{ value }}
-          <span class="Variant_Stock_Status" data-size-stock="{{ value }}">
-            {%- comment -%}Stock status will be updated dynamically{%- endcomment -%}
-          </span>
-          {{ label_unavailable }}
-        </span>
+        <!-- Swatch Name -->
+        <span class="Variant_Product_name">{{ value }}</span>
 
-      {%- else -%}
-        <span class="variant-text">
-          {{ value }}
-          {{ label_unavailable }}
+        <!-- Stock Status -->
+        <span class="Variant_Stock_Status">
+          {% if color_in_stock %}
+            <span class="stock-active">In Stock</span>
+          {% else %}
+            Make to Order
+          {% endif %}
         </span>
-      {%- endif -%}
+      </label>
+    {% endif %}
+
+    {% if option.name == 'Size' %}
+    {% comment %}
+      For size, check the currently selected color (option1) + this size (option2)
+    {% endcomment %}
+    {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+    {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+
+    <label
+      class="variant-product brad-sm brad-sm-size Label-{{ value | handle }}"
+      for="{{ input_id }}"
+      style="width: 31%; justify-content:center; align-items:center;"
+    >
+      <!-- Swatch Name -->
+      <span class="Variant_Product_size_name">{{ value }}</span>
+
+      <!-- Stock Status -->
+      <span class="Variant_Stock_Status" data-size-stock="{{ value }}">
+        {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
+          <span class="stock-active">In Stock</span>
+        {% else %}
+          Make to Order
+        {% endif %}
+      </span>
     </label>
+  {% endif %}
 
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
@@ -217,7 +210,7 @@
       if (matchingVariant && matchingVariant.available && matchingVariant.inventory_quantity > 0) {
         stockEl.innerHTML = '<span class="stock-active">In Stock</span>';
       } else {
-        stockEl.innerHTML = '';
+        stockEl.innerHTML = 'Make to Order';
       }
     });
   }
@@ -237,4 +230,83 @@
     updateSizeStockStatus(checkedColor.value);
   }
 })();
+
+  function removeLeadingZeros() {
+    const sizeLabels = document.querySelectorAll('.Variant_Product_size_name');
+
+    sizeLabels.forEach(function (label) {
+      const currentText = label.textContent.trim();
+      if (/^0\d+$/.test(currentText)) {
+        const newText = currentText.replace(/^0+/, '');
+        label.textContent = newText;
+      }
+    });
+
+    const sizeDisplayElements = document.querySelectorAll('[class*="size"], [class*="Size"]');
+
+    sizeDisplayElements.forEach(function (element) {
+      if (element.textContent.includes('Size:') || element.textContent.includes('size:')) {
+        const currentText = element.textContent;
+        const updatedText = currentText.replace(/(\bsize:\s*)0(\d+)/gi, '$1$2');
+        if (updatedText !== currentText) {
+          element.textContent = updatedText;
+        }
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    removeLeadingZeros();
+
+    const observer = new MutationObserver(function (mutations) {
+      let shouldUpdate = false;
+
+      mutations.forEach(function (mutation) {
+        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+          shouldUpdate = true;
+        }
+      });
+
+      if (shouldUpdate) {
+        setTimeout(removeLeadingZeros, 50);
+      }
+    });
+
+    const productForm = document.querySelector('form[id*="product-form"], .product-form, .product__form');
+    if (productForm) {
+      observer.observe(productForm, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    } else {
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
+  });
+
+  document.addEventListener('variant:change', function () {
+    setTimeout(removeLeadingZeros, 100);
+  });
+
+  document.addEventListener('shopify:section:load', function () {
+    setTimeout(removeLeadingZeros, 100);
+  });
+
+  setInterval(function () {
+    const sizeLabels = document.querySelectorAll('.Variant_Product_size_name');
+    let needsUpdate = false;
+
+    sizeLabels.forEach(function (label) {
+      if (/^0\d+$/.test(label.textContent.trim())) {
+        needsUpdate = true;
+      }
+    });
+    if (needsUpdate) {
+      removeLeadingZeros();
+    }
+  }, 500);
 </script>
