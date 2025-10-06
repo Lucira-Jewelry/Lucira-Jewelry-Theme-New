@@ -196,39 +196,44 @@ window.productVariants = {{ product.variants | json }};
 
 document.addEventListener('DOMContentLoaded', function() {
 
-  const optionMap = { 'Color': 'option1', 'Size': 'option2' }; // Map option names to Shopify variant properties
-
   function updateStockStatus() {
-    // Get selected options
     const selectedOptions = {};
+
+    // Loop through all option types
     document.querySelectorAll('input[type=radio]:checked').forEach(input => {
-      const optionName = input.name.split('-')[0]; // e.g., "Color" or "Size"
+      const optionName = input.name.split('-')[0]; // e.g., "Size" or "Color"
       selectedOptions[optionName] = input.value;
     });
 
-    // Find the matching variant
-    let matchedVariant = null;
-    window.productVariants.forEach(v => {
-      const matches = Object.keys(selectedOptions).every(key => {
-        const optionProp = optionMap[key];
-        return v[optionProp] === selectedOptions[key];
-      });
-      if (matches) matchedVariant = v;
-    });
+    // Loop through all variant labels
+    document.querySelectorAll('.variant-label').forEach(label => {
+      const optionName = label.querySelector('input')?.name.split('-')[0];
+      const value = label.querySelector('input')?.value;
+      if (!optionName || !value) return;
 
-    // Update all stock status spans
-    document.querySelectorAll('.Variant_Stock_Status').forEach(span => {
-      if (!matchedVariant) {
-        span.innerHTML = 'Make to Order';
-      } else if (matchedVariant.available && matchedVariant.inventory_quantity > 0) {
-        span.innerHTML = '<span class="stock-active">In Stock</span>';
-      } else {
-        span.innerHTML = 'Make to Order';
+      let variantAvailable = false;
+
+      // Find matching variant
+      window.productVariants.forEach(v => {
+        const matches = Object.keys(selectedOptions).every(key => {
+          return v['option' + (parseInt(key === 'Color' ? 1 : 2))] === selectedOptions[key];
+        });
+        if (matches && v.available && v.inventory_quantity > 0) {
+          variantAvailable = true;
+        }
+      });
+
+      // Update stock label inside this label
+      const stockSpan = label.querySelector('.Variant_Stock_Status');
+      if (stockSpan) {
+        stockSpan.innerHTML = variantAvailable
+          ? '<span class="stock-active">In Stock</span>'
+          : 'Make to Order';
       }
     });
   }
 
-  // Add event listeners to all radio buttons
+  // Listen for all radio changes
   document.querySelectorAll('input[type=radio]').forEach(input => {
     input.addEventListener('change', updateStockStatus);
   });
