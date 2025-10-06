@@ -1,13 +1,21 @@
 {% comment %}
-  Renders product variant options with dynamic stock update
+  Renders product variant options
 
   Accepts:
   - product: {Object} product object.
   - option: {Object} current product_option object.
   - block: {Object} block object.
   - picker_type: {String} type of picker to dispay
-{% endcomment %}
 
+
+  Usage:
+  {% render 'product-variant-options',
+    product: product,
+    option: option,
+    block: block
+    picker_type: picker_type
+  %}
+{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
@@ -86,8 +94,12 @@
       name="{{ input_name | escape }}"
       value="{{ value | escape }}"
       form="{{ product_form_id }}"
-      {% if value.selected %} checked {% endif %}
-      {% if option_disabled %} class="disabled" {% endif %}
+      {% if value.selected %}
+        checked
+      {% endif %}
+      {% if option_disabled %}
+        class="disabled"
+      {% endif %}
       {{ input_dataset }}
     >
 
@@ -106,18 +118,62 @@
         </span>
       {%- endif -%}
 
-      <span class="variant-text" style="display: inline-block !important;">
-        {{ value }}
-        <span class="Variant_Stock_Status">Loading...</span>
-        {{ label_unavailable }}
-      </span>
+      {%- if option.name == 'Color' -%}
+        {% assign color_in_stock = false %}
+        {% for v in product.variants %}
+          {% if v.option1 == value and v.available and v.inventory_quantity > 0 %}
+            {% assign color_in_stock = true %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        <span class="variant-text">
+          {%- assign parts = value | split: ' ' -%}
+          <span class="variant-karat">{{ parts[0] }}</span>
+          {{ parts[1] }}
+          {{ parts[2] }}
+          <span class="Variant_Stock_Status">
+            {% if color_in_stock %}
+              <span class="stock-active">In Stock</span>
+            {% else %}
+              Make to Order
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
+        </span>
+
+      {%- elsif option.name == 'Size' -%}
+        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+
+        <span class="variant-text" style="display: inline-block !important;">
+          {{ value }}
+          <span class="Variant_Stock_Status">
+            {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
+              <span class="stock-active">In Stock</span>
+            {% else %}
+              Make to Order
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
+        </span>
+
+
+      {%- else -%}
+        <span class="variant-text">
+          {{ value }}
+          {{ label_unavailable }}
+        </span>
+      {%- endif -%}
     </label>
 
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
       id="{{ input_id }}"
       value="{{ value | escape }}"
-      {% if value.selected %} selected="selected" {% endif %}
+      {% if value.selected %}
+        selected="selected"
+      {% endif %}
       {% if swatch_value and picker_type == 'swatch_dropdown' %}
         data-option-swatch-value="{{ swatch_value }}"
         {% if swatch_focal_point %}
@@ -134,44 +190,3 @@
     </option>
   {%- endif -%}
 {%- endfor -%}
-
-{% comment %}
-  Pass product variants to JS for dynamic stock update
-{% endcomment %}
-<script>
-window.productVariants = {{ product.variants | json }};
-
-document.addEventListener('DOMContentLoaded', function() {
-  function updateStockStatus() {
-    // Get selected color
-    const selectedColor = document.querySelector('[name="Color-1"]:checked')?.value || '';
-    const sizeInputs = document.querySelectorAll('[name="Size-2"]'); // adjust to your input_name
-    const stockLabels = document.querySelectorAll('.Variant_Stock_Status');
-
-    sizeInputs.forEach((radio, index) => {
-      const size = radio.value;
-      let variantAvailable = false;
-
-      window.productVariants.forEach(v => {
-        if (v.option1 === selectedColor && v.option2 === size && v.available && v.inventory_quantity > 0) {
-          variantAvailable = true;
-        }
-      });
-
-      const label = stockLabels[index];
-      if (label) {
-        label.innerHTML = variantAvailable 
-          ? '<span class="stock-active">In Stock</span>'
-          : 'Make to Order';
-      }
-    });
-  }
-
-  // Listen to changes
-  document.querySelectorAll('[name="Size-2"]').forEach(input => input.addEventListener('change', updateStockStatus));
-  document.querySelectorAll('[name="Color-1"]').forEach(input => input.addEventListener('change', updateStockStatus));
-
-  // Initial run
-  updateStockStatus();
-});
-</script>
