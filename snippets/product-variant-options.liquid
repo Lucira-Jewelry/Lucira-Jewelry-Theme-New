@@ -16,24 +16,6 @@
     picker_type: picker_type
   %}
 {% endcomment %}
-{% comment %}
-  Renders product variant options
-
-  Accepts:
-  - product: {Object} product object.
-  - option: {Object} current product_option object.
-  - block: {Object} block object.
-  - picker_type: {String} type of picker to dispay
-
-
-  Usage:
-  {% render 'product-variant-options',
-    product: product,
-    option: option,
-    block: block
-    picker_type: picker_type
-  %}
-{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
@@ -119,6 +101,9 @@
         class="disabled"
       {% endif %}
       {{ input_dataset }}
+      {% if option.name == 'Color' %}
+        onchange="updateSizeStockStatus(this.value)"
+      {% endif %}
     >
 
     <label for="{{ input_id }}" class="variant-label">
@@ -166,7 +151,7 @@
 
         <span class="variant-text" style="display: inline-block !important;">
           {{ value }}
-          <span class="Variant_Stock_Status">
+          <span class="Variant_Stock_Status" data-size="{{ value }}">
             {% if current_variant and current_variant.available %}
               {% if current_variant.inventory_quantity > 0 %}
                 <span class="stock-active">In Stock</span>
@@ -175,6 +160,20 @@
           </span>
           {{ label_unavailable }}
         </span>
+        
+        {%- comment -%}Store variant data for each color-size combination{%- endcomment -%}
+        {% for variant in product.variants %}
+          {% if variant.option2 == value %}
+            <script>
+              if (!window.variantStockData) window.variantStockData = {};
+              if (!window.variantStockData['{{ variant.option1 }}']) window.variantStockData['{{ variant.option1 }}'] = {};
+              window.variantStockData['{{ variant.option1 }}']['{{ variant.option2 }}'] = {
+                available: {{ variant.available }},
+                inventory: {{ variant.inventory_quantity | default: 0 }}
+              };
+            </script>
+          {% endif %}
+        {% endfor %}
 
 
       {%- else -%}
