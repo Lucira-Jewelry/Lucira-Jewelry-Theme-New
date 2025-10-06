@@ -26,22 +26,27 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 jQuery(document).ready(function () {
-  jQuery(".accordion .accordion-title").append(
-    "<i class='fa fa-plus accordion-icon' aria-hidden='true'></i>"
-  );
-  
+  // Append the icon element to each accordion title
+  jQuery(".accordion .accordion-title").append('<span class="accordion-icon">+</span>');
+
   jQuery(".accordion .accordion-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
     
-    if (jQuery(this).hasClass("active")) {
-      jQuery(this).removeClass("active");
-    } else {
-      jQuery(this).addClass("active");
-    }
+    // Toggle active class
+    jQuery(this).toggleClass("active");
     
-    jQuery(this).next(".accordion .accordion-content").slideToggle();
+    // Toggle the content
+    jQuery(this).next(".accordion-content").slideToggle();
+
+    // Toggle the icon
+    if (jQuery(this).hasClass("active")) {
+      icon.text("×"); // Show close icon
+    } else {
+      icon.text("+"); // Show plus icon
+    }
   });
 });
+
 
 jQuery(document).ready(function () {
   jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").append(
