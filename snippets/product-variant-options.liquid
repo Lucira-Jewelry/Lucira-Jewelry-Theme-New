@@ -196,44 +196,39 @@ window.productVariants = {{ product.variants | json }};
 
 document.addEventListener('DOMContentLoaded', function() {
 
-  function updateStockStatus() {
-    const selectedOptions = {};
-
-    // Loop through all option types
+  function getSelectedOptions() {
+    const selected = {};
     document.querySelectorAll('input[type=radio]:checked').forEach(input => {
-      const optionName = input.name.split('-')[0]; // e.g., "Size" or "Color"
-      selectedOptions[optionName] = input.value;
+      const optionName = input.name.split('-')[0]; // "Color" or "Size"
+      selected[optionName] = input.value;
+    });
+    return selected;
+  }
+
+  function updateStockStatus() {
+    const selectedOptions = getSelectedOptions();
+
+    // Find the variant that matches current Color + Size
+    let matchedVariant = window.productVariants.find(v => {
+      return v.option1 === selectedOptions['Color'] && v.option2 === selectedOptions['Size'];
     });
 
-    // Loop through all variant labels
-    document.querySelectorAll('.variant-label').forEach(label => {
-      const optionName = label.querySelector('input')?.name.split('-')[0];
-      const value = label.querySelector('input')?.value;
-      if (!optionName || !value) return;
+    // Update stock label
+    document.querySelectorAll('.Variant_Stock_Status').forEach(span => {
+      const spanSize = span.dataset.size;
+      const spanColor = span.dataset.color;
 
-      let variantAvailable = false;
-
-      // Find matching variant
-      window.productVariants.forEach(v => {
-        const matches = Object.keys(selectedOptions).every(key => {
-          return v['option' + (parseInt(key === 'Color' ? 1 : 2))] === selectedOptions[key];
-        });
-        if (matches && v.available && v.inventory_quantity > 0) {
-          variantAvailable = true;
+      if (spanSize === selectedOptions['Size'] && spanColor === selectedOptions['Color']) {
+        if (matchedVariant && matchedVariant.available && matchedVariant.inventory_quantity > 0) {
+          span.innerHTML = '<span class="stock-active">In Stock</span>';
+        } else {
+          span.innerHTML = 'Make to Order';
         }
-      });
-
-      // Update stock label inside this label
-      const stockSpan = label.querySelector('.Variant_Stock_Status');
-      if (stockSpan) {
-        stockSpan.innerHTML = variantAvailable
-          ? '<span class="stock-active">In Stock</span>'
-          : 'Make to Order';
       }
     });
   }
 
-  // Listen for all radio changes
+  // Trigger update on change
   document.querySelectorAll('input[type=radio]').forEach(input => {
     input.addEventListener('change', updateStockStatus);
   });
