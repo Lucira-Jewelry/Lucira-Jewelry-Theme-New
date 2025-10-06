@@ -44,28 +44,71 @@
         data-type: 'add-to-cart-form',
         onsubmit: 'handleGTMAddToCartSubmit(event)'
       -%}
+
         <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
         <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
         <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
-        
-        <!-- PRICE BREAKDOWN HIDDEN INPUTS - ONLY ONCE IN FORM -->
-        <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="0">
-        <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="0">
-        <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="0">
-        <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="0">
-        <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges" value="0">
-        <input type="hidden" name="properties[_GST]" id="prop-gst" value="0">
-        <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="0">
-        
+        <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram">
+        <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight">
+        <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price">
+        <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges">
+        <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges">
+        <input type="hidden" name="properties[_GST]" id="prop-gst">
+        <input type="hidden" name="properties[_Final Price]" id="prop-final-price">
         <input
           type="hidden"
           name="id"
           value="{{ product.selected_or_first_available_variant.id }}"
-          {% if product.selected_or_first_available_variant.available == false or quantity_rule_soldout %}
+          {% if product.selected_or_first_available_variant.available == false
+            or quantity_rule_soldout
+            or product.selected_or_first_available_variant == null
+          %}
             disabled
           {% endif %}
           class="product-variant-id"
         >
+
+        {%- if gift_card_recipient_feature_active -%}
+          {%- render 'gift-card-recipient-form', product: product, form: form, section: section -%}
+        {%- endif -%}
+
+        <div class="product-form__buttons">
+          {%- liquid
+            assign check_against_inventory = true
+            if product.selected_or_first_available_variant.inventory_management != 'shopify' or product.selected_or_first_available_variant.inventory_policy == 'continue'
+              assign check_against_inventory = false
+            endif
+            if product.selected_or_first_available_variant.quantity_rule.min > product.selected_or_first_available_variant.inventory_quantity and check_against_inventory
+              assign quantity_rule_soldout = true
+            endif
+          -%}
+          <button
+            id="ProductSubmitButton-{{ section_id }}"
+            type="submit"
+            name="add"
+            class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %}"
+            {% if product.selected_or_first_available_variant.available == false
+              or quantity_rule_soldout
+              or product.selected_or_first_available_variant == null
+            %}
+              disabled
+            {% endif %}
+          >
+            <span>
+              {%- if product.selected_or_first_available_variant == null -%}
+                {{ 'products.product.unavailable' | t }}
+              {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
+                {{ 'products.product.sold_out' | t }}
+              {%- else -%}
+                {{ 'products.product.add_to_cart' | t }}
+              {%- endif -%}
+            </span>
+            {%- render 'loading-spinner' -%}
+          </button>
+          {%- if show_dynamic_checkout -%}
+            {{ form | payment_button }}
+          {%- endif -%}
+        </div>
       {%- endform -%}
       <div class="desktop-show inline-flex">
         <div class="iwish-app-block-product"><a class="iWishAdd st-1" href="#" data-variant="{{ product.variants.first.id }}" data-product="{{ product.id }}" data-pTitle="{{ product.title | escape }}"></a></div>
