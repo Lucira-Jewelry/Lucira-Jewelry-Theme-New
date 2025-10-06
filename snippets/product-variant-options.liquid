@@ -1,3 +1,21 @@
+{% comment %}
+  Renders product variant options
+
+  Accepts:
+  - product: {Object} product object.
+  - option: {Object} current product_option object.
+  - block: {Object} block object.
+  - picker_type: {String} type of picker to dispay
+
+
+  Usage:
+  {% render 'product-variant-options',
+    product: product,
+    option: option,
+    block: block
+    picker_type: picker_type
+  %}
+{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
@@ -10,85 +28,222 @@
 
 {%- for value in sorted_values -%}
   {%- liquid
+    assign swatch_focal_point = null
+    if value.swatch.image
+      assign image_url = value.swatch.image | image_url: width: 50
+      assign swatch_value = 'url(' | append: image_url | append: ')'
+      assign swatch_focal_point = value.swatch.image.presentation.focal_point
+    elsif value.swatch.color
+      assign swatch_value = 'rgb(' | append: value.swatch.color.rgb | append: ')'
+    else
+      assign swatch_value = null
+    endif
+
     assign option_disabled = true
     if value.available
       assign option_disabled = false
     endif
   -%}
 
-  {%- capture input_id -%}{{ section.id }}-{{ option.position }}-{{ forloop.index0 }}{%- endcapture -%}
-  {%- capture input_name -%}{{ option.name }}-{{ option.position }}{%- endcapture -%}
+  {%- capture input_id -%}
+    {{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
+  {%- endcapture -%}
+
+  {%- capture input_name -%}
+    {{ option.name }}-{{ option.position }}
+  {%- endcapture -%}
+
+  {%- capture input_dataset -%}
+    data-product-url="{{ value.product_url }}"
+    data-option-value-id="{{ value.id }}"
+  {%- endcapture -%}
+
+  {%- capture label_unavailable -%}
+    <span class="visually-hidden label-unavailable">
+      {{- 'products.product.variant_sold_out_or_unavailable' | t -}}
+    </span>
+  {%- endcapture -%}
 
   {%- assign is_default_selected = false -%}
   {%- if value == '12' and option.selected_value == blank -%}
     {%- assign is_default_selected = true -%}
   {%- endif -%}
 
-  <input type="radio"
-         id="{{ input_id }}"
-         name="{{ input_name }}"
-         value="{{ value }}"
-         form="{{ product_form_id }}"
-         {% if value.selected or is_default_selected %}checked{% endif %}
-         {% if option_disabled %}class="disabled"{% endif %}
-  >
-
-  <label for="{{ input_id }}" class="variant-label {% if option.name == 'Size' %}brad-sm-size{% endif %}">
-    <span class="Variant_Product_size_name">{{ value }}</span>
-    <span class="Variant_Stock_Status">
-      {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-      {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
-      {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
-        <span class="stock-active">In Stock</span>
-      {% else %}
-        Make to Order
+  {%- if picker_type == 'swatch' -%}
+    {%- capture help_text -%}
+      <span class="visually-hidden">{{ value | escape }}</span>
+      {{ label_unavailable }}
+    {%- endcapture -%}
+    {%
+      render 'swatch-input',
+      id: input_id,
+      name: input_name,
+      value: value | escape,
+      swatch: value.swatch,
+      product_form_id: product_form_id,
+      checked: value.selected or is_default_selected,
+      visually_disabled: option_disabled,
+      shape: block.settings.swatch_shape,
+      help_text: help_text,
+      additional_props: input_dataset
+    %}
+  {%- elsif picker_type == 'button' -%}
+    <input
+      type="radio"
+      id="{{ input_id }}"
+      name="{{ input_name | escape }}"
+      value="{{ value | escape }}"
+      form="{{ product_form_id }}"
+      {% if value.selected %}
+        checked
       {% endif %}
-    </span>
-  </label>
+      {% if option_disabled %}
+        class="disabled"
+      {% endif %}
+      {{ input_dataset }}
+    >
+
+    <label for="{{ input_id }}" class="variant-label">
+      {%- assign v = value | downcase -%}
+
+      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+        <span class="variant-swatch" aria-hidden="true">
+          {%- if v contains 'yellow' -%}
+            {{- 'yellow-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'rose' or v contains 'rose gold' -%}
+            {{- 'rose-color.svg' | inline_asset_content -}}
+          {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
+            {{- 'silver-color.svg' | inline_asset_content -}}
+          {%- endif -%}
+        </span>
+      {%- endif -%}
+
+      {%- if option.name == 'Color' -%}
+        {% assign color_in_stock = false %}
+        {% for v in product.variants %}
+          {% if v.option1 == value and v.available and v.inventory_quantity > 0 %}
+            {% assign color_in_stock = true %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        <span class="variant-text">
+          {%- assign parts = value | split: ' ' -%}
+          <span class="variant-karat">{{ parts[0] }}</span>
+          {{ parts[1] }}
+          {{ parts[2] }}
+          <span class="Variant_Stock_Status">
+            {% if color_in_stock %}
+              <span class="stock-active">In Stock</span>
+            {% else %}
+              Make to Order
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
+        </span>
+
+      {%- elsif option.name == 'Size' -%}
+        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+
+        <span class="variant-text" style="display: inline-block !important;">
+          {{ value }}
+          <span class="Variant_Stock_Status">
+            {% if current_variant and current_variant.available and current_variant.inventory_quantity > 0 %}
+              <span class="stock-active">In Stock</span>
+            {% else %}
+              
+            {% endif %}
+          </span>
+          {{ label_unavailable }}
+        </span>
+
+
+      {%- else -%}
+        <span class="variant-text">
+          {{ value }}
+          {{ label_unavailable }}
+        </span>
+      {%- endif -%}
+    </label>
+
+  {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
+    <option
+      id="{{ input_id }}"
+      value="{{ value | escape }}"
+      {% if value.selected %}
+        selected="selected"
+      {% endif %}
+      {% if swatch_value and picker_type == 'swatch_dropdown' %}
+        data-option-swatch-value="{{ swatch_value }}"
+        {% if swatch_focal_point %}
+          data-option-swatch-focal-point="{{ swatch_focal_point }}"
+        {% endif %}
+      {% endif %}
+      {{ input_dataset }}
+    >
+      {% if option_disabled -%}
+        {{- 'products.product.value_unavailable' | t: option_value: value -}}
+      {%- else -%}
+        {{- value -}}
+      {%- endif %}
+    </option>
+  {%- endif -%}
 {%- endfor -%}
 
 <script>
 window.productVariants = {{ product.variants | json }};
 
-document.addEventListener('DOMContentLoaded', function () {
-  function updateStockStatus() {
-    const selectedOptions = {};
+document.addEventListener('DOMContentLoaded', function() {
 
-    document.querySelectorAll('input[type=radio]:checked').forEach(input => {
-      const optionName = input.name.split('-')[0];
-      selectedOptions[optionName] = input.value;
+  function getSelectedOptions() {
+    const selected = {};
+    document.querySelectorAll('input[type=radio]').forEach(input => {
+      if (input.checked) {
+        const optionName = input.name.split('-')[0]; // "Color" or "Size"
+        selected[optionName] = input.value;
+      }
+    });
+    return selected;
+  }
+
+  function updateStockStatus() {
+    const selectedOptions = getSelectedOptions();
+
+    // Find the matching variant
+    let matchedVariant = window.productVariants.find(v => {
+      return v.option1 === selectedOptions['Color'] && v.option2 === selectedOptions['Size'];
     });
 
-    document.querySelectorAll('.variant-label').forEach(label => {
-      const input = label.querySelector('input');
-      if (!input) return;
+    // Update stock label
+    document.querySelectorAll('.Variant_Stock_Status').forEach(span => {
+      const spanSize = span.dataset.size;
+      const spanColor = span.dataset.color;
 
-      const value = input.value;
-      const optionName = input.name.split('-')[0];
-
-      let variantAvailable = false;
-      window.productVariants.forEach(v => {
-        const matches = Object.keys(selectedOptions).every(key => {
-          if (key === 'Color') return v.option1 === selectedOptions[key];
-          if (key === 'Size') return v.option2 === selectedOptions[key];
-          return true;
-        });
-        if (matches && v.available && v.inventory_quantity > 0) variantAvailable = true;
-      });
-
-      const stockSpan = label.querySelector('.Variant_Stock_Status');
-      if (stockSpan) {
-        stockSpan.innerHTML = variantAvailable
-          ? '<span class="stock-active">In Stock</span>'
-          : 'Make to Order';
+      if (spanSize === selectedOptions['Size'] && spanColor === selectedOptions['Color']) {
+        if (matchedVariant && matchedVariant.available && matchedVariant.inventory_quantity > 0) {
+          span.innerHTML = '<span class="stock-active">In Stock</span>';
+        } else {
+          span.innerHTML = 'Make to Order';
+        }
       }
     });
   }
 
+  // Attach events to inputs AND their labels
   document.querySelectorAll('input[type=radio]').forEach(input => {
     input.addEventListener('change', updateStockStatus);
+    const label = document.querySelector(`label[for="${input.id}"]`);
+    if (label) {
+      label.addEventListener('click', () => {
+        // Delay slightly to ensure input.checked updates
+        setTimeout(updateStockStatus, 10);
+      });
+    }
   });
 
-  updateStockStatus(); // initial load
+  // Initial update
+  updateStockStatus();
 });
 </script>
+
