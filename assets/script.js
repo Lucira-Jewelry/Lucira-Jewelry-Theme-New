@@ -26,23 +26,23 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 jQuery(document).ready(function () {
-  // Append the icon element to each accordion title
-  jQuery(".accordion .accordion-title").append('<span class="accordion-icon">+</span>');
+  // Append Font Awesome icon to each accordion title
+  jQuery(".accordion .accordion-title").append('<i class="accordion-icon fa fa-plus"></i>');
 
   jQuery(".accordion .accordion-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
-    
+
     // Toggle active class
     jQuery(this).toggleClass("active");
-    
-    // Toggle the content
+
+    // Toggle content
     jQuery(this).next(".accordion-content").slideToggle();
 
-    // Toggle the icon
+    // Toggle icon class
     if (jQuery(this).hasClass("active")) {
-      icon.text("×"); // Show close icon
+      icon.removeClass("fa-plus").addClass("fa-times");
     } else {
-      icon.text("+"); // Show plus icon
+      icon.removeClass("fa-times").addClass("fa-plus");
     }
   });
 });
