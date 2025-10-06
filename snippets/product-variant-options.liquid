@@ -197,37 +197,48 @@ window.productVariants = {{ product.variants | json }};
 document.addEventListener('DOMContentLoaded', function() {
 
   function updateStockStatus() {
-    // Get selected color
-    const selectedColor = document.querySelector('[name="Color-1"]:checked')?.value || '';
-    // Get all size options
-    const sizeRadios = document.querySelectorAll('[name="Size-2"]');
-    const stockLabels = document.querySelectorAll('.Variant_Stock_Status');
+    const selectedOptions = {};
 
-    sizeRadios.forEach((radio, index) => {
-      const size = radio.value;
+    // Loop through all option types
+    document.querySelectorAll('input[type=radio]:checked').forEach(input => {
+      const optionName = input.name.split('-')[0]; // e.g., "Size" or "Color"
+      selectedOptions[optionName] = input.value;
+    });
+
+    // Loop through all variant labels
+    document.querySelectorAll('.variant-label').forEach(label => {
+      const optionName = label.querySelector('input')?.name.split('-')[0];
+      const value = label.querySelector('input')?.value;
+      if (!optionName || !value) return;
+
       let variantAvailable = false;
 
+      // Find matching variant
       window.productVariants.forEach(v => {
-        if (v.option1 === selectedColor && v.option2 === size && v.available && v.inventory_quantity > 0) {
+        const matches = Object.keys(selectedOptions).every(key => {
+          return v['option' + (parseInt(key === 'Color' ? 1 : 2))] === selectedOptions[key];
+        });
+        if (matches && v.available && v.inventory_quantity > 0) {
           variantAvailable = true;
         }
       });
 
-      // Update stock label
-      const label = stockLabels[index];
-      if (label) {
-        label.innerHTML = variantAvailable 
+      // Update stock label inside this label
+      const stockSpan = label.querySelector('.Variant_Stock_Status');
+      if (stockSpan) {
+        stockSpan.innerHTML = variantAvailable
           ? '<span class="stock-active">In Stock</span>'
           : 'Make to Order';
       }
     });
   }
 
-  // Listen for changes
-  document.querySelectorAll('[name="Size-2"]').forEach(input => input.addEventListener('change', updateStockStatus));
-  document.querySelectorAll('[name="Color-1"]').forEach(input => input.addEventListener('change', updateStockStatus));
+  // Listen for all radio changes
+  document.querySelectorAll('input[type=radio]').forEach(input => {
+    input.addEventListener('change', updateStockStatus);
+  });
 
-  // Run initially
+  // Initial update
   updateStockStatus();
 });
 </script>
