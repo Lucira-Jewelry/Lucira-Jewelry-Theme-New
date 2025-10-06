@@ -193,31 +193,38 @@
 
 <script>
   function removeLeadingZeros() {
-    // Clean the size label elements only
     const sizeLabels = document.querySelectorAll('.Variant_Product_size_name');
 
-    sizeLabels.forEach(function (label) {
-      const currentText = label.textContent.trim();
-
-      // If text starts with zeros (e.g. "06" or "007")
-      if (/^0\d+$/.test(currentText)) {
-        const newText = currentText.replace(/^0+/, '');
-        label.textContent = newText;
+    sizeLabels.forEach(label => {
+      let text = label.textContent.trim();
+      if (/^0\d+$/.test(text)) {
+        label.textContent = text.replace(/^0+/, '');
       }
     });
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  // Observe the product form or the entire section for DOM changes
+  function initRemoveZeros() {
     removeLeadingZeros();
 
-    // Watch for changes in the variant area
-    const observer = new MutationObserver(() => setTimeout(removeLeadingZeros, 50));
-    observer.observe(document.body, { childList: true, subtree: true });
+    const productForm = document.querySelector('form[id*="product-form"], .product-form, .product__form');
 
-    document.addEventListener('variant:change', () => setTimeout(removeLeadingZeros, 100));
-    document.addEventListener('shopify:section:load', () => setTimeout(removeLeadingZeros, 100));
+    if (productForm) {
+      const observer = new MutationObserver(() => removeLeadingZeros());
+      observer.observe(productForm, { childList: true, subtree: true });
+    }
 
-    // Recheck periodically for dynamic content
-    setInterval(removeLeadingZeros, 500);
-  });
+    // Listen for Shopify variant changes
+    document.addEventListener('variant:change', removeLeadingZeros);
+    document.addEventListener('shopify:section:load', removeLeadingZeros);
+
+    // Listen for clicks on size radio buttons
+    const sizeRadios = document.querySelectorAll('input[name*="Size"]');
+    sizeRadios.forEach(radio => {
+      radio.addEventListener('change', removeLeadingZeros);
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initRemoveZeros);
 </script>
+
