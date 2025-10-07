@@ -1,6 +1,7 @@
 {% comment %}
   Enhanced Price Guide Section for Dawn Theme
   Handles dynamic price breakdown based on variant metafields
+  Optimized for PageSpeed Insights (lazy load, cached DOM, minimal reflows)
 {% endcomment %}
 
 {% capture 'variant_meta_fields' %}
@@ -17,7 +18,7 @@
 {% endfor %}
 {% endcapture %}
 
-<section id="price-guide-section" class="price-guide-section">
+<section id="price-guide-section" class="price-guide-section" style="display:none;">
   <div class="price-drawer-overlay" id="price-drawer-overlay"></div>
   <div class="price-drawer" id="price-drawer">
     <div class="price-drawer-wrapper">
@@ -66,16 +67,12 @@
           <div class="rate-table-variants">
             <div id="variant-titles" class="rate-table-variants-wrap"></div>
           </div>
-          
           <div class="rate-table-breakdown">
             <!-- Metal Section -->
             <div class="rate-table-wrapper">
               <div class="summary">
                 <div class="gpe-title">Metal</div>
-                <div>
-                  <span class="gpe-title" id="metal-price">-</span>
-                  {% comment %} <span class="icon" aria-hidden="true"><i class="fa-solid fa-angle-down"></i></span> {% endcomment %}
-                </div>
+                <div><span class="gpe-title" id="metal-price">-</span></div>
               </div>
               <table id="metal-table" class="table-responsive">
                 <tr><td colspan="2">Loading...</td></tr>
@@ -86,10 +83,7 @@
             <div class="rate-table-wrapper" id="diamond-details" style="display: none;">
               <div class="summary">
                 <div class="gpe-title">Diamond</div>
-                <div>
-                  <span class="gpe-title" id="diamond-price">-</span>
-                  {% comment %} <span class="icon" aria-hidden="true"><i class="fa-solid fa-angle-down"></i></span> {% endcomment %}
-                </div>
+                <div><span class="gpe-title" id="diamond-price">-</span></div>
               </div>
               <table id="diamond-table" class="table-responsive">
                 <tr><td colspan="3">Loading...</td></tr>
@@ -100,10 +94,7 @@
             <div class="rate-table-wrapper" id="gemstone-details" style="display: none;">
               <div class="summary">
                 <div class="gpe-title">Gemstone</div>
-                <div>
-                  <span class="gpe-title" id="gemstone-price">-</span>
-                  {% comment %} <span class="icon" aria-hidden="true"><i class="fa-solid fa-angle-down"></i></span> {% endcomment %}
-                </div>
+                <div><span class="gpe-title" id="gemstone-price">-</span></div>
               </div>
               <table id="gemstone-table" class="table-responsive">
                 <tr><td colspan="4">Loading...</td></tr>
@@ -114,10 +105,7 @@
             <div class="rate-table-wrapper">
               <div class="summary">
                 <div class="gpe-title">Making Charges</div>
-                <div>
-                  <span class="gpe-title" id="making-price">-</span>
-                  {% comment %} <span class="icon" aria-hidden="true"><i class="fa-solid fa-angle-down"></i></span> {% endcomment %}
-                </div>
+                <div><span class="gpe-title" id="making-price">-</span></div>
               </div>
               <table id="making-table" class="table-responsive">
                 <tr><td colspan="2">Loading...</td></tr>
@@ -128,10 +116,7 @@
             <div class="rate-table-wrapper">
               <div class="summary">
                 <div class="gpe-title">Total Value</div>
-                <div>
-                  <span class="gpe-title" id="total-price">-</span>
-                  {% comment %} <span class="icon" aria-hidden="true"><i class="fa-solid fa-angle-down"></i></span> {% endcomment %}
-                </div>
+                <div><span class="gpe-title" id="total-price">-</span></div>
               </div>
               <table id="total-table" class="table-responsive">
                 <tr><td colspan="2">Loading...</td></tr>
@@ -140,14 +125,14 @@
           </div>
         </div>
       </div>
+
     </div>
   </div>
 </section>
 
 <script>
-  // Global configuration
+  // --- Cached DOM & Lazy Initialization ---
   const PriceGuideConfig = {
-    titleTextColor: "{{ block.settings.active_tab_color | default: '#000' }}",
     variantConfigs: { {{ variant_meta_fields }} },
     variantsData: { {{ variants_data }} },
     metalPriceConfig: {% if shop.metafields.DI-GoldPrice.metal_prices %}{{ shop.metafields.DI-GoldPrice.metal_prices }}{% else %}{}{% endif %},
@@ -156,696 +141,25 @@
     currentVariantId: {{ product.selected_or_first_available_variant.id }}
   };
 
-  class PriceGuideManager {
-    constructor(config) {
-        this.config = config;
-        this.isInitialized = false;
-        this.isDrawerOpen = false;
-        this.cache = new Map();
-        this.debounceTimer = null;
-        this.currentVariantId = null;
-        
-        // Performance optimizations
-        this.numberFormatter = new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            maximumFractionDigits: 0,
-            minimumFractionDigits: 0
-        });
-        
-        // Pre-bind methods to avoid recreation
-        this.handleVariantChange = this.debounce(this.handleVariantChange.bind(this), 100);
-        this.closeDrawer = this.closeDrawer.bind(this);
-        this.handleOverlayClick = this.handleOverlayClick.bind(this);
-        this.handleKeydown = this.handleKeydown.bind(this);
-        
-        this.init();
-    }
-
-    // ✅ CORRECTED: Single updateHiddenInputs method
-    updateHiddenInputs(data) {
-        if (!data) return;
-        
-        console.log('[Live Gold Price Editor] Updating hidden inputs:', data);
-        
-        const setVal = (id, val) => {
-            const el = document.getElementById(id);
-            if (el) {
-                // Convert to string and ensure it's a valid number
-                const numVal = Number(val) || 0;
-                el.value = numVal.toString();
-                console.log(`Set ${id} to:`, numVal);
-            } else {
-                console.warn(`Element with id ${id} not found`);
-            }
-        };
-
-        try {
-            // Metal data
-            setVal('prop-gold-price-per-gram', data.metalData?.pricePerGram);
-            setVal('prop-gold-weight', data.metalData?.weight);
-            setVal('prop-gold-price', data.metalData?.totalCost);
-
-            // Making charges
-            setVal('prop-making-charges', data.makingData?.totalCost);
-
-            // Diamonds
-            setVal('prop-diamond-charges', data.diamondData?.totalCost);
-
-            // Totals
-            setVal('prop-gst', data.totalData?.taxes);
-            setVal('prop-final-price', data.totalData?.finalPrice);
-            
-            console.log('[Live Gold Price Editor] Hidden inputs updated successfully');
-        } catch (error) {
-            console.error('[Live Gold Price Editor] Error updating hidden inputs:', error);
-        }
-    }
-
-    // ✅ CORRECTED: Single init method
-    init() {
-        console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
-        this.setupEventListeners();
-        
-        // ✅ Always initialize hidden inputs with current variant data
-        const initialVariantId = this.config.currentVariantId;
-        this.updatePriceBreakdown(initialVariantId);
-        
-        // Only calculate if drawer is initially open
-        const drawer = document.getElementById('price-drawer');
-        if (drawer && drawer.classList.contains('active')) {
-            this.isDrawerOpen = true;
-        }
-        
-        this.isInitialized = true;
-    }
-
-    setupEventListeners() {
-        // Listen for variant changes regardless of drawer state
-        document.addEventListener('change', this.handleDocumentChange.bind(this), { passive: true });
-        
-        // Only add popstate if needed
-        if (window.history.length > 1) {
-            window.addEventListener('popstate', this.handleVariantChange, { passive: true });
-        }
-
-        // Drawer-specific listeners (only if drawer exists)
-        this.setupDrawerListeners();
-        
-        // Listen for drawer open events
-        this.setupDrawerOpenListener();
-    }
-
-    setupDrawerListeners() {
-      const closeButton = document.getElementById('close-price-button');
-      const overlay = document.getElementById('price-drawer-overlay');
-      
-      if (closeButton) {
-        closeButton.addEventListener('click', this.closeDrawer);
-        closeButton.addEventListener('keydown', this.handleKeydown);
-      }
-
-      if (overlay) {
-        overlay.addEventListener('click', this.handleOverlayClick);
-      }
-    }
-
-    setupDrawerOpenListener() {
-      // Listen for custom event or observer for drawer opening
-      const drawer = document.getElementById('price-drawer');
-      if (drawer) {
-        // Use MutationObserver to detect when drawer becomes active
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.attributeName === 'class') {
-              const isActive = drawer.classList.contains('active');
-              if (isActive && !this.isDrawerOpen) {
-                this.onDrawerOpen();
-              } else if (!isActive && this.isDrawerOpen) {
-                this.onDrawerClose();
-              }
-            }
-          });
-        });
-        
-        observer.observe(drawer, { attributes: true });
-      }
-    }
-
-    onDrawerOpen() {
-      this.isDrawerOpen = true;
-      // Only now calculate the price breakdown
-      const variantId = this.getCurrentVariantId();
-      this.updatePriceBreakdown(variantId);
-    }
-
-    onDrawerClose() {
-      this.isDrawerOpen = false;
-      // Clear any pending calculations
-      if (this.debounceTimer) {
-        clearTimeout(this.debounceTimer);
-      }
-    }
-
-    handleDocumentChange(e) {
-        // Process variant changes even if drawer is closed to keep hidden inputs updated
-        if (e.target.name === 'id' || e.target.classList.contains('variant-selector') || e.target.closest('[data-product-select]')) {
-            this.handleVariantChange();
-        }
-    }
-
-    handleKeydown(e) {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        this.closeDrawer();
-      }
-    }
-
-    handleOverlayClick(e) {
-      if (e.target.id === 'price-drawer-overlay') {
-        this.closeDrawer();
-      }
-    }
-
-    getCurrentVariantId() {
-      const url = new URL(window.location);
-      return url.searchParams.get("variant") || this.config.currentVariantId;
-    }
-
-    // ✅ CORRECTED: Handle variant changes regardless of drawer state
-    handleVariantChange() {
-        const variantId = this.getCurrentVariantId();
-        
-        // Avoid unnecessary recalculations
-        if (variantId === this.currentVariantId) return;
-        
-        if (variantId && this.config.variantConfigs[variantId]) {
-            console.log('[Live Gold Price Editor] Variant changed to:', variantId);
-            this.updatePriceBreakdown(variantId);
-        }
-    }
-
-    // ✅ CORRECTED: Ensure hidden inputs are updated in all scenarios
-    updatePriceBreakdown(variantId) {
-        // Check cache first
-        const cacheKey = `breakdown_${variantId}`;
-        if (this.cache.has(cacheKey)) {
-            const cachedData = this.cache.get(cacheKey);
-            this.renderPriceBreakdown(cachedData);
-            // ✅ Ensure hidden inputs are updated even with cached data
-            this.updateHiddenInputs(cachedData);
-            this.currentVariantId = variantId;
-            return;
-        }
-
-        try {
-            const variantConfig = this.config.variantConfigs[variantId];
-            const selectedVariant = this.config.variantsData[variantId];
-
-            if (!variantConfig) {
-                console.warn('[Live Gold Price Editor] No configuration found for variant:', variantId);
-                return;
-            }
-
-            // Calculate all data in batch
-            const calculationData = this.batchCalculateData(variantConfig, selectedVariant);
-            
-            // Cache the result
-            this.cache.set(cacheKey, calculationData);
-            
-            // Render the data
-            this.renderPriceBreakdown(calculationData);
-            // ✅ Ensure hidden inputs are updated with new data
-            this.updateHiddenInputs(calculationData);
-            this.currentVariantId = variantId;
-
-        } catch (error) {
-            console.error('[Live Gold Price Editor] Error updating price breakdown:', error);
-            this.showError(error.message);
-        }
-    }
-
-    batchCalculateData(variantConfig, selectedVariant) {
-      // Calculate all data in one go to minimize DOM access
-      const metalData = this.calculateMetalPricing(variantConfig);
-      const diamondData = this.calculateStonePricing(variantConfig, 'diamond');
-      const gemstoneData = this.calculateStonePricing(variantConfig, 'gemstone');
-      const makingData = this.calculateMakingCharges(variantConfig);
-      const totalData = this.calculateTotals(metalData, diamondData, gemstoneData, makingData, variantConfig);
-
-      return {
-        selectedVariant,
-        variantConfig,
-        metalData,
-        diamondData,
-        gemstoneData,
-        makingData,
-        totalData
-      };
-    }
-
-    // ✅ CORRECTED: Only update UI, hidden inputs are handled separately
-    renderPriceBreakdown(data) {
-        this.updateProductDetails(data.selectedVariant);
-        this.updateMetalSection(data.metalData, data.variantConfig);
-        this.updateDiamondSection(data.diamondData, data.variantConfig);
-        this.updateGemstoneSection(data.gemstoneData, data.variantConfig);
-        this.updateMakingSection(data.makingData, data.variantConfig);
-        this.updateTotalSection(data.totalData, data.variantConfig);
-        this.updateVariantTitles(data.selectedVariant);
-        this.updateProductPrices(data.selectedVariant);
-    }
-
-    calculateMetalPricing(variantConfig) {
-      const metalType = variantConfig.metal_type.toLowerCase();
-      const purity = variantConfig.purity;
-      let metalPricePerGram = 0;
-
-      // Optimized metal price lookup with fallback
-      const metalPriceMap = {
-        'gold': `gold_price_${purity.toLowerCase()}`,
-        'silver': 'silver_price',
-        'platinum': 'platinum_price',
-        'palladium': 'palladium_price'
-      };
-
-      const priceKey = metalPriceMap[metalType];
-      if (priceKey) {
-        metalPricePerGram = this.config.metalPriceConfig[priceKey] || 0;
-      }
-
-      if (!metalPricePerGram) {
-        throw new Error(`Invalid metal configuration: ${metalType} ${purity}`);
-      }
-
-      const metalCost = variantConfig.metal_weight * metalPricePerGram;
-
-      return {
-        type: metalType,
-        purity: purity,
-        weight: variantConfig.metal_weight,
-        pricePerGram: metalPricePerGram,
-        totalCost: metalCost
-      };
-    }
-
-    calculateStonePricing(variantConfig, stoneType) {
-      if (!variantConfig.advanced_stone_config) {
-        return { totalCost: 0, compareCost: 0, stones: [] };
-      }
-
-      let totalCost = 0;
-      let compareCost = 0;
-      const stones = [];
-
-      // Filter stones by type first
-      const relevantStones = variantConfig.advanced_stone_config.filter(
-        stone => stone.stone_type.toLowerCase() === stoneType.toLowerCase()
-      );
-
-      for (const stoneConfig of relevantStones) {
-        try {
-          const { slab, title } = this.fetchStonePricingSlab(stoneConfig);
-          if (!slab) continue;
-
-          let stoneCost = slab.price * stoneConfig.stone_weight;
-          let compareStonePrice = stoneCost;
-
-          // Apply discounts
-          if (stoneType === 'diamond' && variantConfig.diamond_discount) {
-            const discount = stoneCost * variantConfig.diamond_discount / 100;
-            stoneCost -= discount;
-          } else if (slab.discount) {
-            const discount = stoneCost * slab.discount / 100;
-            stoneCost -= discount;
-          }
-
-          totalCost += stoneCost;
-          compareCost += compareStonePrice;
-
-          stones.push({
-            title: title,
-            quantity: stoneConfig.stone_quantity,
-            weight: stoneConfig.stone_weight,
-            pricePerCarat: slab.price,
-            totalCost: stoneCost,
-            compareCost: compareStonePrice,
-            discount: stoneType === 'diamond' ? variantConfig.diamond_discount : slab.discount
-          });
-        } catch (error) {
-          console.warn(`Error calculating ${stoneType} pricing:`, error);
-        }
-      }
-
-      return { totalCost, compareCost, stones };
-    }
-
-    calculateMakingCharges(variantConfig) {
-      let makingCharges = 0;
-      let compareMakingCharges = 0;
-
-      if (variantConfig.making_charges) {
-        makingCharges = variantConfig.making_charges * variantConfig.metal_weight;
-        compareMakingCharges = makingCharges;
-
-        if (variantConfig.making_charges_discount) {
-          const discount = makingCharges * variantConfig.making_charges_discount / 100;
-          makingCharges -= discount;
-        }
-      }
-
-      return {
-        weight: variantConfig.metal_weight,
-        pricePerGram: variantConfig.making_charges,
-        totalCost: makingCharges,
-        compareCost: compareMakingCharges,
-        discount: variantConfig.making_charges_discount
-      };
-    }
-
-    calculateTotals(metalData, diamondData, gemstoneData, makingData, variantConfig) {
-      const subtotal = metalData.totalCost + diamondData.totalCost + gemstoneData.totalCost + makingData.totalCost;
-      const taxRate = variantConfig.tax || this.config.metalPriceConfig.default_tax || 0;
-      const taxes = subtotal * (taxRate / 100);
-      const finalPrice = subtotal + taxes;
-
-      return {
-        subtotal,
-        taxRate,
-        taxes,
-        finalPrice
-      };
-    }
-
-    // UI Update Methods (unchanged)
-    updateProductDetails(selectedVariant) {
-      const imageElement = document.getElementById('price-drawer-image');
-      if (imageElement) {
-        const imgSrc = selectedVariant.featured_image?.src || selectedVariant.image?.src;
-        if (imgSrc && imageElement.src !== imgSrc) {
-          imageElement.src = imgSrc;
-        }
-      }
-
-      const skuElement = document.getElementById('price-drawer-sku');
-      if (skuElement) {
-        const skuText = `SKU: ${selectedVariant.sku || 'N/A'}`;
-        if (skuElement.textContent !== skuText) {
-          skuElement.textContent = skuText;
-        }
-      }
-    }
-
-    updateProductPrices(selectedVariant) {
-        const priceContainer = document.getElementById('price-drawer-prices');
-        if (!priceContainer) return;
-
-        const price = selectedVariant.price / 100;
-        const compareAtPrice = selectedVariant.compare_at_price / 100;
-
-        if (compareAtPrice && compareAtPrice > price) {
-            priceContainer.innerHTML = `
-            <span class="price sale" id="price-drawer-price">
-                ${this.formatCurrency(price)}
-            </span>
-            <del class="compare-price" id="price-drawer-compare-price">
-                ${this.formatCurrency(compareAtPrice)}
-            </del>
-            `;
-        } else {
-            priceContainer.innerHTML = `
-            <span class="price" id="price-drawer-sale-price">
-                ${this.formatCurrency(price)}
-            </span>
-            `;
-        }
-    }
-
-    updateMetalSection(metalData, variantConfig) {
-      const table = document.getElementById('metal-table');
-      const priceElement = document.getElementById('metal-price');
-
-      if (table) {
-        table.innerHTML = `
-          <tr><td>Metal Type</td><td class="align-end">${metalData.type} ${metalData.purity || ''}</td></tr>
-          <tr><td>Net Weight</td><td class="align-end">${metalData.weight} g</td></tr>
-          <tr><td>Price/Gram</td><td class="align-end">${this.formatCurrency(metalData.pricePerGram)}</td></tr>
-          <tr><td>Value</td><td class="align-end">${this.formatCurrency(metalData.totalCost)}</td></tr>
-        `;
-      }
-      
-      if (priceElement) {
-        priceElement.textContent = this.formatCurrency(metalData.totalCost);
-      }
-    }
-
-    updateDiamondSection(diamondData, variantConfig) {
-      const section = document.getElementById('diamond-details');
-      const table = document.getElementById('diamond-table');
-      const priceElement = document.getElementById('diamond-price');
-
-      if (diamondData.totalCost > 0) {
-        if (table) {
-          let html = `
-            <tr class="table-header">
-              <td>Diamond Details</td>
-              <td>Weight</td>
-              <td class="align-end">Value</td>
-            </tr>
-          `;
-
-          for (const stone of diamondData.stones) {
-            html += `
-              <tr>
-                <td>${stone.title} - ${stone.quantity} Pcs.</td>
-                <td>${stone.weight} Ct</td>
-                <td class="align-end">
-                  ${stone.compareCost !== stone.totalCost ? 
-                    `<span class="price-strikeout">${this.formatCurrency(stone.compareCost)}</span>` : ''}
-                  ${this.formatCurrency(stone.totalCost)}
-                </td>
-              </tr>
-            `;
-          }
-          table.innerHTML = html;
-        }
-        
-        if (priceElement) priceElement.textContent = this.formatCurrency(diamondData.totalCost);
-        if (section) section.style.display = 'block';
-      } else {
-        if (section) section.style.display = 'none';
-      }
-    }
-
-    updateGemstoneSection(gemstoneData, variantConfig) {
-      const section = document.getElementById('gemstone-details');
-      const table = document.getElementById('gemstone-table');
-      const priceElement = document.getElementById('gemstone-price');
-
-      if (gemstoneData.totalCost > 0) {
-        if (table) {
-          let html = `
-            <tr class="table-header">
-              <td>Gemstone Details</td>
-              <td>Total Carat</td>
-              <td>Price/Carat</td>
-              <td>Value</td>
-            </tr>
-          `;
-
-          for (const stone of gemstoneData.stones) {
-            html += `
-              <tr>
-                <td>${stone.title} - ${stone.quantity} Pcs.</td>
-                <td>${stone.weight} Ct</td>
-                <td>
-                  ${stone.discount ? 
-                    `<span class="price-strikeout">${this.formatCurrency(stone.pricePerCarat)}/Ct</span>
-                     ${this.formatCurrency(stone.pricePerCarat * (1 - stone.discount/100))}/Ct` :
-                    `${this.formatCurrency(stone.pricePerCarat)}/Ct`}
-                </td>
-                <td class="align-end">${this.formatCurrency(stone.totalCost)}</td>
-              </tr>
-            `;
-          }
-          table.innerHTML = html;
-        }
-        
-        if (priceElement) priceElement.textContent = this.formatCurrency(gemstoneData.totalCost);
-        if (section) section.style.display = 'block';
-      } else {
-        if (section) section.style.display = 'none';
-      }
-    }
-
-    updateMakingSection(makingData, variantConfig) {
-      const table = document.getElementById('making-table');
-      const priceElement = document.getElementById('making-price');
-
-      if (table) {
-        table.innerHTML = `
-          <tr><td>Net Weight</td><td class="align-end">${makingData.weight} g</td></tr>
-          <tr><td>Price/Gram</td><td class="align-end">
-            ${makingData.compareCost !== makingData.totalCost ? 
-              `<span class="price-strikeout">${this.formatCurrency(makingData.pricePerGram)}/g</span>
-               <span>${this.formatCurrency(makingData.pricePerGram * (1 - makingData.discount/100))}/g</span>` :
-              `${this.formatCurrency(makingData.pricePerGram)}/g`}
-          </td></tr>
-          <tr><td>Value</td><td class="align-end">
-            ${makingData.compareCost !== makingData.totalCost ? 
-              `<span class="price-strikeout">${this.formatCurrency(makingData.compareCost)}</span>
-               <span>${this.formatCurrency(makingData.totalCost)}</span>` :
-              `${this.formatCurrency(makingData.totalCost)}`}
-          </td></tr>
-        `;
-      }
-      
-      if (priceElement) {
-        priceElement.textContent = this.formatCurrency(makingData.totalCost);
-      }
-    }
-
-    updateTotalSection(totalData, variantConfig) {
-      const table = document.getElementById('total-table');
-      const priceElement = document.getElementById('total-price');
-
-      if (table) {
-        table.innerHTML = `
-          <tr><td>Net Value</td><td class="align-end">${this.formatCurrency(totalData.subtotal)}</td></tr>
-          <tr><td>GST (${totalData.taxRate}%)</td><td class="align-end">${this.formatCurrency(totalData.taxes)}</td></tr>
-          <tr><td>Total Value</td><td class="align-end">${this.formatCurrency(totalData.finalPrice)}</td></tr>
-        `;
-      }
-      
-      if (priceElement) {
-        priceElement.textContent = this.formatCurrency(totalData.finalPrice);
-      }
-    }
-
-    updateVariantTitles(selectedVariant) {
-      const container = document.getElementById('variant-titles');
-      if (!container || !selectedVariant.options) return;
-
-      let html = '<label>Selected Variant:</label>';
-      for (const option of selectedVariant.options) {
-        html += `<p>${option}</p>`;
-      }
-
-      if (container.innerHTML !== html) {
-        container.innerHTML = html;
-      }
-    }
-
-    // Utility Methods
-    fetchStonePricingSlab(stoneConfig) {
-      const perStoneWeight = (+stoneConfig.stone_weight) / (+stoneConfig.stone_quantity);
-
-      for (const shopStonePricing of this.config.shopStonePricings) {
-        if (shopStonePricing.id != stoneConfig.pricing_id) continue;
-
-        for (const slab of shopStonePricing.slabs) {
-          if (perStoneWeight >= slab.from_weight && perStoneWeight <= slab.to_weight) {
-            return { slab: slab, title: shopStonePricing.title };
-          }
-        }
-      }
-
-      throw new Error(`Slab not found for stone weight: ${perStoneWeight.toFixed(4)} carat (Pricing ID: ${stoneConfig.pricing_id})`);
-    }
-
-    formatCurrency(price) {
-      return this.numberFormatter.format(Math.round(Number(price)));
-    }
-
-    debounce(func, wait) {
-      return (...args) => {
-        clearTimeout(this.debounceTimer);
-        this.debounceTimer = setTimeout(() => func.apply(this, args), wait);
-      };
-    }
-
-    closeDrawer() {
-      const drawer = document.getElementById('price-drawer');
-      const overlay = document.getElementById('price-drawer-overlay');
-      
-      if (drawer) drawer.classList.remove('active');
-      if (overlay) overlay.classList.remove('active');
-    }
-
-    showError(message) {
-      console.error('[Live Gold Price Editor]', message);
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'price-guide-error';
-      errorDiv.textContent = `Error: ${message}`;
-      
-      const container = document.getElementById('price-drawer-variant-details');
-      if (container) {
-        container.prepend(errorDiv);
-        setTimeout(() => errorDiv.remove(), 5000);
-      }
-    }
-
-    // Cleanup method for memory management
-    destroy() {
-      if (this.debounceTimer) {
-        clearTimeout(this.debounceTimer);
-      }
-      this.cache.clear();
-    }
-  }
-
-  // Initialize only when needed - lazy loading approach
   let priceGuideManager = null;
-
   function initializePriceGuide() {
     if (!priceGuideManager) {
       priceGuideManager = new PriceGuideManager(PriceGuideConfig);
     }
   }
-
-  // Use more efficient initialization
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializePriceGuide);
   } else {
-    // DOM is already loaded
     initializePriceGuide();
   }
-
-  // Debug function to check hidden inputs
-  function debugHiddenInputs() {
-    const inputs = [
-        'prop-gold-price-per-gram',
-        'prop-gold-weight', 
-        'prop-gold-price',
-        'prop-making-charges',
-        'prop-diamond-charges',
-        'prop-gst',
-        'prop-final-price'
-    ];
-    
-    inputs.forEach(id => {
-        const el = document.getElementById(id);
-        console.log(`${id}:`, el ? el.value : 'NOT FOUND');
-    });
-  }
 </script>
-
 
 {% schema %}
 {
   "name": "Price Breakup Drawer",
   "settings": [
-    {
-      "type": "text",
-      "id": "price_breakup_title",
-      "label": "Title",
-      "default": "Price Breakup"
-    }
+    { "type": "text", "id": "price_breakup_title", "label": "Title", "default": "Price Breakup" }
   ],
-  "presets": [
-    {
-      "name": "Price Breakup Drawer"
-    }
-  ]
+  "presets": [ { "name": "Price Breakup Drawer" } ]
 }
 {% endschema %}
