@@ -1,0 +1,237 @@
+{{ 'section-curved-steps-slider.css' | asset_url | stylesheet_tag }}
+
+<section class="curved-steps-slider-section">
+    <div class="slider-container page-width">
+        <div class="semicircle-wrapper">
+            <svg viewBox="0 0 140 270" xmlns="http://www.w3.org/2000/svg">
+                <path class="curve-path" d="M 5,5 A 130,130 0 0,1 135,135 A 130,130 0 0,1 5,265" fill="none" stroke="#e0e0e0" stroke-width="10"/>
+                <path class="curve-progress" id="progressPath" d="M 5,5 A 130,130 0 0,1 135,135 A 130,130 0 0,1 5,265" fill="none" stroke="#4CAF50" stroke-width="10" style="stroke-dasharray: 408.465; stroke-dashoffset: 408.465;"/>
+            </svg>
+            {% for block in section.blocks %}
+                <div class="step-dot step-{{ forloop.index }}{% if forloop.first %} active{% endif %} small" data-step="{{ forloop.index }}">
+                    {{ forloop.index }}
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="content-area">
+            {% for block in section.blocks %}
+                <div class="slide-content{% if forloop.first %} active{% endif %}" data-slide="{{ forloop.index }}" {{ block.shopify_attributes }}>
+                    <div class="content-image">
+                        <div class="placeholder">
+                            {% if block.settings.image != blank %}
+                                {{ block.settings.image | image_url: width: 560 | image_tag: loading: 'lazy', width: 560, height: 700, alt: block.settings.heading }}
+                            {% else %}
+                                {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="content-text">
+                        {% if block.settings.heading != blank %}
+                            <h2>{{ block.settings.heading }}</h2>
+                        {% endif %}
+                        {% if block.settings.description != blank %}
+                            <p>{{ block.settings.description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<script>
+    (function() {
+        let currentStep = 1;
+        const totalSteps = {{ section.blocks.size }};
+        let isLocked = false;
+
+        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
+        const slides = document.querySelectorAll('.curved-steps-slider-section .slide-content');
+        const progressPath = document.getElementById('progressPath');
+        const sliderSection = document.querySelector('.curved-steps-slider-section');
+
+        function updateSlider(step) {
+            currentStep = step;
+
+            dots.forEach((dot, index) => {
+                dot.classList.remove('active');
+                if (index + 1 === step) {
+                    dot.classList.add('active');
+                    dot.classList.remove('small');
+                } else {
+                    dot.classList.add('small');
+                }
+            });
+
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                if (index + 1 === step) {
+                    slide.classList.add('active');
+                }
+            });
+
+            const pathLength = progressPath.getTotalLength();
+            const progress = ((step - 1) / (totalSteps - 1)) * pathLength;
+            progressPath.style.strokeDashoffset = pathLength - progress;
+        }
+
+        dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+                const step = parseInt(dot.dataset.step);
+                updateSlider(step);
+            });
+        });
+
+        let scrollAccumulator = 0;
+        const scrollThreshold = 50;
+
+        window.addEventListener('wheel', (e) => {
+            const rect = sliderSection.getBoundingClientRect();
+            const isInView = rect.top <= 100 && rect.bottom >= 100;
+
+            if (isInView) {
+                if (currentStep === totalSteps && e.deltaY > 0) {
+                    return;
+                }
+
+                if (currentStep === 1 && e.deltaY < 0) {
+                    return;
+                }
+
+                e.preventDefault();
+
+                if (isLocked) return;
+
+                scrollAccumulator += e.deltaY;
+
+                if (Math.abs(scrollAccumulator) >= scrollThreshold) {
+                    isLocked = true;
+
+                    if (scrollAccumulator > 0 && currentStep < totalSteps) {
+                        updateSlider(currentStep + 1);
+                    } else if (scrollAccumulator < 0 && currentStep > 1) {
+                        updateSlider(currentStep - 1);
+                    }
+
+                    scrollAccumulator = 0;
+
+                    setTimeout(() => {
+                        isLocked = false;
+                    }, 600);
+                }
+            }
+        }, { passive: false });
+
+        const pathLength = progressPath.getTotalLength();
+        progressPath.style.strokeDasharray = pathLength;
+        progressPath.style.strokeDashoffset = pathLength;
+        
+        updateSlider(1);
+    })();
+</script>
+
+<style>
+    .semicircle-wrapper { position: relative; width: 205px; height: 400px; flex-shrink: 0; left: -6px; }
+    .semicircle-path{position:absolute;top:0;left:0;width:100%;height:100%}
+    .step-dot{position:absolute;width:70px;height:70px;border-radius:50%;background: #F3DCE0; color: #1a1a1a; font-family: Futura Std; font-weight: 500; font-size: 20px; line-height: 150%; vertical-align: middle; text-transform: uppercase;cursor:pointer;transition:all .6s cubic-bezier(.4,0,.2,1);box-shadow:0 4px 15px rgba(0,0,0,.08);display: flex;  align-items: center; justify-content: center;}
+    .step-dot.active {width: 70px; height: 70px; color: #fff; background: #DAA7B4; font-size: 24px; box-shadow: 0 8px 30px rgba(212, 160, 184, .4); z-index: 2;}
+    .step-dot.small{width:50px;height:50px;font-size:18px;transition:all .6s cubic-bezier(.4,0,.2,1);}
+    .curved-steps-slider-section .step-1{top: 120px; left: 90%;transform:translate(-50%,-50%);}
+    .curved-steps-slider-section .step-2{top: 52%; right: 8px; transform: translate(50%, -50%);}
+    .curved-steps-slider-section .step-3{bottom: 105px; right: 30px;transform:translate(50%,50%)}
+    .curved-steps-slider-section .step-4{bottom: 45px; left: 55%;transform:translate(-50%,50%)}
+    .curved-steps-slider-section svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+    .curved-steps-slider-section .curve-path{fill:#F4F0F0;stroke:#1A1A1A;stroke-width:1}
+    .curved-steps-slider-section .curve-progress{fill:none;stroke:#d4a0b8;stroke-width:2;stroke-linecap:round;stroke-dasharray:1000;stroke-dashoffset:1000;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+    .curved-steps-slider-section .content-area{flex:1;max-width:900px;opacity:0;transform:translateX(50px);animation:fadeInContent .8s ease forwards;animation-delay:.3s}
+    .slider-container { display: grid ; grid-template-columns: calc(25% - 0px) calc(70% - 0px); align-items: flex-start; padding: 60px 0; min-height: 100vh; }
+    .slider-container .slide-content {display: flex ; align-items: center; gap: 40px;}
+    .curved-steps-slider-section { position: relative; }
+    @keyframes fadeInContent{
+    to{opacity:1;transform:translateX(0)}
+    }
+    .curved-steps-slider-section .slide-content{display:none;opacity:0;transition:opacity .8s ease, transform .8s ease;}
+    .curved-steps-slider-section .slide-content.active{display: flex !important ; align-items: center;opacity:1;transform:translateY(0);animation:slideIn .8s cubic-bezier(.4,0,.2,1);}
+    @keyframes slideIn{
+    0%{opacity:0;transform:translateY(40px) scale(0.95);}
+    100%{opacity:1;transform:translateY(0) scale(1);}
+    }
+    .curved-steps-slider-section .content-image{width:100%;max-width:400px;border-radius:8px;overflow:hidden;margin-bottom:0px;box-shadow:0 10px 40px rgba(0,0,0,.1)}
+    .curved-steps-slider-section .content-image img{width:100%;height:100%;object-fit:cover}
+    .curved-steps-slider-section .content-text h2{color: #1A1A1A; margin-bottom: 12px; margin-top: 0;font-weight: 500; font-size: 26px; line-height: 150%; letter-spacing: 1.2px; vertical-align: middle; text-transform: uppercase;}
+    .curved-steps-slider-section .content-text p { color: #1A1A1A; line-height: 1.8; margin-top: 12px; font-size: 14px; margin-bottom: 0;}
+    @media (max-width:1024px){
+    .curved-steps-slider-section .slider-container{flex-direction:column;gap:60px}
+    .curved-steps-slider-section .semicircle-wrapper{width:300px;height:300px}
+    }
+</style>
+
+{% schema %}
+{
+  "name": "Curved Steps Slider",
+  "tag": "section",
+  "class": "section-curved-steps-slider",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "step",
+      "name": "Step",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image"
+        },
+        {
+          "type": "text",
+          "id": "heading",
+          "label": "Heading",
+          "default": "STEP 1 : GET STARTED"
+        },
+        {
+          "type": "textarea",
+          "id": "description",
+          "label": "Description",
+          "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Curved Steps Slider",
+      "blocks": [
+        {
+          "type": "step",
+          "settings": {
+            "heading": "STEP 1 : GET STARTED",
+            "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ut alconsequat."
+          }
+        },
+        {
+          "type": "step",
+          "settings": {
+            "heading": "STEP 2 : OUR EXECUTIVE WILL CALL YOU",
+            "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ut alconsequat."
+          }
+        },
+        {
+          "type": "step",
+          "settings": {
+            "heading": "STEP 3 : CONSULTATION & PLANNING",
+            "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ut alconsequat."
+          }
+        },
+        {
+          "type": "step",
+          "settings": {
+            "heading": "STEP 4 : COMPLETION",
+            "description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, ut alconsequat."
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
