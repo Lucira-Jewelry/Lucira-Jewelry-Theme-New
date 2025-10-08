@@ -64,11 +64,7 @@
     endif
   endfor
 
-  assign products_to_display = section.settings.products_to_show
-  if products_to_display > 8
-    assign products_to_display = 8
-  endif
-
+  assign products_to_display = 4
   assign columns_mobile_int = section.settings.columns_mobile | plus: 0
   assign show_mobile_slider = true
   assign show_desktop_slider = section.settings.enable_desktop_slider
@@ -117,9 +113,24 @@
       <div class="{% if section.settings.full_width %}slider-component-full-width{% endif %} page-width{% if use_slider == false %} page-width{% endif %}{% if show_desktop_slider == false and section.settings.full_width == false %} page-width-desktop{% endif %}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
         
         {%- if use_slider -%}
-          <!-- Swiper Container -->
-          <div class="swiper you-may-also-like-swiper-{{ section.id }}" id="Swiper-{{ section.id }}">
-            <div class="swiper-wrapper">
+          <!-- Swiper Container with Skeleton Loader -->
+          <div class="swiper you-may-also-like-swiper-{{ section.id }} swiper-skeleton" id="Swiper-{{ section.id }}" data-section-id="{{ section.id }}">
+            <!-- Skeleton Loader -->
+            <div class="skeleton-loader">
+              <div class="swiper-wrapper">
+                {% for i in (1..4) %}
+                <div class="swiper-slide skeleton-slide">
+                  <div class="skeleton-card">
+                    <div class="skeleton-image"></div>
+                    <div class="skeleton-text skeleton-title"></div>
+                    <div class="skeleton-text skeleton-price"></div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            <!-- Actual Content (hidden initially) -->
+            <div class="swiper-wrapper swiper-content" style="display: none;">
         {%- else -%}
           <!-- Grid Container -->
           <ul
@@ -250,6 +261,20 @@
 .you-may-also-like-swiper-template--19964365045978__you_may_also_like_6ARbQw{padding-bottom:0}
 .you-may-also-like-collection .card-wrapper .rating-star { display: none !important; }
 
+/* Skeleton Loader Styles */
+.skeleton-loader { position: relative; width: 100%; }
+.skeleton-slide { opacity: 1; }
+.skeleton-card { background: #fff; border-radius: 8px; overflow: hidden; }
+.skeleton-image { width: 100%; padding-bottom: 100%; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+.skeleton-text { height: 16px; margin: 12px; background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+.skeleton-title { width: 70%; }
+.skeleton-price { width: 40%; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+.swiper-skeleton .swiper-button-next, .swiper-skeleton .swiper-button-prev, .swiper-skeleton .swiper-pagination { display: none; }
+.swiper-content-loaded .skeleton-loader { display: none; }
+.swiper-content-loaded .swiper-content { display: flex !important; }
+.swiper-content-loaded .swiper-button-next, .swiper-content-loaded .swiper-button-prev, .swiper-content-loaded .swiper-pagination { display: block; }
+
 @media screen and (max-width: 749px) {
   .swiper-button-next-{{ section.id }}, .swiper-button-prev-{{ section.id }} { width: 36px; height: 36px; }
   .swiper-button-next-{{ section.id }}:after, .swiper-button-prev-{{ section.id }}:after { font-size: 14px; }
@@ -267,15 +292,15 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   // ----------------------------
-  // Lazy initialize Swiper
+  // Lazy initialize Swiper with Skeleton
   // ----------------------------
   const swiperElement = document.querySelector('.you-may-also-like-swiper-{{ section.id }}');
   if (swiperElement) {
-    // Intersection Observer triggers Swiper init when section is in viewport
     const observer = new IntersectionObserver((entries, obs) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           if (!swiperElement.classList.contains('swiper-initialized')) {
+            // Initialize Swiper
             const swiper{{ section.id | replace: '-', '_' }} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
               breakpoints: {
                 320: {
@@ -308,6 +333,13 @@ document.addEventListener('DOMContentLoaded', function() {
               watchSlidesProgress: true,
               watchSlidesVisibility: true,
             });
+            
+            // Remove skeleton and show content after brief delay
+            setTimeout(() => {
+              swiperElement.classList.add('swiper-content-loaded');
+              swiperElement.classList.remove('swiper-skeleton');
+            }, 300);
+            
             swiperElement.classList.add('swiper-initialized');
           }
           obs.unobserve(entry.target);
