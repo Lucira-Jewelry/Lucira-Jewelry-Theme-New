@@ -94,12 +94,13 @@
 
 
 {% if matched_tag != "Nosepins" %}
-  <div class="color-{{ section.settings.color_scheme }} isolate gradient">
+  <div class="color-{{ section.settings.color_scheme }} isolate gradient" style="content-visibility: auto; contain-intrinsic-size: 1000px;">
     <div
       class="collection you-may-also-like-collection{% if section.settings.quick_add == 'bulk' %} collection-quick-add-bulk{% endif %} section-{{ section.id }}-padding{% if section.settings.full_width %}  collection--full-width{% endif %}"
       id="you-may-also-like-{{ section.id }}"
       data-id="{{ section.id }}"
     >
+
       <div class="collection__title title-wrapper title-wrapper--no-top-margin page-width{% if use_slider %} title-wrapper--self-padded-tablet-down{% endif %}{% if show_desktop_slider %} collection__title--desktop-slider{% endif %}">
         {%- if section.settings.header != blank -%}
           <h2 class="title inline-richtext {{ section.settings.heading_size }}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
@@ -236,7 +237,6 @@
 {% endif %}
 
 
-{%- if use_slider -%}
 <style>
   
 .you-may-also-like-swiper-{{ section.id }} { overflow: hidden; padding-bottom: 0px; position: relative; }
@@ -266,190 +266,143 @@
 </style>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  // ----------------------------
+  // Lazy initialize Swiper
+  // ----------------------------
   const swiperElement = document.querySelector('.you-may-also-like-swiper-{{ section.id }}');
   if (swiperElement) {
-    const swiper{{ section.id | replace: '-', '_' }} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
-      // Responsive breakpoints
-      breakpoints: {
-        // Mobile
-        320: {
-          slidesPerView: {{ section.settings.columns_mobile }},
-          spaceBetween: 15,
-          enabled: true,
-        },
-        // Tablet
-        750: {
-          slidesPerView: {% if section.settings.columns_desktop > 3 %}3{% else %}{{ section.settings.columns_desktop }}{% endif %},
-          spaceBetween: 20,
-          enabled: {% if show_desktop_slider %}true{% else %}true{% endif %},
-        },
-        // Desktop
-        990: {
-          slidesPerView: {{ section.settings.columns_desktop }},
-          spaceBetween: 20,
-          enabled: {% if show_desktop_slider %}true{% else %}false{% endif %},
-        }
-      },
-
-      // Navigation arrows
-      navigation: {
-        nextEl: '.swiper-button-next-{{ section.id }}',
-        prevEl: '.swiper-button-prev-{{ section.id }}',
-      },
-
-      // Pagination
-      pagination: {
-        el: '.swiper-pagination-{{ section.id }}',
-        clickable: true,
-      },
-
-      // Additional options
-      loop: true,
-      grabCursor: true,
-      slidesPerGroup: 1,
-      
-      // Auto height
-      autoHeight: false,
-      
-      // Lazy loading (if needed)
-      lazy: {
-        loadPrevNext: true,
-      },
-      
-      // Accessibility
-      a11y: {
-        prevSlideMessage: 'Previous slide',
-        nextSlideMessage: 'Next slide',
-      },
-      
-      // Watch for slides visibility
-      watchSlidesProgress: true,
-      watchSlidesVisibility: true,
-    });
-  }
-});
-</script>
-{%- endif -%}
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    // Create modal if it doesn't exist
-    let modal = document.getElementById('VideoModal');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'VideoModal';
-      modal.className = 'video-modal hidden';
-      modal.innerHTML = `
-        <div class="video-modal__overlay">
-          <div class="video-modal__content">
-            <button class="video-modal__close"><i class="fa-solid fa-xmark"></i></button>
-            <div class="video-modal__video-container"></div>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-
-      // Add CSS styles for the modal
-      const style = document.createElement('style');
-      style.textContent = `
-        .video-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); opacity: 0; visibility: hidden; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-        .video-modal:not(.hidden) { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); opacity: 1; visibility: visible; }
-        .video-modal__content { position: relative; max-width: 100vw; max-height: 90vh; margin: 0 auto; }
-        .video-modal__close { position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10001; }
-        .video-modal__video-container video { width: 100%; height: auto; max-height: 90vh; }
-      `;
-      document.head.appendChild(style);
-    }
-
-    const overlay = modal.querySelector('.video-modal__overlay');
-    const closeBtn = modal.querySelector('.video-modal__close');
-    const videoContainer = modal.querySelector('.video-modal__video-container');
-
-    // Function to handle modal opening
-    function openVideoModal(productHandle, videoId) {
-      console.log('Opening Shopify video:', productHandle, videoId);
-      videoContainer.innerHTML = '';
-
-      fetch(`/products/${productHandle}.js`)
-        .then((response) => response.json())
-        .then((product) => {
-          const video = product.media.find(
-            (media) => media.media_type === 'video' && media.id.toString() === videoId.toString()
-          );
-
-          if (video && video.sources && video.sources.length > 0) {
-            const videoUrl = video.sources[0].url;
-            videoContainer.innerHTML = `
-              <video autoplay muted playsinline loop>
-                <source src="${videoUrl}" type="video/mp4">
-                Your browser does not support the video tag.
-              </video>
-            `;
-
-            modal.style.display = 'block';
-            requestAnimationFrame(() => {
-              modal.classList.remove('hidden');
+    // Intersection Observer triggers Swiper init when section is in viewport
+    const observer = new IntersectionObserver((entries, obs) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          if (!swiperElement.classList.contains('swiper-initialized')) {
+            const swiper{{ section.id | replace: '-', '_' }} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
+              breakpoints: {
+                320: {
+                  slidesPerView: {{ section.settings.columns_mobile }},
+                  spaceBetween: 15
+                },
+                750: {
+                  slidesPerView: {% if section.settings.columns_desktop > 3 %}3{% else %}{{ section.settings.columns_desktop }}{% endif %},
+                  spaceBetween: 20
+                },
+                990: {
+                  slidesPerView: {{ section.settings.columns_desktop }},
+                  spaceBetween: 20
+                }
+              },
+              navigation: {
+                nextEl: '.swiper-button-next-{{ section.id }}',
+                prevEl: '.swiper-button-prev-{{ section.id }}',
+              },
+              pagination: {
+                el: '.swiper-pagination-{{ section.id }}',
+                clickable: true,
+              },
+              loop: true,
+              grabCursor: true,
+              slidesPerGroup: 1,
+              lazy: {
+                loadPrevNext: true
+              },
+              watchSlidesProgress: true,
+              watchSlidesVisibility: true,
             });
-            document.body.style.overflow = 'hidden';
+            swiperElement.classList.add('swiper-initialized');
           }
-        })
-        .catch((error) => {
-          console.error('Error fetching product data:', error);
-        });
-    }
-
-    function closeModal() {
-      modal.classList.add('hidden');
-      setTimeout(() => {
-        if (modal.classList.contains('hidden')) {
-          modal.style.display = 'none';
-          videoContainer.innerHTML = '';
-        }
-      }, 600);
-      document.body.style.overflow = '';
-    }
-
-    // Event delegation - works for all current and future video icons
-    document.addEventListener(
-      'click',
-      function (e) {
-        const videoIcon = e.target.closest('.product-video-icon-wrapper');
-
-        if (videoIcon) {
-          e.preventDefault();
-          e.stopPropagation();
-
-          const productHandle = videoIcon.getAttribute('data-product-handle');
-          const videoId = videoIcon.getAttribute('data-video-id');
-
-          if (productHandle && videoId) {
-            openVideoModal(productHandle, videoId);
-          }
-        }
-      },
-      true
-    );
-
-    // Modal close handlers
-    if (overlay) {
-      overlay.addEventListener('click', function (e) {
-        if (e.target === overlay) {
-          closeModal();
+          obs.unobserve(entry.target);
         }
       });
-    }
+    }, { threshold: 0.1 });
+    observer.observe(swiperElement);
+  }
 
-    if (closeBtn) {
-      closeBtn.addEventListener('click', closeModal);
-    }
+  // ----------------------------
+  // Video Modal
+  // ----------------------------
+  let modal = document.getElementById('VideoModal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'VideoModal';
+    modal.className = 'video-modal hidden';
+    modal.innerHTML = `
+      <div class="video-modal__overlay">
+        <div class="video-modal__content">
+          <button class="video-modal__close"><i class="fa-solid fa-xmark"></i></button>
+          <div class="video-modal__video-container"></div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
 
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
-        closeModal();
+    const style = document.createElement('style');
+    style.textContent = `
+      .video-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); opacity: 0; visibility: hidden; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+      .video-modal:not(.hidden) { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); opacity: 1; visibility: visible; }
+      .video-modal__content { position: relative; max-width: 100vw; max-height: 90vh; margin: 0 auto; }
+      .video-modal__close { position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10001; }
+      .video-modal__video-container video { width: 100%; height: auto; max-height: 90vh; }
+    `;
+    document.head.appendChild(style);
+  }
+
+  const overlay = modal.querySelector('.video-modal__overlay');
+  const closeBtn = modal.querySelector('.video-modal__close');
+  const videoContainer = modal.querySelector('.video-modal__video-container');
+
+  function openVideoModal(productHandle, videoId) {
+    videoContainer.innerHTML = '';
+    fetch(`/products/${productHandle}.js`)
+      .then((response) => response.json())
+      .then((product) => {
+        const video = product.media.find(
+          (media) => media.media_type === 'video' && media.id.toString() === videoId.toString()
+        );
+        if (video && video.sources && video.sources.length > 0) {
+          const videoUrl = video.sources[0].url;
+          videoContainer.innerHTML = `
+            <video autoplay muted playsinline loop>
+              <source src="${videoUrl}" type="video/mp4">
+              Your browser does not support the video tag.
+            </video>
+          `;
+          modal.style.display = 'block';
+          requestAnimationFrame(() => { modal.classList.remove('hidden'); });
+          document.body.style.overflow = 'hidden';
+        }
+      })
+      .catch((error) => console.error('Error fetching product data:', error));
+  }
+
+  function closeModal() {
+    modal.classList.add('hidden');
+    setTimeout(() => {
+      if (modal.classList.contains('hidden')) {
+        modal.style.display = 'none';
+        videoContainer.innerHTML = '';
       }
-    });
-  });
+    }, 600);
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('click', function (e) {
+    const videoIcon = e.target.closest('.product-video-icon-wrapper');
+    if (videoIcon) {
+      e.preventDefault();
+      e.stopPropagation();
+      const productHandle = videoIcon.getAttribute('data-product-handle');
+      const videoId = videoIcon.getAttribute('data-video-id');
+      if (productHandle && videoId) openVideoModal(productHandle, videoId);
+    }
+  }, true);
+
+  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  if (closeBtn) closeBtn.addEventListener('click', closeModal);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
+
+});
 </script>
+
 {% schema %}
 {
   "name": "You May Also Like",
