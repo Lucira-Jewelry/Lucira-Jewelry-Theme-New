@@ -52,7 +52,7 @@
         const totalSteps = {{ section.blocks.size }};
         let isLocked = false;
         let scrollAccumulator = 0;
-        const scrollThreshold = 50;
+        const scrollThreshold = 80; // Increased threshold for less sensitivity
 
         const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
         const slides = document.querySelectorAll('.curved-steps-slider-section .slide-content');
@@ -79,17 +79,27 @@
                 }
             });
 
+            // Fixed progress calculation
             const pathLength = progressPath.getTotalLength();
-            const progress = ((step - 1) / (totalSteps - 1)) * pathLength;
+            const segmentLength = pathLength / (totalSteps - 1);
+            const progress = (step - 1) * segmentLength;
             progressPath.style.strokeDashoffset = pathLength - progress;
         }
 
         function isSectionCentered() {
             const rect = sliderSection.getBoundingClientRect();
             const windowHeight = window.innerHeight;
+            
+            // Check if section is in viewport and more strictly centered
+            const isInViewport = rect.top < windowHeight && rect.bottom > 0;
+            
+            if (!isInViewport) return false;
+            
             const sectionMiddle = rect.top + (rect.height / 2);
             const windowMiddle = windowHeight / 2;
-            const tolerance = windowHeight * 0.25; // 25% tolerance for "centered"
+            
+            // Reduced tolerance to 15% for more precise detection
+            const tolerance = windowHeight * 0.15;
             
             return Math.abs(sectionMiddle - windowMiddle) < tolerance;
         }
@@ -111,11 +121,13 @@
 
                 if (!canScrollDown && e.deltaY > 0) {
                     // Allow normal scroll when at last slide and scrolling down
+                    scrollAccumulator = 0;
                     return;
                 }
 
                 if (!canScrollUp && e.deltaY < 0) {
                     // Allow normal scroll when at first slide and scrolling up
+                    scrollAccumulator = 0;
                     return;
                 }
 
@@ -142,11 +154,12 @@
                     }, 600);
                 }
             } else {
-                // Section is not centered - allow normal scrolling
+                // Section is not centered - reset accumulator and allow normal scrolling
                 scrollAccumulator = 0;
             }
         }, { passive: false });
 
+        // Initialize
         const pathLength = progressPath.getTotalLength();
         progressPath.style.strokeDasharray = pathLength;
         progressPath.style.strokeDashoffset = pathLength;
