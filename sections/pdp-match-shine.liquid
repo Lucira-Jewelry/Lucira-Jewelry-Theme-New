@@ -143,73 +143,96 @@
 {% assign shineprod = product.metafields.custom.matching_product.value %}
 
 {% if shineprod != blank %}
-<div class="pdp-match-shine ">
+<div class="pdp-match-shine" data-lazy-section>
   <div class="pdp-match-shine-headers">
-    <h2> Match & Shine With</h2>
-    <p>Designed to Complement, Meant to Shine </p>
-
+    <h2>Match & Shine With</h2>
+    <p>Designed to Complement, Meant to Shine</p>
   </div>
   <div class="pdp-match-shine-content">
     <div class="pdp-match-shine-main-product">
       <img src="{{ product.featured_media | img_url: '472x472' }}" height="472" width="472" alt="{{ product.title }}">
     </div>
     <div class="pdp-match-shine-slider">
-      {%- for product in product.metafields.custom.matching_product.value -%}
-         <div class="pdp-match-shine-slider-item">
-          
-            {% render 'card-product',
-                card_product: product,
-                media_aspect_ratio: section.settings.image_ratio,
-                image_shape: section.settings.image_shape,
-                show_secondary_image: section.settings.show_secondary_image,
-                show_rating: section.settings.show_rating,
-                skip_styles: skip_card_product_styles,
-                section_id: section.id,
-                quick_add: section.settings.quick_add
-              %}
-          </div>
-      {% endfor %}
+      {%- for product in shineprod -%}
+        <div class="pdp-match-shine-slider-item">
+          {% render 'card-product',
+            card_product: product,
+            media_aspect_ratio: section.settings.image_ratio,
+            image_shape: section.settings.image_shape,
+            show_secondary_image: section.settings.show_secondary_image,
+            show_rating: section.settings.show_rating,
+            skip_styles: skip_card_product_styles,
+            section_id: section.id,
+            quick_add: section.settings.quick_add
+          %}
+        </div>
+      {%- endfor -%}
     </div>
-    
-    
   </div>
-    
 </div>
-  {% endif %}
+{% endif %}
+
+<style>
+.pdp-match-shine {
+  padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px;
+  height: max-content;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  content-visibility: auto;
+  contain-intrinsic-size: 800px;
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+.pdp-match-shine.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+</style>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const matchShineWrapper = document.querySelector(".pdp-match-shine-slider");
+document.addEventListener("DOMContentLoaded", function () {
+  const section = document.querySelector("[data-lazy-section]");
+  if (!section) return;
 
-    if (matchShineWrapper) {
-      matchShineWrapper.addEventListener("click", function (e) {
-        const card = e.target.closest(".pdp-match-shine-slider-item");
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        section.classList.add("visible");
 
-        if (card) {
-          // Customize the selectors below based on your 'card-product' rendering
-          const productTitle = card.querySelector(".card__heading")?.innerText || "Unknown Product";
-          const productLink = card.querySelector("a")?.href || window.location.href;
-          const productImage = card.querySelector("img")?.src || "";
+        const matchShineWrapper = section.querySelector(".pdp-match-shine-slider");
+        if (matchShineWrapper) {
+          matchShineWrapper.addEventListener("click", function (e) {
+            const card = e.target.closest(".pdp-match-shine-slider-item");
+            if (card) {
+              const productTitle = card.querySelector(".card__heading")?.innerText || "Unknown Product";
+              const productLink = card.querySelector("a")?.href || window.location.href;
+              const productImage = card.querySelector("img")?.src || "";
 
-          const eventData = {
-            event: "pdpMatchAndShineClick",
-            action: "Card Click",
-            product: {
-              title: productTitle,
-              link: productLink,
-              image: productImage,
-              source: "Match & Shine Section"
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                event: "pdpMatchAndShineClick",
+                action: "Card Click",
+                product: {
+                  title: productTitle,
+                  link: productLink,
+                  image: productImage,
+                  source: "Match & Shine Section"
+                }
+              });
             }
-          };
-
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push(eventData);
-
-          console.log("✅ Match & Shine card clicked, dataLayer event pushed:", eventData);
+          });
         }
-      });
-    }
-  });
+
+        observer.disconnect();
+      }
+    });
+  }, { threshold: 0.2 });
+
+  observer.observe(section);
+});
 </script>
 
 {% render "product-card-variants-change" %}
