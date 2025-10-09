@@ -153,7 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
-    if (lower.includes("Plt")) return "plt";
+    if (lower.includes("Plt")) return "Plt";
     return "";
   }
 
