@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 // Optimized initialization with CLS prevention
 (function() {
-  const COLOR_TOKENS = ["white", "yellow", "rose", "plt"];
+  const COLOR_TOKENS = ["white", "yellow", "rose"];
   const ALWAYS_SHOW_CODES = ["plt", "mq", "ci", "mh", "mv", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
@@ -153,7 +153,6 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
-    if (lower.includes("plt")) return "plt";
     return "";
   }
 
@@ -161,7 +160,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], plt: [], v360: [] },
+      codes: { mq: [], ci: [], mh: [], mv: [], v360: [], plt: [] },
       extras: []
     };
 
