@@ -153,7 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
-    if (lower.includes("Plt")) return "Plt";
+    if (lower.includes("plt") || lower.includes("platinum")) return "plt"; // ✅ lowercase
     return "";
   }
 
