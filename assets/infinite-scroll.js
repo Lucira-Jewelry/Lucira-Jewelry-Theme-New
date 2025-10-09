@@ -28,14 +28,14 @@ class InfiniteScroll extends HTMLElement {
     this.anchor.style.fontWeight = "400";
     
     this.anchor.innerHTML = `
-      <div style="display: flex; align-items: center; justify-content: center;">
+    <div style="display: flex; align-items: center; justify-content: center;">
         <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
         <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1;"></span>
         <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1;"></span>
         <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1;"></span>
         </span>
-      </div>
-      <div style="font-family: inherit; text-align: center; margin-top: 10px;">Discovering more exquisite pieces</div>
+        </div>
+    <div style="font-family: inherit; text-align: center; margin-top: 10px; display: block;">Discovering more exquisite pieces</div>
     `;
     
     // Add keyframes if not already added
