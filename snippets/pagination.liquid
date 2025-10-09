@@ -1,618 +1,78 @@
 {% comment %}
-  Renders infinite scroll pagination for products. Must be used within paginate tags.
-  Works with Dawn theme structure and custom filters/sorting.
-  
+  Renders a set of links for paginated results. Must be used within paginate tags.
+
   Usage:
-  {% paginate collection.products by section.settings.products_per_page %}
-    {% render 'infinite-scroll-pagination', paginate: paginate, anchor: '' %}
+  {% paginate results by 2 %}
+    {% render 'pagination', paginate: paginate, anchor: '#yourID' %}
   {% endpaginate %}
 
   Accepts:
-  - paginate: {Object} - Shopify paginate object
-  - anchor: {String} - Optional anchor for URL
+  - paginate: {Object}
+  - anchor: {String} (optional) This can be added so that on page reload it takes you to wherever you've placed your anchor tag.
 {% endcomment %}
 
+{{ 'component-pagination.css' | asset_url | stylesheet_tag }}
+
 {%- if paginate.parts.size > 0 -%}
-  <div class="infinite-scroll-wrapper">
-    <!-- Loading indicator -->
-    <div id="infinite-scroll-loader" class="infinite-scroll-loader" style="display: none;">
-      <div class="loader-content">
-        <div class="elegant-dots">
-          <div class="dot"></div>
-          <div class="dot"></div>
-          <div class="dot"></div>
-        </div>
-        <p class="loading-text">Discovering more exquisite pieces...</p>
-      </div>
-    </div>
+  <div class="pagination-wrapper" data-page="{{ paginate.current_page }}">
+    <nav class="pagination" role="navigation" aria-label="{{ 'general.pagination.label' | t }}">
+      <ul class="pagination__list list-unstyled" role="list">
+        {%- if paginate.previous -%}
+          <li>
+            <a
+              href="{{ paginate.previous.url }}{{ anchor }}"
+              class="pagination__item pagination__item--next pagination__item-arrow link motion-reduce"
+              aria-label="{{ 'general.pagination.previous' | t }}"
+            >
+              <span class="svg-wrapper">
+                {{- 'icon-caret.svg' | inline_asset_content -}}
+              </span>
+            </a>
+          </li>
+        {%- endif -%}
 
-    <!-- End of products indicator -->
-    <div id="infinite-scroll-end" class="infinite-scroll-end" style="display: none;">
-      <div class="end-content">
-        <div class="end-decoration">
-          <div class="luxury-line"></div>
-          <div class="end-diamond">◆</div>
-          <div class="luxury-line"></div>
-        </div>
-        <p class="end-text">You've explored our complete collection</p>
-        <p class="end-subtitle">Every piece tells a story of elegance</p>
-      </div>
-    </div>
+        {%- for part in paginate.parts -%}
+          <li>
+            {%- if part.is_link -%}
+              <a
+                href="{{ part.url }}{{ anchor }}"
+                class="pagination__item link"
+                aria-label="{{ 'general.pagination.page' | t: number: part.title }}"
+              >
+                {{- part.title -}}
+              </a>
+            {%- else -%}
+              {%- if part.title == paginate.current_page -%}
+                <a
+                  role="link"
+                  aria-disabled="true"
+                  class="pagination__item pagination__item--current light"
+                  aria-current="page"
+                  aria-label="{{ 'general.pagination.page' | t: number: part.title }}"
+                >
+                  {{- part.title -}}
+                </a>
+              {%- else -%}
+                <span class="pagination__item">{{ part.title }}</span>
+              {%- endif -%}
+            {%- endif -%}
+          </li>
+        {%- endfor -%}
 
-    <!-- Hidden pagination data -->
-    <div id="infinite-scroll-data" 
-         data-next-url="{%- if paginate.next -%}{{ paginate.next.url }}{{ anchor }}{%- endif -%}"
-         data-current-page="{{ paginate.current_page }}"
-         data-total-pages="{{ paginate.pages }}"
-         style="display: none;">
-    </div>
+        {%- if paginate.next -%}
+          <li>
+            <a
+              href="{{ paginate.next.url }}{{ anchor }}"
+              class="pagination__item pagination__item--prev pagination__item-arrow link motion-reduce"
+              aria-label="{{ 'general.pagination.next' | t }}"
+            >
+              <span class="svg-wrapper">
+                {{- 'icon-caret.svg' | inline_asset_content -}}
+              </span>
+            </a>
+          </li>
+        {%- endif -%}
+      </ul>
+    </nav>
   </div>
-
-  <style>
-    .infinite-scroll-wrapper {
-      margin-top: 3rem;
-      text-align: center;
-    }
-
-    .infinite-scroll-loader {
-      padding: 2rem 0;
-      opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .infinite-scroll-loader.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .infinite-scroll-end {
-      padding: 3rem 0;
-      opacity: 0;
-      transform: translateY(20px);
-      transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .infinite-scroll-end.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .loader-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .elegant-dots {
-      display: flex;
-      gap: 0.8rem;
-      align-items: center;
-    }
-
-    .elegant-dots .dot {
-      width: 8px;
-      height: 8px;
-      background: linear-gradient(135deg, #d4af37, #ffd700);
-      border-radius: 50%;
-      animation: elegantPulse 1.8s ease-in-out infinite;
-      box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
-    }
-
-    .elegant-dots .dot:nth-child(1) { animation-delay: 0s; }
-    .elegant-dots .dot:nth-child(2) { animation-delay: 0.3s; }
-    .elegant-dots .dot:nth-child(3) { animation-delay: 0.6s; }
-
-    @keyframes elegantPulse {
-      0%, 60%, 100% {
-        transform: scale(1);
-        opacity: 0.7;
-      }
-      30% {
-        transform: scale(1.3);
-        opacity: 1;
-      }
-    }
-
-    .loading-text {
-      margin: 0;
-      color: #8b7355;
-      font-size: 0.95rem;
-      font-weight: 400;
-      letter-spacing: 0.5px;
-      font-family: 'Georgia', serif;
-    }
-
-    .end-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1.5rem;
-      max-width: 400px;
-      margin: 0 auto;
-    }
-
-    .end-decoration {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      width: 100%;
-      max-width: 280px;
-    }
-
-    .luxury-line {
-      flex: 1;
-      height: 1px;
-      background: linear-gradient(to right, transparent, #d4af37, transparent);
-    }
-
-    .end-diamond {
-      color: #d4af37;
-      font-size: 1.2rem;
-      animation: diamondShine 2s ease-in-out infinite;
-    }
-
-    @keyframes diamondShine {
-      0%, 100% {
-        opacity: 0.7;
-        transform: scale(1);
-      }
-      50% {
-        opacity: 1;
-        transform: scale(1.1);
-      }
-    }
-
-    .end-text {
-      margin: 0;
-      color: #6b5b73;
-      font-size: 18px;
-      font-weight: 500;
-      letter-spacing: 0.3px;
-      font-family: 'Georgia', serif;
-    }
-
-    .end-subtitle {
-      margin: 0;
-      color: #9b8aa3;
-      font-size: 14px;
-      font-weight: 400;
-      font-style: italic;
-      letter-spacing: 0.2px;
-      font-family: 'Georgia', serif;
-    }
-
-    .product-fade-in {
-      opacity: 0;
-      transform: translateY(15px);
-      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    .product-fade-in.animate {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    @media (max-width: 768px) {
-      .infinite-scroll-wrapper { margin-top: 2rem; }
-      .elegant-dots .dot { width: 6px; height: 6px; }
-      .loading-text { font-size: 0.85rem; }
-      .end-text { font-size: 1rem; }
-      .end-subtitle { font-size: 0.8rem; }
-      .infinite-scroll-loader { padding: 1.5rem 0; }
-      .infinite-scroll-end { padding: 2rem 0; }
-    }
-  </style>
-
-  <script>
-    (function() {
-      'use strict';
-
-      // Global state
-      const state = {
-        isLoading: false,
-        hasMorePages: true,
-        loadedProductIds: new Set(),
-        initialized: false,
-        currentUrl: window.location.href,
-        scrollHandler: null,
-        observer: null,
-        abortController: null
-      };
-
-      // Get the correct product grid (the UL element, not the wrapper div)
-      function getProductGrid() {
-        const grids = document.querySelectorAll('#product-grid');
-        // Return the UL element (should have grid class)
-        return Array.from(grids).find(el => el.tagName === 'UL' && el.classList.contains('grid')) || grids[0];
-      }
-
-      // Extract unique product ID
-      function getProductId(element) {
-        // Try multiple methods to get unique identifier
-        const productLink = element.querySelector('a[href*="/products/"]');
-        if (productLink) {
-          const match = productLink.href.match(/\/products\/([^?#]+)/);
-          if (match) return match[1];
-        }
-        
-        return element.dataset.productId || 
-               element.dataset.productHandle || 
-               element.id || 
-               element.outerHTML.substring(0, 150);
-      }
-
-      // Check if product is duplicate
-      function isDuplicate(element) {
-        const id = getProductId(element);
-        return id && state.loadedProductIds.has(id);
-      }
-
-      // Mark product as loaded
-      function markAsLoaded(element) {
-        const id = getProductId(element);
-        if (id) state.loadedProductIds.add(id);
-      }
-
-      // Track existing products
-      function trackExistingProducts() {
-        const grid = getProductGrid();
-        if (!grid) return;
-
-        const products = Array.from(grid.children).filter(child => {
-          // Filter out banner elements and non-product items
-          return !child.classList.contains('brad-collec-banner') && 
-                 child.tagName === 'LI';
-        });
-
-        products.forEach(markAsLoaded);
-        console.log('Tracked', state.loadedProductIds.size, 'existing products');
-      }
-
-      // Animate new products
-      function animateProducts(products) {
-        products.forEach((product, index) => {
-          product.classList.add('product-fade-in');
-          setTimeout(() => product.classList.add('animate'), index * 50);
-        });
-      }
-
-      // Initialize wishlist and other integrations
-      function initIntegrations() {
-        try {
-          // Wishlist
-          if (typeof iWish !== 'undefined' && iWish.init) {
-            iWish.init();
-          }
-          document.dispatchEvent(new CustomEvent('iwish:reload'));
-          
-          // Quick add
-          if (typeof Shopify !== 'undefined' && Shopify.ProductForm) {
-            document.querySelectorAll('product-form').forEach(form => {
-              if (!form.productForm) {
-                new Shopify.ProductForm(form);
-              }
-            });
-          }
-
-          // Custom event for other scripts
-          document.dispatchEvent(new CustomEvent('infinite-scroll:loaded'));
-        } catch (e) {
-          console.warn('Integration init warning:', e);
-        }
-      }
-
-      // UI functions
-      function showLoader() {
-        const loader = document.getElementById('infinite-scroll-loader');
-        if (loader && state.hasMorePages) {
-          loader.style.display = 'block';
-          setTimeout(() => loader.classList.add('show'), 10);
-        }
-      }
-
-      function hideLoader() {
-        const loader = document.getElementById('infinite-scroll-loader');
-        if (loader) {
-          loader.classList.remove('show');
-          setTimeout(() => loader.style.display = 'none', 400);
-        }
-      }
-
-      function showEnd() {
-        const end = document.getElementById('infinite-scroll-end');
-        if (end) {
-          end.style.display = 'block';
-          setTimeout(() => end.classList.add('show'), 10);
-        }
-      }
-
-      function hideEnd() {
-        const end = document.getElementById('infinite-scroll-end');
-        if (end) {
-          end.classList.remove('show');
-          setTimeout(() => end.style.display = 'none', 400);
-        }
-      }
-
-      // Load next page
-      async function loadNextPage() {
-        if (state.isLoading || !state.hasMorePages) return;
-
-        const dataEl = document.getElementById('infinite-scroll-data');
-        const nextUrl = dataEl?.dataset.nextUrl;
-        
-        if (!nextUrl) {
-          state.hasMorePages = false;
-          showEnd();
-          return;
-        }
-
-        state.isLoading = true;
-        showLoader();
-
-        // Cancel previous request if exists
-        if (state.abortController) {
-          state.abortController.abort();
-        }
-        state.abortController = new AbortController();
-
-        try {
-          const response = await fetch(nextUrl, {
-            signal: state.abortController.signal,
-            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-          });
-
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-          const html = await response.text();
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(html, 'text/html');
-
-          // Get new products from the UL grid
-          const newGrids = doc.querySelectorAll('#product-grid');
-          const newGrid = Array.from(newGrids).find(el => 
-            el.tagName === 'UL' && el.classList.contains('grid')
-          );
-
-          if (!newGrid) {
-            state.hasMorePages = false;
-            showEnd();
-            return;
-          }
-
-          // Filter new products (exclude banners and duplicates)
-          const allNewProducts = Array.from(newGrid.children);
-          const newProducts = allNewProducts.filter(product => {
-            // Skip banner elements
-            if (product.classList.contains('brad-collec-banner')) return false;
-            // Skip duplicates
-            if (isDuplicate(product)) return false;
-            // Mark as loaded
-            markAsLoaded(product);
-            return true;
-          });
-
-          console.log('Found', newProducts.length, 'unique new products');
-
-          if (newProducts.length > 0) {
-            const grid = getProductGrid();
-            if (grid) {
-              // Append products
-              newProducts.forEach(product => grid.appendChild(product));
-              animateProducts(newProducts);
-              initIntegrations();
-            }
-          }
-
-          // Update pagination data
-          const newDataEl = doc.getElementById('infinite-scroll-data');
-          if (newDataEl) {
-            dataEl.dataset.nextUrl = newDataEl.dataset.nextUrl || '';
-            dataEl.dataset.currentPage = newDataEl.dataset.currentPage;
-          } else {
-            dataEl.dataset.nextUrl = '';
-          }
-
-          // Check if more pages exist
-          state.hasMorePages = !!dataEl.dataset.nextUrl;
-          if (!state.hasMorePages) {
-            showEnd();
-          } else {
-            setupObserver(); // Re-setup observer for new products
-          }
-
-        } catch (error) {
-          if (error.name !== 'AbortError') {
-            console.error('Load error:', error);
-            state.hasMorePages = false;
-            showEnd();
-          }
-        } finally {
-          state.isLoading = false;
-          state.abortController = null;
-          hideLoader();
-        }
-      }
-
-      // Scroll detection
-      function checkScroll() {
-        if (state.isLoading || !state.hasMorePages) return;
-
-        const scrollTop = window.scrollY || document.documentElement.scrollTop;
-        const windowHeight = window.innerHeight;
-        const docHeight = document.documentElement.scrollHeight;
-        const distanceFromBottom = docHeight - (scrollTop + windowHeight);
-
-        if (distanceFromBottom < 600) {
-          loadNextPage();
-        }
-      }
-
-      // Intersection Observer
-      function setupObserver() {
-        // Disconnect old observer
-        if (state.observer) {
-          state.observer.disconnect();
-        }
-
-        const grid = getProductGrid();
-        if (!grid || !('IntersectionObserver' in window)) return;
-
-        const products = Array.from(grid.children).filter(child => 
-          !child.classList.contains('brad-collec-banner') && child.tagName === 'LI'
-        );
-
-        if (products.length < 3) return;
-
-        state.observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting && !state.isLoading && state.hasMorePages) {
-              loadNextPage();
-            }
-          });
-        }, {
-          rootMargin: '400px 0px',
-          threshold: 0.01
-        });
-
-        // Observe last 3 products
-        const observeCount = Math.min(3, products.length);
-        for (let i = products.length - observeCount; i < products.length; i++) {
-          state.observer.observe(products[i]);
-        }
-      }
-
-      // Debounce utility
-      function debounce(func, wait) {
-        let timeout;
-        return function(...args) {
-          clearTimeout(timeout);
-          timeout = setTimeout(() => func.apply(this, args), wait);
-        };
-      }
-
-      // Initialize
-      function init() {
-        console.log('Initializing infinite scroll...');
-
-        // Cleanup previous instance
-        cleanup();
-
-        // Reset UI
-        hideLoader();
-        hideEnd();
-
-        // Get elements
-        const grid = getProductGrid();
-        const dataEl = document.getElementById('infinite-scroll-data');
-
-        if (!grid || !dataEl) {
-          console.warn('Required elements not found, retrying...');
-          setTimeout(init, 300);
-          return;
-        }
-
-        // Check URL change
-        if (state.currentUrl !== window.location.href) {
-          state.loadedProductIds.clear();
-          state.currentUrl = window.location.href;
-        }
-
-        // Track existing products
-        trackExistingProducts();
-
-        // Check pagination
-        const currentPage = parseInt(dataEl.dataset.currentPage) || 1;
-        const totalPages = parseInt(dataEl.dataset.totalPages) || 1;
-        state.hasMorePages = !!dataEl.dataset.nextUrl;
-
-        console.log('Page:', currentPage, '/', totalPages, '| Has more:', state.hasMorePages);
-
-        if (currentPage >= totalPages) {
-          showEnd();
-          return;
-        }
-
-        // Setup scroll listener
-        state.scrollHandler = debounce(checkScroll, 150);
-        window.addEventListener('scroll', state.scrollHandler, { passive: true });
-
-        // Setup intersection observer
-        setupObserver();
-
-        state.initialized = true;
-      }
-
-      // Cleanup
-      function cleanup() {
-        if (state.scrollHandler) {
-          window.removeEventListener('scroll', state.scrollHandler);
-          state.scrollHandler = null;
-        }
-        if (state.observer) {
-          state.observer.disconnect();
-          state.observer = null;
-        }
-        if (state.abortController) {
-          state.abortController.abort();
-          state.abortController = null;
-        }
-        state.initialized = false;
-        state.isLoading = false;
-      }
-
-      // Reinitialize function
-      window.reinitInfiniteScroll = function() {
-        console.log('Reinitializing...');
-        cleanup();
-        state.loadedProductIds.clear();
-        setTimeout(init, 400);
-      };
-
-      // Listen for filter/sort changes
-      document.addEventListener('facets-updated', () => {
-        setTimeout(window.reinitInfiniteScroll, 300);
-      });
-
-      // URL change detection
-      let lastUrl = window.location.href;
-      setInterval(() => {
-        if (window.location.href !== lastUrl) {
-          lastUrl = window.location.href;
-          setTimeout(window.reinitInfiniteScroll, 200);
-        }
-      }, 500);
-
-      // DOM change observer for facets
-      setTimeout(() => {
-        const grid = getProductGrid();
-        if (grid) {
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach(mutation => {
-              if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                const hasProducts = Array.from(mutation.addedNodes).some(node => 
-                  node.nodeType === 1 && node.tagName === 'LI' && 
-                  !node.classList.contains('brad-collec-banner')
-                );
-                if (hasProducts) {
-                  setTimeout(window.reinitInfiniteScroll, 300);
-                }
-              }
-            });
-          });
-          observer.observe(grid, { childList: true });
-        }
-      }, 1000);
-
-      // Start initialization
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(init, 200));
-      } else {
-        setTimeout(init, 200);
-      }
-
-    })();
-  </script>
 {%- endif -%}
