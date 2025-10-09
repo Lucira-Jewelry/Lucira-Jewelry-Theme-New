@@ -19,7 +19,7 @@ class InfiniteScroll extends HTMLElement {
     this.observer.disconnect();
 
     this.anchor.style.display = "flex";
-    this.anchor.innerText = "Loading...";
+    this.anchor.innerText = "Discovering more exquisite pieces...";
 
     const url = this.anchor.getAttribute("href");
     if (!url) return;
