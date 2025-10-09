@@ -4,6 +4,7 @@ class InfiniteScroll extends HTMLElement {
     this.anchor = this.querySelector("a");
     if (!this.anchor) return;
 
+    // IntersectionObserver to load next page
     this.observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -18,6 +19,7 @@ class InfiniteScroll extends HTMLElement {
   async loadNextPage() {
     this.observer.disconnect();
 
+    // Show loader
     this.anchor.style.display = "flex";
     this.anchor.style.alignItems = "center";
     this.anchor.style.justifyContent = "center";
@@ -26,21 +28,21 @@ class InfiniteScroll extends HTMLElement {
     this.anchor.style.fontSize = "14px";
     this.anchor.style.letterSpacing = "0.05em";
     this.anchor.style.fontWeight = "400";
-    
+
     this.anchor.innerHTML = `
-    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
-      <div style="display: flex; align-items: center; justify-content: center;">
-        <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
-          <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1;"></span>
-          <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1; animation-delay: 0.2s;"></span>
-          <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 1; animation-delay: 0.4s;"></span>
-        </span>
+      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
+        <div style="display: flex; align-items: center; justify-content: center;">
+          <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
+            <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out;"></span>
+            <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.2s;"></span>
+            <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.4s;"></span>
+          </span>
+        </div>
+        <div style="font-family: inherit; text-align: center; margin-top: 10px;">Discovering more exquisite pieces</div>
       </div>
-      <div style="font-family: inherit; text-align: center; margin-top: 10px; display: block;">Discovering more exquisite pieces</div>
-    </div>
     `;
 
-    // Add keyframes if not already added
+    // Add keyframes and end-message CSS if not already added
     if (!document.getElementById('luxury-dots-style')) {
       const style = document.createElement('style');
       style.id = 'luxury-dots-style';
@@ -108,20 +110,17 @@ class InfiniteScroll extends HTMLElement {
         Array.from(newGrid.children).forEach((child) => {
           grid.appendChild(child);
         });
-        
-        // Re-initialize wishlist for newly loaded products
         this.initWishlist();
       }
 
       // Handle next infinite scroll
-        const newInfinite = html.querySelector("infinite-scroll");
-        if (newInfinite) {
-            this.replaceWith(newInfinite);
-        } else {
-            // No more pages - show end message
-            this.remove();
-            this.showEndMessage();
-        }
+      const newInfinite = html.querySelector("infinite-scroll");
+      if (newInfinite) {
+        this.replaceWith(newInfinite);
+      } else {
+        this.remove();
+        this.showEndMessage();
+      }
     } catch (err) {
       console.error("InfiniteScroll error:", err);
     }
@@ -129,18 +128,42 @@ class InfiniteScroll extends HTMLElement {
     this.anchor.style.display = "none";
     this.anchor.innerHTML = "";
   }
-  
-  // Show elegant end message
+
+  // Show elegant end message (with fallback creation)
   showEndMessage() {
-    const endElement = document.getElementById('infinite-scroll-end');
-    if (endElement) {
-      endElement.style.display = 'block';
-      endElement.style.opacity = '0';
-      endElement.style.transition = 'opacity 0.8s ease-in-out';
-      setTimeout(() => { endElement.style.opacity = '1'; }, 100);
+    console.log("✅ Reached end of collection");
+
+    let endElement = document.getElementById('infinite-scroll-end');
+
+    if (!endElement) {
+      console.warn("⚠️ #infinite-scroll-end not found — creating fallback.");
+      endElement = document.createElement('div');
+      endElement.id = 'infinite-scroll-end';
+      endElement.className = 'infinite-scroll-end';
+      endElement.innerHTML = `
+        <div class="end-content">
+          <div class="end-decoration">
+            <div class="luxury-line"></div>
+            <div class="end-diamond">◆</div>
+            <div class="luxury-line"></div>
+          </div>
+          <p class="end-text">You've explored our complete collection</p>
+          <p class="end-subtitle">Every piece tells a story of elegance</p>
+        </div>
+      `;
+      document.querySelector('[data-product-grid]')?.after(endElement);
     }
+
+    // Force reveal
+    endElement.style.display = 'block';
+    endElement.style.opacity = '0';
+    endElement.style.transition = 'opacity 0.8s ease-in-out';
+    setTimeout(() => {
+      endElement.style.opacity = '1';
+      console.log("✨ End message now visible.");
+    }, 100);
   }
-  
+
   // Wishlist initialization
   initWishlist() {
     try {
