@@ -20,63 +20,97 @@
             {% endfor %}
         </div>
 
-        <div class="swiper curved-steps-swiper">
-            <div class="swiper-wrapper">
-                {% for block in section.blocks %}
-                    <div class="swiper-slide" {{ block.shopify_attributes }}>
-                        <div class="slide-content">
-                            <div class="content-image">
-                                <div class="placeholder">
-                                    {% if block.settings.image != blank %}
-                                        {{ block.settings.image | image_url: width: 560 | image_tag: loading: 'lazy', width: 560, height: 700, alt: block.settings.heading }}
-                                    {% else %}
-                                        {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <div class="content-text">
-                                {% if block.settings.heading != blank %}
-                                    <h2>{{ block.settings.heading }}</h2>
-                                {% endif %}
-                                {% if block.settings.description != blank %}
-                                    <p>{{ block.settings.description }}</p>
-                                {% endif %}
-                            </div>
+        <div class="content-area">
+            {% for block in section.blocks %}
+                <div class="slide-content{% if forloop.first %} active{% endif %}" data-slide="{{ forloop.index }}" {{ block.shopify_attributes }}>
+                    <div class="content-image">
+                        <div class="image-placeholder" style="aspect-ratio: 560/700; background: #f5f5f5;">
+                            {% if block.settings.image != blank %}
+                                <img 
+                                    data-src="{{ block.settings.image | image_url: width: 560 }}"
+                                    alt="{{ block.settings.heading | escape }}"
+                                    width="560"
+                                    height="700"
+                                    class="lazy-image{% if forloop.first %} load-immediate{% endif %}"
+                                    style="opacity: 0; transition: opacity 0.3s ease;"
+                                />
+                            {% else %}
+                                {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+                            {% endif %}
                         </div>
                     </div>
-                {% endfor %}
-            </div>
+                    <div class="content-text">
+                        {% if block.settings.heading != blank %}
+                            <h2>{{ block.settings.heading }}</h2>
+                        {% endif %}
+                        {% if block.settings.description != blank %}
+                            <p>{{ block.settings.description }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
         </div>
     </div>
 </section>
 
 <script>
     (function() {
+        let currentStep = 1;
         const totalSteps = {{ section.blocks.size }};
-        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
-        const progressPath = document.getElementById('progressPath');
-        const sliderSection = document.querySelector('.curved-steps-slider-section');
-
         let isLocked = false;
         let scrollAccumulator = 0;
         const scrollThreshold = 80;
 
-        // Initialize Swiper
-        const swiper = new Swiper('.curved-steps-swiper', {
-            direction: 'horizontal',
-            slidesPerView: 1,
-            spaceBetween: 0,
-            speed: 600,
-            allowTouchMove: true,
-            effect: 'slide',
-            on: {
-                slideChange: function() {
-                    updateDotsAndProgress(this.activeIndex + 1);
+        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
+        const slides = document.querySelectorAll('.curved-steps-slider-section .slide-content');
+        const progressPath = document.getElementById('progressPath');
+        const sliderSection = document.querySelector('.curved-steps-slider-section');
+
+        // Lazy loading setup with Intersection Observer
+        const imageObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const img = entry.target;
+                    const src = img.getAttribute('data-src');
+                    
+                    if (src) {
+                        img.src = src;
+                        img.onload = () => {
+                            img.style.opacity = '1';
+                            img.classList.add('loaded');
+                        };
+                        img.removeAttribute('data-src');
+                    }
+                    
+                    observer.unobserve(img);
                 }
+            });
+        }, {
+            rootMargin: '50px' // Start loading 50px before entering viewport
+        });
+
+        // Observe all lazy images
+        const lazyImages = document.querySelectorAll('.curved-steps-slider-section .lazy-image');
+        lazyImages.forEach(img => {
+            // Load first image immediately
+            if (img.classList.contains('load-immediate')) {
+                const src = img.getAttribute('data-src');
+                if (src) {
+                    img.src = src;
+                    img.onload = () => {
+                        img.style.opacity = '1';
+                        img.classList.add('loaded');
+                    };
+                    img.removeAttribute('data-src');
+                }
+            } else {
+                imageObserver.observe(img);
             }
         });
 
-        function updateDotsAndProgress(step) {
+        function updateSlider(step) {
+            currentStep = step;
+
             dots.forEach((dot, index) => {
                 dot.classList.remove('active');
                 if (index + 1 === step) {
@@ -84,6 +118,25 @@
                     dot.classList.remove('small');
                 } else {
                     dot.classList.add('small');
+                }
+            });
+
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                if (index + 1 === step) {
+                    slide.classList.add('active');
+                    
+                    // Load image for active slide if not loaded yet
+                    const img = slide.querySelector('.lazy-image:not(.loaded)');
+                    if (img && img.hasAttribute('data-src')) {
+                        const src = img.getAttribute('data-src');
+                        img.src = src;
+                        img.onload = () => {
+                            img.style.opacity = '1';
+                            img.classList.add('loaded');
+                        };
+                        img.removeAttribute('data-src');
+                    }
                 }
             });
 
@@ -103,7 +156,6 @@
             
             const sectionMiddle = rect.top + (rect.height / 2);
             const windowMiddle = windowHeight / 2;
-            
             const tolerance = windowHeight * 0.15;
             
             return Math.abs(sectionMiddle - windowMiddle) < tolerance;
@@ -112,7 +164,7 @@
         dots.forEach(dot => {
             dot.addEventListener('click', () => {
                 const step = parseInt(dot.dataset.step);
-                swiper.slideTo(step - 1);
+                updateSlider(step);
             });
         });
 
@@ -120,8 +172,8 @@
             const centered = isSectionCentered();
 
             if (centered) {
-                const canScrollDown = swiper.activeIndex < totalSteps - 1;
-                const canScrollUp = swiper.activeIndex > 0;
+                const canScrollDown = currentStep < totalSteps;
+                const canScrollUp = currentStep > 1;
 
                 if (!canScrollDown && e.deltaY > 0) {
                     scrollAccumulator = 0;
@@ -143,9 +195,9 @@
                     isLocked = true;
 
                     if (scrollAccumulator > 0 && canScrollDown) {
-                        swiper.slideNext();
+                        updateSlider(currentStep + 1);
                     } else if (scrollAccumulator < 0 && canScrollUp) {
-                        swiper.slidePrev();
+                        updateSlider(currentStep - 1);
                     }
 
                     scrollAccumulator = 0;
@@ -164,70 +216,358 @@
         progressPath.style.strokeDasharray = pathLength;
         progressPath.style.strokeDashoffset = pathLength;
         
-        updateDotsAndProgress(1);
+        updateSlider(1);
     })();
 </script>
 
 <style>
-    .semicircle-wrapper { position: relative; width: 205px; height: 400px; flex-shrink: 0; left: -6px; }
-    .semicircle-path{position:absolute;top:0;left:0;width:100%;height:100%}
-    .step-dot{position:absolute;width:70px;height:70px;border-radius:50%;background: #F3DCE0; color: #1a1a1a; font-family: Futura Std; font-weight: 500; font-size: 20px; line-height: 150%; vertical-align: middle; text-transform: uppercase;cursor:pointer;transition:all .6s cubic-bezier(.4,0,.2,1);box-shadow:0 4px 15px rgba(0,0,0,.08);display: flex;  align-items: center; justify-content: center;}
-    .step-dot.active {width: 70px; height: 70px; color: #fff; background: #DAA7B4; font-size: 24px; box-shadow: 0 8px 30px rgba(212, 160, 184, .4); z-index: 2;}
-    .step-dot.small{width:50px;height:50px;font-size:18px;transition:all .6s cubic-bezier(.4,0,.2,1);}
-    .curved-steps-slider-section .step-1{top: 80px; left: 78%;transform:translate(-50%,-50%);}
-    .curved-steps-slider-section .step-2{top: 42%; right: 12px;transform: translate(50%, -50%);}
-    .curved-steps-slider-section .step-3{bottom: 142px; right: 14px;transform: translate(50%, 50%);}
-    .curved-steps-slider-section .step-4{bottom: 65px; left: 70%;transform:translate(-50%,50%)}
-    .curved-steps-slider-section svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
-    .curved-steps-slider-section .curve-path{fill:#F4F0F0;stroke:#1A1A1A;stroke-width:1}
-    .curved-steps-slider-section .curve-progress{fill:none;stroke:#d4a0b8;stroke-width:2;stroke-linecap:round;stroke-dasharray:1000;stroke-dashoffset:1000;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+    /* Base Section Styles */
+    .curved-steps-slider-section { 
+        position: relative; 
+        padding: 60px 0 0;
+    }
     
-    .curved-steps-swiper {
+    .curved-steps-slider-section h2 {
+        font-weight: 500; 
+        font-size: 24px; 
+        line-height: 150%; 
+        text-align: center; 
+        vertical-align: middle; 
+        text-transform: uppercase; 
+        margin-top: 0; 
+        margin-bottom: 12px;
+    }
+    
+    .curved-steps-slider-section p {
+        color: #1a1a1a; 
+        max-width: 690px; 
+        margin: 0 auto; 
+        font-weight: 400; 
+        font-size: 16px; 
+        letter-spacing: 1px; 
+        text-align: center; 
+        vertical-align: middle; 
+        line-height: 1.6;
+    }
+
+    /* Slider Container */
+    .slider-container {
+        display: grid; 
+        grid-template-columns: calc(25% - 0px) calc(70% - 0px); 
+        align-items: flex-start; 
+        margin: 60px 0 0;
+    }
+
+    /* Semicircle Wrapper */
+    .semicircle-wrapper { 
+        position: relative; 
+        width: 205px; 
+        height: 400px; 
+        flex-shrink: 0; 
+        left: -6px; 
+    }
+
+    .semicircle-wrapper svg {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+
+    .curve-path {
+        fill: #F4F0F0;
+        stroke: #1A1A1A;
+        stroke-width: 1;
+    }
+
+    .curve-progress {
+        fill: none;
+        stroke: #d4a0b8;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-dasharray: 1000;
+        stroke-dashoffset: 1000;
+        transition: stroke-dashoffset 1s cubic-bezier(.4,0,.2,1);
+    }
+
+    /* Step Dots */
+    .step-dot {
+        position: absolute;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background: #F3DCE0; 
+        color: #1a1a1a; 
+        font-family: Futura Std; 
+        font-weight: 500; 
+        font-size: 20px; 
+        line-height: 150%; 
+        vertical-align: middle; 
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: all .6s cubic-bezier(.4,0,.2,1);
+        box-shadow: 0 4px 15px rgba(0,0,0,.08);
+        display: flex;  
+        align-items: center; 
+        justify-content: center;
+    }
+
+    .step-dot.active {
+        width: 70px; 
+        height: 70px; 
+        color: #fff; 
+        background: #DAA7B4; 
+        font-size: 24px; 
+        box-shadow: 0 8px 30px rgba(212, 160, 184, .4); 
+        z-index: 2;
+    }
+
+    .step-dot.small {
+        width: 50px;
+        height: 50px;
+        font-size: 18px;
+        transition: all .6s cubic-bezier(.4,0,.2,1);
+    }
+
+    .curved-steps-slider-section .step-1 {
+        top: 80px; 
+        left: 78%;
+        transform: translate(-50%,-50%);
+    }
+
+    .curved-steps-slider-section .step-2 {
+        top: 42%; 
+        right: 12px;
+        transform: translate(50%, -50%);
+    }
+
+    .curved-steps-slider-section .step-3 {
+        bottom: 142px; 
+        right: 14px;
+        transform: translate(50%, 50%);
+    }
+
+    .curved-steps-slider-section .step-4 {
+        bottom: 65px; 
+        left: 70%;
+        transform: translate(-50%,50%);
+    }
+
+    /* Content Area */
+    .content-area {
         flex: 1;
         max-width: 940px;
-        overflow: hidden;
+        opacity: 1;
+        transform: translateX(0);
     }
-    
-    .curved-steps-swiper .swiper-wrapper {
-        display: flex;
+
+    /* Slide Content */
+    .slide-content {
+        display: none;
+        opacity: 0;
+        gap: 40px;
+        align-items: center;
     }
-    
-    .curved-steps-swiper .swiper-slide {
+
+    .slide-content.active {
+        display: flex !important;
+        align-items: center;
+        opacity: 1;
+        transform: translateY(0);
+        animation: slideIn .8s cubic-bezier(.4,0,.2,1);
+    }
+
+    @keyframes slideIn {
+        0% {
+            opacity: 0;
+            transform: translateY(40px) scale(0.95);
+        }
+        100% {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    /* Content Image - FIXED: Prevent layout shift */
+    .content-image {
         width: 100%;
+        max-width: 370px;
         flex-shrink: 0;
     }
-    
-    .slider-container {display: grid ; grid-template-columns: calc(25% - 0px) calc(70% - 0px); align-items: flex-start; margin: 60px 0 0;}
-    .slider-container .slide-content {display: flex ; align-items: center; gap: 40px;}
-    .curved-steps-slider-section { position: relative; padding: 60px 0 0;}
-    
-    .curved-steps-slider-section .content-image{width:100%;max-width:370px;overflow:hidden;margin-bottom:0px;box-shadow:0 10px 40px rgba(0,0,0,.1)}
-    .curved-steps-slider-section .content-image img{width:100%;height:100%;object-fit:cover;display: block;}
-    .curved-steps-slider-section .content-text h2{color: #1A1A1A; margin-bottom: 12px; margin-top: 0; font-weight: 500; font-size: 20px; line-height: 1.5; letter-spacing: 1.2px; vertical-align: middle; text-transform: uppercase;}
-    .curved-steps-slider-section .content-text p { color: #1A1A1A; line-height: 1.8; margin-top: 12px; font-size: 14px; margin-bottom: 0;}
-    .curved-steps-slider-section h2 {font-weight: 500; font-size: 24px; line-height: 150%; text-align: center; vertical-align: middle; text-transform: uppercase; margin-top: 0; margin-bottom: 12px;}
-    .curved-steps-slider-section p {color: #1a1a1a; max-width: 690px; margin: 0 auto; font-weight: 400; font-size: 16px; letter-spacing: 1px; text-align: center; vertical-align: middle; line-height: 1.6;}
-    .slider-container .content-text h2, .slider-container .content-text p{text-align: left;}
-    @media (max-width:1024px){
-    .curved-steps-slider-section .slider-container{flex-direction:column;gap:60px}
-    .curved-steps-slider-section .semicircle-wrapper{width:300px;height:300px}
+
+    .image-placeholder {
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 10px 40px rgba(0,0,0,.1);
+        width: 100%;
+        height: 0;
+        padding-bottom: 125%; /* 700/560 = 1.25 = 125% aspect ratio */
     }
-    @media (max-width:767px){
-      .curved-steps-slider-section {padding: 30px 0;}
-      .curved-steps-slider-section .step-1 {top: 30px; left: 20%; transform: translate(-50%, -50%);}
-      .step-dot.active { width: 50px; height: 50px; color: #fff; background: #DAA7B4; font-size: 14px; box-shadow: 0 8px 30px rgba(212, 160, 184, .4); z-index: 2; }
-      .curved-steps-slider-section .step-2 { top: 32%; right: 168px; transform: translate(50% 50% , -50%); }
-      .step-dot {width: 40px; height: 40px;}
-      .curved-steps-slider-section svg {width: 50%;}
-      .curved-steps-slider-section .step-3 { bottom: 90px; right: 166px; transform: translate(50%, 50%); }
-      .curved-steps-slider-section .step-4 { bottom: 25px; left: 20%; transform: translate(-50%, 50%); }
-      .slider-container { display: grid ; grid-template-columns: calc(30% - 0px) calc(56% - 0px); align-items: flex-start; margin: 60px 0 0; padding: 0 12px 0 0; }
-      .slider-container .slide-content {flex-direction: column; gap: 22px;}
-      .curved-steps-slider-section .content-text h2 {font-size: 12px; line-height: 1.7;}
-      .curved-steps-slider-section .content-text p { color: #1A1A1A; margin-top: 12px; margin-bottom: 0; font-weight: 400; font-size: 12px; line-height: 150%; letter-spacing: 1px; }
-      .curved-steps-slider-section h2 {font-size: 18px;}
-      .curved-steps-slider-section p { color: #1a1a1a; margin: 0 auto; letter-spacing: 1px; vertical-align: middle; font-weight: 400; font-size: 12px; line-height: 150%; text-align: center; max-width: 90%; }
-      .curved-steps-slider-section .content-text p {margin: 0;}
+
+    .image-placeholder img {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+    }
+
+    .lazy-image {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .lazy-image.loaded {
+        opacity: 1;
+    }
+
+    /* Content Text */
+    .content-text {
+        flex: 1;
+        min-width: 0; /* Prevent text overflow issues */
+    }
+
+    .content-text h2 {
+        color: #1A1A1A; 
+        margin-bottom: 12px; 
+        margin-top: 0; 
+        font-weight: 500; 
+        font-size: 20px; 
+        line-height: 1.5; 
+        letter-spacing: 1.2px; 
+        vertical-align: middle; 
+        text-transform: uppercase;
+    }
+
+    .content-text p { 
+        color: #1A1A1A; 
+        line-height: 1.8; 
+        margin-top: 12px; 
+        font-size: 14px; 
+        margin-bottom: 0;
+    }
+
+    .slider-container .content-text h2, 
+    .slider-container .content-text p {
+        text-align: left;
+    }
+
+    /* Tablet Responsive */
+    @media (max-width:1024px) {
+        .slider-container {
+            flex-direction: column;
+            gap: 60px;
+        }
+        
+        .semicircle-wrapper {
+            width: 300px;
+            height: 300px;
+        }
+    }
+
+    /* Mobile Responsive */
+    @media (max-width:767px) {
+        .curved-steps-slider-section {
+            padding: 30px 0;
+        }
+        
+        .curved-steps-slider-section h2 {
+            font-size: 18px;
+        }
+        
+        .curved-steps-slider-section p { 
+            color: #1a1a1a; 
+            margin: 0 auto; 
+            letter-spacing: 1px; 
+            vertical-align: middle; 
+            font-weight: 400; 
+            font-size: 12px; 
+            line-height: 150%; 
+            text-align: center; 
+            max-width: 90%; 
+        }
+        
+        .slider-container { 
+            display: grid; 
+            grid-template-columns: calc(30% - 0px) calc(56% - 0px); 
+            align-items: flex-start; 
+            margin: 60px 0 0; 
+            padding: 0 12px 0 0; 
+        }
+        
+        .slider-container .slide-content {
+            gap: 22px;
+        }
+        
+        .slide-content.active {
+            flex-direction: column;
+        }
+        
+        .semicircle-wrapper svg {
+            width: 50%;
+        }
+        
+        .step-dot {
+            width: 40px; 
+            height: 40px;
+        }
+        
+        .step-dot.active { 
+            width: 50px; 
+            height: 50px; 
+            color: #fff; 
+            background: #DAA7B4; 
+            font-size: 14px; 
+            box-shadow: 0 8px 30px rgba(212, 160, 184, .4); 
+            z-index: 2; 
+        }
+        
+        .curved-steps-slider-section .step-1 {
+            top: 30px; 
+            left: 20%; 
+            transform: translate(-50%, -50%);
+        }
+        
+        .curved-steps-slider-section .step-2 { 
+            top: 32%; 
+            right: 168px; 
+            transform: translate(50%, -50%); 
+        }
+        
+        .curved-steps-slider-section .step-3 { 
+            bottom: 90px; 
+            right: 166px; 
+            transform: translate(50%, 50%); 
+        }
+        
+        .curved-steps-slider-section .step-4 { 
+            bottom: 25px; 
+            left: 20%; 
+            transform: translate(-50%, 50%); 
+        }
+        
+        .content-text h2 {
+            font-size: 12px; 
+            line-height: 1.7;
+        }
+        
+        .content-text p { 
+            color: #1A1A1A; 
+            margin-top: 12px; 
+            margin-bottom: 0; 
+            font-weight: 400; 
+            font-size: 12px; 
+            line-height: 150%; 
+            letter-spacing: 1px; 
+        }
+        
+        .curved-steps-slider-section .content-text p {
+            margin: 0;
+        }
     }
 </style>
 
