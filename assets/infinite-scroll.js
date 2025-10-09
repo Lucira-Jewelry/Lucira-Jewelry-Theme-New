@@ -118,8 +118,9 @@ class InfiniteScroll extends HTMLElement {
       if (newInfinite) {
         this.replaceWith(newInfinite);
       } else {
-        this.remove();
+        // Show end message BEFORE removing the component
         this.showEndMessage();
+        this.remove();
       }
     } catch (err) {
       console.error("InfiniteScroll error:", err);
@@ -133,35 +134,45 @@ class InfiniteScroll extends HTMLElement {
   showEndMessage() {
     console.log("✅ Reached end of collection");
 
-    let endElement = document.getElementById('infinite-scroll-end');
+    // Use requestAnimationFrame to ensure DOM is ready
+    requestAnimationFrame(() => {
+      let endElement = document.getElementById('infinite-scroll-end');
 
-    if (!endElement) {
-      console.warn("⚠️ #infinite-scroll-end not found — creating fallback.");
-      endElement = document.createElement('div');
-      endElement.id = 'infinite-scroll-end';
-      endElement.className = 'infinite-scroll-end';
-      endElement.innerHTML = `
-        <div class="end-content">
-          <div class="end-decoration">
-            <div class="luxury-line"></div>
-            <div class="end-diamond">◆</div>
-            <div class="luxury-line"></div>
+      if (!endElement) {
+        console.warn("⚠️ #infinite-scroll-end not found — creating fallback.");
+        endElement = document.createElement('div');
+        endElement.id = 'infinite-scroll-end';
+        endElement.className = 'infinite-scroll-end';
+        endElement.innerHTML = `
+          <div class="end-content">
+            <div class="end-decoration">
+              <div class="luxury-line"></div>
+              <div class="end-diamond">◆</div>
+              <div class="luxury-line"></div>
+            </div>
+            <p class="end-text">You've explored our complete collection</p>
+            <p class="end-subtitle">Every piece tells a story of elegance</p>
           </div>
-          <p class="end-text">You've explored our complete collection</p>
-          <p class="end-subtitle">Every piece tells a story of elegance</p>
-        </div>
-      `;
-      document.querySelector('[data-product-grid]')?.after(endElement);
-    }
+        `;
+        const grid = document.querySelector('[data-product-grid]');
+        if (grid) {
+          grid.after(endElement);
+        } else {
+          document.body.appendChild(endElement);
+        }
+      }
 
-    // Force reveal
-    endElement.style.display = 'block';
-    endElement.style.opacity = '0';
-    endElement.style.transition = 'opacity 0.8s ease-in-out';
-    setTimeout(() => {
-      endElement.style.opacity = '1';
-      console.log("✨ End message now visible.");
-    }, 100);
+      // Force reveal with proper display setting
+      endElement.style.display = 'block';
+      endElement.style.opacity = '0';
+      endElement.style.transition = 'opacity 0.8s ease-in-out';
+      
+      // Small delay to ensure display:block is applied before opacity transition
+      setTimeout(() => {
+        endElement.style.opacity = '1';
+        console.log("✨ End message now visible.");
+      }, 50);
+    });
   }
 
   // Wishlist initialization
