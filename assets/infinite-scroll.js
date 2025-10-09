@@ -37,6 +37,9 @@ class InfiniteScroll extends HTMLElement {
         Array.from(newGrid.children).forEach((child) => {
           grid.appendChild(child);
         });
+        
+        // Re-initialize wishlist for newly loaded products
+        this.initWishlist();
       }
 
       // Handle next infinite scroll
@@ -52,6 +55,25 @@ class InfiniteScroll extends HTMLElement {
 
     this.anchor.style.display = "none";
     this.anchor.innerText = "";
+  }
+  
+  // Wishlist initialization
+  initWishlist() {
+    try {
+      if (typeof iWish !== 'undefined' && typeof iWish.init === 'function') {
+        iWish.init();
+      }
+      
+      document.dispatchEvent(new CustomEvent('iwish:reload'));
+      document.dispatchEvent(new CustomEvent('wishlist:init'));
+      
+      if (typeof iWishCounter === 'function') {
+        iWishCounter();
+      }
+      
+    } catch (error) {
+      console.error('Wishlist init error:', error);
+    }
   }
 }
 
