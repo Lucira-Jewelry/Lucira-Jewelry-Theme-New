@@ -32,7 +32,7 @@ class InfiniteScroll extends HTMLElement {
     this.anchor.innerHTML = `
       <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">
         <div style="display: flex; align-items: center; justify-content: center;">
-          <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
+          <span class="luxury-dots" style="display: flex; gap: 8px; align-items: center;">
             <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out;"></span>
             <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.2s;"></span>
             <span class="dot" style="width: 8px; height: 8px; background: linear-gradient(135deg, #d4af37 0%, #ffe6ae 50%, #d4af37 100%); border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.4s;"></span>
