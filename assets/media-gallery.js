@@ -153,7 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
-    if (/\bplt\b/.test(lower) || lower.includes("platinum")) return "plt";
+    if (lower.includes("Plt")) return "plt";
     return "";
   }
 
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [], plt: [] },
+      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
       extras: []
     };
 
