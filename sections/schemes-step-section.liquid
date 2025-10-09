@@ -20,49 +20,66 @@
             {% endfor %}
         </div>
 
-        <div class="content-area">
-            {% for block in section.blocks %}
-                <div class="slide-content{% if forloop.first %} active{% endif %}" data-slide="{{ forloop.index }}" {{ block.shopify_attributes }}>
-                    <div class="content-image">
-                        <div class="placeholder">
-                            {% if block.settings.image != blank %}
-                                {{ block.settings.image | image_url: width: 560 | image_tag: loading: 'lazy', width: 560, height: 700, alt: block.settings.heading }}
-                            {% else %}
-                                {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
-                            {% endif %}
+        <div class="swiper curved-steps-swiper">
+            <div class="swiper-wrapper">
+                {% for block in section.blocks %}
+                    <div class="swiper-slide" {{ block.shopify_attributes }}>
+                        <div class="slide-content">
+                            <div class="content-image">
+                                <div class="placeholder">
+                                    {% if block.settings.image != blank %}
+                                        {{ block.settings.image | image_url: width: 560 | image_tag: loading: 'lazy', width: 560, height: 700, alt: block.settings.heading }}
+                                    {% else %}
+                                        {{ 'image' | placeholder_svg_tag: 'placeholder-svg' }}
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="content-text">
+                                {% if block.settings.heading != blank %}
+                                    <h2>{{ block.settings.heading }}</h2>
+                                {% endif %}
+                                {% if block.settings.description != blank %}
+                                    <p>{{ block.settings.description }}</p>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
-                    <div class="content-text">
-                        {% if block.settings.heading != blank %}
-                            <h2>{{ block.settings.heading }}</h2>
-                        {% endif %}
-                        {% if block.settings.description != blank %}
-                            <p>{{ block.settings.description }}</p>
-                        {% endif %}
-                    </div>
-                </div>
-            {% endfor %}
+                {% endfor %}
+            </div>
         </div>
     </div>
 </section>
 
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Swiper/11.0.5/swiper-bundle.min.js"></script>
+
 <script>
     (function() {
-        let currentStep = 1;
         const totalSteps = {{ section.blocks.size }};
+        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
+        const progressPath = document.getElementById('progressPath');
+        const sliderSection = document.querySelector('.curved-steps-slider-section');
+
         let isLocked = false;
         let scrollAccumulator = 0;
         const scrollThreshold = 80;
 
-        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
-        const slides = document.querySelectorAll('.curved-steps-slider-section .slide-content');
-        const progressPath = document.getElementById('progressPath');
-        const sliderSection = document.querySelector('.curved-steps-slider-section');
+        // Initialize Swiper
+        const swiper = new Swiper('.curved-steps-swiper', {
+            direction: 'horizontal',
+            slidesPerView: 1,
+            spaceBetween: 0,
+            speed: 600,
+            allowTouchMove: true,
+            effect: 'slide',
+            on: {
+                slideChange: function() {
+                    updateDotsAndProgress(this.activeIndex + 1);
+                }
+            }
+        });
 
-        function updateSlider(step, direction = 'next') {
-            const previousStep = currentStep;
-            currentStep = step;
-
+        function updateDotsAndProgress(step) {
             dots.forEach((dot, index) => {
                 dot.classList.remove('active');
                 if (index + 1 === step) {
@@ -70,29 +87,6 @@
                     dot.classList.remove('small');
                 } else {
                     dot.classList.add('small');
-                }
-            });
-
-            slides.forEach((slide, index) => {
-                slide.classList.remove('active', 'slide-out-left', 'slide-out-right', 'slide-in-left', 'slide-in-right');
-                
-                if (index + 1 === previousStep) {
-                    // Slide out the previous slide
-                    if (direction === 'next') {
-                        slide.classList.add('slide-out-left');
-                    } else {
-                        slide.classList.add('slide-out-right');
-                    }
-                }
-                
-                if (index + 1 === step) {
-                    // Slide in the new slide
-                    slide.classList.add('active');
-                    if (direction === 'next') {
-                        slide.classList.add('slide-in-right');
-                    } else {
-                        slide.classList.add('slide-in-left');
-                    }
                 }
             });
 
@@ -121,8 +115,7 @@
         dots.forEach(dot => {
             dot.addEventListener('click', () => {
                 const step = parseInt(dot.dataset.step);
-                const direction = step > currentStep ? 'next' : 'prev';
-                updateSlider(step, direction);
+                swiper.slideTo(step - 1);
             });
         });
 
@@ -130,8 +123,8 @@
             const centered = isSectionCentered();
 
             if (centered) {
-                const canScrollDown = currentStep < totalSteps;
-                const canScrollUp = currentStep > 1;
+                const canScrollDown = swiper.activeIndex < totalSteps - 1;
+                const canScrollUp = swiper.activeIndex > 0;
 
                 if (!canScrollDown && e.deltaY > 0) {
                     scrollAccumulator = 0;
@@ -153,9 +146,9 @@
                     isLocked = true;
 
                     if (scrollAccumulator > 0 && canScrollDown) {
-                        updateSlider(currentStep + 1, 'next');
+                        swiper.slideNext();
                     } else if (scrollAccumulator < 0 && canScrollUp) {
-                        updateSlider(currentStep - 1, 'prev');
+                        swiper.slidePrev();
                     }
 
                     scrollAccumulator = 0;
@@ -169,11 +162,12 @@
             }
         }, { passive: false });
 
+        // Initialize
         const pathLength = progressPath.getTotalLength();
         progressPath.style.strokeDasharray = pathLength;
         progressPath.style.strokeDashoffset = pathLength;
         
-        updateSlider(1, 'next');
+        updateDotsAndProgress(1);
     })();
 </script>
 
@@ -190,90 +184,25 @@
     .curved-steps-slider-section svg{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
     .curved-steps-slider-section .curve-path{fill:#F4F0F0;stroke:#1A1A1A;stroke-width:1}
     .curved-steps-slider-section .curve-progress{fill:none;stroke:#d4a0b8;stroke-width:2;stroke-linecap:round;stroke-dasharray:1000;stroke-dashoffset:1000;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
-    .curved-steps-slider-section .content-area{flex:1;max-width:940px;position:relative;overflow:hidden;}
+    
+    .curved-steps-swiper {
+        flex: 1;
+        max-width: 940px;
+        overflow: hidden;
+    }
+    
+    .curved-steps-swiper .swiper-wrapper {
+        display: flex;
+    }
+    
+    .curved-steps-swiper .swiper-slide {
+        width: 100%;
+        flex-shrink: 0;
+    }
+    
     .slider-container {display: grid ; grid-template-columns: calc(25% - 0px) calc(70% - 0px); align-items: flex-start; margin: 60px 0 0;}
     .slider-container .slide-content {display: flex ; align-items: center; gap: 40px;}
     .curved-steps-slider-section { position: relative; padding: 60px 0 0;}
-    
-    /* Swiper-style scroll animations */
-    .curved-steps-slider-section .slide-content{
-        position: absolute;
-        width: 100%;
-        display: none;
-        opacity: 0;
-        transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    
-    .curved-steps-slider-section .slide-content.active{
-        display: flex !important;
-        align-items: center;
-        position: relative;
-        opacity: 1;
-    }
-    
-    /* Slide in from right */
-    .curved-steps-slider-section .slide-content.slide-in-right {
-        animation: slideInFromRight 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
-    
-    /* Slide in from left */
-    .curved-steps-slider-section .slide-content.slide-in-left {
-        animation: slideInFromLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
-    
-    /* Slide out to left */
-    .curved-steps-slider-section .slide-content.slide-out-left {
-        animation: slideOutToLeft 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
-    
-    /* Slide out to right */
-    .curved-steps-slider-section .slide-content.slide-out-right {
-        animation: slideOutToRight 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
-    
-    @keyframes slideInFromRight {
-        0% {
-            opacity: 0;
-            transform: translateX(100px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-    
-    @keyframes slideInFromLeft {
-        0% {
-            opacity: 0;
-            transform: translateX(-100px);
-        }
-        100% {
-            opacity: 1;
-            transform: translateX(0);
-        }
-    }
-    
-    @keyframes slideOutToLeft {
-        0% {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        100% {
-            opacity: 0;
-            transform: translateX(-100px);
-        }
-    }
-    
-    @keyframes slideOutToRight {
-        0% {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        100% {
-            opacity: 0;
-            transform: translateX(100px);
-        }
-    }
     
     .curved-steps-slider-section .content-image{width:100%;max-width:370px;overflow:hidden;margin-bottom:0px;box-shadow:0 10px 40px rgba(0,0,0,.1)}
     .curved-steps-slider-section .content-image img{width:100%;height:100%;object-fit:cover;display: block;}
@@ -296,9 +225,8 @@
       .curved-steps-slider-section .step-3 { bottom: 90px; right: 166px; transform: translate(50%, 50%); }
       .curved-steps-slider-section .step-4 { bottom: 25px; left: 20%; transform: translate(-50%, 50%); }
       .slider-container { display: grid ; grid-template-columns: calc(30% - 0px) calc(56% - 0px); align-items: flex-start; margin: 60px 0 0; padding: 0 12px 0 0; }
-      .curved-steps-slider-section .slide-content.active {flex-direction: column;}
+      .slider-container .slide-content {flex-direction: column; gap: 22px;}
       .curved-steps-slider-section .content-text h2 {font-size: 12px; line-height: 1.7;}
-      .slider-container .slide-content {gap: 22px;}
       .curved-steps-slider-section .content-text p { color: #1A1A1A; margin-top: 12px; margin-bottom: 0; font-weight: 400; font-size: 12px; line-height: 150%; letter-spacing: 1px; }
       .curved-steps-slider-section h2 {font-size: 18px;}
       .curved-steps-slider-section p { color: #1a1a1a; margin: 0 auto; letter-spacing: 1px; vertical-align: middle; font-weight: 400; font-size: 12px; line-height: 150%; text-align: center; max-width: 90%; }
