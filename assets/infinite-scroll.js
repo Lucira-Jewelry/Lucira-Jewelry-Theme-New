@@ -35,7 +35,7 @@ class InfiniteScroll extends HTMLElement {
             <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.4s; opacity: 0.4;"></span>
         </span>
       </div>
-      <span style="font-family: inherit;">Discovering more exquisite pieces</span>
+      <div style="font-family: inherit;">Discovering more exquisite pieces</div>
     `;
     
     // Add keyframes if not already added
