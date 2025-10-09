@@ -176,7 +176,6 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
-        else if (alt.includes("plt")) buckets.codes.plt.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
