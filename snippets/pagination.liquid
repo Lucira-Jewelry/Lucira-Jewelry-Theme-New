@@ -28,6 +28,8 @@
         <p class="loading-text">Discovering more exquisite pieces...</p>
       </div>
     </div>
+
+    <!-- End of products indicator - MOVED INSIDE THE IF CONDITION -->
     <div id="infinite-scroll-end" class="infinite-scroll-end" style="display: none;">
       <div class="end-content">
         <div class="end-decoration">
@@ -99,59 +101,52 @@
 
   <script>
     (function() {
-      // --------------------------
-      // Global State
-      // --------------------------
+      const DEBUG = true;
+
       window.infiniteScrollState = window.infiniteScrollState || {
-        cleanup: null,
-        loadedProductIds: new Set(),
-        isInitialized: false,
-        lastInitTime: 0,
-        currentUrl: window.location.href,
-        observer: null,
-        isLoading: false,
-        hasNextPage: true,
-        nextUrl: ''
+        cleanup: null, loadedProductIds: new Set(), isInitialized: false,
+        lastInitTime: 0, currentUrl: window.location.href, observer: null, scrollTimeout: null
       };
 
-      // --------------------------
-      // Utility Functions
-      // --------------------------
-      function getProductId(productElement) {
-        const id = productElement.dataset.productId ||
-              productElement.dataset.id ||
-              productElement.getAttribute('data-product-handle');
-        
-        if (id) return id;
-        
+      function dbg(...args){ if(DEBUG) console.debug('[infiniteScroll]', ...args); }
+
+      // Robust getProductId — returns null if not determinable (avoid brittle fallbacks)
+      function getProductId(productElement){
+        if(!productElement || productElement.nodeType !== 1) return null;
+        const ds = productElement.dataset || {};
+        if(ds.productId) return `id:${ds.productId}`;
+        if(ds.id) return `id:${ds.id}`;
+        if(ds.productHandle) return `handle:${ds.productHandle}`;
+        // try link handle
         const link = productElement.querySelector('a[href*="/products/"]');
-        if (link) {
-          const match = link.href.match(/\/products\/([^?/#]+)/);
-          if (match) return match[1];
+        if(link){
+          try{
+            const href = link.getAttribute('href');
+            const handle = href.split('/products/')[1].split('?')[0].replace(/\/$/,'');
+            if(handle) return `handle:${handle}`;
+          }catch(e){}
         }
-        
-        return productElement.id || null;
+        // try variant/product sku elements
+        const sku = productElement.querySelector('[data-sku], [data-variant-id], .product-sku, .sku');
+        if(sku && sku.textContent.trim()) return `sku:${sku.textContent.trim().slice(0,50)}`;
+        return null;
       }
 
-      function isProductDuplicate(productElement) {
+      function isProductDuplicate(productElement){
         const productId = getProductId(productElement);
-        if (!productId) return false;
+        if(!productId) return false; // can't safely say it's duplicate — show it
         return window.infiniteScrollState.loadedProductIds.has(productId);
       }
 
-      function markProductAsLoaded(productElement) {
+      function markProductAsLoaded(productElement){
         const productId = getProductId(productElement);
-        if (productId) {
-          window.infiniteScrollState.loadedProductIds.add(productId);
-        }
+        if(productId) window.infiniteScrollState.loadedProductIds.add(productId);
       }
 
-      function animateNewProducts(newProducts) {
+      function animateNewProducts(newProducts){
         newProducts.forEach((product, index) => {
           product.classList.add('product-fade-in');
-          setTimeout(() => {
-            product.classList.add('animate');
-          }, index * 15);
+          setTimeout(()=> product.classList.add('animate'), index * 15);
         });
       }
 
@@ -161,311 +156,222 @@
           document.dispatchEvent(new CustomEvent('iwish:reload'));
           document.dispatchEvent(new CustomEvent('wishlist:init'));
           if (typeof iWishCounter === 'function') iWishCounter();
-        } catch (err) {
-          console.error('Wishlist init error:', err);
-        }
+        } catch (err) { console.error('Wishlist init error:', err); }
       }
 
-      // --------------------------
-      // Infinite Scroll Core
-      // --------------------------
-      function initInfiniteScroll() {
+      function initInfiniteScroll(){
         const now = Date.now();
-        if (window.infiniteScrollState.isInitialized && now - window.infiniteScrollState.lastInitTime < 500) {
-          return;
-        }
-
-        if (window.infiniteScrollState.cleanup) {
-          window.infiniteScrollState.cleanup();
-        }
+        if(window.infiniteScrollState.isInitialized && now - window.infiniteScrollState.lastInitTime < 500) return;
+        if(window.infiniteScrollState.cleanup) window.infiniteScrollState.cleanup();
 
         const productGrid = document.getElementById('product-grid');
         const loader = document.getElementById('infinite-scroll-loader');
         const endIndicator = document.getElementById('infinite-scroll-end');
         const nextPageData = document.getElementById('next-page-data');
 
-        if (!productGrid || !loader || !endIndicator || !nextPageData) {
+        if(!productGrid || !loader || !endIndicator || !nextPageData){
+          dbg('Required DOM nodes not ready, retrying init...');
           setTimeout(initInfiniteScroll, 200);
           return;
         }
 
         const currentPage = parseInt(nextPageData.dataset.currentPage) || 1;
         const totalPages = parseInt(nextPageData.dataset.totalPages) || 1;
-        
-        // Store in global state instead of local variables
-        window.infiniteScrollState.nextUrl = nextPageData.dataset.nextUrl || '';
-        window.infiniteScrollState.hasNextPage = window.infiniteScrollState.nextUrl !== '';
+        let isLoading = false;
+        let hasNextPage = !!(nextPageData.dataset.nextUrl && nextPageData.dataset.nextUrl.trim());
 
-        // Reset state on URL change or page 1
-        if (window.infiniteScrollState.currentUrl !== window.location.href || currentPage === 1) {
+        if(window.infiniteScrollState.currentUrl !== window.location.href || currentPage === 1) {
           window.infiniteScrollState.loadedProductIds.clear();
         }
         window.infiniteScrollState.currentUrl = window.location.href;
-        window.infiniteScrollState.isLoading = false;
 
-        // Mark existing products
+        // mark existing products
         Array.from(productGrid.children).forEach(markProductAsLoaded);
 
-        // --------------------------
-        // Loader & End Indicator Management
-        // --------------------------
-        function showLoader() { 
-          loader.style.display = 'block'; 
-          loader.classList.add('show');
-          endIndicator.style.display = 'none';
-          endIndicator.classList.remove('show');
-        }
-        
-        function hideLoader() { 
-          loader.classList.remove('show'); 
-          setTimeout(() => {
-            loader.style.display = 'none';
-          }, 300);
-        }
-        
-        function showEndIndicator() { 
-          if (!window.infiniteScrollState.hasNextPage && !window.infiniteScrollState.isLoading) {
-            hideLoader();
-            setTimeout(() => {
-              endIndicator.style.display = 'block'; 
-              endIndicator.classList.add('show');
-            }, 400);
-          }
-        }
+        function showLoader(){ if (hasNextPage) { loader.style.display = 'block'; loader.classList.add('show'); } }
+        function hideLoader(){ loader.classList.remove('show'); setTimeout(()=>loader.style.display='none',400); }
+        function showEndIndicator(){ if(!hasNextPage){ endIndicator.style.display='block'; endIndicator.classList.add('show'); } }
 
-        // --------------------------
-        // Load Next Page (Optimized)
-        // --------------------------
-        async function loadNextPage() {
-          // Guard clause - use global state
-          if (window.infiniteScrollState.isLoading || !window.infiniteScrollState.hasNextPage) {
-            return;
-          }
-          
-          window.infiniteScrollState.isLoading = true;
+        async function loadNextPage(){
+          if(isLoading || !hasNextPage) return;
+          isLoading = true;
           showLoader();
 
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-            const response = await fetch(window.infiniteScrollState.nextUrl, {
-              method: 'GET',
-              headers: {
-                'X-Requested-With': 'XMLHttpRequest',
-                'Cache-Control': 'no-cache'
-              },
-              signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            
+          const fetchUrl = nextPageData.dataset.nextUrl;
+          dbg('Fetching next page:', fetchUrl);
+          try{
+            const response = await fetch(fetchUrl, { method:'GET', headers:{'Cache-Control':'no-cache'} });
+            if(!response.ok) throw new Error(`HTTP ${response.status}`);
             const html = await response.text();
+
+            // parse response with DOMParser for reliability
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
 
             const newGrid = doc.querySelector('#product-grid');
             const newNextData = doc.querySelector('#next-page-data');
-            
-            if (!newGrid || newGrid.children.length === 0) {
-              window.infiniteScrollState.hasNextPage = false;
+
+            if(!newGrid){
+              dbg('Fetched HTML does not contain #product-grid. Server may return different markup for XHR requests.');
+              hasNextPage = false;
               showEndIndicator();
-              return; 
+              return;
             }
 
-            // Process products
-            const allProducts = Array.from(newGrid.children);
+            // collect product nodes more defensively (direct children or known classes)
+            const candidateSelectors = ['[data-product-id]','[data-id]','.product-card','.grid-item','.card','li'];
+            let allProducts = [];
+            // prefer direct children if they look like product cards
+            allProducts = Array.from(newGrid.children).filter(n => n.nodeType===1);
+            if(!allProducts.length){
+              // fallback to querying known selectors inside newGrid
+              const found = newGrid.querySelectorAll(candidateSelectors.join(','));
+              allProducts = Array.from(found);
+            }
+
+            dbg('newGrid children count:', newGrid.children.length, 'allProducts length:', allProducts.length);
+
             const uniqueProducts = allProducts.filter(p => !isProductDuplicate(p));
+            dbg('uniqueProducts:', uniqueProducts.length);
 
-            if (uniqueProducts.length > 0) {
-              const fragment = document.createDocumentFragment();
-              uniqueProducts.forEach(p => { 
-                markProductAsLoaded(p); 
-                fragment.appendChild(p);
-              });
-              productGrid.appendChild(fragment);
-              
-              requestAnimationFrame(() => {
-                animateNewProducts(uniqueProducts);
-                initWishlist();
+            if(uniqueProducts.length > 0){
+              // append clones so we don't accidentally remove nodes from the fetched doc
+              const appended = [];
+              uniqueProducts.forEach(p => {
+                const clone = p.cloneNode(true);
+                productGrid.appendChild(clone);
+                markProductAsLoaded(clone);
+                appended.push(clone);
               });
 
-              // Update global state and DOM data
-              const newNextUrl = newNextData?.dataset.nextUrl || '';
-              window.infiniteScrollState.nextUrl = newNextUrl;
-              window.infiniteScrollState.hasNextPage = newNextUrl !== '';
-              
-              nextPageData.dataset.nextUrl = newNextUrl;
-              nextPageData.dataset.currentPage = (parseInt(nextPageData.dataset.currentPage) + 1).toString();
-              
-              // Only reobserve if there's more to load
-              if (window.infiniteScrollState.hasNextPage) {
-                setTimeout(() => reobserveProducts(), 150);
+              animateNewProducts(appended);
+              initWishlist();
+
+              // update pagination dataset
+              if(newNextData && newNextData.dataset.nextUrl){
+                nextPageData.dataset.nextUrl = newNextData.dataset.nextUrl;
+                nextPageData.dataset.currentPage = (parseInt(nextPageData.dataset.currentPage || currentPage) + 1).toString();
+                hasNextPage = !!nextPageData.dataset.nextUrl;
               } else {
-                showEndIndicator();
+                // If there's no next-page-data in response, set hasNextPage false
+                nextPageData.dataset.nextUrl = '';
+                hasNextPage = false;
               }
             } else {
-              window.infiniteScrollState.hasNextPage = false;
-              showEndIndicator();
+              dbg('No unique items found in fetched page — marking end of results.');
+              hasNextPage = false;
             }
-            
-          } catch(err) {
-            if (err.name === 'AbortError') {
-              console.error('Infinite scroll: Request timeout');
-            } else {
-              console.error('Infinite scroll error:', err);
-            }
-            window.infiniteScrollState.hasNextPage = false;
+
+            if(!hasNextPage) showEndIndicator();
+            reobserveProducts();
+          } catch(err){
+            console.error('Infinite scroll error:', err);
+            hasNextPage = false;
             showEndIndicator();
           } finally {
-            window.infiniteScrollState.isLoading = false;
+            isLoading = false;
             hideLoader();
           }
         }
 
-        // --------------------------
-        // Intersection Observer
-        // --------------------------
-        function reobserveProducts() {
-          if (window.infiniteScrollState.observer) {
-            window.infiniteScrollState.observer.disconnect();
-          }
-          
-          const products = Array.from(productGrid.children);
-          if (products.length < 1 || !('IntersectionObserver' in window)) {
-            return;
-          }
+        function shouldLoadMore(){
+          const scrollTop = window.scrollY || document.documentElement.scrollTop;
+          const windowHeight = window.innerHeight;
+          const docHeight = Math.max(document.body.scrollHeight, document.documentElement.scrollHeight);
+          return (scrollTop + windowHeight) / docHeight > 0.75;
+        }
 
-          window.infiniteScrollState.observer = new IntersectionObserver((entries) => {
+        function handleScroll(){
+          if(window.infiniteScrollState.scrollTimeout) clearTimeout(window.infiniteScrollState.scrollTimeout);
+          window.infiniteScrollState.scrollTimeout = setTimeout(()=>{
+            if(shouldLoadMore() && hasNextPage && !isLoading) loadNextPage();
+          }, 100);
+        }
+
+        function reobserveProducts(){
+          if(window.infiniteScrollState.observer) { window.infiniteScrollState.observer.disconnect(); window.infiniteScrollState.observer = null; }
+          const products = Array.from(productGrid.children).filter(n => n.nodeType===1);
+          if(products.length < 1 || !('IntersectionObserver' in window)) return;
+
+          window.infiniteScrollState.observer = new IntersectionObserver(entries => {
             entries.forEach(entry => {
-              // Always check global state
-              if (entry.isIntersecting && 
-                  window.infiniteScrollState.hasNextPage && 
-                  !window.infiniteScrollState.isLoading) {
-                loadNextPage();
-              }
+              if(entry.isIntersecting && hasNextPage && !isLoading) loadNextPage();
             });
-          }, { 
-            root: null, 
-            rootMargin: '400px 0px',
-            threshold: 0
-          });
+          }, { root: null, rootMargin: '500px 0px', threshold: 0.1 });
 
-          const lastProduct = products[products.length - 1];
-          if (lastProduct) {
-            window.infiniteScrollState.observer.observe(lastProduct);
+          const observeCount = Math.min(3, products.length);
+          for(let i = products.length - observeCount; i < products.length; i++){
+            if(products[i]) window.infiniteScrollState.observer.observe(products[i]);
           }
         }
 
-        // --------------------------
-        // Initial Setup
-        // --------------------------
-        if (currentPage >= totalPages && !window.infiniteScrollState.hasNextPage) {
-          showEndIndicator();
-        } else if (window.infiniteScrollState.hasNextPage) {
-          endIndicator.style.display = 'none';
-          endIndicator.classList.remove('show');
-          reobserveProducts();
-        }
+        // initial setup
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        if(currentPage >= totalPages) showEndIndicator(); else reobserveProducts();
 
-        // --------------------------
-        // Cleanup
-        // --------------------------
-        window.infiniteScrollState.cleanup = function() {
-          if (window.infiniteScrollState.observer) { 
-            window.infiniteScrollState.observer.disconnect(); 
-            window.infiniteScrollState.observer = null; 
-          }
+        window.infiniteScrollState.cleanup = function(){
+          window.removeEventListener('scroll', handleScroll);
+          if(window.infiniteScrollState.observer) { window.infiniteScrollState.observer.disconnect(); window.infiniteScrollState.observer = null; }
+          if(window.infiniteScrollState.scrollTimeout) { clearTimeout(window.infiniteScrollState.scrollTimeout); window.infiniteScrollState.scrollTimeout = null; }
           window.infiniteScrollState.isInitialized = false;
-          window.infiniteScrollState.isLoading = false;
         };
-        
         window.infiniteScrollState.isInitialized = true;
         window.infiniteScrollState.lastInitTime = now;
+        dbg('Infinite scroll initialized. currentPage:', currentPage, 'totalPages:', totalPages, 'hasNextPage:', hasNextPage);
       }
 
-      // --------------------------
-      // Reinit After Sort/Filter
-      // --------------------------
-      window.reinitInfiniteScroll = function() {
-        if (window.infiniteScrollState.cleanup) {
-          window.infiniteScrollState.cleanup();
-        }
-        
-        setTimeout(() => {
-          window.infiniteScrollState.loadedProductIds.clear();
-          window.infiniteScrollState.currentUrl = window.location.href;
-          window.infiniteScrollState.isInitialized = false;
-          window.infiniteScrollState.isLoading = false;
-          window.infiniteScrollState.hasNextPage = true;
-
-          const loader = document.getElementById('infinite-scroll-loader');
-          const endIndicator = document.getElementById('infinite-scroll-end');
-          if (loader) { 
-            loader.style.display = 'none'; 
-            loader.classList.remove('show'); 
+      // reinit after filters/sorts
+      window.reinitInfiniteScroll = function(){
+        if(window.infiniteScrollState.cleanup) window.infiniteScrollState.cleanup();
+        setTimeout(()=>{
+          const nextPageData = document.getElementById('next-page-data');
+          if(nextPageData){
+            window.infiniteScrollState.loadedProductIds.clear();
+            window.infiniteScrollState.currentUrl = window.location.href;
+            window.infiniteScrollState.isInitialized = false;
+            const loader = document.getElementById('infinite-scroll-loader');
+            const endIndicator = document.getElementById('infinite-scroll-end');
+            if(loader){ loader.style.display='none'; loader.classList.remove('show'); }
+            if(endIndicator){ endIndicator.style.display='none'; endIndicator.classList.remove('show'); }
           }
-          if (endIndicator) { 
-            endIndicator.style.display = 'none'; 
-            endIndicator.classList.remove('show'); 
-          }
-          
-          setTimeout(initInfiniteScroll, 100);
-        }, 300);
+          setTimeout(initInfiniteScroll, 200);
+        }, 500);
       };
 
-      // --------------------------
-      // URL Change Detection
-      // --------------------------
+      // url change detection
       let lastUrl = window.location.href;
-      function checkUrlChange() { 
-        if (window.location.href !== lastUrl) { 
-          lastUrl = window.location.href; 
-          window.reinitInfiniteScroll();
-        } 
-      }
+      function checkUrlChange(){ if(window.location.href !== lastUrl){ lastUrl = window.location.href; setTimeout(window.reinitInfiniteScroll, 300); } }
       window.addEventListener('popstate', checkUrlChange);
       setInterval(checkUrlChange, 1000);
 
-      // --------------------------
-      // Collection Events
-      // --------------------------
-      document.addEventListener('facetsLoaded', () => setTimeout(window.reinitInfiniteScroll, 200));
-      document.addEventListener('collectionFiltered', () => setTimeout(window.reinitInfiniteScroll, 200));
+      // collection events
+      document.addEventListener('facetsLoaded', ()=>setTimeout(window.reinitInfiniteScroll, 400));
+      document.addEventListener('collectionFiltered', ()=>setTimeout(window.reinitInfiniteScroll, 400));
 
-      // --------------------------
-      // MutationObserver
-      // --------------------------
-      setTimeout(() => {
+      // DOM mutation observer (watch deeper subtree)
+      setTimeout(()=>{
         const productGrid = document.getElementById('product-grid');
-        if (productGrid) {
-          const gridObserver = new MutationObserver(mutations => {
-            let shouldReinit = false;
-            mutations.forEach(m => {
-              if (m.type === 'childList' && m.addedNodes.length > 5) {
-                shouldReinit = true;
+        if(productGrid){
+          const gridObserver = new MutationObserver(mutations=>{
+            mutations.forEach(m=>{
+              if(m.type === 'childList'){
+                const hasProducts = Array.from(productGrid.children).some(c => c.dataset?.productId || c.classList.contains('product-card') || c.classList.contains('grid-item'));
+                if(hasProducts && productGrid.children.length > 0) setTimeout(window.reinitInfiniteScroll, 500);
               }
             });
-            if (shouldReinit) {
-              setTimeout(window.reinitInfiniteScroll, 300);
-            }
           });
-          gridObserver.observe(productGrid, { childList: true, subtree: false });
+          gridObserver.observe(productGrid, { childList: true, subtree: true });
         }
       }, 1000);
 
-      // --------------------------
-      // Initial Init
-      // --------------------------
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => setTimeout(initInfiniteScroll, 100));
+      if(document.readyState === 'loading'){
+        document.addEventListener('DOMContentLoaded', ()=>setTimeout(initInfiniteScroll, 100));
       } else {
         setTimeout(initInfiniteScroll, 100);
       }
 
     })();
   </script>
+
 
 {%- endif -%}
