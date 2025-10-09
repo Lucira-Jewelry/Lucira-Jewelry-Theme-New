@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 // Optimized initialization with CLS prevention
 (function() {
-  const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
+  const COLOR_TOKENS = ["white", "yellow", "rose"];
   const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
@@ -153,7 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
-    if (lower.includes("Plt")) return "Plt";
+    if (/\bplt\b/.test(lower) || lower.includes("platinum")) return "plt";
     return "";
   }
 
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      codes: { mq: [], ci: [], mh: [], mv: [], v360: [], plt: [] },
       extras: []
     };
 
@@ -176,6 +176,7 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
+        else if (alt.includes("plt")) buckets.codes.plt.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
