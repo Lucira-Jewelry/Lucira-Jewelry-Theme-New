@@ -150,16 +150,14 @@ class InfiniteScroll extends HTMLElement {
         endElement.id = 'infinite-scroll-end';
         endElement.className = 'infinite-scroll-end';
         endElement.innerHTML = `
-          <div id="infinite-scroll-end" class="infinite-scroll-end" style="display: none;">
-            <div class="end-content">
-              <div class="end-decoration">
+          <div class="end-content">
+            <div class="end-decoration">
                 <div class="luxury-line"><span style="display: none">.</span></div>
                 <div class="end-diamond"><span style="display: none">.</span>◆</div>
                 <div class="luxury-line"><span style="display: none">.</span></div>
-              </div>
-              <p class="end-text">You've explored our complete collection</p>
-              <p class="end-subtitle">Every piece tells a story of elegance</p>
             </div>
+            <p class="end-text">You've explored our complete collection</p>
+            <p class="end-subtitle">Every piece tells a story of elegance</p>
           </div>
         `;
         const grid = document.querySelector('[data-product-grid]');
