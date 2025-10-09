@@ -153,6 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
+    if (/\bplt\b/.test(lower) || lower.includes("platinum")) return "plt";
     return "";
   }
 
