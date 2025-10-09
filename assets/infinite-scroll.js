@@ -2,7 +2,13 @@ class InfiniteScroll extends HTMLElement {
   constructor() {
     super();
     this.anchor = this.querySelector("a");
-    if (!this.anchor) return;
+    
+    // If there's no anchor, we're on the last page - show end message immediately
+    if (!this.anchor) {
+      this.showEndMessage();
+      this.remove();
+      return;
+    }
 
     // IntersectionObserver to load next page
     this.observer = new IntersectionObserver((entries) => {
