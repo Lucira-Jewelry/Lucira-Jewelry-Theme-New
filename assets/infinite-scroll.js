@@ -28,12 +28,14 @@ class InfiniteScroll extends HTMLElement {
     this.anchor.style.fontWeight = "400";
     
     this.anchor.innerHTML = `
+      <div>
+        <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
+            <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 0.4;"></span>
+            <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.2s; opacity: 0.4;"></span>
+            <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.4s; opacity: 0.4;"></span>
+        </span>
+      </div>
       <span style="font-family: inherit;">Discovering more exquisite pieces</span>
-      <span class="luxury-dots" style="display: flex; gap: 6px; align-items: center;">
-        <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out; opacity: 0.4;"></span>
-        <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.2s; opacity: 0.4;"></span>
-        <span class="dot" style="width: 4px; height: 4px; background: currentColor; border-radius: 50%; animation: luxuryPulse 1.4s infinite ease-in-out 0.4s; opacity: 0.4;"></span>
-      </span>
     `;
     
     // Add keyframes if not already added
