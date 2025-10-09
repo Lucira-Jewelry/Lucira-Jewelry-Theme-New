@@ -1,0 +1,215 @@
+{% schema %}
+  {
+    "name": "PDP Product Videos",
+    "settings": [],
+    "presets": [
+      {
+        "name": "PDP Product Videos"
+      }
+    ]
+  }
+{% endschema %}
+
+<style>
+.pdp-product-videos { padding: 0px 0 0; background: #000; }
+.pdp-product-videos .video-container {
+  position: relative;
+  margin-bottom: 0;
+}
+
+.pdp-product-videos .elegant-video {
+  max-width: 100%;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+  display: block;
+}
+
+.pdp-product-videos .video-controls {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 50px;
+  height: 50px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  opacity: 0;
+  transform: translateY(10px);
+  z-index: 10;
+}
+
+.pdp-product-videos .video-container:hover .video-controls {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.pdp-product-videos .video-controls:hover {
+  background: rgba(212, 175, 55, 0.8);
+  border-color: rgba(212, 175, 55, 0.6);
+  transform: scale(1.1);
+  box-shadow: 0 8px 20px rgba(212, 175, 55, 0.3);
+}
+
+.pdp-product-videos .play-icon, 
+.pdp-product-videos .pause-icon {
+  width: 20px;
+  height: 20px;
+  fill: white;
+  transition: all 0.3s ease;
+}
+
+.pdp-product-videos .pause-icon {
+  display: none;
+}
+
+.pdp-product-videos .video-container.playing .play-icon {
+  display: none;
+}
+
+.pdp-product-videos .video-container.playing .pause-icon {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .pdp-product-videos .video-controls {
+    width: 45px;
+    height: 45px;
+    bottom: 15px;
+    right: 15px;
+  }
+  
+  .pdp-product-videos .play-icon, 
+  .pdp-product-videos .pause-icon {
+    width: 18px;
+    height: 18px;
+  }
+}
+</style>
+
+<div class="pdp-product-videos">
+    <div class="product-videos">
+      {% if product.metafields.custom.product_video_1 != blank %}
+        <div class="video-container" data-video="1">
+          <video class="elegant-video" autoplay muted loop playsinline preload="metadata">
+            <source src="{{ product.metafields.custom.product_video_1 | file_url }}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          
+          <div class="video-controls">
+            <svg class="play-icon" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg class="pause-icon" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if product.metafields.custom.product_video_2 != blank %}
+        <div class="video-container" data-video="2">
+          <video class="elegant-video" autoplay muted loop playsinline preload="metadata">
+            <source src="{{ product.metafields.custom.product_video_2 | file_url }}" type="video/mp4">
+            Your browser does not support the video tag.
+          </video>
+          
+          <div class="video-controls">
+            <svg class="play-icon" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z"/>
+            </svg>
+            <svg class="pause-icon" viewBox="0 0 24 24">
+              <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+            </svg>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const videoContainers = document.querySelectorAll('.pdp-product-videos .video-container');
+  
+  videoContainers.forEach(container => {
+    const video = container.querySelector('.elegant-video');
+    const controls = container.querySelector('.video-controls');
+    
+    // Set initial state for autoplaying videos
+    video.addEventListener('loadeddata', function() {
+      if (!video.paused) {
+        container.classList.add('playing');
+      }
+    });
+    
+    // Handle autoplay state changes
+    video.addEventListener('play', function() {
+      container.classList.add('playing');
+      pauseOtherVideos(video);
+    });
+    
+    video.addEventListener('pause', function() {
+      container.classList.remove('playing');
+    });
+    
+    // Play/pause on control button click
+    controls.addEventListener('click', function(e) {
+      e.stopPropagation();
+      togglePlay(video, container);
+    });
+    
+    // Play/pause on video click
+    video.addEventListener('click', function() {
+      togglePlay(video, container);
+    });
+    
+    // Update state when video ends (though loop should prevent this)
+    video.addEventListener('ended', function() {
+      container.classList.remove('playing');
+    });
+    
+    // Handle cases where autoplay might be blocked
+    video.addEventListener('loadstart', function() {
+      // Try to play, but don't force it if blocked
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          container.classList.add('playing');
+        }).catch(() => {
+          // Autoplay was blocked, keep paused state
+          container.classList.remove('playing');
+        });
+      }
+    });
+  });
+  
+  function togglePlay(video, container) {
+    if (video.paused) {
+      video.play().then(() => {
+        container.classList.add('playing');
+      }).catch(e => {
+        console.log('Play failed:', e);
+      });
+    } else {
+      video.pause();
+      container.classList.remove('playing');
+    }
+  }
+  
+  function pauseOtherVideos(currentVideo) {
+    const allVideos = document.querySelectorAll('.pdp-product-videos .elegant-video');
+    allVideos.forEach(video => {
+      if (video !== currentVideo && !video.paused) {
+        video.pause();
+        video.closest('.video-container').classList.remove('playing');
+      }
+    });
+  }
+});
+</script>
