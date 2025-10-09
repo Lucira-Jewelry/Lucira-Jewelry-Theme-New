@@ -81,9 +81,31 @@ class InfiniteScroll extends HTMLElement {
       if (newInfinite) {
         this.replaceWith(newInfinite);
       } else {
-        // No more pages - show end message
+        // No more pages - replace with end message
+        const endMessage = `
+          <div id="infinite-scroll-end" class="infinite-scroll-end" style="display: block; opacity: 0; transition: opacity 0.8s ease-in-out;">
+            <div class="end-content">
+              <div class="end-decoration">
+                <div class="luxury-line"><span style="display: none">.</span></div>
+                <div class="end-diamond"><span style="display: none">.</span>◆</div>
+                <div class="luxury-line"><span style="display: none">.</span></div>
+              </div>
+              <p class="end-text">You've explored our complete collection</p>
+              <p class="end-subtitle">Every piece tells a story of elegance</p>
+            </div>
+          </div>
+        `;
+        
+        this.insertAdjacentHTML('afterend', endMessage);
         this.remove();
-        this.showEndMessage();
+        
+        // Trigger fade-in animation
+        setTimeout(() => {
+          const endElement = document.getElementById('infinite-scroll-end');
+          if (endElement) {
+            endElement.style.opacity = '1';
+          }
+        }, 100);
       }
     } catch (err) {
       console.error("InfiniteScroll error:", err);
@@ -91,23 +113,6 @@ class InfiniteScroll extends HTMLElement {
 
     this.anchor.style.display = "none";
     this.anchor.innerHTML = "";
-  }
-  
-  // Show elegant end message
-  showEndMessage() {
-    const endElement = document.getElementById('infinite-scroll-end');
-    if (endElement) {
-      endElement.style.display = 'block';
-      
-      // Add fade-in animation
-      endElement.style.opacity = '0';
-      endElement.style.transition = 'opacity 0.8s ease-in-out';
-      
-      // Trigger animation after a brief delay
-      setTimeout(() => {
-        endElement.style.opacity = '1';
-      }, 100);
-    }
   }
   
   // Wishlist initialization
