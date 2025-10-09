@@ -109,7 +109,9 @@
         lastInitTime: 0,
         currentUrl: window.location.href,
         observer: null,
-        isLoading: false
+        isLoading: false,
+        hasNextPage: true,
+        nextUrl: ''
       };
 
       // --------------------------
@@ -189,8 +191,10 @@
 
         const currentPage = parseInt(nextPageData.dataset.currentPage) || 1;
         const totalPages = parseInt(nextPageData.dataset.totalPages) || 1;
-        let nextUrl = nextPageData.dataset.nextUrl || '';
-        let hasNextPage = nextUrl !== '';
+        
+        // Store in global state instead of local variables
+        window.infiniteScrollState.nextUrl = nextPageData.dataset.nextUrl || '';
+        window.infiniteScrollState.hasNextPage = window.infiniteScrollState.nextUrl !== '';
 
         // Reset state on URL change or page 1
         if (window.infiniteScrollState.currentUrl !== window.location.href || currentPage === 1) {
@@ -208,7 +212,6 @@
         function showLoader() { 
           loader.style.display = 'block'; 
           loader.classList.add('show');
-          // CRITICAL: Hide end indicator when loading
           endIndicator.style.display = 'none';
           endIndicator.classList.remove('show');
         }
@@ -221,9 +224,8 @@
         }
         
         function showEndIndicator() { 
-          // Only show if truly no next page
-          if (!hasNextPage && !window.infiniteScrollState.isLoading) {
-            hideLoader(); // Ensure loader is hidden first
+          if (!window.infiniteScrollState.hasNextPage && !window.infiniteScrollState.isLoading) {
+            hideLoader();
             setTimeout(() => {
               endIndicator.style.display = 'block'; 
               endIndicator.classList.add('show');
@@ -235,8 +237,8 @@
         // Load Next Page (Optimized)
         // --------------------------
         async function loadNextPage() {
-          // Guard clause - prevent multiple loads
-          if (window.infiniteScrollState.isLoading || !hasNextPage) {
+          // Guard clause - use global state
+          if (window.infiniteScrollState.isLoading || !window.infiniteScrollState.hasNextPage) {
             return;
           }
           
@@ -244,11 +246,10 @@
           showLoader();
 
           try {
-            // Use AbortController for timeout
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 sec timeout
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-            const response = await fetch(nextUrl, {
+            const response = await fetch(window.infiniteScrollState.nextUrl, {
               method: 'GET',
               headers: {
                 'X-Requested-With': 'XMLHttpRequest',
@@ -269,7 +270,7 @@
             const newNextData = doc.querySelector('#next-page-data');
             
             if (!newGrid || newGrid.children.length === 0) {
-              hasNextPage = false;
+              window.infiniteScrollState.hasNextPage = false;
               showEndIndicator();
               return; 
             }
@@ -279,7 +280,6 @@
             const uniqueProducts = allProducts.filter(p => !isProductDuplicate(p));
 
             if (uniqueProducts.length > 0) {
-              // Use DocumentFragment for faster DOM insertion
               const fragment = document.createDocumentFragment();
               uniqueProducts.forEach(p => { 
                 markProductAsLoaded(p); 
@@ -287,29 +287,27 @@
               });
               productGrid.appendChild(fragment);
               
-              // Animate after DOM update
               requestAnimationFrame(() => {
                 animateNewProducts(uniqueProducts);
                 initWishlist();
               });
 
-              // Update pagination
+              // Update global state and DOM data
               const newNextUrl = newNextData?.dataset.nextUrl || '';
+              window.infiniteScrollState.nextUrl = newNextUrl;
+              window.infiniteScrollState.hasNextPage = newNextUrl !== '';
+              
               nextPageData.dataset.nextUrl = newNextUrl;
               nextPageData.dataset.currentPage = (parseInt(nextPageData.dataset.currentPage) + 1).toString();
               
-              nextUrl = newNextUrl;
-              hasNextPage = nextUrl !== '';
-              
               // Only reobserve if there's more to load
-              if (hasNextPage) {
+              if (window.infiniteScrollState.hasNextPage) {
                 setTimeout(() => reobserveProducts(), 150);
               } else {
                 showEndIndicator();
               }
             } else {
-              // No unique products means we're done
-              hasNextPage = false;
+              window.infiniteScrollState.hasNextPage = false;
               showEndIndicator();
             }
             
@@ -319,7 +317,7 @@
             } else {
               console.error('Infinite scroll error:', err);
             }
-            hasNextPage = false;
+            window.infiniteScrollState.hasNextPage = false;
             showEndIndicator();
           } finally {
             window.infiniteScrollState.isLoading = false;
@@ -342,17 +340,19 @@
 
           window.infiniteScrollState.observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
-              if (entry.isIntersecting && hasNextPage && !window.infiniteScrollState.isLoading) {
+              // Always check global state
+              if (entry.isIntersecting && 
+                  window.infiniteScrollState.hasNextPage && 
+                  !window.infiniteScrollState.isLoading) {
                 loadNextPage();
               }
             });
           }, { 
             root: null, 
-            rootMargin: '400px 0px', // Trigger earlier for better UX
+            rootMargin: '400px 0px',
             threshold: 0
           });
 
-          // Observe last product only
           const lastProduct = products[products.length - 1];
           if (lastProduct) {
             window.infiniteScrollState.observer.observe(lastProduct);
@@ -362,11 +362,9 @@
         // --------------------------
         // Initial Setup
         // --------------------------
-        // CRITICAL FIX: Don't show end indicator on init unless truly at end
-        if (currentPage >= totalPages && !hasNextPage) {
+        if (currentPage >= totalPages && !window.infiniteScrollState.hasNextPage) {
           showEndIndicator();
-        } else if (hasNextPage) {
-          // Ensure end indicator is hidden on init
+        } else if (window.infiniteScrollState.hasNextPage) {
           endIndicator.style.display = 'none';
           endIndicator.classList.remove('show');
           reobserveProducts();
@@ -401,8 +399,8 @@
           window.infiniteScrollState.currentUrl = window.location.href;
           window.infiniteScrollState.isInitialized = false;
           window.infiniteScrollState.isLoading = false;
+          window.infiniteScrollState.hasNextPage = true;
 
-          // Reset ALL indicators
           const loader = document.getElementById('infinite-scroll-loader');
           const endIndicator = document.getElementById('infinite-scroll-end');
           if (loader) { 
@@ -447,7 +445,6 @@
             let shouldReinit = false;
             mutations.forEach(m => {
               if (m.type === 'childList' && m.addedNodes.length > 5) {
-                // Only reinit if many products added (likely a filter/sort)
                 shouldReinit = true;
               }
             });
