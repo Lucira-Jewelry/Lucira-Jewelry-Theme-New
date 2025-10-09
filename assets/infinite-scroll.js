@@ -114,14 +114,14 @@ class InfiniteScroll extends HTMLElement {
       }
 
       // Handle next infinite scroll
-      const newInfinite = html.querySelector("infinite-scroll");
-      if (newInfinite) {
-        this.replaceWith(newInfinite);
-      } else {
-        // No more pages - show end message
-        this.remove();
-        this.showEndMessage();
-      }
+        const newInfinite = html.querySelector("infinite-scroll");
+        if (newInfinite) {
+            this.replaceWith(newInfinite);
+        } else {
+            // No more pages - show end message
+            this.remove();
+            this.showEndMessage();
+        }
     } catch (err) {
       console.error("InfiniteScroll error:", err);
     }
