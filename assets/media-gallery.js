@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 // Optimized initialization with CLS prevention
 (function() {
-  const COLOR_TOKENS = ["white", "yellow", "rose"];
+  const COLOR_TOKENS = ["white", "yellow", "rose", "platinum"];
   const ALWAYS_SHOW_CODES = ["plt", "mq", "ci", "mh", "mv", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
@@ -153,6 +153,7 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("white")) return "white";
     if (lower.includes("yellow")) return "yellow";
     if (lower.includes("rose")) return "rose";
+    if (lower.includes("platinum")) return "platinum";
     return "";
   }
 
