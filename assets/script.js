@@ -141,7 +141,7 @@ $(document).ready(function () {
             }, 300, function () {
               $otherContent.css("overflow", "hidden");
             });
-            $el.find(".lucira-accordion-icon").html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
+            $el.find(".lucira-accordion-icon").html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
           }
         });
 
@@ -157,7 +157,7 @@ $(document).ready(function () {
           }, 300, function () {
             $content.css("overflow", "hidden");
           });
-          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
+          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
         } else {
           const naturalHeight = $content.css({ height: "auto", paddingTop: "12px", paddingBottom: "12px" }).outerHeight();
 
