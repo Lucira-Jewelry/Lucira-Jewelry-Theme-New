@@ -829,14 +829,24 @@
   {% assign current_blog = blog %}
 {% endif %}
 
-{%- paginate current_blog.articles by 12 -%}
+{% assign article_limit = section.settings.post_limit | default: 12 %}
+
+{% if current_blog.articles_count > article_limit %}
+  {%- paginate current_blog.articles by article_limit -%}
+    {% assign articles_to_show = paginate.items %}
+    {% assign show_pagination = true %}
+  {%- endpaginate -%}
+{% else %}
+  {% assign articles_to_show = current_blog.articles %}
+  {% assign show_pagination = false %}
+{% endif %}
+
 <div class="lucira-section lucira-blog">
   <div class="container-1">
     <div class="header">
       {% if section.settings.title != blank %}
         <h2 class="header-title">{{ section.settings.title }}</h2>
       {% endif %}
-
       {% if section.settings.subtitle != blank %}
         <p class="header-subtitle">{{ section.settings.subtitle }}</p>
       {% endif %}
@@ -845,15 +855,8 @@
     <main>
       <section class="section">
         {% if current_blog != blank %}
-
-          {% comment %}
-            Get the current tag from the URL
-          {% endcomment %}
-          {% assign current_tag = '' %}
-          {% if current_tags.size > 0 %}
-            {% assign current_tag = current_tags.first %}
-          {% endif %}
-
+          {% assign current_tag = current_tags.first %}
+          
           <nav class="blog-nav">
             <button class="dropdown-toggle" data-default-text="Categories">
               {% if current_tags.size > 0 %}
@@ -865,97 +868,26 @@
             <div class="dropdown-content">
               <a href="{{ current_blog.url }}" class="{% if current_tags.size == 0 %}active{% endif %}">All</a>
               {% for tag in current_blog.all_tags %}
-                <a
-                  href="{{ current_blog.url }}/tagged/{{ tag | handle }}"
-                  class="{% if current_tags contains tag %}active{% endif %}"
-                >
-                  {{ tag }}
-                </a>
+                <a href="{{ current_blog.url }}/tagged/{{ tag | handle }}" class="{% if current_tags contains tag %}active{% endif %}">{{ tag }}</a>
               {% endfor %}
             </div>
           </nav>
 
           <div class="blog-grid">
+            {% assign filtered_articles = articles_to_show %}
             {% if current_tags.size > 0 %}
-              {% assign tag_found = false %}
-              {% assign tag_articles_count = 0 %}
-              {% assign all_articles_count = 0 %}
+              {% assign filtered_articles = articles_to_show | where: "tags", current_tags.first %}
+            {% endif %}
 
-              {% for article in current_blog.articles %}
-                {% if article.tags contains current_tags.first %}
-                  {% assign tag_found = true %}
-                  {% assign all_articles_count = all_articles_count | plus: 1 %}
-                  {% assign tag_articles_count = tag_articles_count | plus: 1 %}
-
-                  <a class="a-anchor" href="{{ article.url }}">
-                    <div class="blog-card">
-                      <div class="blog-card-image-container card-image-container">
-                        {% if article.image %}
-                          <img
-                            src="{{ article.image | img_url: '600x600', crop: 'center' }}"
-                            alt="{{ article.title }}"
-                            class="blog-card-image card-image"
-                            loading="lazy"
-                          >
-                        {% else %}
-                          <img
-                            src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
-                            alt="{{ article.title }}"
-                            class="blog-card-image card-image"
-                            loading="lazy"
-                          >
-                        {% endif %}
-                      </div>
-                      <div class="blog-card-category">
-                        {% if article.tags.size > 0 %}
-                          {{ article.tags.first }}
-                        {% else %}
-                          Blog
-                        {% endif %}
-                      </div>
-                      <div class="blog-card-content">
-                        <h3 class="blog-card-title">{{ article.title }}</h3>
-                        <div class="blog-card-avatar-container">
-                          <img
-                            src="{{ 'arrow.svg' | asset_url }}"
-                            alt="Arrow"
-                            class="blog-card-avatar"
-                            loading="lazy"
-                          >
-                        </div>
-                      </div>
-                    </div>
-                  </a>
-                {% endif %}
-              {% endfor %}
-
-              {% if tag_found == false %}
-                <div class="no-posts-message">
-                  <p>No posts found for "{{ current_tags.first }}"</p>
-                </div>
-              {% endif %}
-            {% else %}
-              {% assign all_articles_count = 0 %}
-              {% for article in current_blog.articles %}
-                {% assign all_articles_count = all_articles_count | plus: 1 %}
-
+            {% if filtered_articles.size > 0 %}
+              {% for article in filtered_articles %}
                 <a class="a-anchor" href="{{ article.url }}">
                   <div class="blog-card">
                     <div class="blog-card-image-container card-image-container">
                       {% if article.image %}
-                        <img
-                          src="{{ article.image | img_url: '600x600', crop: 'center' }}"
-                          alt="{{ article.title }}"
-                          class="blog-card-image card-image"
-                          loading="lazy"
-                        >
+                        <img src="{{ article.image | img_url: '600x600', crop: 'center' }}" alt="{{ article.title }}" class="blog-card-image card-image" loading="lazy">
                       {% else %}
-                        <img
-                          src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
-                          alt="{{ article.title }}"
-                          class="blog-card-image card-image"
-                          loading="lazy"
-                        >
+                        <img src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg" alt="{{ article.title }}" class="blog-card-image card-image" loading="lazy">
                       {% endif %}
                     </div>
                     <div class="blog-card-category">
@@ -968,19 +900,22 @@
                     <div class="blog-card-content">
                       <h3 class="blog-card-title">{{ article.title }}</h3>
                       <div class="blog-card-avatar-container">
-                        <img
-                          src="{{ 'arrow.svg' | asset_url }}"
-                          alt="Arrow"
-                          class="blog-card-avatar"
-                          loading="lazy"
-                        >
+                        <img src="{{ 'arrow.svg' | asset_url }}" alt="Arrow" class="blog-card-avatar" loading="lazy">
                       </div>
                     </div>
                   </div>
                 </a>
               {% endfor %}
+            {% else %}
+              <div class="no-posts-message">
+                <p>No posts found{% if current_tags.size > 0 %} for "{{ current_tags.first }}"{% endif %}</p>
+              </div>
             {% endif %}
           </div>
+
+          {% if show_pagination %}
+            {% render 'pagination', paginate: paginate %}
+          {% endif %}
 
         {% else %}
           <div class="text-center">
@@ -990,11 +925,8 @@
       </section>
     </main>
   </div>
-  {% if paginate.pages > 1 %}
-    {% render 'pagination', paginate: paginate %}
-  {% endif %}
 </div>
-{%- endpaginate -%}
+
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
