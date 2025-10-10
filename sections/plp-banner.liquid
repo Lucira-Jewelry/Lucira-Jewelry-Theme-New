@@ -498,259 +498,158 @@
     </div>
   </div>
 
-// REPLACE THE ENTIRE <script> BLOCK AT THE BOTTOM OF THE FILE WITH THIS:
-
-<script>
-  // Performance monitoring with Intersection Observer
-  document.addEventListener("DOMContentLoaded", () => {
-    const section = document.querySelector('.curved-slider-section');
-    if (!section) return;
-
-    // Track performance metrics
-    const performanceMetrics = {
-      sectionVisible: false,
-      wheelInteracted: false,
-      drawerOpened: false
-    };
-
-    // Intersection Observer for section visibility
-    const sectionObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting && !performanceMetrics.sectionVisible) {
-          performanceMetrics.sectionVisible = true;
-          
-          // Push to dataLayer for analytics
-          if (window.dataLayer) {
-            window.dataLayer.push({
-              event: 'sectionVisible',
-              sectionName: 'PLP Collection Banner',
-              timestamp: Date.now()
-            });
-          }
-          
-          console.log('PLP Banner visible:', performanceMetrics);
-        }
-      });
-    }, {
-      threshold: 0.25 // Trigger when 25% visible
-    });
-
-    sectionObserver.observe(section);
-
-    // Observer for individual wheel cards
-    const cards = document.querySelectorAll('.wheel__card');
-    const cardObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.classList.add('card-visible');
-        }
-      });
-    }, {
-      threshold: 0.5,
-      rootMargin: '0px'
-    });
-
-    cards.forEach(card => cardObserver.observe(card));
-
-    // Track wheel interaction
-    const wheel = document.querySelector('.wheel');
-    if (wheel) {
-      wheel.addEventListener('mousedown', () => {
-        if (!performanceMetrics.wheelInteracted) {
-          performanceMetrics.wheelInteracted = true;
-          if (window.dataLayer) {
-            window.dataLayer.push({
-              event: 'wheelInteraction',
-              interactionType: 'drag_start'
-            });
-          }
-        }
-      }, { once: true });
-    }
-
-    // Track drawer open
-    const openBtns = document.querySelectorAll('.open-drawer-btn');
-    openBtns.forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!performanceMetrics.drawerOpened) {
-          performanceMetrics.drawerOpened = true;
-          if (window.dataLayer) {
-            window.dataLayer.push({
-              event: 'drawerOpened',
-              collectionTitle: document.querySelector('.plp-collection-banner__title')?.textContent || 'Unknown'
-            });
-          }
-        }
-      }, { once: true });
-    });
-  });
-
-  // Main carousel setup with Intersection Observer optimization
-  document.addEventListener("DOMContentLoaded", () => {
-    gsap.registerPlugin(Draggable);
-
-    function setupCarousel() {
-      const wheel = document.querySelector(".wheel");
-      if (!wheel) return;
-
-      const cards = gsap.utils.toArray(".wheel__card");
-      const count = 8;
-      const radius = wheel.offsetWidth / 2;
-      const center = radius;
-      const DEG2RAD = Math.PI / 180;
-
-      const arc = window.innerWidth < 767 ? 180 : 140;
-      const startAngle = -arc / 2;
-      const slice = arc / (count - 1);
-
-      // Use Intersection Observer to lazy-animate cards
-      const carouselObserver = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            const card = entry.target;
-            const i = cards.indexOf(card);
-            const angle = startAngle + i * slice;
-            const rad = angle * DEG2RAD;
-            const x = center + radius * Math.cos(rad);
-            const y = center + radius * Math.sin(rad);
-            const distanceFromCenter = Math.abs(i - Math.floor(count / 2));
-            const maxDist = Math.floor(count / 2);
-            const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDist) * 0.6);
-            const scale = Math.max(0.75, 1 - (distanceFromCenter / maxDist) * 0.25);
-
-            gsap.set(card, {
-              x: x,
-              y: y,
-              xPercent: -50,
-              yPercent: -50,
-              rotation: angle + 270,
-            });
-            
-            carouselObserver.unobserve(card);
-          }
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      gsap.registerPlugin(Draggable);
+  
+      function setupCarousel() {
+        const wheel = document.querySelector(".wheel");
+        if (!wheel) return;
+  
+        const cards = gsap.utils.toArray(".wheel__card");
+        const count = 8;
+        const radius = wheel.offsetWidth / 2;
+        const center = radius;
+        const DEG2RAD = Math.PI / 180;
+  
+        const arc = window.innerWidth < 767 ? 180 : 140;
+        const startAngle = -arc / 2;
+        const slice = arc / (count - 1);
+  
+        cards.forEach((card, i) => {
+          const angle = startAngle + i * slice;
+          const rad = angle * DEG2RAD;
+          const x = center + radius * Math.cos(rad);
+          const y = center + radius * Math.sin(rad);
+          const distanceFromCenter = Math.abs(i - Math.floor(count / 2));
+          const maxDist = Math.floor(count / 2);
+          const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDist) * 0.6);
+          const scale = Math.max(0.75, 1 - (distanceFromCenter / maxDist) * 0.25);
+  
+          gsap.set(card, {
+            x: x,
+            y: y,
+            xPercent: -50,
+            yPercent: -50,
+            rotation: angle + 270,
+          });
         });
-      }, { rootMargin: '100px' });
-
-      cards.forEach((card) => {
-        carouselObserver.observe(card);
-      });
-
-      gsap.set(wheel, { rotation: 0 });
-
-      if (window.wheelDraggable && window.wheelDraggable.kill) {
-        window.wheelDraggable.kill();
-      }
-
-      const isMobile = window.innerWidth <= 767;
-      let isDragging = false;
-      let touchStartTime = 0;
-      let startX = 0;
-      let startY = 0;
-
-      window.wheelDraggable = Draggable.create(wheel, {
-        type: "rotation",
-        inertia: true,
-        onDragStart: () => {
-          isDragging = true;
-        },
-        onDragEnd: () => {
-          setTimeout(() => { isDragging = false; }, 50);
-        },
-        onThrowUpdate: updateVisuals,
-        snap: (endValue) => {
-          const snapAngle = 360 / count;
-          return Math.round(endValue / snapAngle) * snapAngle;
-        },
-        allowEvent: (e) => {
-          return !(e.target.closest('a') && isDragging);
-        },
-        onClick: (e) => {
-          if (e.target.closest('a') && isDragging) {
-            return false;
-          }
+  
+        gsap.set(wheel, { rotation: 0 });
+  
+        if (window.wheelDraggable && window.wheelDraggable.kill) {
+          window.wheelDraggable.kill();
         }
-      })[0];
-
-      // Accurate click on mobile with scale animation
-      if (isMobile) {
-        wheel.addEventListener("touchstart", (e) => {
-          touchStartTime = Date.now();
-          isDragging = false;
-          const touch = e.touches[0];
-          startX = touch.clientX;
-          startY = touch.clientY;
-        });
-
-        wheel.addEventListener("touchend", (e) => {
-          const timeDiff = Date.now() - touchStartTime;
-          const touch = e.changedTouches[0];
-          const deltaX = Math.abs(touch.clientX - startX);
-          const deltaY = Math.abs(touch.clientY - startY);
-          const moved = deltaX > 10 || deltaY > 10;
-
-          if (!moved && timeDiff < 250) {
-            const card = e.target.closest(".wheel__card");
-            const link = e.target.closest("a");
-
-            if (card) {
-              // Feedback animation on mobile tap
-              gsap.fromTo(
-                card,
-                { scale: 0.95 },
-                {
-                  scale: 1,
-                  duration: 0.3,
-                  ease: "power2.out",
-                }
-              );
-            }
-
-            if (link) {
-              e.preventDefault();
-              e.stopPropagation();
-              // Delay to show animation before navigating
-              setTimeout(() => link.click(), 150);
+  
+        const isMobile = window.innerWidth <= 767;
+        let isDragging = false;
+        let touchStartTime = 0;
+        let startX = 0;
+        let startY = 0;
+  
+        window.wheelDraggable = Draggable.create(wheel, {
+          type: "rotation",
+          inertia: true,
+          onDragStart: () => {
+            isDragging = true;
+          },
+          onDragEnd: () => {
+            setTimeout(() => { isDragging = false; }, 50);
+          },
+          onThrowUpdate: updateVisuals,
+          snap: (endValue) => {
+            const snapAngle = 360 / count;
+            return Math.round(endValue / snapAngle) * snapAngle;
+          },
+          allowEvent: (e) => {
+            return !(e.target.closest('a') && isDragging);
+          },
+          onClick: (e) => {
+            if (e.target.closest('a') && isDragging) {
+              return false;
             }
           }
-        });
+        })[0];
+  
+        // Accurate click on mobile with scale animation
+        if (isMobile) {
+          wheel.addEventListener("touchstart", (e) => {
+            touchStartTime = Date.now();
+            isDragging = false;
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+          });
+  
+          wheel.addEventListener("touchend", (e) => {
+            const timeDiff = Date.now() - touchStartTime;
+            const touch = e.changedTouches[0];
+            const deltaX = Math.abs(touch.clientX - startX);
+            const deltaY = Math.abs(touch.clientY - startY);
+            const moved = deltaX > 10 || deltaY > 10;
+  
+            if (!moved && timeDiff < 250) {
+              const card = e.target.closest(".wheel__card");
+              const link = e.target.closest("a");
+  
+              if (card) {
+                // Feedback animation on mobile tap
+                gsap.fromTo(
+                  card,
+                  { scale: 0.95 },
+                  {
+                    scale: 1,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  }
+                );
+              }
+  
+              if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Delay to show animation before navigating
+                setTimeout(() => link.click(), 150);
+              }
+            }
+          });
+        }
       }
-    }
-
-    function updateVisuals() {
-      // Optional: animation sync on throw or rotate
-    }
-
-    setupCarousel();
-    window.addEventListener("resize", setupCarousel);
-  });
-
-  // Drawer functionality
-  document.addEventListener("DOMContentLoaded", function () {
-    const openBtns = document.querySelectorAll(".open-drawer-btn");
-    const wrapper = document.getElementById("plp-drawer-wrapper");
-    const overlay = wrapper?.querySelector(".drawer-overlay");
-    const closeBtn = wrapper?.querySelector(".drawer-close");
-    const continueBtn = wrapper?.querySelector(".continue-button");
-
-    const openDrawer = () => {
-      wrapper.classList.remove("hidden");
-      document.body.classList.add("drawer-open");
-    };
-
-    const closeDrawer = () => {
-      wrapper.classList.add("hidden");
-      document.body.classList.remove("drawer-open");
-    };
-
-    openBtns.forEach(btn => {
-      btn.addEventListener("click", openDrawer);
+  
+      function updateVisuals() {
+        // Optional: animation sync on throw or rotate
+      }
+  
+      setupCarousel();
+      window.addEventListener("resize", setupCarousel);
     });
-
-    closeBtn?.addEventListener("click", closeDrawer);
-    overlay?.addEventListener("click", closeDrawer);
-    continueBtn?.addEventListener("click", function (e) {
-      e.preventDefault();
-      closeDrawer();
-    });
+  
+    document.addEventListener("DOMContentLoaded", function () {
+      const openBtns = document.querySelectorAll(".open-drawer-btn");
+      const wrapper = document.getElementById("plp-drawer-wrapper");
+      const overlay = wrapper?.querySelector(".drawer-overlay");
+      const closeBtn = wrapper?.querySelector(".drawer-close");
+      const continueBtn = wrapper?.querySelector(".continue-button");
+  
+      const openDrawer = () => {
+        wrapper.classList.remove("hidden");
+        document.body.classList.add("drawer-open");
+      };
+  
+      const closeDrawer = () => {
+        wrapper.classList.add("hidden");
+        document.body.classList.remove("drawer-open");
+      };
+  
+      openBtns.forEach(btn => {
+        btn.addEventListener("click", openDrawer);
+      });
+  
+      closeBtn?.addEventListener("click", closeDrawer);
+      overlay?.addEventListener("click", closeDrawer);
+      continueBtn?.addEventListener("click", function (e) {
+        e.preventDefault();
+        closeDrawer();
+      });
   });
-</script>
+  </script>
