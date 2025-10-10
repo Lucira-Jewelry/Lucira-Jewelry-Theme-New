@@ -1,4 +1,3 @@
-
 {% assign show_banner = true %}
 
 {% if section.settings.exclude_from_collections %}
@@ -12,14 +11,15 @@
 
 {% if show_banner %}
 {{ 'plp-banner.css' | asset_url | stylesheet_tag }}
-<script src="{{ 'gsap.min.js' | asset_url }}" defer></script>
-<script src="{{ 'Draggable.min.js' | asset_url }}" defer></script>
+
+<!-- Preconnect to Shopify CDN for faster image loading -->
+<link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
 
 <!-- Drawer Content (if metafields exist) -->
 {% assign drawer_content = collection.metafields.custom.plp_banner_content %}
 {% assign drawer_image = collection.metafields.custom.plp_drawer_image %}
 
-<section class="curved-slider-section">
+<section class="curved-slider-section" data-carousel-observer>
   <div class="curve-bg">
     <div class="plp-collection-banner__content">
       {% if section.settings.show_breadcrumbs %}
@@ -78,14 +78,6 @@
         {% endif %}
       </div>
 
-      {% comment %} {% if section.settings.show_description and collection.description != blank %}
-        <div class="plp-collection-banner__description">
-          {{ collection.description }}
-        </div>
-      {% endif %} {% endcomment %}
-
-      
-
       {% if drawer_content != blank %}
         <div class="plp-collection-banner__drawer-trigger">
           <p class="plp-collection-banner__drawer-preview">
@@ -108,8 +100,10 @@
     </div>
   </div>
   {% if collection.metafields.custom.banner_filter_activated == true %}
-  <div class="wheel-wrapper">
-    <div class="wheel">
+  <div class="wheel-wrapper" data-wheel-container>
+    <!-- Placeholder to prevent layout shift -->
+    <div class="wheel-placeholder" style="width: 100%; height: 100%; position: absolute;"></div>
+    <div class="wheel" data-wheel-element>
       {% comment %} First loop through all metafield items {% endcomment %}
       {% for block in collection.metafields.custom.collection_banner_filter.value %}
         {% if block.collection and block.banner_image %}
@@ -140,8 +134,8 @@
                   alt="{{ block.banner_label | default: block.collection.value.title }}"
                   loading="lazy"
                   decoding="async"
-                  width="auto"
-                  height="auto"
+                  width="240"
+                  height="240"
                 >
               </picture>
             </a>
@@ -192,8 +186,8 @@
                         alt="{{ block.banner_label | default: block.collection.value.title }}"
                         loading="lazy"
                         decoding="async"
-                        width="auto"
-                        height="auto"
+                        width="240"
+                        height="240"
                       >
                     </picture>
                   </a>
@@ -208,8 +202,10 @@
     </div>
   </div>
 {% else %}
-  <div class="wheel-wrapper">
-  <div class="wheel">
+  <div class="wheel-wrapper" data-wheel-container>
+    <!-- Placeholder to prevent layout shift -->
+    <div class="wheel-placeholder" style="width: 100%; height: 100%; position: absolute;"></div>
+    <div class="wheel" data-wheel-element>
     {% comment %} Hardcoded collections data - URL|Title|ImageURL {% endcomment %}
     {% assign hardcoded_collections = "
       /collections/all-rings|Rings|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rings.jpg?v=1752557714,
@@ -262,10 +258,16 @@
   .collection-template-page .header-wrapper {background-attachment: fixed; border: 0;}
 
   .curved-slider-section .wheel{position:absolute;bottom:140px;left:50%;transform:translateX(-50%);width:1900px;height:1900px;pointer-events:none;z-index:2}
-  .curved-slider-section .wheel__card{position:absolute;width:200px;height:200px;border-radius:50%;overflow:hidden;background:#fff;pointer-events:auto;cursor:pointer}
+  .curved-slider-section .wheel__card{position:absolute;width:200px;height:200px;border-radius:50%;overflow:hidden;background:#fff;pointer-events:auto;cursor:pointer;opacity:0;transition:opacity 0.3s ease}
+  .curved-slider-section .wheel__card.loaded{opacity:1}
   .curved-slider-section .wheel__card img{width:100%;height:100%;object-fit:cover;object-position:bottom}
 
   .plp-collection-banner__content { margin-bottom: 120px; }
+
+  /* Prevent layout shift */
+  .wheel-placeholder {
+    min-height: 670px;
+  }
 
   @media (max-width: 768px) {
     .curved-slider-section .wheel{cursor:grabbing}
@@ -281,7 +283,7 @@
     .curved-slider-section .wheel {width: 600px; height: 600px; bottom: 0;}
     .curved-slider-section .curve-bg {height: 390px;}
     .curved-slider-section .wheel-wrapper {bottom: 60px;}
-    
+    .wheel-placeholder { min-height: 400px; }
   }
   @media only screen and (min-width:1600px) and (max-width:1920px){
     .curved-slider-section .curve-bg {height: 815px;}
@@ -499,54 +501,78 @@
   </div>
 
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      gsap.registerPlugin(Draggable);
-  
-      function setupCarousel() {
-        const wheel = document.querySelector(".wheel");
-        if (!wheel) return;
-  
-        const cards = gsap.utils.toArray(".wheel__card");
-        const count = 8;
-        const radius = wheel.offsetWidth / 2;
-        const center = radius;
-        const DEG2RAD = Math.PI / 180;
-  
-        const arc = window.innerWidth < 767 ? 180 : 140;
-        const startAngle = -arc / 2;
-        const slice = arc / (count - 1);
-  
-        cards.forEach((card, i) => {
-          const angle = startAngle + i * slice;
-          const rad = angle * DEG2RAD;
-          const x = center + radius * Math.cos(rad);
-          const y = center + radius * Math.sin(rad);
-          const distanceFromCenter = Math.abs(i - Math.floor(count / 2));
-          const maxDist = Math.floor(count / 2);
-          const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDist) * 0.6);
-          const scale = Math.max(0.75, 1 - (distanceFromCenter / maxDist) * 0.25);
-  
-          gsap.set(card, {
-            x: x,
-            y: y,
-            xPercent: -50,
-            yPercent: -50,
-            rotation: angle + 270,
+    // Optimized script loading with IntersectionObserver
+    (function() {
+      let gsapLoaded = false;
+      let draggableLoaded = false;
+      let carouselInitialized = false;
+
+      // Load scripts dynamically only when needed
+      function loadScript(src, callback) {
+        const script = document.createElement('script');
+        script.src = src;
+        script.defer = true;
+        script.onload = callback;
+        document.head.appendChild(script);
+      }
+
+      // Function to check if both scripts are loaded
+      function checkScriptsLoaded() {
+        if (gsapLoaded && draggableLoaded && !carouselInitialized) {
+          carouselInitialized = true;
+          setupCarousel();
+        }
+      }
+
+      // Setup IntersectionObserver for carousel
+      function initCarouselObserver() {
+        const carouselSection = document.querySelector('[data-carousel-observer]');
+        if (!carouselSection) return;
+
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(entry => {
+            if (entry.isIntersecting && !carouselInitialized) {
+              // Load scripts when carousel comes into view
+              loadScript("{{ 'gsap.min.js' | asset_url }}", function() {
+                gsapLoaded = true;
+                checkScriptsLoaded();
+              });
+              
+              loadScript("{{ 'Draggable.min.js' | asset_url }}", function() {
+                draggableLoaded = true;
+                checkScriptsLoaded();
+              });
+
+              // Disconnect observer after triggering
+              observer.disconnect();
+            }
           });
+        }, {
+          rootMargin: '200px 0px', // Start loading 200px before carousel enters viewport
+          threshold: 0.01
         });
-  
+
+        observer.observe(carouselSection);
+      }
+
+      function setupCarousel() {
+        if (!window.gsap || !window.Draggable) {
+          console.warn('GSAP or Draggable not loaded yet');
+          return;
+        }
+
         gsap.set(wheel, { rotation: 0 });
-  
+    
         if (window.wheelDraggable && window.wheelDraggable.kill) {
           window.wheelDraggable.kill();
         }
-  
+    
         const isMobile = window.innerWidth <= 767;
         let isDragging = false;
         let touchStartTime = 0;
         let startX = 0;
         let startY = 0;
-  
+    
         window.wheelDraggable = Draggable.create(wheel, {
           type: "rotation",
           inertia: true,
@@ -570,7 +596,7 @@
             }
           }
         })[0];
-  
+    
         // Accurate click on mobile with scale animation
         if (isMobile) {
           wheel.addEventListener("touchstart", (e) => {
@@ -580,18 +606,18 @@
             startX = touch.clientX;
             startY = touch.clientY;
           });
-  
+    
           wheel.addEventListener("touchend", (e) => {
             const timeDiff = Date.now() - touchStartTime;
             const touch = e.changedTouches[0];
             const deltaX = Math.abs(touch.clientX - startX);
             const deltaY = Math.abs(touch.clientY - startY);
             const moved = deltaX > 10 || deltaY > 10;
-  
+    
             if (!moved && timeDiff < 250) {
               const card = e.target.closest(".wheel__card");
               const link = e.target.closest("a");
-  
+    
               if (card) {
                 // Feedback animation on mobile tap
                 gsap.fromTo(
@@ -604,7 +630,7 @@
                   }
                 );
               }
-  
+    
               if (link) {
                 e.preventDefault();
                 e.stopPropagation();
@@ -614,42 +640,64 @@
             }
           });
         }
+
+        // Setup resize observer with debounce
+        let resizeTimeout;
+        window.addEventListener("resize", () => {
+          clearTimeout(resizeTimeout);
+          resizeTimeout = setTimeout(setupCarousel, 250);
+        });
       }
-  
+    
       function updateVisuals() {
         // Optional: animation sync on throw or rotate
       }
-  
-      setupCarousel();
-      window.addEventListener("resize", setupCarousel);
-    });
-  
-    document.addEventListener("DOMContentLoaded", function () {
-      const openBtns = document.querySelectorAll(".open-drawer-btn");
-      const wrapper = document.getElementById("plp-drawer-wrapper");
-      const overlay = wrapper?.querySelector(".drawer-overlay");
-      const closeBtn = wrapper?.querySelector(".drawer-close");
-      const continueBtn = wrapper?.querySelector(".continue-button");
-  
-      const openDrawer = () => {
-        wrapper.classList.remove("hidden");
-        document.body.classList.add("drawer-open");
-      };
-  
-      const closeDrawer = () => {
-        wrapper.classList.add("hidden");
-        document.body.classList.remove("drawer-open");
-      };
-  
-      openBtns.forEach(btn => {
-        btn.addEventListener("click", openDrawer);
-      });
-  
-      closeBtn?.addEventListener("click", closeDrawer);
-      overlay?.addEventListener("click", closeDrawer);
-      continueBtn?.addEventListener("click", function (e) {
-        e.preventDefault();
-        closeDrawer();
-      });
-  });
+
+      // Initialize observer when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initCarouselObserver);
+      } else {
+        initCarouselObserver();
+      }
+
+      // Drawer functionality with lazy initialization
+      function initDrawer() {
+        const openBtns = document.querySelectorAll(".open-drawer-btn");
+        const wrapper = document.getElementById("plp-drawer-wrapper");
+        
+        if (!wrapper || openBtns.length === 0) return;
+
+        const overlay = wrapper.querySelector(".drawer-overlay");
+        const closeBtn = wrapper.querySelector(".drawer-close");
+        const continueBtn = wrapper.querySelector(".continue-button");
+    
+        const openDrawer = () => {
+          wrapper.classList.remove("hidden");
+          document.body.classList.add("drawer-open");
+        };
+    
+        const closeDrawer = () => {
+          wrapper.classList.add("hidden");
+          document.body.classList.remove("drawer-open");
+        };
+    
+        openBtns.forEach(btn => {
+          btn.addEventListener("click", openDrawer);
+        });
+    
+        closeBtn?.addEventListener("click", closeDrawer);
+        overlay?.addEventListener("click", closeDrawer);
+        continueBtn?.addEventListener("click", function (e) {
+          e.preventDefault();
+          closeDrawer();
+        });
+      }
+
+      // Initialize drawer
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDrawer);
+      } else {
+        initDrawer();
+      }
+    })();
   </script>
