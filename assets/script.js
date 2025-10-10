@@ -92,7 +92,7 @@ $(document).ready(function () {
         $(".lucira-accordion-toggle").removeClass("active")
           .off("click")
           .find(".lucira-accordion-icon")
-          .html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
+          .html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
         initialized = false;
       }
       return;
@@ -124,7 +124,7 @@ $(document).ready(function () {
           paddingTop: "0",
           paddingBottom: "0"
         });
-        $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
+        $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
       }
 
       $toggle.on("click", function () {
