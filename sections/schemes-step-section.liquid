@@ -1,4 +1,4 @@
-<section class="curved-steps-slider-section">
+<section class="curved-steps-slider-section" style="opacity: 0; transition: opacity 0.6s ease-in-out;">
     <div class="title-wrapper">
         {% if section.settings.curved_steps_title != blank %}
             <h2>{{ section.settings.curved_steps_title }}</h2>
@@ -55,150 +55,176 @@
 
 <script>
     (function() {
-        const totalSteps = {{ section.blocks.size }};
-        const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
-        const progressPath = document.getElementById('progressPath');
         const sliderSection = document.querySelector('.curved-steps-slider-section');
+        const totalSteps = {{ section.blocks.size }};
+        
+        // Intersection Observer to handle visibility
+        const observerOptions = {
+            root: null,
+            rootMargin: '0px',
+            threshold: 0.1
+        };
 
-        let isLocked = false;
-        let scrollAccumulator = 0;
-        const scrollThreshold = 50; // Reduced for more responsive scrolling
-        let lastScrollTime = 0;
-        const scrollCooldown = 100; // Minimum time between scroll detections
-
-        // Initialize Swiper with VERTICAL direction
-        const swiper = new Swiper('.curved-steps-swiper', {
-            direction: 'vertical',
-            slidesPerView: 1,
-            spaceBetween: 0,
-            speed: 600,
-            allowTouchMove: true,
-            effect: 'slide',
-            mousewheel: false, // We'll handle this manually for better control
-            on: {
-                slideChange: function() {
-                    updateDotsAndProgress(this.activeIndex + 1);
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && !sliderSection.classList.contains('loaded')) {
+                    initializeSlider();
                 }
+            });
+        }, observerOptions);
+
+        observer.observe(sliderSection);
+
+        function initializeSlider() {
+            // Wait for Swiper library to be fully loaded
+            if (typeof Swiper === 'undefined') {
+                setTimeout(initializeSlider, 100);
+                return;
             }
-        });
 
-        function updateDotsAndProgress(step) {
-            dots.forEach((dot, index) => {
-                dot.classList.remove('active');
-                if (index + 1 === step) {
-                    dot.classList.add('active');
-                    dot.classList.remove('small');
-                } else {
-                    dot.classList.add('small');
+            const dots = document.querySelectorAll('.curved-steps-slider-section .step-dot');
+            const progressPath = document.getElementById('progressPath');
+
+            let isLocked = false;
+            let scrollAccumulator = 0;
+            const scrollThreshold = 50;
+            let lastScrollTime = 0;
+            const scrollCooldown = 100;
+
+            // Initialize Swiper with VERTICAL direction
+            const swiper = new Swiper('.curved-steps-swiper', {
+                direction: 'vertical',
+                slidesPerView: 1,
+                spaceBetween: 0,
+                speed: 600,
+                allowTouchMove: true,
+                effect: 'slide',
+                mousewheel: false,
+                on: {
+                    slideChange: function() {
+                        updateDotsAndProgress(this.activeIndex + 1);
+                    },
+                    init: function() {
+                        // Mark as loaded and show section after Swiper is initialized
+                        setTimeout(() => {
+                            sliderSection.style.opacity = '1';
+                            sliderSection.classList.add('loaded');
+                        }, 100);
+                    }
                 }
             });
 
-            // Custom values for each step
-            const stepValues = {
-                1: { dasharray: 502.465, dashoffset: 408.465 },
-                2: { dasharray: 435.465, dashoffset: 272.31 },
-                3: { dasharray: 390.465, dashoffset: 136.155 },
-                4: { dasharray: 410.465, dashoffset: 0 }
-            };
+            function updateDotsAndProgress(step) {
+                dots.forEach((dot, index) => {
+                    dot.classList.remove('active');
+                    if (index + 1 === step) {
+                        dot.classList.add('active');
+                        dot.classList.remove('small');
+                    } else {
+                        dot.classList.add('small');
+                    }
+                });
 
-            const values = stepValues[step] || stepValues[1];
-            progressPath.style.strokeDasharray = values.dasharray;
-            progressPath.style.strokeDashoffset = values.dashoffset;
-        }
+                const stepValues = {
+                    1: { dasharray: 502.465, dashoffset: 408.465 },
+                    2: { dasharray: 435.465, dashoffset: 272.31 },
+                    3: { dasharray: 390.465, dashoffset: 136.155 },
+                    4: { dasharray: 410.465, dashoffset: 0 }
+                };
 
-        function isSectionCentered() {
-            const rect = sliderSection.getBoundingClientRect();
-            const windowHeight = window.innerHeight;
-            
-            const isInViewport = rect.top < windowHeight && rect.bottom > 0;
-            
-            if (!isInViewport) return false;
-            
-            const sectionMiddle = rect.top + (rect.height / 2);
-            const windowMiddle = windowHeight / 2;
-            
-            const tolerance = windowHeight * 0.2; // Slightly increased tolerance
-            
-            return Math.abs(sectionMiddle - windowMiddle) < tolerance;
-        }
+                const values = stepValues[step] || stepValues[1];
+                progressPath.style.strokeDasharray = values.dasharray;
+                progressPath.style.strokeDashoffset = values.dashoffset;
+            }
 
-        dots.forEach(dot => {
-            dot.addEventListener('click', () => {
-                const step = parseInt(dot.dataset.step);
-                swiper.slideTo(step - 1);
-                scrollAccumulator = 0; // Reset accumulator on click
+            function isSectionCentered() {
+                const rect = sliderSection.getBoundingClientRect();
+                const windowHeight = window.innerHeight;
+                
+                const isInViewport = rect.top < windowHeight && rect.bottom > 0;
+                
+                if (!isInViewport) return false;
+                
+                const sectionMiddle = rect.top + (rect.height / 2);
+                const windowMiddle = windowHeight / 2;
+                
+                const tolerance = windowHeight * 0.2;
+                
+                return Math.abs(sectionMiddle - windowMiddle) < tolerance;
+            }
+
+            dots.forEach(dot => {
+                dot.addEventListener('click', () => {
+                    const step = parseInt(dot.dataset.step);
+                    swiper.slideTo(step - 1);
+                    scrollAccumulator = 0;
+                });
             });
-        });
 
-        window.addEventListener('wheel', (e) => {
-            const centered = isSectionCentered();
-            const currentTime = Date.now();
+            window.addEventListener('wheel', (e) => {
+                const centered = isSectionCentered();
+                const currentTime = Date.now();
 
-            if (centered) {
-                const canScrollDown = swiper.activeIndex < totalSteps - 1;
-                const canScrollUp = swiper.activeIndex > 0;
+                if (centered) {
+                    const canScrollDown = swiper.activeIndex < totalSteps - 1;
+                    const canScrollUp = swiper.activeIndex > 0;
 
-                // Allow page scroll if at boundaries
-                if (!canScrollDown && e.deltaY > 0) {
-                    scrollAccumulator = 0;
-                    return;
-                }
-
-                if (!canScrollUp && e.deltaY < 0) {
-                    scrollAccumulator = 0;
-                    return;
-                }
-
-                e.preventDefault();
-
-                // Skip if locked or in cooldown
-                if (isLocked || (currentTime - lastScrollTime) < scrollCooldown) {
-                    return;
-                }
-
-                // Normalize scroll delta for different input devices
-                const normalizedDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100);
-                scrollAccumulator += normalizedDelta;
-
-                // Check if threshold is reached
-                if (Math.abs(scrollAccumulator) >= scrollThreshold) {
-                    isLocked = true;
-                    lastScrollTime = currentTime;
-
-                    if (scrollAccumulator > 0 && canScrollDown) {
-                        swiper.slideNext();
-                    } else if (scrollAccumulator < 0 && canScrollUp) {
-                        swiper.slidePrev();
+                    if (!canScrollDown && e.deltaY > 0) {
+                        scrollAccumulator = 0;
+                        return;
                     }
 
+                    if (!canScrollUp && e.deltaY < 0) {
+                        scrollAccumulator = 0;
+                        return;
+                    }
+
+                    e.preventDefault();
+
+                    if (isLocked || (currentTime - lastScrollTime) < scrollCooldown) {
+                        return;
+                    }
+
+                    const normalizedDelta = Math.sign(e.deltaY) * Math.min(Math.abs(e.deltaY), 100);
+                    scrollAccumulator += normalizedDelta;
+
+                    if (Math.abs(scrollAccumulator) >= scrollThreshold) {
+                        isLocked = true;
+                        lastScrollTime = currentTime;
+
+                        if (scrollAccumulator > 0 && canScrollDown) {
+                            swiper.slideNext();
+                        } else if (scrollAccumulator < 0 && canScrollUp) {
+                            swiper.slidePrev();
+                        }
+
+                        scrollAccumulator = 0;
+
+                        setTimeout(() => {
+                            isLocked = false;
+                        }, 650);
+                    }
+                } else {
                     scrollAccumulator = 0;
-
-                    setTimeout(() => {
-                        isLocked = false;
-                    }, 650); // Slightly longer than slide transition
+                    isLocked = false;
                 }
-            } else {
-                scrollAccumulator = 0;
-                isLocked = false;
-            }
-        }, { passive: false });
+            }, { passive: false });
 
-        // Reset on scroll when leaving section
-        let wasInSection = false;
-        window.addEventListener('scroll', () => {
-            const inSection = isSectionCentered();
-            if (wasInSection && !inSection) {
-                scrollAccumulator = 0;
-                isLocked = false;
-            }
-            wasInSection = inSection;
-        });
+            let wasInSection = false;
+            window.addEventListener('scroll', () => {
+                const inSection = isSectionCentered();
+                if (wasInSection && !inSection) {
+                    scrollAccumulator = 0;
+                    isLocked = false;
+                }
+                wasInSection = inSection;
+            });
 
-        // Initialize with step 1 values
-        progressPath.style.strokeDasharray = 502.465;
-        progressPath.style.strokeDashoffset = 408.465;
-        
-        updateDotsAndProgress(1);
+            progressPath.style.strokeDasharray = 502.465;
+            progressPath.style.strokeDashoffset = 408.465;
+            
+            updateDotsAndProgress(1);
+        }
     })();
 </script>
 
@@ -216,28 +242,34 @@
     .curved-steps-slider-section .curve-path{fill:#F4F0F0;stroke:#1A1A1A;stroke-width:1}
     .curved-steps-slider-section .curve-progress{fill:none;stroke:#d4a0b8;stroke-width:2;stroke-linecap:round;stroke-dasharray:1000;stroke-dashoffset:1000;transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
     
+    /* Reserve space to prevent layout shift */
+    .curved-steps-slider-section {
+        min-height: 600px;
+        position: relative;
+        padding: 60px 0 0;
+    }
+    
     /* VERTICAL SLIDER STYLES */
     .curved-steps-swiper {
         flex: 1;
         max-width: 940px;
         overflow: hidden;
-        height: 500px; /* Fixed height for vertical scrolling */
+        height: 500px;
     }
     
     .curved-steps-swiper .swiper-wrapper {
         display: flex;
-        flex-direction: column; /* Vertical layout */
+        flex-direction: column;
     }
     
     .curved-steps-swiper .swiper-slide {
         width: 100%;
-        height: 500px; /* Match swiper height */
+        height: 500px;
         flex-shrink: 0;
     }
     
     .slider-container {display: grid ; grid-template-columns: calc(25% - 0px) calc(70% - 0px); align-items: flex-start; margin: 60px 0 0;}
     .slider-container .slide-content {display: flex ; align-items: center; gap: 40px;}
-    .curved-steps-slider-section { position: relative; padding: 60px 0 0;}
     
     .curved-steps-slider-section .content-image{width:100%;max-width:370px;overflow:hidden;margin-bottom:0px;box-shadow:0 10px 40px rgba(0,0,0,.1)}
     .curved-steps-slider-section .content-image img{width:100%;height:100%;object-fit:cover;display: block;}
@@ -246,14 +278,16 @@
     .curved-steps-slider-section h2 {font-weight: 500; font-size: 24px; line-height: 150%; text-align: center; vertical-align: middle; text-transform: uppercase; margin-top: 0; margin-bottom: 12px;}
     .curved-steps-slider-section p {color: #1a1a1a; max-width: 690px; margin: 0 auto; font-weight: 400; font-size: 16px; letter-spacing: 1px; text-align: center; vertical-align: middle; line-height: 1.6;}
     .slider-container .content-text h2, .slider-container .content-text p{text-align: left;}
+    
     @media (max-width:1024px){
-    .curved-steps-slider-section .slider-container{flex-direction:column;gap:36px}
-    .curved-steps-slider-section .semicircle-wrapper{width:300px;height:300px}
-    .curved-steps-swiper {height: 460px;}
-    .curved-steps-swiper .swiper-slide {height: 400px;}
+        .curved-steps-slider-section .slider-container{flex-direction:column;gap:36px}
+        .curved-steps-slider-section .semicircle-wrapper{width:300px;height:300px}
+        .curved-steps-swiper {height: 460px;}
+        .curved-steps-swiper .swiper-slide {height: 400px;}
     }
+    
     @media (max-width:767px){
-      .curved-steps-slider-section {padding: 30px 0;}
+      .curved-steps-slider-section {padding: 30px 0; min-height: 500px;}
       .curved-steps-slider-section .step-1 {top: 30px; left: 20%; transform: translate(-50%, -50%);}
       .step-dot.active { width: 50px; height: 50px; color: #fff; background: #DAA7B4; font-size: 14px; box-shadow: 0 8px 30px rgba(212, 160, 184, .4); z-index: 2; }
       .curved-steps-slider-section .step-2 { top: 32%; right: 168px; transform: translate(50% 50% , -50%); }
@@ -268,7 +302,6 @@
       .curved-steps-slider-section h2 {font-size: 18px;}
       .curved-steps-slider-section p { color: #1a1a1a; margin: 0 auto; letter-spacing: 1px; vertical-align: middle; font-weight: 400; font-size: 12px; line-height: 150%; text-align: center; max-width: 90%; }
       .curved-steps-slider-section .content-text p {margin: 0;}
-
       .curved-steps-swiper .swiper-slide {height: 350px;}
       .curved-steps-slider-section .semicircle-wrapper {width: 240px;}
       .curved-steps-slider-section .step-3 {bottom: 100px; right: 135px; transform: translate(50%, 50%);}
