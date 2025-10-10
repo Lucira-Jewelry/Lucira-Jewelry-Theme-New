@@ -822,7 +822,14 @@
     .lucira-blog .blog-card-title { font-size: 12px; !important;}
   }
 </style>
-{%- paginate blog.articles by 12 -%}
+{% assign blog_handle = section.settings.blog %}
+{% if blog_handle != blank %}
+  {% assign current_blog = blogs[blog_handle] %}
+{% else %}
+  {% assign current_blog = blog %}
+{% endif %}
+
+{%- paginate current_blog.articles by 12 -%}
 <div class="lucira-section lucira-blog">
   <div class="container-1">
     <div class="header">
@@ -837,8 +844,7 @@
 
     <main>
       <section class="section">
-        {% if section.settings.blog != blank %}
-          {% assign blog_handle = section.settings.blog %}
+        {% if current_blog != blank %}
 
           {% comment %}
             Get the current tag from the URL
@@ -857,10 +863,10 @@
               {% endif %}
             </button>
             <div class="dropdown-content">
-              <a href="{{ blog.url }}" class="{% if current_tags.size == 0 %}active{% endif %}">All</a>
-              {% for tag in blog.all_tags %}
+              <a href="{{ current_blog.url }}" class="{% if current_tags.size == 0 %}active{% endif %}">All</a>
+              {% for tag in current_blog.all_tags %}
                 <a
-                  href="{{ blog.url }}/tagged/{{ tag | handle }}"
+                  href="{{ current_blog.url }}/tagged/{{ tag | handle }}"
                   class="{% if current_tags contains tag %}active{% endif %}"
                 >
                   {{ tag }}
@@ -870,123 +876,17 @@
           </nav>
 
           <div class="blog-grid">
-            {% comment %}
-              If we have a current tag, filter articles by that tag
-            {% endcomment %}
             {% if current_tags.size > 0 %}
-              {% comment %}
-                Filter articles for the current tag - note Shopify doesn't have a direct "where" filter
-                for tags, so we need to manually check if each article has the tag
-              {% endcomment %}
               {% assign tag_found = false %}
               {% assign tag_articles_count = 0 %}
               {% assign all_articles_count = 0 %}
 
-              {% for article in blog.articles %}
+              {% for article in current_blog.articles %}
                 {% if article.tags contains current_tags.first %}
                   {% assign tag_found = true %}
                   {% assign all_articles_count = all_articles_count | plus: 1 %}
                   {% assign tag_articles_count = tag_articles_count | plus: 1 %}
 
-                  {% if tag_articles_count <= section.settings.post_limit %}
-                    <a class="a-anchor" href="{{ article.url }}">
-                      <div class="blog-card">
-                        <div class="blog-card-image-container card-image-container">
-                          {% if article.image %}
-                            <img
-                              src="{{ article.image | img_url: '600x600', crop: 'center' }}"
-                              alt="{{ article.title }}"
-                              class="blog-card-image card-image"
-                              loading="lazy"
-                            >
-                          {% else %}
-                            <img
-                              src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
-                              alt="{{ article.title }}"
-                              class="blog-card-image card-image"
-                              loading="lazy"
-                            >
-                          {% endif %}
-                        </div>
-                        <div class="blog-card-category">
-                          {% if article.tags.size > 0 %}
-                            {{ article.tags.first }}
-                          {% else %}
-                            Blog
-                          {% endif %}
-                        </div>
-                        <div class="blog-card-content">
-                          <p class="blog-card-title">{{ article.title }}</p>
-                          <div class="blog-card-avatar-container">
-                            <img
-                              src="{{ 'arrow.svg' | asset_url }}"
-                              alt="Arrow"
-                              class="blog-card-avatar"
-                              loading="lazy"
-                            >
-                          </div>
-                        </div>
-                      </div>
-                    </a>
-                  {% else %}
-                    <a class="a-anchor" href="{{ article.url }}">
-                      <div class="blog-card">
-                        <div class="blog-card-image-container card-image-container">
-                          {% if article.image %}
-                            <img
-                              src="{{ article.image | img_url: '600x600', crop: 'center' }}"
-                              alt="{{ article.title }}"
-                              class="blog-card-image card-image"
-                              loading="lazy"
-                            >
-                          {% else %}
-                            <img
-                              src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
-                              alt="{{ article.title }}"
-                              class="blog-card-image card-image"
-                              loading="lazy"
-                            >
-                          {% endif %}
-                        </div>
-                        <div class="blog-card-category">
-                          {% if article.tags.size > 0 %}
-                            {{ article.tags.first }}
-                          {% else %}
-                            Blog
-                          {% endif %}
-                        </div>
-                        <div class="blog-card-content">
-                          <h3 class="blog-card-title">{{ article.title }}</h3>
-                          <div class="blog-card-avatar-container">
-                            <img
-                              src="{{ 'arrow.svg' | asset_url }}"
-                              alt="Arrow"
-                              class="blog-card-avatar"
-                              loading="lazy"
-                            >
-                          </div>
-                        </div>
-                      </div>
-                    </a>
-                  {% endif %}
-                {% endif %}
-              {% endfor %}
-
-              {% if tag_found == false %}
-                <div class="no-posts-message">
-                  <p>No posts found for "{{ current_tags.first }}"</p>
-                </div>
-              {% endif %}
-            {% else %}
-              {% comment %}
-                No tag selected, show all articles
-              {% endcomment %}
-              {% assign all_articles_count = 0 %}
-
-              {% for article in blog.articles %}
-                {% assign all_articles_count = all_articles_count | plus: 1 %}
-
-                {% if forloop.index <= section.settings.post_limit %}
                   <a class="a-anchor" href="{{ article.url }}">
                     <div class="blog-card">
                       <div class="blog-card-image-container card-image-container">
@@ -1026,47 +926,58 @@
                       </div>
                     </div>
                   </a>
-                {% else %}
-                  <a class="a-anchor hidden-post" href="{{ article.url }}">
-                    <div class="blog-card">
-                      <div class="blog-card-image-container card-image-container">
-                        {% if article.image %}
-                          <img
-                            src="{{ article.image | img_url: '600x600', crop: 'center' }}"
-                            alt="{{ article.title }}"
-                            class="blog-card-image card-image"
-                            loading="lazy"
-                          >
-                        {% else %}
-                          <img
-                            src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
-                            alt="{{ article.title }}"
-                            class="blog-card-image card-image"
-                            loading="lazy"
-                          >
-                        {% endif %}
-                      </div>
-                      <div class="blog-card-category">
-                        {% if article.tags.size > 0 %}
-                          {{ article.tags.first }}
-                        {% else %}
-                          Blog
-                        {% endif %}
-                      </div>
-                      <div class="blog-card-content">
-                        <h3 class="blog-card-title">{{ article.title }}</h3>
-                        <div class="blog-card-avatar-container">
-                          <img
-                            src="{{ 'arrow.svg' | asset_url }}"
-                            alt="Arrow"
-                            class="blog-card-avatar"
-                            loading="lazy"
-                          >
-                        </div>
+                {% endif %}
+              {% endfor %}
+
+              {% if tag_found == false %}
+                <div class="no-posts-message">
+                  <p>No posts found for "{{ current_tags.first }}"</p>
+                </div>
+              {% endif %}
+            {% else %}
+              {% assign all_articles_count = 0 %}
+              {% for article in current_blog.articles %}
+                {% assign all_articles_count = all_articles_count | plus: 1 %}
+
+                <a class="a-anchor" href="{{ article.url }}">
+                  <div class="blog-card">
+                    <div class="blog-card-image-container card-image-container">
+                      {% if article.image %}
+                        <img
+                          src="{{ article.image | img_url: '600x600', crop: 'center' }}"
+                          alt="{{ article.title }}"
+                          class="blog-card-image card-image"
+                          loading="lazy"
+                        >
+                      {% else %}
+                        <img
+                          src="https://i.postimg.cc/mDSyRfRg/612bb2954f79f7184b14fddfb4625b0800e1465f.jpg"
+                          alt="{{ article.title }}"
+                          class="blog-card-image card-image"
+                          loading="lazy"
+                        >
+                      {% endif %}
+                    </div>
+                    <div class="blog-card-category">
+                      {% if article.tags.size > 0 %}
+                        {{ article.tags.first }}
+                      {% else %}
+                        Blog
+                      {% endif %}
+                    </div>
+                    <div class="blog-card-content">
+                      <h3 class="blog-card-title">{{ article.title }}</h3>
+                      <div class="blog-card-avatar-container">
+                        <img
+                          src="{{ 'arrow.svg' | asset_url }}"
+                          alt="Arrow"
+                          class="blog-card-avatar"
+                          loading="lazy"
+                        >
                       </div>
                     </div>
-                  </a>
-                {% endif %}
+                  </div>
+                </a>
               {% endfor %}
             {% endif %}
           </div>
@@ -1079,9 +990,10 @@
       </section>
     </main>
   </div>
-  {%- if paginate.pages > 1 -%}
-    {%- render 'pagination', paginate: paginate -%}
-  {%- endif -%}
+  {% if paginate.pages > 1 %}
+    {% render 'pagination', paginate: paginate %}
+  {% endif %}
 </div>
 {%- endpaginate -%}
+
 
