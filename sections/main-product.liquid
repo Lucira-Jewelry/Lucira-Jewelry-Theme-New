@@ -915,58 +915,70 @@
   })();
 </script>
 
+<!-- Store all product variants in JS -->
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-    const wishlistBtns = document.querySelectorAll(".product-form .iWishAdd");
-    
-	wishlistBtns.forEach(function (btn) {
-      btn.addEventListener("click", function () {
-        // Only push to dataLayer if NOT already added
-        if (!btn.classList.contains("iwishAdded")) {
-          const variantId = btn.getAttribute("data-variant") || "";
-          const productId = btn.getAttribute("data-product") || "";
-          const productTitle = btn.getAttribute("data-ptitle") || "";
+  window.productVariants = {{ product.variants | json }};
+</script>
 
-          // ✅ Replace these with real Liquid or dataset values
-          const productData = {
-            id: productId,
-            sku: "{{ product.selected_variant.sku }}",
-            variant_id: variantId,
-            vendor_code: "{{ product.vendor | escape }}",
-            product_name: productTitle,
-            product_type: "{{ product.type }}",
-            category: "{{ product.collections.first.title | escape }}",
-            product_url: "{{ shop.url }}{{ product.url }}",
-            collection: "{{ product.collections.first.title | escape }}",
-            purity: "{{ product.metafields.custom.purity }}",
-            material: "{{ product.metafields.custom.material }}",
-            colour: "{{ product.metafields.custom.colour }}",
-            thumbnail_image: "{{ product.featured_image | image_url: '400x400' }}",
-            price: {{ product.selected_variant.price | divided_by: 100.0 }},
-            offer_price: {{ product.selected_variant.compare_at_price | divided_by: 100.0 }},
-            making_charges: "{{ product.metafields.custom.making_charges }}",
-            image: [
-              {% for image in product.images %}
-                "{{ image | image_url: '800x800' }}"{% unless forloop.last %},{% endunless %}
-              {% endfor %}
-            ],
-            currency: "{{ shop.currency }}",
-            product_persona: "{{ product.metafields.custom.persona }}",
-            
-          };
+<script>
+document.addEventListener("DOMContentLoaded", function () {
 
-          // Push into dataLayer
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: "addToWishlist",
-            products: productData
-          });
+  const wishlistBtns = document.querySelectorAll(".product-form .iWishAdd");
 
-        }
+  wishlistBtns.forEach(function (btn) {
+    btn.addEventListener("click", function () {
+
+      // Only push if not already added
+      if (btn.classList.contains("iwishAdded")) return;
+
+      const variantId = parseInt(btn.getAttribute("data-variant")) || 0;
+      const productId = btn.getAttribute("data-product") || "";
+      const productTitle = btn.getAttribute("data-ptitle") || "";
+
+      // Find the selected variant from JS object
+      const selectedVariant = window.productVariants.find(v => v.id === variantId);
+
+      // Build dynamic productData
+      const productData = {
+        id: productId,
+        sku: selectedVariant ? selectedVariant.sku : "",
+        variant_id: selectedVariant ? selectedVariant.id : variantId,
+        vendor_code: "{{ product.vendor | escape }}",
+        product_name: productTitle,
+        product_type: "{{ product.type }}",
+        category: "{{ product.collections.first.title | escape }}",
+        product_url: "{{ shop.url }}{{ product.url }}",
+        collection: "{{ product.collections.first.title | escape }}",
+        purity: "{{ product.metafields.custom.purity }}",
+        material: "{{ product.metafields.custom.material }}",
+        colour: "{{ product.metafields.custom.colour }}",
+        thumbnail_image: "{{ product.featured_image | image_url: '400x400' }}",
+        price: selectedVariant ? selectedVariant.price / 100 : 0,
+        offer_price: selectedVariant && selectedVariant.compare_at_price ? selectedVariant.compare_at_price / 100 : 0,
+        making_charges: "{{ product.metafields.custom.making_charges }}",
+        image: [
+          {% for image in product.images %}
+            "{{ image | image_url: '800x800' }}"{% unless forloop.last %},{% endunless %}
+          {% endfor %}
+        ],
+        currency: "{{ shop.currency }}",
+        product_persona: "{{ product.metafields.custom.persona }}"
+      };
+
+      // Push to dataLayer
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "addToWishlist",
+        products: productData
       });
+
+      // Optionally mark as added to prevent double push
+      btn.classList.add("iwishAdded");
     });
   });
+});
 </script>
+
 
 <script>
   document.addEventListener("DOMContentLoaded", function () {
