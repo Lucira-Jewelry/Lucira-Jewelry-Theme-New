@@ -1139,69 +1139,70 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
+<!-- Make sure to store product variants in JS (only on product pages) -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+  {% if product %}
+    window.productVariants = {{ product.variants | json }};
+  {% endif %}
+</script>
 
-  // Store all variants in JS for SKU / variant ID lookup
-  window.productVariants = {{ product.variants | json }};
+<script>
+document.addEventListener("click", function(e) {
+  const btn = e.target.closest(".iWishAddColl");
+  if (!btn) return; // Not a wishlist button
+  if (btn.classList.contains("iwishAdded")) return; // Already added
 
-  const wishlistBtns = document.querySelectorAll(".product-card-wrapper .iWishAddColl");
+  const productCard = btn.closest(".product-card-wrapper, .product-card");
+  if (!productCard) return;
 
-  wishlistBtns.forEach(function (btn) {
-    btn.addEventListener("click", function () {
+  // DOM elements
+  const titleEl = productCard.querySelector(".card__heading a, .product-title a");
+  const priceEl = productCard.querySelector(".price .price-item--regular");
+  const compareAtEl = productCard.querySelector(".price .price-item--sale, .price .price-item--compare");
+  const imgEl = productCard.querySelector("img");
 
-      if (btn.classList.contains("iwishAdded")) return;
+  // Data attributes
+  const productId = btn.getAttribute("data-product") || "";
+  const variantId = parseInt(btn.getAttribute("data-variant")) || 0;
 
-      const productCard = btn.closest(".product-card-wrapper");
-      if (!productCard) return;
+  // Find selected variant if variants object exists (product page)
+  const selectedVariant = window.productVariants ? window.productVariants.find(v => v.id === variantId) : null;
 
-      // DOM elements for dynamic data
-      const titleEl = productCard.querySelector(".card__heading a, .product-title a");
-      const priceEl = productCard.querySelector(".price .price-item--regular");
-      const compareAtEl = productCard.querySelector(".price .price-item--sale, .price .price-item--compare");
-      const imgEl = productCard.querySelector("img");
+  // Collect multiple images if needed
+  const imageEls = productCard.querySelectorAll("img");
+  const images = Array.from(imageEls).map(img => img.src);
 
-      // Extract product ID and variant ID from data attributes on button
-      const productId = btn.getAttribute("data-product") || "";
-      const variantId = parseInt(btn.getAttribute("data-variant")) || 0;
+  // Build productData
+  const productData = {
+    shopify_product_id: productId,
+    item_name: titleEl ? titleEl.innerText.trim() : "",
+    sku: selectedVariant ? selectedVariant.sku : "",
+    variant_id: selectedVariant ? selectedVariant.id : variantId,
+    price: priceEl ? parseFloat(priceEl.innerText.replace(/[^0-9.]/g, "")) : (selectedVariant ? selectedVariant.price / 100 : 0),
+    offer_price: compareAtEl ? parseFloat(compareAtEl.innerText.replace(/[^0-9.]/g, "")) : (selectedVariant && selectedVariant.compare_at_price ? selectedVariant.compare_at_price / 100 : 0),
+    product_url: titleEl ? titleEl.href : "",
+    thumbnail_image: imgEl ? imgEl.src : "",
+    images: images.length ? images : [imgEl ? imgEl.src : ""],
+    currency: "{{ shop.currency }}",
+    purity: "{{ product.metafields.custom.purity | default: '' }}",
+    material: "{{ product.metafields.custom.material | default: '' }}",
+    colour: "{{ product.metafields.custom.colour | default: '' }}",
+    making_charges: "{{ product.metafields.custom.making_charges | default: '' }}",
+    product_persona: "{{ product.metafields.custom.persona | default: '' }}"
+  };
 
-      // Find selected variant from Shopify variants JS object
-      const selectedVariant = window.productVariants.find(v => v.id === variantId);
-
-      // Build the productData object
-      const productData = {
-        shopify_product_id: productId,
-        item_name: titleEl ? titleEl.innerText.trim() : "{{ product.title | escape }}",
-        sku: selectedVariant ? selectedVariant.sku : "",
-        variant_id: selectedVariant ? selectedVariant.id : variantId,
-        price: priceEl ? parseFloat(priceEl.innerText.replace(/[^0-9.]/g, "")) : (selectedVariant ? selectedVariant.price / 100 : 0),
-        offer_price: compareAtEl ? parseFloat(compareAtEl.innerText.replace(/[^0-9.]/g, "")) : (selectedVariant && selectedVariant.compare_at_price ? selectedVariant.compare_at_price / 100 : 0),
-        product_url: titleEl ? titleEl.href : "{{ shop.url }}{{ product.url }}",
-        thumbnail_image: imgEl ? imgEl.src : "{{ product.featured_image | image_url: '400x400' }}",
-        currency: "{{ shop.currency }}"
-      };
-
-      // Push to dataLayer
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: "addToWishlist",
-        products: productData
-      });
-
-      // Mark as added to prevent duplicate pushes
-      btn.classList.add("iwishAdded");
-
-    });
+  // Push to dataLayer
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: "addToWishlist",
+    products: productData
   });
 
-});
+  // Mark button as added to prevent duplicates
+  btn.classList.add("iwishAdded");
 
-// Optional: Disable console logs in production
-if (typeof console !== "undefined") {
-  console.log = function() {};
-  console.warn = function() {};
-  console.error = function() {};
-  console.info = function() {};
-  console.debug = function() {};
-}
+  // Debug
+  console.log("Wishlist pushed:", productData);
+
+});
 </script>
