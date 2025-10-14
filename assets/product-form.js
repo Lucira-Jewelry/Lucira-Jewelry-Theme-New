@@ -111,6 +111,11 @@ if (!customElements.get('product-form')) {
             this.querySelector('.loading__spinner').classList.add('hidden');
 
             CartPerformance.measureFromEvent("add:user-action", evt);
+            
+            // Reset flag after operation completes
+            setTimeout(() => {
+              window.cartAddInProgress = false;
+            }, 500);
           });
       }
 
