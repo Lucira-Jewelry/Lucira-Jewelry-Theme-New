@@ -936,60 +936,7 @@ customElements.define("cart-drawer-items", CartDrawerItems);
   });
 })();
 
-// FIXED: Removed smooth drawer updates that caused flickering
-document.addEventListener("DOMContentLoaded", () => {
-  const cartDrawerEl = document.querySelector("cart-drawer");
-  if (!cartDrawerEl) return;
 
-  document.body.addEventListener("submit", async (e) => {
-    const form = e.target;
-    if (!form.matches('form[action^="/cart/add"]')) return;
-
-    e.preventDefault();
-    const formData = new FormData(form);
-
-    try {
-      await fetch("/cart/add.js", {
-        method: "POST",
-        body: formData,
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      });
-
-      const res = await fetch("/cart?section_id=cart-drawer");
-      const html = await res.text();
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
-      const newDrawer = doc.querySelector("cart-drawer");
-
-      if (newDrawer) {
-        // Direct content replacement - NO OPACITY TRANSITIONS
-        cartDrawerEl.innerHTML = newDrawer.innerHTML;
-
-        // Open drawer immediately
-        cartDrawerEl.open();
-
-        // Immediate activation of cross-selling - NO DELAYS
-        const crossSelling = cartDrawerEl.querySelector(
-          ".you-may-also-like-wrapper"
-        );
-        const crossSellingMobile = cartDrawerEl.querySelector(
-          ".you-may-also-like-wrapper-mobile"
-        );
-
-        if (crossSelling) {
-          crossSelling.style.display = "block";
-          cartDrawerEl.activateCrossSelling();
-        }
-
-        if (crossSellingMobile) {
-          crossSellingMobile.style.display = "block";
-        }
-      }
-    } catch (error) {
-      console.error("Add to cart failed:", error);
-    }
-  });
-});
 
 // Helper functions
 function trapFocus(element, focusElement = null) {
