@@ -128,19 +128,19 @@ class CartDrawer extends HTMLElement {
     }
   }
 
-  attachDesktopRecommendationListeners() {
-    const desktopWrapper = this.querySelector(".you-may-also-like-wrapper");
-    if (!desktopWrapper) return;
+//   attachDesktopRecommendationListeners() {
+//     const desktopWrapper = this.querySelector(".you-may-also-like-wrapper");
+//     if (!desktopWrapper) return;
 
-    desktopWrapper
-      .querySelectorAll(".you-may-also-like-add-button")
-      .forEach((button) => {
-        button.addEventListener("click", (e) => {
-          e.preventDefault();
-          handleRecommendationAddToCart(button);
-        });
-      });
-  }
+//     desktopWrapper
+//       .querySelectorAll(".you-may-also-like-add-button")
+//       .forEach((button) => {
+//         button.addEventListener("click", (e) => {
+//           e.preventDefault();
+//           handleRecommendationAddToCart(button);
+//         });
+//       });
+//   }
 
   deactivateCrossSelling() {
     const youMayAlsoLike = this.querySelector(".you-may-also-like-wrapper");
