@@ -21,6 +21,11 @@ if (!customElements.get('product-form')) {
         evt.preventDefault();
         if (this.submitButton.getAttribute('aria-disabled') === 'true') return;
 
+        if (window.cartAddInProgress) {
+          console.log('Cart add already in progress from product form');
+          return;
+        }
+
         this.handleErrorMessage();
 
         this.submitButton.setAttribute('aria-disabled', true);
