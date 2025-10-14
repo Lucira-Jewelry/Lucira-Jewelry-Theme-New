@@ -21,11 +21,6 @@ if (!customElements.get('product-form')) {
         evt.preventDefault();
         if (this.submitButton.getAttribute('aria-disabled') === 'true') return;
 
-        if (window.cartAddInProgress) {
-          console.log('Cart add already in progress from product form');
-          return;
-        }
-
         this.handleErrorMessage();
 
         this.submitButton.setAttribute('aria-disabled', true);
@@ -111,11 +106,6 @@ if (!customElements.get('product-form')) {
             this.querySelector('.loading__spinner').classList.add('hidden');
 
             CartPerformance.measureFromEvent("add:user-action", evt);
-            
-            // Reset flag after operation completes
-            setTimeout(() => {
-              window.cartAddInProgress = false;
-            }, 500);
           });
       }
 
