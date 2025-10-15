@@ -68,7 +68,17 @@ class CartItems extends HTMLElement {
     const index = event.target.dataset.index;
     let message = '';
 
-    if (inputValue < event.target.dataset.min) {
+    if (inputValue === 0) {
+      // 0 quantity means remove the item
+      this.updateQuantity(
+        index,
+        0,
+        event,
+        document.activeElement.getAttribute('name'),
+        event.target.dataset.quantityVariantId
+      );
+      return;
+    } else if (inputValue < event.target.dataset.min) {
       message = window.quickOrderListStrings.min_error.replace('[min]', event.target.dataset.min);
     } else if (inputValue > parseInt(event.target.max)) {
       message = window.quickOrderListStrings.max_error.replace('[max]', event.target.max);
