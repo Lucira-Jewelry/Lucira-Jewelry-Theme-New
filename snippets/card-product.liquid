@@ -290,7 +290,7 @@
           {%- endif -%}
         </div>
       </div>
-      {% render 'gtm-productClick' %}
+      {% comment %} {% render 'gtm-productClick' %}
       <div class="card__content">
         {% if card_product.metafields.custom.product_card_tags.value != blank
           or card_product.metafields.custom.shipping.value == 10
@@ -358,6 +358,16 @@
               </div>
             </div>
           </div>
+          {% for variant in card_product.variants %}
+            {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+              {% assign discount = variant.compare_at_price | minus: variant.price %}
+              {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
+              <span class="label-amount">{{ discount_percent | round }}% OFF</span>
+              {% break %} {# stops after first discounted variant #}
+            {% endif %}
+          {% endfor %}
+
+
         {% endif %}
 
         {% assign video = card_product.media | where: 'media_type', 'video' | first %}
@@ -375,7 +385,105 @@
               class="product-video-icon"
             >
           </div>
-        {% endif %}
+        {% endif %} {% endcomment %}
+
+
+        {% render 'gtm-productClick' %}
+            <div class="card__content">
+              {% if card_product.metafields.custom.product_card_tags.value != blank
+                or card_product.metafields.custom.shipping.value == 10
+              %}
+                <div class="product-collection-card-icons">
+                  <div class="carousel-container" data-product-id="{{ card_product.id }}">
+                    <div class="icon-container">
+                      {% assign first_tag = true %}
+                      {% assign icon_index = 0 %}
+                      {% assign all_labels = '' %}
+
+                      {% for tag_icon in card_product.metafields.custom.product_card_tags.value %}
+                        {% if tag_icon.product_tags_enable and tag_icon.product_tags_image %}
+                          <img
+                            src="{{ tag_icon.product_tags_image | img_url: '16x16' }}"
+                            class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                            width="16"
+                            height="16"
+                            style="width:16px;height:16px;object-fit:contain;"
+                            alt="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
+                            data-tag-type="{{ tag_icon.icon_type | default: 'tag' }}"
+                          >
+                          {% assign first_tag = false %}
+                          {% assign icon_index = icon_index | plus: 1 %}
+                          {% assign all_labels = all_labels | append: tag_icon.product_tags_label | append: '|' %}
+                        {% endif %}
+                      {% endfor %}
+
+                      {% if card_product.metafields.custom.shipping.value == 10 %}
+                        <img
+                          src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
+                          class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                          width="16"
+                          height="16"
+                          style="width:16px;height:16px;object-fit:contain;"
+                          alt="Fast Shipping"
+                          data-tag-type="shipping"
+                        >
+                        {% assign first_tag = false %}
+                        {% assign icon_index = icon_index | plus: 1 %}
+                        {% assign all_labels = all_labels | append: 'Fast Shipping' | append: '|' %}
+                      {% endif %}
+
+                      {% if card_product.tags contains 'Engraving Available' %}
+                        <img
+                          src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108"
+                          class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                          width="16"
+                          height="16"
+                          style="width:16px;height:16px;object-fit:contain;"
+                          alt="Engraving"
+                          data-tag-type="engraving"
+                        >
+                        {% assign first_tag = false %}
+                        {% assign icon_index = icon_index | plus: 1 %}
+                        {% assign all_labels = all_labels | append: 'Engraving' | append: '|' %}
+                      {% endif %}
+                    </div>
+
+                    <div class="text-content">
+                      {% assign labels_array = all_labels | split: '|' %}
+                      {% if labels_array[0] != blank %}
+                        {{ labels_array[0] }}
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endif %}
+
+             
+              {% for variant in card_product.variants %}
+                {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+                  {% assign discount = variant.compare_at_price | minus: variant.price %}
+                  {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
+                  <span class="label-amount">{{ discount_percent | round }}% OFF</span>
+                  {% break %}
+                {% endif %}
+              {% endfor %}
+
+              {% assign video = card_product.media | where: 'media_type', 'video' | first %}
+              {% if video %}
+                <div class="product-video-icon-wrapper" 
+                      data-product-handle="{{ card_product.handle }}" 
+                      data-video-id="{{ video.id }}"
+                      data-product-id="{{ card_product.id }}">
+                  <img
+                    src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/play_circle.svg?v=1753099595"
+                    width="28"
+                    height="28"
+                    loading="lazy"
+                    alt="Play product video"
+                    class="product-video-icon"
+                  >
+                </div>
+              {% endif %}
 
         <div class="card__information">
           <h3
@@ -388,7 +496,7 @@
               href="{{ card_product.url }}"
               id="CardLink-{{ section_id }}-{{ card_product.id }}"
               class="full-unstyled-link"
-              aria-labelledby="CardLink-{{ section_id }}-{{ card_product.id }} Badge-{{ section_id }}-{{ card_product.id }}" target="_blank"
+              aria-labelledby="CardLink-{{ section_id }}-{{ card_product.id }} Badge-{{ section_id }}-{{ card_product.id }}" 
             >
               {{ card_product.title | escape }}
             </a>
