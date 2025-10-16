@@ -95,6 +95,9 @@
 
 <script>
   const insuranceVariantId = '46764838093018';
+  
+  // Debounce flag - MUST be declared at the top
+  let quantityChangeInProgress = false;
 
   function updateUI(checkbox, features, isActive) {
     if (isActive) {
@@ -106,6 +109,60 @@
       features.classList.remove('active');
       features.classList.add('unactive');
     }
+  }
+
+  // Sync insurance with cart state
+  async function syncInsuranceCheckbox() {
+    // Don't sync if a quantity change is still processing
+    if (quantityChangeInProgress) {
+      console.log('Skipping sync - quantity change in progress');
+      return;
+    }
+    
+    const cart = await (await fetch('/cart.js')).json();
+    const insuranceItem = cart.items.find((i) => i.variant_id == insuranceVariantId);
+    const otherItems = cart.items.filter((i) => i.variant_id != insuranceVariantId);
+    const hasOtherItems = otherItems.length > 0;
+
+    // If cart is empty or has only insurance, remove insurance
+    if (!hasOtherItems && insuranceItem) {
+      await fetch('/cart/change.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: insuranceItem.key, quantity: 0 }),
+      });
+      
+      // Refresh cart after removal
+      const updatedCart = await (await fetch('/cart.js')).json();
+      const updatedInsuranceItem = updatedCart.items.find((i) => i.variant_id == insuranceVariantId);
+      
+      document.querySelectorAll('#insurance-check').forEach((checkbox) => {
+        const box = checkbox.closest('.insurance-box');
+        if (!box) return;
+        const features = box.querySelector('.insurance-features');
+        checkbox.checked = false;
+        updateUI(checkbox, features, false);
+      });
+      return;
+    }
+
+    // Keep insurance quantity at 1 if it exists
+    if (hasOtherItems && insuranceItem && insuranceItem.quantity !== 1) {
+      await fetch('/cart/change.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: insuranceItem.key, quantity: 1 }),
+      });
+    }
+
+    // Update UI
+    document.querySelectorAll('#insurance-check').forEach((checkbox) => {
+      const box = checkbox.closest('.insurance-box');
+      if (!box) return;
+      const features = box.querySelector('.insurance-features');
+      checkbox.checked = !!insuranceItem && hasOtherItems;
+      updateUI(checkbox, features, checkbox.checked);
+    });
   }
 
   async function toggleInsurance(checkbox, features, preloader) {
@@ -127,32 +184,47 @@
     try {
       const cart = await (await fetch('/cart.js')).json();
       const insuranceItem = cart.items.find((i) => i.variant_id == insuranceVariantId);
-      const hasOtherItems = cart.items.some((i) => i.variant_id != insuranceVariantId);
-
-      if (isChecked && !insuranceItem && hasOtherItems) {
-        await fetch('/cart/add.js', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: insuranceVariantId, quantity: 1 }),
-        });
+      const otherItems = cart.items.filter((i) => i.variant_id != insuranceVariantId);
+      const hasOtherItems = otherItems.length > 0;
+      
+      if (isChecked && hasOtherItems) {
+        if (!insuranceItem) {
+          // Add insurance with quantity 1
+          await fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: insuranceVariantId, quantity: 1 }),
+          });
+        } else if (insuranceItem.quantity !== 1) {
+          // Keep insurance quantity at 1
+          await fetch('/cart/change.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: insuranceItem.key, quantity: 1 }),
+          });
+        }
         await new Promise((r) => setTimeout(r, 400));
-        await syncInsuranceCheckbox();
       } else if (!isChecked && insuranceItem) {
+        // Remove insurance
         await fetch('/cart/change.js', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: insuranceItem.key, quantity: 0 }),
         });
+      } else if (isChecked && !hasOtherItems) {
+        // Can't add insurance to empty cart
+        checkbox.checked = false;
+        updateUI(checkbox, features, false);
+        checkbox.dataset.processing = 'false';
+        preloader.classList.remove('active');
+        return;
       }
 
       await new Promise((r) => setTimeout(r, 100));
-
-      const updatedCart = await (await fetch('/cart.js')).json();
-      const updatedInsuranceItem = updatedCart.items.find((i) => i.variant_id == insuranceVariantId);
-      checkbox.checked = !!updatedInsuranceItem;
-      updateUI(checkbox, features, !!updatedInsuranceItem);
+      await syncInsuranceCheckbox();
 
       // Update cart bubble
+      const updatedCart = await (await fetch('/cart.js')).json();
       const bubbleWrapper = document.querySelector('.cart-count-bubble');
       if (bubbleWrapper) {
         const countSpan = bubbleWrapper.querySelector('span[aria-hidden="true"]');
@@ -169,7 +241,7 @@
     }
   }
 
-  // Event delegation: works even if checkbox is replaced in DOM
+  // Event delegation for checkbox changes
   document.body.addEventListener('change', function (e) {
     if (e.target && e.target.matches('#insurance-check')) {
       const box = e.target.closest('.insurance-box');
@@ -179,38 +251,87 @@
     }
   });
 
-  // Initialize checkbox state on page load and after cart updates
-  async function syncInsuranceCheckbox() {
-    const cart = await (await fetch('/cart.js')).json();
-    const insuranceItem = cart.items.find((i) => i.variant_id == insuranceVariantId);
+  // Listen for quantity button clicks (+ and -)
+  document.body.addEventListener('click', async function(e) {
+    // Check if it's a quantity button
+    if (e.target && (e.target.matches('quantity-input button, .quantity__button, button[name="plus"], button[name="minus"]') 
+        || e.target.closest('quantity-input button, .quantity__button, button[name="plus"], button[name="minus"]'))
+        && !e.target.closest('.insurance-box')) {
+      console.log('Quantity button clicked, setting flag');
+      quantityChangeInProgress = true;
+      
+      // Wait for Shopify to process the change
+      await new Promise(r => setTimeout(r, 2000));
+      
+      quantityChangeInProgress = false;
+      console.log('Quantity button change complete');
+      await syncInsuranceCheckbox();
+    }
+  });
 
-    document.querySelectorAll('#insurance-check').forEach((checkbox) => {
-      const box = checkbox.closest('.insurance-box');
-      if (!box) return; // Safety check
-      const features = box.querySelector('.insurance-features');
+  // Listen for quantity changes in cart
+  document.body.addEventListener('change', async function(e) {
+    // Check if it's a quantity input change (but NOT the insurance checkbox)
+    if (e.target && e.target.matches('quantity-input input, .quantity__input, input[name="updates[]"]') 
+        && !e.target.closest('.insurance-box')) {
+      console.log('Quantity change detected, setting flag');
+      quantityChangeInProgress = true;
+      
+      // Wait longer for Shopify to process
+      await new Promise(r => setTimeout(r, 2000));
+      
+      quantityChangeInProgress = false;
+      console.log('Quantity change complete, syncing');
+      await syncInsuranceCheckbox();
+    }
+  });
 
-      checkbox.checked = !!insuranceItem;
-      updateUI(checkbox, features, checkbox.checked);
-    });
-  }
+  // Also listen for input events (fires during typing)
+  document.body.addEventListener('input', function(e) {
+    if (e.target && e.target.matches('quantity-input input, .quantity__input, input[name="updates[]"]') 
+        && !e.target.closest('.insurance-box')) {
+      console.log('Quantity input detected');
+      quantityChangeInProgress = true;
+    }
+  });
+
+  // Listen for cart item removal
+  document.body.addEventListener('click', async function(e) {
+    if (e.target && (e.target.matches('cart-remove-button, .cart-item__remove, [data-cart-item-remove]') || 
+        e.target.closest('cart-remove-button, .cart-item__remove, [data-cart-item-remove]'))) {
+      await new Promise(r => setTimeout(r, 500));
+      await syncInsuranceCheckbox();
+    }
+  });
 
   // Initial load
   document.addEventListener('DOMContentLoaded', syncInsuranceCheckbox);
 
-  // Re-sync after cart updates
+  // Cart update events
   document.addEventListener('cart:updated', () => setTimeout(syncInsuranceCheckbox, 300));
-
-  // ✅ NEW: Listen for common Shopify cart drawer events
   document.addEventListener('cart:refresh', () => setTimeout(syncInsuranceCheckbox, 300));
-  
-  // ✅ NEW: Observe DOM changes in cart drawer/page
+
+  // Observe cart drawer changes
   const observeCartChanges = () => {
     const cartDrawer = document.querySelector('cart-drawer, #CartDrawer, .cart-drawer, [id*="cart"]');
     if (!cartDrawer) return;
 
+    let debounceTimer;
     const observer = new MutationObserver(() => {
-      // When cart DOM updates, re-sync checkbox
-      syncInsuranceCheckbox();
+      // Don't sync if quantity change is happening
+      if (quantityChangeInProgress) {
+        console.log('Observer: Skipping - quantity change in progress');
+        return;
+      }
+      
+      // Debounce to avoid multiple rapid syncs
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        if (!quantityChangeInProgress) {
+          console.log('Observer: Syncing after mutation');
+          syncInsuranceCheckbox();
+        }
+      }, 800);
     });
 
     observer.observe(cartDrawer, {
@@ -219,14 +340,12 @@
     });
   };
 
-  // ✅ NEW: Start observing after page loads
   document.addEventListener('DOMContentLoaded', () => {
     observeCartChanges();
-    // Also try after a delay in case cart drawer loads late
     setTimeout(observeCartChanges, 1000);
   });
 
-  // ✅ NEW: Listen for Shopify theme's cart update events
+  // Shopify theme events
   if (window.Shopify && window.Shopify.theme) {
     document.addEventListener('shopify:section:load', () => setTimeout(syncInsuranceCheckbox, 300));
     document.addEventListener('shopify:section:reorder', () => setTimeout(syncInsuranceCheckbox, 300));
