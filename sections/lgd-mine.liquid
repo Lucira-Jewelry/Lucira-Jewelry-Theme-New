@@ -442,9 +442,6 @@
     width: 100%;
     height: auto;
   }
-  .testdp-dot{
-display:none;
-}
 </style>
 
 <div class="diamond-process-section">
@@ -489,8 +486,7 @@ display:none;
               <div
                 class="dp-dot"
                 style="width:35px;height:35px;border-radius:50%;background-color: {{ block.settings.dot_color }}"
-              >
-            <p class="testdp-dot"></p></div>
+              ></div>
             {% elsif block.settings.center_type == 'icon' and block.settings.center_icon != blank %}
               <img
                 src="{{ block.settings.center_icon | img_url: '600x600' }}"
@@ -580,6 +576,9 @@ display:none;
 </div>
 
 <script>
+// ===== EXACT VIDEO MATCHING ANIMATION =====
+
+// 1. Image-set slide animations
 const slides = document.querySelectorAll(".dp-image-set");
 
 const slideObserver = new IntersectionObserver((entries) => {
@@ -600,92 +599,147 @@ const lastSlide = document.querySelector(".dp-image-set:last-child");
 const finalBlock = document.querySelector(".dp-final-block");
 
 if(lastSlide && finalBlock){
- const diamondIcon = lastSlide.querySelector(".dp-icon, .dp-dot");
- const finalDiamond = finalBlock.querySelector(".dp-final-diamond-img");
- 
- if(diamondIcon && finalDiamond){
-  let isAnimating = false;
-  let startPos = null;
-  
-  const animate = () => {
-   const lastSlideRect = lastSlide.getBoundingClientRect();
-   const finalDiamondRect = finalDiamond.getBoundingClientRect();
-   const vh = window.innerHeight;
-   
-   // Start when last slide is exiting viewport
-   const shouldStart = lastSlideRect.bottom < vh * 0.5;
-   // End when diamond is well centered
-   const shouldEnd = finalDiamondRect.top < vh * 0.35;
-   
-   if(shouldStart && !shouldEnd){
-    // 1. INITIALIZE: Get starting position and fix the icon
-    if(!isAnimating){
-     const iconRect = diamondIcon.getBoundingClientRect();
-     startPos = {
-      top: iconRect.top,
-      left: iconRect.left,
-      width: iconRect.width,
-      height: iconRect.height
-     };
-     
-    }
-    
-    isAnimating = true;
-    
-    // 2. CALCULATE PROGRESS: Determine how far along the animation is
-    const animationStart = vh * 0.5;
-    const animationEnd = vh * 0.35;
-    const currentPos = finalDiamondRect.top;
-    
-    let progress = (animationStart - currentPos) / (animationStart - animationEnd);
-    progress = Math.max(0, Math.min(1, progress));
-    
-    // Smooth easing curve for natural movement
-    const eased = progress < 0.5 
-     ? 4 * progress * progress * progress 
-     : 1 - Math.pow(-2 * progress + 2, 3) / 2;
-    
-    // 3. INTERPOLATE: Calculate the current position and size
-    // Target position (center of final diamond)
-    const targetTop = finalDiamondRect.top + (finalDiamondRect.height / 2) - (startPos.height / 2);
-    const targetLeft = finalDiamondRect.left + (finalDiamondRect.width / 2) - (startPos.width / 2);
-    
-    // Current interpolated position
-    const currentTop = startPos.top + ((targetTop - startPos.top) * eased);
-    const currentLeft = startPos.left + ((targetLeft - startPos.left) * eased);
-    
-    // Scale gradually from 1 to 3
-    const scale = 1 + (2 * eased);
-    
-    
-   } else if(shouldEnd && isAnimating){
-    // 5. END ANIMATION: Fade out at the target position
-    const targetTop = finalDiamondRect.top + (finalDiamondRect.height / 2) - (startPos.height / 2);
-    const targetLeft = finalDiamondRect.left + (finalDiamondRect.width / 2) - (startPos.width / 2);
-    
-    
-   } else if(!shouldStart && isAnimating){
-    // 6. RESET: If scrolling back up
-    isAnimating = false;
-    startPos = null;
-    
-   }
-  };
-  
-  // Smooth scroll handling with RAF (existing code)
-  let rafId = null;
-  window.addEventListener("scroll", () => {
-   if(rafId) cancelAnimationFrame(rafId);
-   rafId = requestAnimationFrame(animate);
-  }, { passive: true });
-  
-  // Initial check (existing code)
-  animate();
- }
+  const diamondIcon = lastSlide.querySelector(".dp-icon, .dp-dot");
+  const finalDiamond = finalBlock.querySelector(".dp-final-diamond-img");
+  
+  if(diamondIcon && finalDiamond){
+    let isAnimating = false;
+    let startPos = null;
+    
+    const animate = () => {
+      const lastSlideRect = lastSlide.getBoundingClientRect();
+      const finalDiamondRect = finalDiamond.getBoundingClientRect();
+      const vh = window.innerHeight;
+      
+      // Start when last slide is exiting viewport
+      const shouldStart = lastSlideRect.bottom < vh * 0.5;
+      // End when diamond is well centered
+      const shouldEnd = finalDiamondRect.top < vh * 0.35;
+      
+      if(shouldStart && !shouldEnd){
+        // 1. INITIALIZE: Get starting position and fix the icon
+        if(!isAnimating){
+          const iconRect = diamondIcon.getBoundingClientRect();
+          startPos = {
+            top: iconRect.top,
+            left: iconRect.left,
+            width: iconRect.width,
+            height: iconRect.height
+          };
+          
+{% comment %}           diamondIcon.style.position = "fixed";
+          diamondIcon.style.top = startPos.top + "px";
+          diamondIcon.style.left = startPos.left + "px";
+          diamondIcon.style.width = startPos.width + "px";
+          diamondIcon.style.height = startPos.height + "px";
+          diamondIcon.style.transform = "none";
+          diamondIcon.style.zIndex = "9999"; {% endcomment %}
+        }
+        
+        isAnimating = true;
+        
+        // 2. CALCULATE PROGRESS: Determine how far along the animation is
+        const animationStart = vh * 0.5;
+        const animationEnd = vh * 0.35;
+        const currentPos = finalDiamondRect.top;
+        
+        let progress = (animationStart - currentPos) / (animationStart - animationEnd);
+        progress = Math.max(0, Math.min(1, progress));
+        
+        // Smooth easing curve for natural movement
+        const eased = progress < 0.5 
+          ? 4 * progress * progress * progress 
+          : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+        
+        // 3. INTERPOLATE: Calculate the current position and size
+        // Target position (center of final diamond)
+        const targetTop = finalDiamondRect.top + (finalDiamondRect.height / 2) - (startPos.height / 2);
+        const targetLeft = finalDiamondRect.left + (finalDiamondRect.width / 2) - (startPos.width / 2);
+        
+        // Current interpolated position
+        const currentTop = startPos.top + ((targetTop - startPos.top) * eased);
+        const currentLeft = startPos.left + ((targetLeft - startPos.left) * eased);
+        
+        // Scale gradually from 1 to 3
+        const scale = 1 + (2 * eased);
+        
+{% comment %}         // 4. APPLY STYLES
+        diamondIcon.style.transition = "none";
+        diamondIcon.style.top = currentTop + "px";
+        diamondIcon.style.left = currentLeft + "px";
+        diamondIcon.style.transform = `scale(${scale})`;
+        diamondIcon.style.opacity = "1"; {% endcomment %}
+        
+      } else if(shouldEnd && isAnimating){
+        // 5. END ANIMATION: Fade out at the target position
+        const targetTop = finalDiamondRect.top + (finalDiamondRect.height / 2) - (startPos.height / 2);
+        const targetLeft = finalDiamondRect.left + (finalDiamondRect.width / 2) - (startPos.width / 2);
+        
+{% comment %}         diamondIcon.style.transition = "opacity 1s ease-out";
+        diamondIcon.style.top = targetTop + "px";
+        diamondIcon.style.left = targetLeft + "px";
+        diamondIcon.style.transform = "scale(3)";
+        diamondIcon.style.opacity = "0"; {% endcomment %}
+        
+      } else if(!shouldStart && isAnimating){
+        // 6. RESET: If scrolling back up
+        isAnimating = false;
+        startPos = null;
+        
+{% comment %}         diamondIcon.style.position = "";
+        diamondIcon.style.top = "";
+        diamondIcon.style.left = "";
+        diamondIcon.style.width = "";
+        diamondIcon.style.height = ""; {% endcomment %}
+{% comment %}         diamondIcon.style.transition = "transform 0.6s ease-out, opacity 0.6s ease-out"; {% endcomment %}
+{% comment %}         diamondIcon.style.transform = "";
+        diamondIcon.style.opacity = "";
+        diamondIcon.style.zIndex = ""; {% endcomment %}
+      }
+    };
+    
+    // Smooth scroll handling with RAF (existing code)
+    let rafId = null;
+    window.addEventListener("scroll", () => {
+      if(rafId) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(animate);
+    }, { passive: true });
+    
+    // Initial check (existing code)
+    animate();
+  }
 }
 
 const diamond = document.querySelector('.dp-final-diamond-img');
 const wrapper = document.querySelector('.dp-final-block');
+
+{% comment %} window.addEventListener('scroll', () => {
+  const rect = wrapper.getBoundingClientRect();
+
+  // Check if wrapper is in viewport center
+  if (rect.top <= window.innerHeight / 2 && rect.bottom >= window.innerHeight / 2) {
+    diamond?.parentElement?.classList.add('fixed');
+
+    // Calculate scroll progress inside this block
+    let scrollProgress = (window.innerHeight / 2 - rect.top) / rect.height;
+    let scale = 1 + scrollProgress * 4; // start 1, max 5
+    if (scale > 5) scale = 5;
+
+   if (diamond) {
+    diamond.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    diamond.parentElement?.classList.remove('fixed');
+
+    // Optional: reset after animation (e.g., 300ms)
+    setTimeout(() => {
+      diamond.style.transform = `translate(-50%, -50%) scale(1)`;
+    }, 300);
+  }
+
+  }
+}); {% endcomment %}
+</script>
+
+<script>
   (function () {
     // Run only for desktop
 
@@ -871,6 +925,8 @@ const wrapper = document.querySelector('.dp-final-block');
       initAnimation();
     });
   })();
+</script>
+<script>
   document.addEventListener('DOMContentLoaded', function () {
     // Select all containers
     const items = document.querySelectorAll('.dp-center-image-container');
