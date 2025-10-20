@@ -332,7 +332,53 @@
       });
     });
   });
+
+
+  document.addEventListener("DOMContentLoaded", function () {
+  // Select all homepage card grid sections
+  const cardSections = document.querySelectorAll(".home-card-grid-section");
+  if (!cardSections.length) return;
+
+  const observer = new IntersectionObserver((entries, obs) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const section = entry.target;
+        section.classList.add("visible");
+
+        // Optional: attach click tracking for cards inside this section
+        const cards = section.querySelectorAll(".home-tile");
+        cards.forEach(card => {
+          if (card.dataset.trackingAttached) return; // avoid duplicates
+          card.dataset.trackingAttached = "true";
+
+          card.addEventListener("click", () => {
+            const titleEl = card.querySelector(".home-card-grid-title");
+            const promoName = titleEl ? titleEl.textContent.trim() : "Unknown Promo";
+            const index = Array.from(cards).indexOf(card) + 1;
+            const promoId = `home-banner-${index}`;
+
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: "promoClick",
+              promoClick: {
+                promo_id: promoId,
+                creative_name: "homepage_banner_image",
+                promo_name: promoName
+              }
+            });
+          });
+        });
+
+        obs.unobserve(section); // stop observing after reveal
+      }
+    });
+  }, { threshold: 0.2 });
+
+  cardSections.forEach(section => observer.observe(section));
+});
+
 </script>
+
 
 <style>
 
@@ -362,6 +408,19 @@
     font-size: 24px;
   font-family: "Futura Std", sans-serif !important;
   }
+  .home-card-grid-section {
+  content-visibility: auto;
+  contain-intrinsic-size: 650px auto; /* default intrinsic height */
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+
+.home-card-grid-section.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
   @media screen and (max-width:45em){
     .home-card-grid-section{margin-block:24px;}
     .home-card-grid-container{display:none;}
@@ -389,3 +448,7 @@
     .index .collapsible-content__header h2{font-size:32px;}
   }
 </style>
+
+
+
+
