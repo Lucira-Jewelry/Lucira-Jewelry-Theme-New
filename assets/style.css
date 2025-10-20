@@ -1,850 +1,291 @@
-{{ 'component-list-menu.css' | asset_url | stylesheet_tag }}
-{{ 'component-search.css' | asset_url | stylesheet_tag }}
-{{ 'component-menu-drawer.css' | asset_url | stylesheet_tag }}
-
-<link
-  rel="stylesheet"
-  href="{{ 'component-cart-notification.css' | asset_url }}"
-  media="print"
-  onload="this.media='all'"
->
-
-{%- if section.settings.menu_type_desktop == 'mega' -%}
-  <link rel="stylesheet" href="{{ 'component-mega-menu.css' | asset_url }}" media="print" onload="this.media='all'">
-{%- endif -%}
-
-<style>
-  header-drawer {
-    justify-self: start;
-    margin-left: 0;
-  }
-
-  {%- if section.settings.sticky_header_type == 'reduce-logo-size' -%}
-    .scrolled-past-header .header__heading-logo-wrapper {
-      width: 75%;
-    }
-  {%- endif -%}
-
-  {%- if section.settings.menu_type_desktop != "drawer" -%}
-    @media screen and (min-width: 990px) {
-      header-drawer {
-        display: none;
-      }
-    }
-  {%- endif -%}
-
-  .menu-drawer-container {
-    display: flex;
-  }
-
-  .list-menu {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
-
-  .list-menu--inline {
-    display: inline-flex;
-    flex-wrap: wrap;
-  }
-
-  
-
-  .list-menu__item {
-    display: flex;
-    align-items: center;
-    line-height: calc(1 + 0.3 / var(--font-body-scale));
-  }
-
-  .list-menu__item--link {
-    text-decoration: none;
-    padding-bottom: 1rem;
-    padding-top: 1rem;
-    line-height: calc(1 + 0.8 / var(--font-body-scale));
-  }
-
-  @media screen and (min-width: 750px) {
-    .list-menu__item--link {
-      padding-bottom: 0.5rem;
-      padding-top: 0.5rem;
-    }
-  }
-</style>
-
-{%- style -%}
-  .header {
-    padding: {{ section.settings.padding_top | times: 0.5 | round: 0 }}px 3rem {{ section.settings.padding_bottom | times: 0.5 | round: 0 }}px 3rem;
-  }
-
-  .section-header {
-    position: sticky; /* This is for fixing a Safari z-index issue. PR #2147 */
-    margin-bottom: {{ section.settings.margin_bottom | times: 0.75 | round: 0 }}px;
-  }
-
-  @media screen and (min-width: 750px) {
-    .section-header {
-      margin-bottom: {{ section.settings.margin_bottom }}px;
-    }
-  }
-
-  @media screen and (min-width: 990px) {
-    .header {
-      padding-top: {{ section.settings.padding_top }}px;
-      padding-bottom: {{ section.settings.padding_bottom }}px;
-    }
-  }
-{%- endstyle -%}
-
-<script src="{{ 'cart-notification.js' | asset_url }}" defer="defer"></script>
-
-{%- liquid
-  for block in section.blocks
-    if block.type == '@app'
-      assign has_app_block = true
-    endif
-  endfor
--%}
-
-{% liquid
-  assign header_tag = 'div'
-
-  if section.settings.sticky_header_type != 'none' and request.page_type != 'product' and page.template_suffix != 'craftmanship' and page.template_suffix != 'purpose-and-value'
-    assign header_tag = 'sticky-header'
-  endif
-%}
-
-  {% if section.settings.sticky_header_type != 'none' and request.page_type != 'product' and page.template_suffix != 'craftmanship' or page.template_suffix != 'purpose-and-value' %}
-    <style>
-      .header__inline-menu.desktop-menu .small-logo {
-        display: none;
-      }
-    </style>
-  {% endif %}
-
-
-  {%- assign transparent_enabled = false -%}
-
-  {%- if request.page_type == 'index' and section.settings.transparent_homepage -%}
-  {%- assign transparent_enabled = true -%}
-  {%- elsif section.settings.transparent_header -%}
-    {%- if page.template_suffix == 'purpose-and-value' or page.template_suffix == 'craftmanship' -%}
-      {%- assign transparent_enabled = true -%}
-    {% comment %} {%- elsif collection.template_suffix == 'hexa' -%}
-      {%- assign transparent_enabled = true -%} {% endcomment %}
-    {%- elsif request.page_type == 'product' and section.settings.transparent_products contains product.id -%}
-      {%- assign transparent_enabled = true -%}
-    {%- endif -%}
-  {%- endif -%}
-
-
-  <{{ header_tag }}
-    {% if header_tag == 'sticky-header' %}
-      data-sticky-type="{{ section.settings.sticky_header_type }}"
-      data-transparent-enabled="{{ transparent_enabled }}"
-    {% endif %}
-    class="header-wrapper color-{{ section.settings.color_scheme }} gradient
-    {% if transparent_enabled %} header-wrapper--transparent{% endif %}
-    {% if section.settings.show_line_separator %} header-wrapper--border-bottom{% endif %}">
-
-
-
-  {%- liquid
-    assign social_links = false
-    assign localization_forms = false
-
-    if settings.social_twitter_link != blank or settings.social_facebook_link != blank or settings.social_pinterest_link != blank or settings.social_instagram_link != blank or settings.social_youtube_link != blank or settings.social_vimeo_link != blank or settings.social_tiktok_link != blank or settings.social_tumblr_link != blank or settings.social_snapchat_link != blank
-      assign social_links = true
-    endif
-
-    if localization.available_countries.size > 1 and section.settings.enable_country_selector or section.settings.enable_language_selector and localization.available_languages.size > 1
-      assign localization_forms = true
-    endif
-  -%}
-  <header class="header header--{{ section.settings.logo_position }} header--mobile-{{ section.settings.mobile_logo_position }} page-width{% if section.settings.menu_type_desktop == 'drawer' %} drawer-menu{% endif %}{% if section.settings.menu != blank %} header--has-menu{% endif %}{% if has_app_block %} header--has-app{% endif %}{% if social_links %} header--has-social{% endif %}{% if shop.customer_accounts_enabled %} header--has-account{% endif %}{% if localization_forms %} header--has-localizations{% endif %}">
-    {%- liquid
-      if section.settings.menu != blank
-        render 'header-drawer'
-      endif
-
-      if section.settings.logo_position == 'top-center' or section.settings.menu == blank
-        render 'header-search', input_id: 'Search-In-Modal-1'
-      endif
-    -%}
-
-    {%- if section.settings.logo_position != 'middle-center' -%}
-      {%- if request.page_type == 'index' -%}
-        <div class="header__heading">
-      {%- endif -%}
-      <a href="{{ routes.root_url }}" class="header__heading-link link link--text focus-inset">
-        {%- if settings.logo != blank -%}
-          <div class="header__heading-logo-wrapper">
-            {%- assign logo_alt = settings.logo.alt | default: shop.name | escape -%}
-            {%- assign logo_height = settings.logo_width | divided_by: settings.logo.aspect_ratio -%}
-            {% capture sizes %}(max-width: {{ settings.logo_width | times: 2 }}px) 50vw, {{ settings.logo_width }}px{% endcapture %}
-            {% capture widths %}{{ settings.logo_width }}, {{ settings.logo_width | times: 1.5 | round }}, {{ settings.logo_width | times: 2 }}{% endcapture %}
-            {{
-              settings.logo
-              | image_url: width: 600
-              | image_tag:
-                class: 'header__heading-logo motion-reduce',
-                widths: widths,
-                height: logo_height,
-                width: settings.logo_width,
-                alt: logo_alt,
-                sizes: sizes,
-                preload: true
-            }}
-          </div>
-        {%- else -%}
-          <span class="h2">{{ shop.name }}</span>
-        {%- endif -%}
-      </a>
-      {%- if request.page_type == 'index' -%}
-        </div>
-      {%- endif -%}
-    {%- endif -%}
-
-    {%- liquid
-      if section.settings.menu != blank
-        if section.settings.menu_type_desktop == 'dropdown'
-          render 'header-dropdown-menu'
-        elsif section.settings.menu_type_desktop != 'drawer'
-          render 'header-mega-menu'
-        endif
-      endif
-    %}
-
-    {%- if section.settings.logo_position == 'middle-center' -%}
-      {%- if request.page_type == 'index' -%}
-        <h1 class="header__heading">
-      {%- endif -%}
-        <a href="{{ routes.root_url }}" class="header__heading-link link link--text focus-inset">
-          {%- if settings.logo != blank -%}
-            <div class="header__heading-logo-wrapper">
-              {%- assign logo_alt = settings.logo.alt | default: shop.name | escape -%}
-              {%- assign logo_height = settings.logo_width | divided_by: settings.logo.aspect_ratio -%}
-              {% capture sizes %}(min-width: 750px) {{ settings.logo_width }}px, 50vw{% endcapture %}
-              {% capture widths %}{{ settings.logo_width }}, {{ settings.logo_width | times: 1.5 | round }}, {{ settings.logo_width | times: 2 }}{% endcapture %}
-              {{
-                settings.logo
-                | image_url: width: 600
-                | image_tag:
-                  class: 'header__heading-logo',
-                  widths: widths,
-                  height: logo_height,
-                  width: settings.logo_width,
-                  alt: logo_alt,
-                  sizes: sizes,
-                  preload: true
-              }}
-            </div>
-          {%- else -%}
-            <span class="h2">{{ shop.name }}</span>
-          {%- endif -%}
-        </a>
-      {%- if request.page_type == 'index' -%}
-        </h1>
-      {%- endif -%}
-    {%- endif -%}
-
-    <div class="header__icons{% if section.settings.enable_country_selector or section.settings.enable_language_selector %} header__icons--localization header-localization{% endif %}">
-      <div class="search_wrapper">
-        {% render 'header-search-bar' %}
-      </div>
-
-      <div class="icon-wrapper">
-        <div class="desktop-localization-wrapper">
-          {%- if section.settings.enable_country_selector and localization.available_countries.size > 1 -%}
-            <localization-form class="small-hide medium-hide" data-prevent-hide>
-              {%- form 'localization', id: 'HeaderCountryForm', class: 'localization-form' -%}
-                <div>
-                  <h2 class="visually-hidden" id="HeaderCountryLabel">{{ 'localization.country_label' | t }}</h2>
-                  {%- render 'country-localization', localPosition: 'HeaderCountry' -%}
-                </div>
-              {%- endform -%}
-            </localization-form>
-          {% endif %}
-
-          {%- if section.settings.enable_language_selector and localization.available_languages.size > 1 -%}
-            <localization-form class="small-hide medium-hide" data-prevent-hide>
-              {%- form 'localization', id: 'HeaderLanguageForm', class: 'localization-form' -%}
-                <div>
-                  <h2 class="visually-hidden" id="HeaderLanguageLabel">{{ 'localization.language_label' | t }}</h2>
-                  {%- render 'language-localization', localPosition: 'HeaderLanguage' -%}
-                </div>
-              {%- endform -%}
-            </localization-form>
-          {%- endif -%}
-        </div>
-
-        {%- if shop.customer_accounts_enabled -%}
-          <a
-            href="{%- if customer -%}{{ routes.account_url }}{%- else -%}{{ routes.account_login_url }}{%- endif -%}"
-            class="header__icon header__icon--account link focus-inset{% if section.settings.menu != blank %} small-hide{% endif %}"
-            rel="nofollow"
-          >
-            {%- if section.settings.enable_customer_avatar -%}
-              <account-icon>
-                {%- if customer and customer.has_avatar? -%}
-                  {{ customer | avatar }}
-                {%- else -%}
-                  {% comment %} <span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span> {% endcomment %}
-                {%- endif -%}
-              </account-icon>
-            {%- else -%}
-              <span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span>
-            {%- endif -%}
-            <span class="visually-hidden">
-              {%- liquid
-                if customer
-                  echo 'customer.account_fallback' | t
-                else
-                  echo 'customer.log_in' | t
-                endif
-              -%}
-            </span>
-          </a>
-        {%- endif -%}
-
-        <a class="iwishDrawer header__icon iw_desk_link" href="#" title="Wishlist"><span class="svg-wrapper">
-          <svg class="icon icon-wishlist">
-            <use xlink:href="#wishlist 1"></use>
-          </svg></span> <span class="iwish-counter iw-count-show" style="display:none;">0</span>
-        </a>
-
-        {%- for block in section.blocks -%}
-          {%- case block.type -%}
-            {%- when '@app' -%}
-              {% render block %}
-          {%- endcase -%}
-        {%- endfor -%}
-
-        <a href="{{ routes.cart_url }}" class="header__icon header__icon--cart link focus-inset" id="cart-icon-bubble">
-          {% if cart == empty %}
-            <svg class="icon icon-cart-empty">
-              <use xlink:href="#cart icon 1"></use>
-            </svg>
-          {% else %}
-            <span class="svg-wrapper">
-              <svg class="icon icon-cart">
-                <use xlink:href="#cart icon 1"></use>
-              </svg>
-            </span>
-          {% endif %}
-          <span class="visually-hidden">{{ 'templates.cart.cart' | t }}</span>
-          {%- if cart != empty -%}
-            <div class="cart-count-bubble">
-              {%- if cart.item_count < 100 -%}
-                <span aria-hidden="true">{{ cart.item_count }}</span>
-              {%- endif -%}
-              <span class="visually-hidden">{{ 'sections.header.cart_count' | t: count: cart.item_count }}</span>
-            </div>
-          {%- endif -%}
-        </a>
-
-        <a class="header__icon announce"
-          id="cart-icon-bubble"
-          onclick="showPopup(false, false, true)"
-          style="cursor:pointer;">
-        
-          <span class="icon-desktop">
-            {% if template contains "index" %}
-              <svg class="icon icon-announcement">
-                <use xlink:href="#Announcement icon above whatsapp 1"></use>
-              </svg>
-            {% else %}
-              <svg class="icon icon-announcement">
-                <use xlink:href="#Announcement icon above whatsapp 1"></use>
-              </svg>
-            {% endif %}
-          </span>
-        </a>
-      </div>
-    </div>
-  </header>
-</{{ header_tag }}>
-
-{%- if settings.cart_type == 'notification' -%}
-  {%- render 'cart-notification',
-    color_scheme: section.settings.color_scheme,
-    desktop_menu_type: section.settings.menu_type_desktop
-  -%}
-{%- endif -%}
-
-{% javascript %}
-  class StickyHeader extends HTMLElement {
-    constructor() {
-      super();
-    }
-
-    connectedCallback() {
-      this.header = document.querySelector('.section-header');
-      this.headerIsAlwaysSticky =
-        this.getAttribute('data-sticky-type') === 'always' ||
-        this.getAttribute('data-sticky-type') === 'reduce-logo-size';
-      this.headerBounds = {};
-
-      this.setHeaderHeight();
-
-      window.matchMedia('(max-width: 990px)').addEventListener('change', this.setHeaderHeight.bind(this));
-
-      if (this.headerIsAlwaysSticky) {
-        this.header.classList.add('shopify-section-header-sticky');
-      }
-
-      this.currentScrollTop = 0;
-      this.preventReveal = false;
-      this.predictiveSearch = this.querySelector('predictive-search');
-
-      this.onScrollHandler = this.onScroll.bind(this);
-      this.hideHeaderOnScrollUp = () => (this.preventReveal = true);
-
-      this.addEventListener('preventHeaderReveal', this.hideHeaderOnScrollUp);
-      window.addEventListener('scroll', this.onScrollHandler, false);
-
-      this.createObserver();
-    }
-
-    setHeaderHeight() {
-      document.documentElement.style.setProperty('--header-height', `${this.header.offsetHeight}px`);
-    }
-
-    disconnectedCallback() {
-      this.removeEventListener('preventHeaderReveal', this.hideHeaderOnScrollUp);
-      window.removeEventListener('scroll', this.onScrollHandler);
-    }
-
-    createObserver() {
-      let observer = new IntersectionObserver((entries, observer) => {
-        this.headerBounds = entries[0].intersectionRect;
-        observer.disconnect();
-      });
-
-      observer.observe(this.header);
-    }
-
-    onScroll() {
-      const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-
-      if (this.predictiveSearch && this.predictiveSearch.isOpen) return;
-
-      if (scrollTop > this.currentScrollTop && scrollTop > this.headerBounds.bottom) {
-        this.header.classList.add('scrolled-past-header');
-        if (this.preventHide) return;
-        requestAnimationFrame(this.hide.bind(this));
-      } else if (scrollTop < this.currentScrollTop && scrollTop > this.headerBounds.bottom) {
-        this.header.classList.add('scrolled-past-header');
-        if (!this.preventReveal) {
-          requestAnimationFrame(this.reveal.bind(this));
-        } else {
-          window.clearTimeout(this.isScrolling);
-
-          this.isScrolling = setTimeout(() => {
-            this.preventReveal = false;
-          }, 66);
-
-          requestAnimationFrame(this.hide.bind(this));
-        }
-      } else if (scrollTop <= this.headerBounds.top) {
-        this.header.classList.remove('scrolled-past-header');
-        requestAnimationFrame(this.reset.bind(this));
-      }
-
-      this.currentScrollTop = scrollTop;
-    }
-
-    hide() {
-      if (this.headerIsAlwaysSticky) return;
-      this.header.classList.add('shopify-section-header-hidden', 'shopify-section-header-sticky');
-      this.closeMenuDisclosure();
-      this.closeSearchModal();
-    }
-
-    reveal() {
-      if (this.headerIsAlwaysSticky) return;
-      this.header.classList.add('shopify-section-header-sticky', 'animate');
-      this.header.classList.remove('shopify-section-header-hidden');
-    }
-
-    reset() {
-      if (this.headerIsAlwaysSticky) return;
-      this.header.classList.remove('shopify-section-header-hidden', 'shopify-section-header-sticky', 'animate');
-    }
-
-    closeMenuDisclosure() {
-      this.disclosures = this.disclosures || this.header.querySelectorAll('header-menu');
-      this.disclosures.forEach((disclosure) => disclosure.close());
-    }
-
-    closeSearchModal() {
-      this.searchModal = this.searchModal || this.header.querySelector('details-modal');
-      this.searchModal.close(false);
-    }
-  }
-
-  customElements.define('sticky-header', StickyHeader);
-{% endjavascript %}
-
-<script type="application/ld+json">
-  {
-    "@context": "http://schema.org",
-    "@type": "Organization",
-    "name": {{ shop.name | json }},
-    {% if settings.logo %}
-      "logo": {{ settings.logo | image_url: width: 500 | prepend: "https:" | json }},
-    {% endif %}
-    "sameAs": [
-      {{ settings.social_twitter_link | json }},
-      {{ settings.social_facebook_link | json }},
-      {{ settings.social_pinterest_link | json }},
-      {{ settings.social_instagram_link | json }},
-      {{ settings.social_tiktok_link | json }},
-      {{ settings.social_tumblr_link | json }},
-      {{ settings.social_snapchat_link | json }},
-      {{ settings.social_youtube_link | json }},
-      {{ settings.social_vimeo_link | json }}
-    ],
-    "url": {{ request.origin | append: page.url | json }}
-  }
-</script>
-
-{%- if request.page_type == 'index' -%}
-  {% assign potential_action_target = request.origin | append: routes.search_url | append: '?q={search_term_string}' %}
-  <script type="application/ld+json">
-    {
-      "@context": "http://schema.org",
-      "@type": "WebSite",
-      "name": {{ shop.name | json }},
-      "potentialAction": {
-        "@type": "SearchAction",
-        "target": {{ potential_action_target | json }},
-        "query-input": "required name=search_term_string"
-      },
-      "url": {{ request.origin | append: page.url | json }}
-    }
-  </script>
-{%- endif -%}
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const cartIcon = document.getElementById('cart-icon-bubble');
-
-    if (cartIcon) {
-      cartIcon.addEventListener('click', function () {
-        fetch('/cart.js')
-          .then(response => response.json())
-          .then(cart => {
-            const cartData = {
-              event: 'viewCart',
-              cart: {
-                currency: 'INR', // or cart.currency if present
-                cart_total: cart.original_total_price / 100,
-                grand_total: cart.total_price / 100,
-                discount_amount: (cart.original_total_price - cart.total_price) / 100,
-                total_quantity: cart.item_count,
-                total_product: cart.items.length,
-                coupon_code: (cart.cart_level_discount_applications?.[0]?.code) || '',
-                items: cart.items.map((item, index) => ({
-                  id: item.product_id.toString(),
-                  sku: item.sku || '',
-                  variant_id: item.variant_id.toString(),
-                  product_name: item.product_title,
-                  product_type: item.product_type,
-                  category: item.vendor,
-                  sub_category: item.product_type, // adjust if needed
-                  price: item.original_price / 100,
-                  offer_price: item.discounted_price / 100,
-                  quantity: item.quantity,
-                  thumbnail_image: item.image,
-                  index_position: index + 1
-                }))
-              }
-            };
-
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(cartData);
-          })
-          .catch(error => {
-            console.error('Cart fetch error:', error);
-          });
-      });
-    }
-  });
-</script>
-
-{% schema %}
-{
-  "name": "t:sections.header.name",
-  "class": "section-header",
-  "max_blocks": 10,
-  "settings": [
-    {
-      "type": "select",
-      "id": "logo_position",
-      "options": [
-        {
-          "value": "top-left",
-          "label": "t:sections.header.settings.logo_position.options__2.label"
-        },
-        {
-          "value": "top-center",
-          "label": "t:sections.header.settings.logo_position.options__3.label"
-        },
-        {
-          "value": "middle-left",
-          "label": "t:sections.header.settings.logo_position.options__1.label"
-        },
-        {
-          "value": "middle-center",
-          "label": "t:sections.header.settings.logo_position.options__4.label"
-        }
-      ],
-      "default": "middle-left",
-      "label": "t:sections.header.settings.logo_position.label",
-      "info": "t:sections.header.settings.logo_help.content"
-    },
-    {
-      "type": "select",
-      "id": "mobile_logo_position",
-      "options": [
-        {
-          "value": "center",
-          "label": "t:sections.header.settings.mobile_logo_position.options__1.label"
-        },
-        {
-          "value": "left",
-          "label": "t:sections.header.settings.mobile_logo_position.options__2.label"
-        }
-      ],
-      "default": "center",
-      "label": "t:sections.header.settings.mobile_logo_position.label"
-    },
-    {
-      "type": "link_list",
-      "id": "menu",
-      "default": "main-menu",
-      "label": "t:sections.header.settings.menu.label"
-    },
-    {
-      "type": "select",
-      "id": "menu_type_desktop",
-      "options": [
-        {
-          "value": "dropdown",
-          "label": "t:sections.header.settings.menu_type_desktop.options__1.label"
-        },
-        {
-          "value": "mega",
-          "label": "t:sections.header.settings.menu_type_desktop.options__2.label"
-        },
-        {
-          "value": "drawer",
-          "label": "t:sections.header.settings.menu_type_desktop.options__3.label"
-        }
-      ],
-      "default": "dropdown",
-      "label": "t:sections.header.settings.menu_type_desktop.label"
-    },
-    {
-      "type": "checkbox",
-      "id": "transparent_homepage",
-      "label": "Enable Transparent Header on Home Page",
-      "default": true,
-      "info": "Header will appear transparent over the home page content."
-    },
-    {
-      "type": "checkbox",
-      "id": "transparent_header",
-      "label": "Enable Transparent Header",
-      "default": false,
-      "info": "Header will appear transparent over selected page content."
-    },
-    {
-      "type": "select",
-      "id": "mega_menu_images_toggle",
-      "options": [
-        {
-          "value": "none",
-          "label": "None"
-        },
-        {
-          "value": "featured",
-          "label": "Featured"
-        },
-        {
-          "value": "metafield",
-          "label": "Metafield"
-        }
-      ],
-      "default": "none",
-      "label": "Mega menu collection image type"
-    },
-    {
-      "type": "checkbox",
-      "id": "mega_menu_images_title",
-      "label": "Hide the collection title (when mega menu images is active)",
-      "default": false
-    },
-    {
-      "type": "checkbox",
-      "id": "megamenu_backdrop_toggle",
-      "label": "Add a backdrop to darken rest of page when megamenu is open",
-      "default": true
-    },
-    {
-      "type": "select",
-      "id": "sticky_header_type",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:sections.header.settings.sticky_header_type.options__1.label"
-        },
-        {
-          "value": "on-scroll-up",
-          "label": "t:sections.header.settings.sticky_header_type.options__2.label"
-        },
-        {
-          "value": "always",
-          "label": "t:sections.header.settings.sticky_header_type.options__3.label"
-        },
-        {
-          "value": "reduce-logo-size",
-          "label": "t:sections.header.settings.sticky_header_type.options__4.label"
-        }
-      ],
-      "default": "on-scroll-up",
-      "label": "t:sections.header.settings.sticky_header_type.label"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_line_separator",
-      "default": true,
-      "label": "t:sections.header.settings.show_line_separator.label"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.header.settings.header__1.content"
-    },
-    {
-      "type": "color_scheme",
-      "id": "color_scheme",
-      "label": "t:sections.all.colors.label",
-      "default": "scheme-1"
-    },
-    {
-      "type": "color_scheme",
-      "id": "menu_color_scheme",
-      "label": "t:sections.header.settings.menu_color_scheme.label",
-      "default": "scheme-1"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.header.settings.header__utilities.content"
-    },
-    {
-      "type": "checkbox",
-      "id": "enable_country_selector",
-      "default": true,
-      "label": "t:sections.header.settings.enable_country_selector.label",
-      "info": "t:sections.header.settings.enable_country_selector.info"
-    },
-    {
-      "type": "checkbox",
-      "id": "enable_language_selector",
-      "default": true,
-      "label": "t:sections.header.settings.enable_language_selector.label",
-      "info": "t:sections.header.settings.enable_language_selector.info"
-    },
-    {
-      "type": "checkbox",
-      "id": "enable_customer_avatar",
-      "default": true,
-      "label": "t:sections.header.settings.enable_customer_avatar.label",
-      "info": "t:sections.header.settings.enable_customer_avatar.info"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.all.spacing"
-    },
-    {
-      "type": "range",
-      "id": "margin_bottom",
-      "min": 0,
-      "max": 100,
-      "step": 4,
-      "unit": "px",
-      "label": "t:sections.header.settings.margin_bottom.label",
-      "default": 0
-    },
-    {
-      "type": "header",
-      "content": "t:sections.all.padding.section_padding_heading"
-    },
-    {
-      "type": "range",
-      "id": "padding_top",
-      "min": 0,
-      "max": 36,
-      "step": 4,
-      "unit": "px",
-      "label": "t:sections.all.padding.padding_top",
-      "default": 20
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom",
-      "min": 0,
-      "max": 36,
-      "step": 4,
-      "unit": "px",
-      "label": "t:sections.all.padding.padding_bottom",
-      "default": 20
-    }
-  ],
-  "blocks": [
-    {
-      "type": "menu_image",
-      "name": "Menu Image",
-      "settings": [
-        {
-          "type": "number",
-          "id": "parent_index",
-          "label": "Parent menu index (1, 2, 3…)"
-        },
-        {
-          "type": "image_picker",
-          "id": "image",
-          "label": "Image"
-        },
-        {
-          "type": "url",
-          "id": "link",
-          "label": "Optional link"
-        },
-        {
-          "type": "range",
-          "id": "image_width",
-          "min": 200,
-          "max": 800,
-          "step": 20,
-          "unit": "px",
-          "label": "Image Width",
-          "default": 420
-        },
-        {
-          "type": "range",
-          "id": "image_height",
-          "min": 160,
-          "max": 600,
-          "step": 20,
-          "unit": "px",
-          "label": "Image Height",
-          "default": 420
-        },
-      ]
-    },
-    {
-      "type": "@app"
-    }
-  ]
+/* watch and buy section start */ 
+section.watch-and-buy-section .watch-buy-item video{width:100%;display:block;border-radius:12px; height: auto;}
+.page-exclusive-promotions-page-template-page h1.main-page-title.page-title {display: none;}
+.page-modern-slavery-policy-template-page h1.main-page-title.page-title {display: none;}
+.page-privacy-policy-new-template-page h1.main-page-title.page-title {display: none;}
+.page-supplier-code-conduct-new-template-page h1.main-page-title.page-title {display: none;}
+.page-shipping-policy-new-template-page h1.main-page-title.page-title {display: none;}
+section.watch-and-buy-section button.carousel-shopping-bag{cursor: unset; pointer-events: none; display:flex;align-items:center;justify-content:center;position:absolute;top:12px;right:12px;border:0;background:#fffFFF66;width:40px;height:40px;border-radius:50%;}
+section.watch-and-buy-section .watch-buy-item .item-content{display:none;}
+section.watch-and-buy-section h2.section-title{font-family: 'Futura Std', sans-serif; font-weight: 500; line-height: 150%; vertical-align: middle; text-transform: uppercase; color: #1a1a1a; text-align: center; margin: 0; font-size: 24px; margin-bottom: 0px;}
+section.watch-and-buy-section h2.section-subtitle{color: #535361;font-weight:400; font-size: 18px; line-height: 2;text-align:center;vertical-align:middle;max-width:800px;margin-left:auto;margin-right:auto;margin-bottom:40px;margin-top:0;}
+section.watch-and-buy-section {padding: 30px 0;}
+.watch-buy-video-popup .popup_overlay{position:fixed;z-index:9999;left:0;top:0;width:100%;height:100%;overflow:auto;background-color:#00000080;cursor:pointer;}
+.watch-buy-video-popup .popup-content{display:flex;flex-direction:column;justify-content:center;align-items:flex-end;left:50%;top:50%;transform:translate(-50%,-50%);cursor:default;max-width:390px;height:650px;position:relative;}
+.watch-buy-video-popup .popup-content video{width:100%;object-fit:contain;}
+.watch-buy-video-popup .close-popup{background:0 0;border:0;padding:10px;margin-bottom:10px; opacity: 0.6;transition: 0.3s; position:absolute;top:0;right:10px;cursor:pointer;z-index:99;}
+.watch-buy-video-popup .close-popup:hover{transform:scale(1);transition:transform .2s ease; opacity: 1;}
+.watch-buy-video-popup .popup-details{display:flex;align-items:center;gap:12px;background:#fff;padding:20px;width:100%;margin:0;border-radius:0 0 12px 12px;position:absolute;bottom:0;}
+.watch-buy-video-popup h3.product-title{font-family:Futura,sans-serif;font-weight:400;font-size:16px;line-height:21px;vertical-align:middle;}
+.watch-buy-video-popup img.product-image{max-width:100px;}
+.watch-and-buy-section .watch-buy-item{cursor:pointer;position:relative;width:100%!important;box-sizing:border-box;overflow:hidden;}
+.watch-and-buy-section .watch-buy-item:hover{opacity:.9;transition:opacity .3s ease;}
+.watch-buy-slider .owl-carousel{overflow:visible;}
+.watch-buy-slider .owl-stage-outer{overflow:hidden;}
+section.watch-and-buy-section .owl-theme .owl-nav{margin-top:0!important;}
+.watch-and-buy-section .owl-carousel .owl-nav button.owl-prev img,section.watch-and-buy-section .owl-carousel .owl-nav button.owl-next img{display:block;}
+section.watch-and-buy-section .owl-carousel .owl-nav button.owl-next img{position:relative;left:2px;}
+section.watch-and-buy-section .owl-carousel .owl-nav button.owl-prev img{position:relative;right:1px;}
+.watch-and-buy-section .owl-carousel .owl-nav button.owl-prev,section.watch-and-buy-section .owl-carousel .owl-nav button.owl-next{width:35px;height:35px;background:#00000040!important;display:flex;align-items:center;justify-content:center;border-radius:50%;}
+.watch-buy-video-popup .video-progress-container{position:absolute;top:-4px;left:20px;right:20px;}
+.watch-buy-video-popup .video-progress-bar{width:100%;height:4px;background:rgba(255,255,255,.3);border-radius:2px;overflow:hidden;}
+.watch-buy-video-popup .video-progress-fill{height:100%;background:#fff;width:0%;transition:width .1s ease;}
+.watch-buy-video-popup .popup-slider-nav{position:absolute;top:50%;width:100%;display:flex;justify-content:space-between;padding:0 20px;pointer-events:none;transform:translateY(-50%);}
+.watch-buy-video-popup .popup-nav-btn{background:rgba(0,0,0,.5);border:none;border-radius:50%;width:35px;height:35px;display:flex;align-items:center;justify-content:center;cursor:pointer;pointer-events:auto;transition:background .3s ease;}
+
+.watch-buy-video-popup .popup-product-card{position:absolute;bottom:0px;left:50%;background:#fff;border-radius:8px;padding:8px;display:flex !important;align-items:center;justify-content:center;gap:10px;width:92%;margin:0 auto;cursor:pointer;transform:translateX(-50%);}
+
+.watch-buy-video-popup .item-content{padding:12px;}
+.watch-buy-video-popup .item-bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;}
+.watch-buy-video-popup .product-card-image{width: 60px; height: 60px; object-fit: cover; border-radius: 8px; transform: scale3d(1.15, 1.15, 5);}
+.watch-buy-video-popup .product-card-info{flex:1;min-width:0;cursor:pointer;}
+.watch-buy-video-popup .product-card-title{margin:0 0 0px 0;color:#1a1a1a;font-family:Futura,sans-serif;font-weight:400;font-size:16px;line-height:1.5;vertical-align:middle;max-width:260px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;}
+.watch-buy-video-popup .product-card-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.watch-buy-video-popup .product-card-price{color:#1a1a1a;margin:0;font-family:Futura,sans-serif;font-weight:650;font-size:18px;line-height:150%;vertical-align:middle;}
+del#popupProductComparePrice{font-family:Futura,sans-serif;font-weight:500;font-size:16px;line-height:2;vertical-align:middle;text-decoration:line-through;}
+.watch-buy-video-popup{display:none;}
+section.watch-and-buy-section{opacity:0;transition:opacity .5s ease;}
+.watch-and-buy-section.loaded{opacity:1;}
+.product-card-price-wrapper{display:flex;align-items:center;column-gap:10px;flex-wrap:wrap;margin-top:2px;}
+section.watch-and-buy-section button.carousel-shopping-bag img{width:18px!important;}
+.watch-and-buy-wrapper{position:relative;max-width:100%;margin:0 auto;}
+.watch-buy-slider .owl-nav{position:absolute;top:50%;transform:translateY(-50%);width:100%;margin-top:0;pointer-events:none;}
+.watch-buy-slider .owl-nav button{position:absolute;pointer-events:all;margin:0!important;}
+.watch-buy-slider .owl-nav button.owl-prev{left:-45px;top:-20px;}
+.watch-buy-slider .owl-nav button.owl-next{right:-45px;top:-20px;}
+.watch-buy-video-popup .popup-content video{width:100%;object-fit:contain;controls:none; border-radius: 12px;}
+.watch-buy-video-popup .popup-content video::-webkit-media-controls{display:none!important;}
+.watch-buy-video-popup .popup-content video::-webkit-media-controls-panel{display:none!important;}
+.watch-buy-video-popup .popup-content video::-webkit-media-controls-play-button{display:none!important;}
+.watch-buy-video-popup .popup-content video::-webkit-media-controls-start-playback-button{display:none!important;}
+.watch-buy-video-popup .popup-content video::-moz-media-controls{display:none!important;}
+.watch-buy-video-popup .popup-content video{width:100%;object-fit:contain;outline:0;}
+.watch-buy-video-popup .popup-content video::-webkit-media-controls-enclosure{display:none!important;}
+.lucira-section.faq-section .accordion h2 {cursor: pointer; text-transform: unset; gap: 20px; color: #1A1A1A; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 18px; line-height: 100%; display: flex ; padding: 0; justify-content: space-between; margin: 0; }
+.lucira-section.faq-section .accordion p {margin: 30px 0 0; margin-top: 20px; color: rgb(26 26 26 / 75%); font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; vertical-align: middle; }
+.lucira-section.faq-section .accordion-item {padding: 0 0 !important; border-bottom: 1px solid #66666652;}
+.lucira-section.faq-section .accordion p {margin: 20px 0 30px;}
+.lucira-section.faq-section .accordion-item .accordion-title {padding: 22px 24px 22px 20px !important;}
+.lucira-section.faq-section .accordion-item .accordion-content {display: none; padding: 0 0px;}
+.lucira-section.faq-section {padding-bottom: 60px;}
+.lucira-section.faq-section .accordion-item .accordion-title { font-size: 14px !important; justify-content: space-between !important; display: flex ; align-items: center; text-align: left; margin: 0; text-transform: capitalize; }
+.lucira-section.faq-section .accordion p { margin: 20px 0 30px; text-align: left; }
+.lucira-section.faq-section {padding: 40px 0;}
+.lucira-section.faq-section p {margin-top: 0 !important; text-align: center;}
+.lucira-section.faq-section h3 { text-align: center; margin-bottom: 6px; margin-top: 0; }
+/* watch and buy section end */
+section.nector-reward-banner-section {background: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Loyalty-Desktop-Banner_1.jpg?v=1750941750); background-repeat: no-repeat; background-size: cover; background-position: right top; position: relative;}
+section.nector-reward-banner-section .nector-reward-banner-wrapper .grid-row {display: grid; grid-template-columns: calc(50% - 0px) calc(50% - 0px); gap: 0px; height: 100vh; align-items: flex-start;}
+section.nector-reward-banner-section h1 {color: #ffffff; margin: 0; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 40px; line-height: 100%; text-transform: uppercase; margin-bottom: 40px; }
+section.nector-reward-banner-section p {color: #ffffff; max-width: 600px;}
+section.nector-reward-banner-section p { font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 1.5; margin: 0; margin-bottom: 80px; }
+section.nector-reward-banner-section a.button-design { background: #ffffff; color: #A68380; text-decoration: none; padding: 16px 32px; display: inline-block; max-width: 360px; width: 100%; text-align: center; border-radius: 20px; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 16px; line-height: 1.2; text-transform: uppercase; }
+.nector-reward-how-it-works-wrapper .heading-wrapper h2 {text-align: center;font-weight: 500; font-size: 32px; line-height: 150%;  text-align: center; vertical-align: middle; text-transform: uppercase; color: #1A1A1A;}
+section.nector-reward-how-it-works-section .how-it-works-item h2 { font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 24px; line-height: 150%; text-align: left; vertical-align: middle; text-transform: uppercase; color: #1A1A1A; }
+.nector-reward-how-it-works-wrapper .heading-wrapper p { margin: 0; color: #1A1A1A; margin-top: 0; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 18px; line-height: 24px; text-align: center; vertical-align: middle; max-width: 845px; margin-left: auto; margin-right: auto; margin-bottom: 40px; }
+.nector-reward-how-it-works-wrapper .how-it-works-item {display: flex ; flex-direction: column; border: 1px solid #000000; padding: 20px 24px; justify-content: flex-start; align-items: flex-start; border-radius: 12px; height: 250px;}
+.nector-reward-how-it-works-wrapper .grid-row { display: grid ; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.nector-reward-how-it-works-wrapper p { margin: 0; color: #1A1A1A; margin-top: 0; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 22px; vertical-align: middle; }
+
+
+.nector-reward-ways-to-earn-wrapper .heading-wrapper h2 {text-align: center;font-weight: 500; font-size: 32px; line-height: 150%;  text-align: center; vertical-align: middle; text-transform: uppercase; color: #1A1A1A;}
+section.nector-reward-ways-to-earn-section .how-it-works-item h2 { font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 24px; line-height: 150%; text-align: left; vertical-align: middle; text-transform: uppercase; color: #1A1A1A; }
+.nector-reward-ways-to-earn-wrapper .heading-wrapper p { margin: 0; color: #1A1A1A; margin-top: 0; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 18px; line-height: 24px; text-align: center; vertical-align: middle; max-width: 845px; margin-left: auto; margin-right: auto; margin-bottom: 40px; }
+.nector-reward-ways-to-earn-wrapper .grid-row {display: grid ; grid-template-columns: repeat(4, 1fr); gap: 20px;}
+.nector-reward-ways-to-earn-wrapper .grid-row img {width: 100%; height: auto; display: block;}
+.nector-reward-ways-to-earn-wrapper .grid-row h3 { margin-top: 20px; margin-bottom: 12px; text-transform: uppercase; font-weight: 500; font-size: 16px; line-height: 150% 27px ; vertical-align: middle; }
+.nector-reward-ways-to-earn-wrapper .grid-row p { font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; line-height: 1.5; vertical-align: middle; margin: 0; }
+
+
+.lucira-section h3 { font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 20px; line-height: 150%; text-align: left; vertical-align: middle; text-transform: uppercase; color: #1a1a1a; }
+.lucira-section p {margin: 0; color: #1a1a1a; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; vertical-align: middle;}
+.lucira-section .heading-wrapper h2 {font-weight: 500; font-size: 24px; line-height: 150%; text-align: center; vertical-align: middle; text-transform: uppercase; color: #1a1a1a; margin-top: 0;}
+.lucira-section .heading-wrapper p {color: #1a1a1a; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 24px; text-align: center; vertical-align: middle; max-width: 845px; margin: 0 auto 40px;}
+.lucira-section {padding-top: 60px !important;}
+
+.nector-referral-program-section .grid-card-wrapper p:first-child { color: #1a1a1a; margin: 0; font-family: 'Futura Std'; font-weight: 400; font-size: 18px; line-height: 24px; vertical-align: middle; }
+.nector-referral-program-section .grid-column img.image-bg-left { position: absolute; bottom: 0; left: 0; width: 350px; }
+.nector-referral-program-section .grid-column:last-child img.image-bg-right { position: absolute; bottom: 0; right: 0px; width: 280px; }
+.nector-reward-banner-content-wrapper {padding-top: 135px;}
+.page-video_call_pdp-template-page .nector-reward-ways-to-earn-wrapper .grid-row { display: grid ; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+
+.nector-referral-program-section .referral-copy-wrapper p { margin-bottom: 20px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 150%; vertical-align: middle; color: #1A1A1A; }
+.nector-referral-program-section .nector-referral-program-wrapper .grid-row {display: grid ; grid-template-columns: calc(31.33% - 5px) calc(33.33% - 5px) calc(33.33% - 5px); align-items: center; gap: 20px; }
+/* .nector-referral-program-section .nector-referral-program-wrapper .grid-row {display: grid ; grid-template-columns: calc(50% - 10px) calc(50% - 10px); align-items: center; gap: 20px; max-width: 70%; margin: 0 auto;} */
+.nector-referral-program-section .referral-copy-wrapper { background: #fff; padding: 0; }
+.nector-referral-program-section .referral-copy-wrapper p { font-size: 1rem; font-weight: 500; color: #333; margin-bottom: 20px; }
+.nector-referral-program-section .copy-link-container { display: flex; margin-bottom: 25px; border-radius: 0; overflow: hidden; }
+.nector-referral-program-section .copy-link-container input { flex: 1; padding: 12px 15px; border: 1px solid #ddd; border-radius: 8px 0 0 8px; border-right: none; font-size: 14px; color: #666; outline: none; background: #fff; font-family: inherit; }
+.nector-referral-program-section .login_button {padding: 14px 25px; background: #a68380; color: #fff; border: none; cursor: pointer; transition: background-color .3s ease; font-family: inherit; font-weight: 500; font-size: 14px; line-height: 150%; vertical-align: middle; text-transform: uppercase; border-radius: 0 8px 8px 0; text-decoration: none;}
+.nector-referral-program-section .copy-link-container input:focus { border-color: #999; }
+.nector-referral-program-section .copy-btn { padding: 12px 20px; background: #a88a7a; color: white; width: 125px; border: none; font-weight: 500; cursor: pointer; transition: background-color 0.3s ease; font-size: 14px; text-transform: uppercase; font-family: inherit; }
+.nector-referral-program-section .copy-btn:hover { background: #967c6c; }
+.nector-referral-program-section .copy-btn:active { background: #856b5a; }
+.nector-referral-program-section .copy-btn.copied { background: #008000; }
+.nector-referral-program-section .grid-social-icons { display: flex; gap: 10px; justify-content: flex-start; }
+.nector-referral-program-section .grid-social-icons a { display: block; width: 50px; height: 50px; }
+.nector-referral-program-section .grid-social-icons img { width: 50px; height: 50px; border-radius: 50%; transition: transform 0.2s ease; }
+.nector-referral-program-section .grid-social-icons a:hover img { transform: scale(1.1); }
+.nector-referral-program-section .grid-card-wrapper {position: relative; background: #F3E0CF; padding: 24px; border-radius: 8px; text-align: center; border: 1px solid #F3E0CF; height: 180px; display: flex; flex-direction: column; justify-content: center; }
+.nector-referral-program-section .toast { position: fixed; top: 20px; right: 20px; background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 15px 25px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2); transform: translateX(400px); transition: transform 0.3s ease; z-index: 1000; font-weight: 600; }
+.nector-referral-program-section .copy-btn { padding: 14px 25px; background: #A68380; color: #fff; border: none; cursor: pointer; transition: background-color .3s ease; font-family: inherit; font-weight: 500; font-size: 14px; line-height: 150%; vertical-align: middle; text-transform: uppercase; border-radius: 0 8px 8px 0; }
+.nector-referral-program-section .copy-link-container input { flex: 1; padding: 12px 15px; border: 1px solid #CCCCCC; border-radius: 8px 0 0 8px; border-right: none; color: #666666; outline: none; background: #fff; font-weight: 400; font-size: 16px; line-height: 150%; vertical-align: middle; font-family: inherit; }
+.nector-referral-program-section .referral-copy-wrapper p { color: #1A1A1A; margin-bottom: 20px; font-family: 'Futura Std'; font-weight: 400; font-size: 16px; line-height: 150%; vertical-align: middle; }
+.nector-referral-program-section .grid-card-wrapper p:first-child {color: #1a1a1a; margin-bottom: 15px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 24px; text-align: right; vertical-align: middle; margin: 0;}
+.nector-referral-program-section .grid-card-wrapper p:last-child {-webkit-text-stroke: 0.6px #000000; font-weight: 500 !important; font-size: 24px !important; margin-top: 20px !important; line-height: 1.2; }
+.nector-referral-program-section .grid-card-wrapper p {text-align: right;}
+.nector-referral-program-section .grid-column:last-child .grid-card-wrapper p {text-align: left;}
+.nector-referral-program-section .grid-column:last-child .grid-card-wrapper h1 {text-align: left;}
+.lucira-section.faq-section .accordion h2 {cursor: pointer; text-transform: unset; gap: 20px; color: #1A1A1A; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 18px; line-height: 100%; display: flex ; padding: 0; justify-content: space-between; margin: 0; }
+.lucira-section.faq-section .accordion p {margin: 30px 0 0; margin-top: 20px; color: rgb(26 26 26 / 75%); font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 14px; line-height: 1.6; vertical-align: middle; }
+.lucira-section.faq-section .accordion-item {padding: 0 0 !important; border-bottom: 1px solid #66666652;}
+.lucira-section.faq-section .accordion p {margin: 20px 0 30px;}
+.lucira-section.faq-section .accordion-item .accordion-title {padding: 22px 20px 22px 0 !important;}
+
+.lucira-section.faq-section .accordion-item .accordion-content {display: none; padding: 0x;}
+.lucira-section.faq-section {padding-bottom: 60px;}
+.page-terms-condition-template-page h1.main-page-title.page-title {display: none;}
+.gold-offers-wrapper {background: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321316135_1_1.jpg?v=1759498219); background-repeat: no-repeat; background-size: 100%; height: 70px; margin-top: 40px; border-radius: 12px;position: relative;} .gold-offers-wrapper img {position: absolute; bottom: 0; left: 16px;} 
+.gold-offers-content-wrap h4 {margin: 0; color: #FFFFFF; font-weight: 500; font-size: 18px; line-height: 150%; letter-spacing: 0.7px; vertical-align: middle; margin-top: 0; margin-left: 0;} .gold-offers-content-wrap p {margin: 0; font-weight: 500; font-size: 12px; line-height: 150%; letter-spacing: 0.1px; vertical-align: middle; color: #fff;} .gold-offers-content-wrap {left: 135px;max-width: 80%; position: absolute; right: 0; top: 50%; transform: translateY(-50%);}
+@keyframes luxuryPulse{
+0%,100%,80%{opacity:.4;transform:scale(1)}
+40%{opacity:1;transform:scale(1.3)}
 }
-{% endschema %}
+@keyframes fadeInUp{
+0%{opacity:0;transform:translateY(20px)}
+100%{opacity:1;transform:translateY(0)}
+}
+.infinite-scroll-anchor{display:flex;align-items:center;justify-content:center;gap:12px;color:#8b7355;font-size:14px;letter-spacing:.05em;font-weight:400}
+.luxury-dots{display:flex;gap:8px;align-items:center}
+.luxury-dots .dot{width:8px;height:8px;background:linear-gradient(135deg,#d4af37 0,#ffe6ae 50%,#d4af37 100%);border-radius:50%;animation:luxuryPulse 1.4s infinite ease-in-out}
+.luxury-dots .dot:nth-child(2){animation-delay:.2s}
+.luxury-dots .dot:nth-child(3){animation-delay:.4s}
+.infinite-scroll-end{display:none;text-align:center;padding:60px 0 100px;color:#6f5b3e;font-family:Futura,sans-serif}
+.infinite-scroll-end .end-decoration{display:flex;align-items:center;justify-content:center;margin-bottom:20px}
+.infinite-scroll-end .luxury-line{height:1px;width:80px;background:linear-gradient(90deg,transparent,#d4af37,transparent)}
+.infinite-scroll-end .end-diamond{color:#d4af37;font-size:16px;margin:0 10px}
+.infinite-scroll-end .end-text{font-size:18px;letter-spacing:.04em;margin-bottom:6px;animation:fadeInUp .6s ease forwards}
+.infinite-scroll-end .end-subtitle{font-size:14px;color:#a8905b;letter-spacing:.03em;animation:fadeInUp .8s ease forwards}
+.page-schemes-page-template-page .lucira-section.faq-section { padding: 30px 0 !important; }
+.page-schemes-page-template-page .lucira-section .heading-wrapper p { color: #1a1a1a; font-weight: 400; font-size: 16px; line-height: 24px; text-align: center; vertical-align: middle; margin: 0 auto 40px;     max-width: 690px;}
+.insurance-item-cart-item {display:none !important}
+.announcement-bar .slider-button { height: 3.8rem; transform: rotate(-90deg) scale(1.1); }
+.slider-button--next .icon, .slider-button--prev .icon { width: 12px; height: 12px; }
+.search-modal__form svg path {fill: rgb(26 26 26 / 75%);}
+svg.icon.icon-cart-empty { height: 30px; width: 30px; }
+svg.icon.icon-cart { width: 30px; height: 30px; }
+.header__icon.announce svg {width: 30px; height: 30px;}
+svg.icon.menu-image-icon { width: 24px; height: 24px; display: block; }
+svg.icon.icon-lucira-logo { display: block; }
+.home-card-grid-arrow {filter: invert(100%); display: block;}
+
+@media only screen and (min-width:375px) and (max-width:410px){
+  .nector-referral-program-section .grid-column img.image-bg-left {width: 280px;}
+}
+
+
+@media only screen and (min-width:0px) and (max-width:767px){
+  .nector-websdk-widget .nector-rewards-widget-container{  z-index:99999 !important;}
+  section.nector-reward-banner-section .nector-reward-banner-wrapper .grid-row {grid-template-columns: 1fr; height: 535px; align-items: flex-end;}
+  section.nector-reward-banner-section h1 { margin: 0; font-family: 'Futura Std', sans-serif; margin-bottom: 12px; font-weight: 400; font-size: 18px; line-height: 100%; text-align: center; text-transform: uppercase; color: #ffffff;}
+  section.nector-reward-banner-section p { font-family: 'Futura Std', sans-serif; margin: 0; color: #1A1A1A; margin-bottom: 32px; font-weight: 400; font-size: 12px; line-height: 1.3; text-align: center; color: #ffffff; }
+  section.nector-reward-banner-section .nector-reward-banner-wrapper .grid-row .grid-column:nth-child(1) {grid-row: 2;}
+  section.nector-reward-banner-section .nector-reward-banner-content-wrapper { margin-bottom: 40px; text-align: center;}
+  section.nector-reward-banner-section a.button-design {padding: 16px 50px; max-width: max-content; font-size: 12px;}
+  section.nector-reward-banner-sectisection.nector-reward-how-it-works-section {position: relative;}
+  section.nector-reward-banner-section:after {content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; background: linear-gradient(180deg, #1f77db00 37.64%, #000000 81.77%);}
+  section.nector-reward-banner-section .page-width {position: relative; z-index: 10;}
+  section.nector-reward-banner-section .popup-video-container { width: 100%; height: 100%;}
+  .nector-reward-how-it-works-wrapper .grid-row { display: grid ; grid-template-columns: repeat(1, 1fr); gap: 20px; }
+  .nector-reward-how-it-works-wrapper .heading-wrapper h2 { font-weight: 500; font-size: 18px; line-height: 1.4; text-align: center; vertical-align: middle; text-transform: uppercase; color: #1A1A1A; }
+  section.nector-reward-how-it-works-section .how-it-works-item h2 { font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 18px; line-height: 1.6; text-align: left; vertical-align: middle; text-transform: uppercase; color: #1A1A1A; margin-right: 0; margin-left: 0; margin-bottom: 6px; margin-top: 20px; }
+  .nector-reward-how-it-works-wrapper p { margin: 0; color: #1A1A1A; margin-top: 10px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; line-height: 1.4; vertical-align: middle; }
+  .nector-reward-how-it-works-wrapper .heading-wrapper p { margin: 0; color: #1A1A1A; margin-top: 6px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; line-height: 1.4; text-align: center; vertical-align: middle; max-width: 845px; margin-left: auto; margin-right: auto; margin-bottom: 40px; }
+  .nector-reward-how-it-works-wrapper .how-it-works-item img {width: 40px; height: 40px;}
+  .nector-reward-ways-to-earn-wrapper p { margin: 0; color: #1A1A1A; margin-top: 10px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; line-height: 1.4; vertical-align: middle; }
+  .nector-reward-ways-to-earn-wrapper .heading-wrapper p { margin: 0; color: #1A1A1A; margin-top: 6px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; line-height: 1.4; text-align: center; vertical-align: middle; max-width: 845px; margin-left: auto; margin-right: auto; margin-bottom: 40px; }
+  .nector-reward-ways-to-earn-wrapper .heading-wrapper h2 { font-weight: 500; font-size: 18px; line-height: 1.4; text-align: center; vertical-align: middle; text-transform: uppercase; color: #1A1A1A; }
+
+
+
+    .lucira-section h2 { font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 20px; line-height: 1.6; text-align: left; vertical-align: middle; text-transform: uppercase; color: #1a1a1a; }
+  .lucira-section .heading-wrapper h2 {font-weight: 500; font-size: 18px; line-height: 1.6; text-align: center; vertical-align: middle; text-transform: uppercase; color: #1a1a1a; margin-top: 0;}
+  .lucira-section .heading-wrapper p {color: #1a1a1a; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; line-height: 1.6; text-align: center; vertical-align: middle; max-width: 845px; margin: 0 auto 40px;}
+  .lucira-section p {margin: 0; color: #1a1a1a; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; line-height: 22px; vertical-align: middle;}
+  .lucira-section {padding-top: 40px !important;}
+  .nector-reward-ways-to-earn-wrapper .grid-row {grid-template-columns: repeat(1, 1fr); gap: 24px;}
+  .lucira-section.faq-section .accordion h2 { cursor: pointer; color: #1a1a1a; font-family: 'Futura Std', sans-serif; display: flex ; padding: 0; justify-content: space-between; margin: 0; font-weight: 500; font-size: 16px; line-height: 21px; text-transform: unset; }
+  .nector-referral-program-section .nector-referral-program-wrapper .grid-row { display: grid ; grid-template-columns: 1fr; align-items: center; gap: 30px; max-width: 100%;}
+  .nector-referral-program-section .grid-card-wrapper p:last-child {font-size: 18px; line-height: 25px; line-height: 1.1;}
+  .nector-referral-program-section .grid-card-wrapper p:first-child {font-size: 14px; line-height: 25px;}
+  .nector-referral-program-section .referral-copy-wrapper p {font-size: 14px;}
+  section.nector-reward-banner-section { background: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Loyalty-Mobile-Banner_1.jpg?v=1750941750); background-repeat: no-repeat; background-size: cover; background-position: right top; position: relative; }
+  .lucira-section h3 {font-size: 18px;}
+  section.nector-reward-banner-section a.button-design { background: #a68380; color: #ffffff;}
+
+
+    .nector-referral-program-section .grid-column img.image-bg-left { position: absolute; bottom: 0; left: 0; width: 295px; }
+  .nector-referral-program-section .grid-column:last-child img.image-bg-right { position: absolute; bottom: 0; right: 0; width: 295px; }
+  .nector-referral-program-section .grid-column:last-child {margin-top: 20px;}
+  .nector-referral-program-section .grid-card-wrapper p:last-child {font-size: 22px !important;}
+  .nector-referral-program-section .grid-card-wrapper p span {font-size: 14px; line-height: 1.1;}
+  .nector-referral-program-section .nector-referral-program-wrapper .grid-row {max-width: 100%;}
+  .lucira-section .accordion-icon { transition: transform 0.3s ease; }
+  .lucira-section .accordion .accordion-title.active .accordion-icon { transform: rotate(45deg); position: relative; right: 2px;}
+  .page-video_call_pdp-template-page .nector-reward-ways-to-earn-wrapper .grid-row {grid-template-columns: repeat(1, 1fr);}
+
+  .watch-and-buy-wrapper {position:relative;max-width:100%;margin:0 auto;}
+  .watch-buy-slider .owl-nav{position:absolute;top:50%;transform:translateY(-50%);width:100%;margin-top:0;pointer-events:none;}
+  .watch-buy-slider .owl-nav button{position:absolute;pointer-events:all;margin:0!important;}
+  .watch-buy-slider .owl-nav button.owl-prev{left:-45px;}
+  .watch-buy-slider .owl-nav button.owl-next{right:-45px;}
+  section.watch-and-buy-section .page-width{padding:0 !important;}
+  section.watch-and-buy-section h2.section-title{padding:0 2rem;font-weight:400;font-size:18px;line-height:150%;text-align:center;text-transform:uppercase;}
+  section.watch-and-buy-section h2.section-subtitle{padding:0 2rem;margin-top:0;font-weight:400;font-size:12px;line-height:150%;text-transform:capitalize;}
+  section.watch-and-buy-section{padding:40px 0 40px;}
+  section.watch-and-buy-section .popup-video-container {height: 100%; width: 100%;}
+  .watch-buy-video-popup .popup-content {height: 100vh; width: 100%; max-width: 100%;}
+  .watch-buy-video-popup .popup-content video {border-radius: 0; width: 100%; height: 90vh; object-fit: cover; outline: 0;}
+  .watch-buy-video-popup .popup-video-container { width: 100%; height: 100%; }
+  .watch-buy-video-popup .video-progress-container {top: 20px;}
+  .watch-buy-video-popup .close-popup {top: 55px; right: 20px;}
+  .watch-buy-video-popup .popup-product-card {bottom: 80px;}
+  section.watch-and-buy-section button.carousel-shopping-bag {width: 32px !important; height: 32px !important;}
+  .watch-buy-video-popup .product-card-price {font-size: 14px;}
+  .lucira-section.faq-section .accordion p {font-size: 14px;}
+  section.watch-and-buy-section {padding: 20px 0;}
+  .gold-offers-wrapper img { position: absolute; bottom: 0; left: 16px; width: 70px; height: auto; }
+  .gold-offers-content-wrap { left: 100px; max-width: 100%; position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+  .gold-offers-content-wrap h4 {font-size: 12px;}
+  .gold-offers-content-wrap p { margin: 0; color: #fff; font-weight: 500; font-size: 8px; line-height: 150%; letter-spacing: 0.1px; vertical-align: middle; }
+  .gold-offers-wrapper {height: 46px;}
+  .img.item-certified { width: 26px; }
+  .cart-certificate-item-wrapper {font-size: 12px !important;}
+  .icon.lucira-pen {width: 25px;}
+}
+
+@media only screen and (min-width:0px) and (max-width:410px){
+  .nector-referral-program-section .grid-column:last-child img.image-bg-right { position: absolute; bottom: 0; right: 0; width: 235px; }
+}
+@media screen and (min-width: 750px){
+.page-width.custom_pagess {width: 75% !important;}
+}
+@media only screen and (min-width:1600px) and (max-width:2100px){
+  .nector-reward-ways-to-earn-wrapper .grid-row h3 {font-size: 18px;}
+  .nector-reward-how-it-works-wrapper .how-it-works-item img {width: 60px !important;}
+  section.nector-reward-banner-section .nector-reward-banner-wrapper .grid-row {height: 90vh;}
+  .nector-referral-program-section .grid-card-wrapper p span { font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 21px; line-height: 150%; vertical-align: middle; letter-spacing: 1px; }
+  .nector-referral-program-section .grid-card-wrapper p:first-child { color: #1a1a1a; margin: 0; font-family: 'Futura Std'; font-weight: 400; font-size: 18px; line-height: 24px; vertical-align: middle; }
+  .nector-referral-program-section .grid-card-wrapper p:last-child { -webkit-text-stroke: .6px #000000; font-weight: 500 !important; font-size: 32px !important; margin-top: 24px !important; line-height: normal; }
+  .nector-referral-program-section .grid-card-wrapper {padding: 35px;}
+  .nector-referral-program-section .grid-column img.image-bg-left { position: absolute; bottom: 0; left: 0; width: 375px; }
+  .nector-referral-program-section .grid-column:last-child img.image-bg-right { position: absolute; bottom: 0; right: 0; width: 285px; }
+  .nector-reward-banner-content-wrapper {padding-top: 160px;}
+  .nector-reward-ways-to-earn-wrapper .grid-row h3 {margin-bottom: 8px;}
+
+}
+
+@media only screen and (min-width:0px) and (max-width:365px){
+  .gold-offers-wrapper { height: 43px; }
+  .gold-offers-content-wrap { left: 95px;}
+}
