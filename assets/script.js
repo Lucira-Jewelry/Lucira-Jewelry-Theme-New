@@ -1,3 +1,20 @@
+document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+  anchor.addEventListener("click", function (e) {
+    e.preventDefault();
+    const targetId = this.getAttribute("href").substring(1);
+    if (targetId === "") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    const targetElement = document.getElementById(targetId);
+    if (targetElement) {
+      const y =
+        targetElement.getBoundingClientRect().top + window.pageYOffset + -120;
+      window.scrollTo({ top: y, behavior: "smooth" });
+    }
+  });
+});
+
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
