@@ -9,7 +9,7 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     const targetElement = document.getElementById(targetId);
     if (targetElement) {
       const y =
-        targetElement.getBoundingClientRect().top + window.pageYOffset + -120;
+        targetElement.getBoundingClientRect().top + window.pageYOffset + -100;
       window.scrollTo({ top: y, behavior: "smooth" });
     }
   });
