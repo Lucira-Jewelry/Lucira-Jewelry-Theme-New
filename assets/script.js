@@ -174,7 +174,7 @@ $(document).ready(function () {
           }, 300, function () {
             $content.css("overflow", "hidden");
           });
-          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
+          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
         } else {
           const naturalHeight = $content.css({ height: "auto", paddingTop: "12px", paddingBottom: "12px" }).outerHeight();
 
@@ -197,7 +197,7 @@ $(document).ready(function () {
           });
 
           $toggle.addClass("active");
-          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/minus.svg?v=1753965750" width="auto" height="auto">');
+          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-minus"></use></svg>');
         }
       });
     });
