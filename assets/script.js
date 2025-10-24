@@ -44,7 +44,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
 jQuery(document).ready(function () {
   // Append Font Awesome icon to each accordion title
-  jQuery(".accordion .accordion-title").append("<svg class='icon' width='18' height='18'><use xlink:href='#cart + icon 1'></use> </svg>");
+  jQuery(".accordion .accordion-title").append('<i class="accordion-icon fa fa-plus"></i>');
 
   jQuery(".accordion .accordion-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
