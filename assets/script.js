@@ -141,7 +141,7 @@ $(document).ready(function () {
           paddingTop: "0",
           paddingBottom: "0"
         });
-        $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
+        $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
       }
 
       $toggle.on("click", function () {
