@@ -109,7 +109,7 @@ $(document).ready(function () {
         $(".lucira-accordion-toggle").removeClass("active")
           .off("click")
           .find(".lucira-accordion-icon")
-          .html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
+          .html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
         initialized = false;
       }
       return;
@@ -158,7 +158,7 @@ $(document).ready(function () {
             }, 300, function () {
               $otherContent.css("overflow", "hidden");
             });
-            $el.find(".lucira-accordion-icon").html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="20" height="20">');
+            $el.find(".lucira-accordion-icon").html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
           }
         });
 
