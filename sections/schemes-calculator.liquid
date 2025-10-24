@@ -80,9 +80,7 @@
     function handleInputChange(input) {
         // Allow user to type freely
         let value = input.value.replace(/[^0-9]/g, '');
-        
         if (value) {
-            // Update the input with just numbers as they type
             input.value = value;
         }
     }
@@ -90,10 +88,8 @@
     function updateCalculation() {
         const input = document.getElementById('calculator_monthly_installment');
         let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 1000;
-        
         // Clamp value between min and max
         value = Math.max(1000, Math.min(19000, value));
-        
         updateValues(value);
     }
 
@@ -103,64 +99,75 @@
         const max = slider.max;
         const percentage = ((value - min) / (max - min)) * 100;
         slider.style.setProperty('--slider-progress', percentage + '%');
-        updateValues(parseInt(value));
+
+        // Update premium amount live
+        document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
+
+        // Also update input field
+        document.getElementById('calculator_monthly_installment').value = value;
+
+        // Update active tab if matches
+        document.querySelectorAll('.price-tab').forEach(tab => {
+            tab.classList.remove('active');
+            const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
+            if (tabValue === parseInt(value)) tab.classList.add('active');
+        });
+
+        // Optional: if you want total amounts to update live, uncomment:
+        // const payAmount = value * 9;
+        // const freeAmount = value;
+        // const totalAmount = value * 10;
+        // document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
+        // document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+        // document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
     }
 
     function selectTab(button, value) {
-        // Remove active class from all tabs
-        document.querySelectorAll('.price-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Add active class to clicked tab
+        document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
         button.classList.add('active');
-        
         updateValues(value);
     }
 
     function updateValues(installmentAmount) {
-        // Update input field
+        // Update input
         const input = document.getElementById('calculator_monthly_installment');
         input.value = installmentAmount;
-        
+
         // Update slider
         const slider = document.getElementById('installment_slider');
         slider.value = installmentAmount;
-        
-        // Update slider progress color
         const min = slider.min;
         const max = slider.max;
         const percentage = ((installmentAmount - min) / (max - min)) * 100;
         slider.style.setProperty('--slider-progress', percentage + '%');
-        
-        // Update active tab if it matches
+
+        // Update active tab
+        document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
         document.querySelectorAll('.price-tab').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // Find and activate matching tab
-        const tabs = document.querySelectorAll('.price-tab');
-        tabs.forEach(tab => {
             const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
-            if (tabValue === installmentAmount) {
-                tab.classList.add('active');
-            }
+            if (tabValue === installmentAmount) tab.classList.add('active');
         });
-        
-        // Calculate amounts
+
+        // Update premium and total amounts
         const payAmount = installmentAmount * 9;
         const freeAmount = installmentAmount;
         const totalAmount = installmentAmount * 10;
-        
-        // Update display
+
+        document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
         document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
         document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
         document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
     }
 
-    // Initialize with default value of 10000
+    // Initialize default value
     document.addEventListener('DOMContentLoaded', function() {
         updateValues(1000);
+
+        // Make slider update premium live
+        const slider = document.getElementById('installment_slider');
+        slider.addEventListener('input', function() {
+            updateFromSlider(this.value);
+        });
     });
 </script>
 
