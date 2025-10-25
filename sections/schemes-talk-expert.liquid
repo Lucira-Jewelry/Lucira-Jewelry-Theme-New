@@ -11,6 +11,7 @@
         <input 
           type="tel" 
           name="contact[phone]" 
+          id="talkToExpertPhone"
           placeholder="Mobile Number" 
           required 
           class="talk-to-us-expert-input"
@@ -23,18 +24,41 @@
           Talk to an Expert
         </button>
       </form>
+      
+      <div id="formFeedback" class="form-feedback" style="display: none;"></div>
 
     </div>
   </div>
 </div>
 
 <script>
+document.addEventListener('DOMContentLoaded', function() {
+  const form = document.getElementById('talkToExpertForm');
+  
+  if (form) {
+    form.addEventListener('submit', handleExpertForm);
+  }
+  
+  // Enhanced phone input formatting
+  const phoneInput = document.getElementById('talkToExpertPhone');
+  if (phoneInput) {
+    phoneInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.length > 0) {
+        value = value.match(new RegExp('.{1,4}', 'g')).join(' ');
+      }
+      e.target.value = value;
+    });
+  }
+});
+
 function handleExpertForm(event) {
   event.preventDefault();
   
   const phoneInput = document.getElementById('talkToExpertPhone');
   const phoneNumber = phoneInput.value.trim();
   const feedbackEl = document.getElementById('formFeedback');
+  const submitButton = event.target.querySelector('button[type="submit"]');
   
   // Clear previous feedback
   feedbackEl.style.display = 'none';
@@ -47,7 +71,7 @@ function handleExpertForm(event) {
     return false;
   }
   
-  // Basic phone validation (adjust regex as needed)
+  // Basic phone validation
   const phoneRegex = /^[\d\+\-\(\)\s]{10,}$/;
   if (!phoneRegex.test(phoneNumber)) {
     showFeedback('Please enter a valid phone number.', 'error');
@@ -55,42 +79,84 @@ function handleExpertForm(event) {
     return false;
   }
   
-  // Show success message
-  showFeedback('Thank you! An expert will contact you shortly.', 'success');
+  // Disable button and show loading state
+  submitButton.disabled = true;
+  submitButton.textContent = 'Sending...';
   
-  // Send email notification
-  sendExpertEmail(phoneNumber);
-  
-  // Optional: Submit to Shopify as well
-  setTimeout(() => {
-    event.target.submit();
-  }, 2000);
+  // Send email via POST request
+  sendExpertEmailPost(phoneNumber)
+    .then(() => {
+      showFeedback('Thank you! An expert will contact you shortly.', 'success');
+      phoneInput.value = '';
+      
+      // Also submit to Shopify contact form
+      setTimeout(() => {
+        event.target.submit();
+      }, 1500);
+    })
+    .catch((error) => {
+      showFeedback('There was an error submitting your request. Please try again.', 'error');
+      console.error('Error:', error);
+    })
+    .finally(() => {
+      // Re-enable button
+      submitButton.disabled = false;
+      submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Talk to an Expert';
+    });
   
   return false;
 }
 
-function sendExpertEmail(phoneNumber) {
-  const email = 'support@lucirajewelry.com';
-  const subject = encodeURIComponent('Talk to an Expert Request - Lucira Jewelry');
-  const body = encodeURIComponent(
-`New Expert Consultation Request:
+async function sendExpertEmailPost(phoneNumber) {
+  const emailData = {
+    to: 'support@lucirajewelry.com',
+    subject: 'Talk to an Expert Request - Lucira Jewelry',
+    body: `New Expert Consultation Request:
 
 Phone Number: ${phoneNumber}
 Date: ${new Date().toLocaleString()}
 Source: Website Form
 
-Please contact this customer as soon as possible.`
-  );
+Please contact this customer as soon as possible.`,
+    phone: phoneNumber,
+    timestamp: new Date().toISOString()
+  };
 
-  // Create mailto link
-  const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
-  
-  // Open email client
-  window.location.href = mailtoLink;
-  
-  // Optional: Also open Gmail in new tab
-  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
-  window.open(gmailUrl, '_blank');
+  // Option 1: Send to your server endpoint
+  try {
+    const response = await fetch('/apps/expert-inquiry/send-email', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(emailData)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to send email');
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Email send error:', error);
+    
+    // Fallback: Use Shopify's contact form
+    const formData = new FormData();
+    formData.append('contact[phone]', phoneNumber);
+    formData.append('contact[tags]', 'Talk to Expert');
+    formData.append('contact[body]', emailData.body);
+    
+    const fallbackResponse = await fetch('/contact#contact_form', {
+      method: 'POST',
+      body: formData
+    });
+    
+    if (!fallbackResponse.ok) {
+      throw new Error('Fallback submission failed');
+    }
+    
+    return { success: true, method: 'fallback' };
+  }
 }
 
 function showFeedback(message, type) {
@@ -106,20 +172,6 @@ function showFeedback(message, type) {
     }, 5000);
   }
 }
-
-// Enhanced phone input formatting (optional)
-document.addEventListener('DOMContentLoaded', function() {
-  const phoneInput = document.getElementById('talkToExpertPhone');
-  if (phoneInput) {
-    phoneInput.addEventListener('input', function(e) {
-      let value = e.target.value.replace(/\D/g, '');
-      if (value.length > 0) {
-        value = value.match(new RegExp('.{1,4}', 'g')).join(' ');
-      }
-      e.target.value = value;
-    });
-  }
-});
 </script>
 
 <style>
