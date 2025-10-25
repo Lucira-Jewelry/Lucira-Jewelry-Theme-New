@@ -727,25 +727,32 @@ class SlideshowComponent extends SliderComponent {
     }
   }
 
-  setAutoPlay() {
-    this.autoplaySpeed = 1000 * this.slider.dataset.speed;
-    this.addEventListener("mouseover", this.focusInHandling.bind(this));
-    this.addEventListener("mouseleave", this.focusOutHandling.bind(this));
-    this.addEventListener("focusin", this.focusInHandling.bind(this));
-    this.addEventListener("focusout", this.focusOutHandling.bind(this));
-
-    const autoplayBtn = this.querySelector(".slideshow__autoplay");
-    if (autoplayBtn) {
-      this.sliderAutoplayButton = autoplayBtn;
-      this.sliderAutoplayButton.addEventListener("click", this.autoPlayToggle.bind(this));
-      this.autoplayButtonIsSetToPlay = true;
-      this.play();
-    } else if (!this.reducedMotion.matches && !this.announcementBarArrowButtonWasClicked) {
-      this.play();
-    } else {
-      this.pause();
-    }
+setAutoPlay() {
+  // ✅ ADD THIS: Initialize sliderItems if not already set
+  if (!this.sliderItems) {
+    this.sliderItems = this.querySelectorAll('.announcement-bar__slide, .slideshow__slide');
+    this.sliderItemOffset = this.sliderItems[0]?.clientWidth || 0;
   }
+
+  this.autoplaySpeed = 1000 * this.slider.dataset.speed;
+  this.addEventListener("mouseover", this.focusInHandling.bind(this));
+  this.addEventListener("mouseleave", this.focusOutHandling.bind(this));
+  this.addEventListener("focusin", this.focusInHandling.bind(this));
+  this.addEventListener("focusout", this.focusOutHandling.bind(this));
+
+  const autoplayBtn = this.querySelector(".slideshow__autoplay");
+  if (autoplayBtn) {
+    this.sliderAutoplayButton = autoplayBtn;
+    this.sliderAutoplayButton.addEventListener("click", this.autoPlayToggle.bind(this));
+    this.autoplayButtonIsSetToPlay = true;
+    this.play();
+  } else if (!this.reducedMotion.matches && !this.announcementBarArrowButtonWasClicked) {
+    this.play();
+  } else {
+    this.pause();
+  }
+}
+
 
   onButtonClick(e) {
     super.onButtonClick(e);
