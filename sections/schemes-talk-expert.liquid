@@ -12,6 +12,7 @@
         <input type="hidden" name="utf8" value="✓" />
         <input type="hidden" name="contact[subject]" value="Talk to Expert Request - Lucira Jewelry" />
         <input type="hidden" name="contact[tags]" value="Talk to Expert" />
+        <input type="hidden" name="contact[email]" value="tech@lucirajewelry.com" />
         
         <input 
           type="tel" 
@@ -112,6 +113,15 @@ Source: Website Form
 
 Please contact this customer as soon as possible.`;
   
+  // Send email notification first using Web3Forms (free service)
+  sendEmailNotification(phoneNumber, timestamp)
+    .then(() => {
+      console.log('Email sent successfully');
+    })
+    .catch(err => {
+      console.error('Email error:', err);
+    });
+  
   // Submit the form using fetch to handle it properly
   const formData = new FormData(form);
   
@@ -126,9 +136,6 @@ Please contact this customer as soon as possible.`;
     if (response.ok || response.redirected) {
       showFeedback('Thank you! An expert will contact you shortly.', 'success');
       phoneInput.value = '';
-      
-      // Send email notification
-      sendEmailNotification(phoneNumber, timestamp);
     } else {
       throw new Error('Form submission failed');
     }
@@ -149,23 +156,44 @@ Please contact this customer as soon as possible.`;
   return false;
 }
 
-function sendEmailNotification(phoneNumber, timestamp) {
-  // Method 1: mailto link (opens email client)
-  const email = 'tech@lucirajewelry.com';
-  const subject = encodeURIComponent('Talk to an Expert Request - Lucira Jewelry');
-  const body = encodeURIComponent(
-    `New Expert Consultation Request:
+async function sendEmailNotification(phoneNumber, timestamp) {
+  const emailData = {
+    access_key: "f505772e-17fc-484d-bbd3-7ffa392f0146", // Replace with your Web3Forms access key from https://web3forms.com
+    subject: "Talk to an Expert Request - Lucira Jewelry",
+    from_name: "Lucira Jewelry Website",
+    email: "tech@lucirajewelry.com",
+    message: `New Expert Consultation Request:
 
-    Phone Number: ${phoneNumber}
-    Date: ${timestamp}
-    Source: Website Form
+Phone Number: ${phoneNumber}
+Date: ${timestamp}
+Source: Website Form
 
-    Please contact this customer as soon as possible.`
-  );
+Please contact this customer as soon as possible.`
+  };
 
-  // Create mailto link but don't navigate to it (just log it)
-  const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
-  console.log('Email notification:', mailtoLink);
+  try {
+    const response = await fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(emailData)
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      console.log("Email sent successfully via Web3Forms");
+      return result;
+    } else {
+      throw new Error(result.message || "Failed to send email");
+    }
+  } catch (error) {
+    console.error("Email sending failed:", error);
+    throw error;
+  }
+}
 
 function showFeedback(message, type) {
   const feedbackEl = document.getElementById('formFeedback');
