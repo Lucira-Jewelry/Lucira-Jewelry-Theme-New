@@ -7,69 +7,185 @@
         </h2>
       {% endif %}
 
-      <form method="post" action="/contact#contact_form" id="talkToExpertForm" class="talk-to-us-expert-input-wrapper">
-        <input 
-          type="tel" 
-          name="contact[phone]" 
-          placeholder="Mobile Number" 
-          required 
-          class="talk-to-us-expert-input"
-        />
-        <input type="hidden" name="contact[tags]" value="Talk to Expert" />
-        <button type="submit" class="talk-to-us-expert-button">
-          <svg width="24" height="24">
-            <use href="#icon-bell"></use>
-          </svg>
-          Talk to an Expert
-        </button>
+      <form method="post" action="/contact#contact_form" id="talkToExpertForm" class="talk-to-us-expert-input-wrapper" onsubmit="return handleExpertForm(event)">
+        <div class="input-group">
+          <label for="talkToExpertPhone" class="sr-only">Mobile Number</label>
+          <input 
+            type="tel" 
+            id="talkToExpertPhone"
+            name="contact[phone]" 
+            placeholder="Mobile Number" 
+            required 
+            pattern="[0-9+\-\s()]{10,}"
+            title="Please enter a valid phone number"
+            class="talk-to-us-expert-input"
+          />
+          <input type="hidden" name="contact[tags]" value="Talk to Expert" />
+          <button type="submit" class="talk-to-us-expert-button">
+            <svg width="24" height="24" aria-hidden="true">
+              <use href="#icon-bell"></use>
+            </svg>
+            Talk to an Expert
+          </button>
+        </div>
+        <div id="formFeedback" class="form-feedback" style="display: none;"></div>
       </form>
-
     </div>
   </div>
 </div>
 
 <script>
-function sendEmail() {
-  const phoneInput = document.getElementById('talkToExpertPhone').value.trim();
-  if (!phoneInput) {
-    alert('Please enter your mobile number.');
-    return;
+function handleExpertForm(event) {
+  event.preventDefault();
+  
+  const phoneInput = document.getElementById('talkToExpertPhone');
+  const phoneNumber = phoneInput.value.trim();
+  const feedbackEl = document.getElementById('formFeedback');
+  
+  // Clear previous feedback
+  feedbackEl.style.display = 'none';
+  feedbackEl.className = 'form-feedback';
+  
+  // Validation
+  if (!phoneNumber) {
+    showFeedback('Please enter your mobile number.', 'error');
+    phoneInput.focus();
+    return false;
   }
+  
+  // Basic phone validation (adjust regex as needed)
+  const phoneRegex = /^[\d\+\-\(\)\s]{10,}$/;
+  if (!phoneRegex.test(phoneNumber)) {
+    showFeedback('Please enter a valid phone number.', 'error');
+    phoneInput.focus();
+    return false;
+  }
+  
+  // Show success message
+  showFeedback('Thank you! An expert will contact you shortly.', 'success');
+  
+  // Send email notification
+  sendExpertEmail(phoneNumber);
+  
+  // Optional: Submit to Shopify as well
+  setTimeout(() => {
+    event.target.submit();
+  }, 2000);
+  
+  return false;
+}
 
+function sendExpertEmail(phoneNumber) {
   const email = 'support@lucirajewelry.com';
   const subject = encodeURIComponent('Talk to an Expert Request - Lucira Jewelry');
-  const body = encodeURIComponent(`Hello,\n\nI would like to talk to an expert. My phone number is: ${phoneInput}\n\nThanks.`);
+  const body = encodeURIComponent(
+`New Expert Consultation Request:
 
-  // Universal mailto link
+Phone Number: ${phoneNumber}
+Date: ${new Date().toLocaleString()}
+Source: Website Form
+
+Please contact this customer as soon as possible.`
+  );
+
+  // Create mailto link
   const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
   
-  // Gmail web link
-  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
-
-  // Try mailto first (works with all email clients)
+  // Open email client
   window.location.href = mailtoLink;
-
-  {% comment %} Optional: open Gmail in new tab if user prefers (uncomment to enable) {% endcomment %}
+  
+  // Optional: Also open Gmail in new tab
+  const gmailUrl = `https://mail.google.com/mail/?view=cm&fs=1&to=${email}&su=${subject}&body=${body}`;
   window.open(gmailUrl, '_blank');
 }
+
+function showFeedback(message, type) {
+  const feedbackEl = document.getElementById('formFeedback');
+  feedbackEl.textContent = message;
+  feedbackEl.className = `form-feedback ${type}`;
+  feedbackEl.style.display = 'block';
+  
+  // Auto-hide success messages after 5 seconds
+  if (type === 'success') {
+    setTimeout(() => {
+      feedbackEl.style.display = 'none';
+    }, 5000);
+  }
+}
+
+// Enhanced phone input formatting (optional)
+document.addEventListener('DOMContentLoaded', function() {
+  const phoneInput = document.getElementById('talkToExpertPhone');
+  if (phoneInput) {
+    phoneInput.addEventListener('input', function(e) {
+      let value = e.target.value.replace(/\D/g, '');
+      if (value.length > 0) {
+        value = value.match(new RegExp('.{1,4}', 'g')).join(' ');
+      }
+      e.target.value = value;
+    });
+  }
+});
 </script>
 
-
 <style>
-  .talk-to-us-expert-section {padding: 30px 0;}
-  .talk-to-us-expert-title {margin-bottom: 28px; margin-top: 0; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: .7px; text-align: center; vertical-align: middle; text-transform: uppercase;}
-  .talk-to-us-expert-button { background: #B76F79; color: #fff; border: 0; padding: 12px 28px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; display: inline-flex ; align-items: center; gap: 10px; }
-  input.talk-to-us-expert-input { padding: 14px 28px 14px 20px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; border: 1px solid #666666; max-width: 300px; width: 100%;}
-  .talk-to-us-expert-input-wrapper { text-align: center; display: flex ; align-items: center; justify-content: center; gap: 8px; }
-  input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; -moz-appearance: none; appearance: none; margin: 0; }
-  h2.talk-to-us-expert-title { margin-top: 0; font-size: 18px; width: 90%; margin-left: auto; margin-right: auto; }
-  @media only screen and (min-width:0) and (max-width:767px){
-    .talk-to-us-expert-button { background: #B76F79; color: #fff; border: 0; padding: 12px 12px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; display: inline-flex ; align-items: center; justify-content: center; gap: 10px; width: 100%; max-width: 300px; }
-    input.talk-to-us-expert-input { padding: 14px 28px 14px 20px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; border: 1px solid #666666; max-width: 300px; width: 100%; }
-    .talk-to-us-expert-input-wrapper { text-align: center; flex-direction: column;}
-    .featured-collections-tabs h2 { margin-bottom: 28px; max-width: 300px; margin-left: auto; margin-right: auto; }
-    .tab-link { padding: 1rem 2rem; font-size: 12px;letter-spacing: 1.4px;}
+.input-group {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.talk-to-us-expert-input {
+  flex: 1;
+  min-width: 200px;
+}
+
+.form-feedback {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.form-feedback.error {
+  background-color: #ffe6e6;
+  color: #d8000c;
+  border: 1px solid #d8000c;
+}
+
+.form-feedback.success {
+  background-color: #e6ffe6;
+  color: #2d8515;
+  border: 1px solid #2d8515;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .input-group {
+    flex-direction: column;
   }
+  
+  .talk-to-us-expert-input {
+    width: 100%;
+  }
+  
+  .talk-to-us-expert-button {
+    width: 100%;
+  }
+}
 </style>
 
 {% schema %}
