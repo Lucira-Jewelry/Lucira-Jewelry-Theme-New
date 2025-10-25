@@ -7,7 +7,12 @@
         </h2>
       {% endif %}
 
-      <form method="post" action="/contact#contact_form" id="talkToExpertForm" class="talk-to-us-expert-input-wrapper">
+      <form method="post" action="/contact" id="talkToExpertForm" accept-charset="UTF-8" class="talk-to-us-expert-input-wrapper">
+        <input type="hidden" name="form_type" value="contact" />
+        <input type="hidden" name="utf8" value="✓" />
+        <input type="hidden" name="contact[subject]" value="Talk to Expert Request - Lucira Jewelry" />
+        <input type="hidden" name="contact[tags]" value="Talk to Expert" />
+        
         <input 
           type="tel" 
           name="contact[phone]" 
@@ -16,7 +21,13 @@
           required 
           class="talk-to-us-expert-input"
         />
-        <input type="hidden" name="contact[tags]" value="Talk to Expert" />
+        
+        <textarea 
+          name="contact[body]" 
+          id="talkToExpertBody"
+          style="display: none;"
+        ></textarea>
+        
         <button type="submit" class="talk-to-us-expert-button">
           <svg width="24" height="24">
             <use href="#icon-bell"></use>
@@ -50,15 +61,22 @@ document.addEventListener('DOMContentLoaded', function() {
       e.target.value = value;
     });
   }
+  
+  // Check for success message in URL
+  if (window.location.hash === '#contact_form' && window.location.search.includes('contact_posted=true')) {
+    showFeedback('Thank you! An expert will contact you shortly.', 'success');
+  }
 });
 
 function handleExpertForm(event) {
   event.preventDefault();
   
+  const form = event.target;
   const phoneInput = document.getElementById('talkToExpertPhone');
+  const bodyInput = document.getElementById('talkToExpertBody');
   const phoneNumber = phoneInput.value.trim();
   const feedbackEl = document.getElementById('formFeedback');
-  const submitButton = event.target.querySelector('button[type="submit"]');
+  const submitButton = form.querySelector('button[type="submit"]');
   
   // Clear previous feedback
   feedbackEl.style.display = 'none';
@@ -81,82 +99,89 @@ function handleExpertForm(event) {
   
   // Disable button and show loading state
   submitButton.disabled = true;
-  submitButton.textContent = 'Sending...';
+  const originalHTML = submitButton.innerHTML;
+  submitButton.innerHTML = 'Sending...';
   
-  // Send email via POST request
-  sendExpertEmailPost(phoneNumber)
-    .then(() => {
+  // Add formatted message to body field
+  const timestamp = new Date().toLocaleString();
+  bodyInput.value = `New Expert Consultation Request
+
+Phone Number: ${phoneNumber}
+Date: ${timestamp}
+Source: Website Form
+
+Please contact this customer as soon as possible.`;
+  
+  // Submit the form using fetch to handle it properly
+  const formData = new FormData(form);
+  
+  fetch(form.action, {
+    method: 'POST',
+    body: formData,
+    headers: {
+      'Accept': 'application/json'
+    }
+  })
+  .then(response => {
+    if (response.ok || response.redirected) {
       showFeedback('Thank you! An expert will contact you shortly.', 'success');
       phoneInput.value = '';
       
-      // Also submit to Shopify contact form
-      setTimeout(() => {
-        event.target.submit();
-      }, 1500);
-    })
-    .catch((error) => {
-      showFeedback('There was an error submitting your request. Please try again.', 'error');
-      console.error('Error:', error);
-    })
-    .finally(() => {
-      // Re-enable button
-      submitButton.disabled = false;
-      submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Talk to an Expert';
-    });
+      // Send email notification
+      sendEmailNotification(phoneNumber, timestamp);
+    } else {
+      throw new Error('Form submission failed');
+    }
+  })
+  .catch(error => {
+    console.error('Error:', error);
+    // Try standard form submission as fallback
+    showFeedback('Submitting your request...', 'success');
+    setTimeout(() => {
+      form.submit();
+    }, 500);
+  })
+  .finally(() => {
+    submitButton.disabled = false;
+    submitButton.innerHTML = originalHTML;
+  });
   
   return false;
 }
 
-async function sendExpertEmailPost(phoneNumber) {
-  const emailData = {
-    to: 'support@lucirajewelry.com',
-    subject: 'Talk to an Expert Request - Lucira Jewelry',
-    body: `New Expert Consultation Request:
+function sendEmailNotification(phoneNumber, timestamp) {
+  // Method 1: mailto link (opens email client)
+  const email = 'support@lucirajewelry.com';
+  const subject = encodeURIComponent('Talk to an Expert Request - Lucira Jewelry');
+  const body = encodeURIComponent(
+`New Expert Consultation Request:
 
 Phone Number: ${phoneNumber}
-Date: ${new Date().toLocaleString()}
+Date: ${timestamp}
 Source: Website Form
 
-Please contact this customer as soon as possible.`,
-    phone: phoneNumber,
-    timestamp: new Date().toISOString()
-  };
+Please contact this customer as soon as possible.`
+  );
 
-  // Option 1: Send to your server endpoint
-  try {
-    const response = await fetch('/apps/expert-inquiry/send-email', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(emailData)
-    });
-    
-    if (!response.ok) {
-      throw new Error('Failed to send email');
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Email send error:', error);
-    
-    // Fallback: Use Shopify's contact form
-    const formData = new FormData();
-    formData.append('contact[phone]', phoneNumber);
-    formData.append('contact[tags]', 'Talk to Expert');
-    formData.append('contact[body]', emailData.body);
-    
-    const fallbackResponse = await fetch('/contact#contact_form', {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (!fallbackResponse.ok) {
-      throw new Error('Fallback submission failed');
-    }
-    
-    return { success: true, method: 'fallback' };
-  }
+  // Create mailto link but don't navigate to it (just log it)
+  const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
+  console.log('Email notification:', mailtoLink);
+  
+  // Method 2: Try to send via third-party email service
+  // Using Formspree free tier (replace with your endpoint)
+  fetch('https://formspree.io/f/xanyddzp', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      email: email,
+      subject: 'Talk to an Expert Request - Lucira Jewelry',
+      phone: phoneNumber,
+      timestamp: timestamp,
+      message: `New expert consultation request from ${phoneNumber}`
+    })
+  }).catch(err => console.log('Email service error:', err));
 }
 
 function showFeedback(message, type) {
