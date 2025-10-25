@@ -6,7 +6,6 @@
           {{ section.settings.talk_to_us_expert_banner_title }}
         </h2>
       {% endif %}
-      
       <div class="talk-to-us-expert-input-wrapper">
         <input
           type="number"
@@ -16,59 +15,89 @@
         />
         <button
           class="talk-to-us-expert-button"
-          onclick="sendExpertRequest()"
+          id="submitBtn"
         >
           <svg width="24" height="24">
             <use href="#icon-bell"></use>
           </svg>
-          Talk to an Expert
+          <span id="btnText">Talk to an Expert</span>
         </button>
       </div>
-      
-      <p id="talkToExpertMessage" style="margin-top:10px;color:green;display:none;"></p>
+      <div id="statusMessage" style="margin-top: 10px; text-align: center;"></div>
     </div>
   </div>
 </div>
 
 <script>
-function sendExpertRequest() {
+document.getElementById('submitBtn').addEventListener('click', async function() {
   const phoneInput = document.getElementById('talkToExpertPhone').value.trim();
-  const messageEl = document.getElementById('talkToExpertMessage');
-
+  const statusMessage = document.getElementById('statusMessage');
+  const btnText = document.getElementById('btnText');
+  const submitBtn = document.getElementById('submitBtn');
+  
   if (!phoneInput) {
-    alert('Please enter your mobile number.');
+    statusMessage.style.color = 'red';
+    statusMessage.textContent = 'Please enter your mobile number.';
     return;
   }
 
-  // Create form data
-  const formData = new FormData();
-  formData.append('form_type', 'contact');
-  formData.append('utf8', '✓');
-  formData.append('contact[email]', 'support@lucirajewelry.com'); // Recipient email
-  formData.append('contact[body]', `Talk to an Expert Request\nPhone: ${phoneInput}`);
+  // Disable button and show loading state
+  submitBtn.disabled = true;
+  btnText.textContent = 'Sending...';
+  statusMessage.textContent = '';
 
-  // Send form data using fetch
-  fetch('/contact', {
-    method: 'POST',
-    body: formData
-  })
-  .then(response => {
+  try {
+    const response = await fetch('/contact', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({
+        'form_type': 'contact',
+        'utf8': '✓',
+        'contact[name]': 'Expert Consultation Request',
+        'contact[email]': 'support@lucirajewelry.com',
+        'contact[phone]': phoneInput,
+        'contact[body]': `Customer requested expert consultation. Phone: ${phoneInput}`
+      })
+    });
+
     if (response.ok) {
-      messageEl.style.color = 'green';
-      messageEl.textContent = 'Your request has been sent! Our expert will contact you soon.';
-      messageEl.style.display = 'block';
+      statusMessage.style.color = 'green';
+      statusMessage.textContent = 'Request sent successfully! We will contact you soon.';
       document.getElementById('talkToExpertPhone').value = '';
+      btnText.textContent = 'Talk to an Expert';
     } else {
-      throw new Error('Network response was not ok.');
+      throw new Error('Submission failed');
     }
-  })
-  .catch(() => {
-    messageEl.style.color = 'red';
-    messageEl.textContent = 'Failed to send request. Please try again.';
-    messageEl.style.display = 'block';
-  });
-}
+  } catch (error) {
+    statusMessage.style.color = 'red';
+    statusMessage.textContent = 'Failed to send request. Please try again.';
+    btnText.textContent = 'Talk to an Expert';
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+// Allow Enter key to submit
+document.getElementById('talkToExpertPhone').addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    document.getElementById('submitBtn').click();
+  }
+});
 </script>
+
+<style>
+#statusMessage {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.talk-to-us-expert-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+</style>
 
 
 <style>
@@ -84,7 +113,7 @@ function sendExpertRequest() {
     input.talk-to-us-expert-input { padding: 14px 28px 14px 20px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; border: 1px solid #666666; max-width: 300px; width: 100%; }
     .talk-to-us-expert-input-wrapper { text-align: center; flex-direction: column;}
     .featured-collections-tabs h2 { margin-bottom: 28px; max-width: 300px; margin-left: auto; margin-right: auto; }
-    .tab-link { padding: 1rem 2rem; font-size: 12px; letter-spacing: 1.4px;}
+    .tab-link { padding: 1rem 2rem; font-size: 12px;letter-spacing: 1.4px;}
   }
 </style>
 
