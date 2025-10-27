@@ -1,118 +1,55 @@
-<section class="scheme-calculator-section">
-  <div class="page-width">
-    <div class="scheme-calculator-content">
-      {% if section.settings.calculator_title != blank %}
-        <h2>{{ section.settings.calculator_title }}</h2>
-      {% endif %}
-      {% if section.settings.calculator_subtitle != blank %}
-        <p>{{ section.settings.calculator_subtitle }}</p>
-      {% endif %}
-    </div>
-
-    <div class="grid-row">
-      <div class="grid-column left-column">
-        <div class="calculator-form-wrapper">
-          <h3>Enter Your Monthly Installment To See Your Total Savings</h3>
-          <div class="calculator_form_container">
-            <label for="calculator_monthly_installment">Monthly Installment</label>
-            <div class="input-group">
-              <div class="input-wrapper">
-                <span class="currency-symbol">₹</span>
-                <input
-                  type="text"
-                  id="calculator_monthly_installment"
-                  placeholder="10,000"
-                  value="10000"
-                  oninput="handleInputChange(this)"
-                />
-              </div>
-              <!-- NOTE: added popup ID here -->
-              <button class="check-button" onclick="updateCalculation('schemePopup')">CHECK</button>
-            </div>
-
-            <!-- Range Slider -->
-            <div class="range-slider-container">
-              <input
-                type="range"
-                id="installment_slider"
-                min="1000"
-                max="19000"
-                step="500"
-                value="10000"
-                oninput="updateFromSlider(this.value)"
-              />
-            </div>
-
-            <p class="or-text">Or</p>
-
-            <!-- Price Tabs -->
-            <div class="price-tabs">
-              <button class="price-tab" onclick="selectTab(this, 2000)">₹2,000</button>
-              <button class="price-tab" onclick="selectTab(this, 5000)">₹5,000</button>
-              <button class="price-tab popular-tab" onclick="selectTab(this, 10000)">
-                ₹10,000<span class="popular-badge">Popular</span>
-              </button>
-              <button class="price-tab" onclick="selectTab(this, 19000)">₹19,000</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="grid-column right-column">
-        <div class="calculator-results">
-          <div class="result-item">
-            <div class="check-icon"><i class="fa-solid fa-check"></i></div>
-            <div class="result-text">
-              <span>Your Premium amount/month</span>
-              <span class="result-amount" id="premium_amount">₹10,000</span>
-            </div>
-          </div>
-          <div class="result-item">
-            <div class="check-icon"><i class="fa-solid fa-check"></i></div>
-            <div class="result-text">
-              <span>Total Investment (9 months)</span>
-              <span class="result-amount" id="pay_amount">₹90,000</span>
-            </div>
-          </div>
-          <div class="result-item">
-            <div class="check-icon"><i class="fa-solid fa-check"></i></div>
-            <div class="result-text">
-              <span>We Pay your 10th Premium</span>
-              <span class="result-amount" id="free_amount">₹10,000</span>
-            </div>
-          </div>
-          <div class="total-redeemable">
-            <span>Total Redeemable Amount</span>
-            <span class="total-amount" id="total_amount">₹1,00,000</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-
 <div id="schemePopup" class="scheme-popup-overlay">
   <div class="scheme-popup-content">
-    <span class="scheme-popup-close" onclick="closePopup('schemePopup')">&times;</span>
+    <span class="scheme-popup-close" onclick="schemeClosePopup('schemePopup')">&times;</span>
     <h3>Get Your Scheme Details</h3>
 
-    <form id="schemeForm" onsubmit="submitSchemeForm(event)">
-      <input type="text" name="full_name" placeholder="Full Name" required />
-      <input type="tel" name="phone_number" placeholder="Phone Number" required />
+    {%- form 'contact', id: 'schemeForm', class: 'scheme-form' -%}
+      <!-- Required hidden Shopify fields -->
+      <input type="hidden" name="form_type" value="contact">
+      <input type="hidden" name="utf8" value="✓">
+      <input type="hidden" name="contact[subject]" value="Scheme Calculator Request - Lucira Jewelry">
+      <input type="hidden" name="contact[tags]" value="Scheme Calculator">
+      <input type="hidden" name="contact[email]" value="support@lucirajewelry.com">
 
-      <!-- Hidden fields (auto-filled on CHECK click) -->
-      <input type="hidden" name="monthly_installment" id="hidden_monthly_installment" />
-      <input type="hidden" name="premium_amount" id="hidden_premium_amount" />
-      <input type="hidden" name="pay_amount" id="hidden_pay_amount" />
-      <input type="hidden" name="free_amount" id="hidden_free_amount" />
-      <input type="hidden" name="total_amount" id="hidden_total_amount" />
+      <!-- Visible user inputs -->
+      <input type="text" name="contact[name]" placeholder="Full Name" required />
+      <input
+        type="tel"
+        name="contact[phone]"
+        id="schemePhone"
+        placeholder="Phone Number"
+        required
+        oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
+      />
+
+      <!-- Hidden dynamic message body -->
+      <textarea name="contact[body]" id="schemeBody" style="display:none;"></textarea>
+
+      <!-- Hidden calculation fields -->
+      <input type="hidden" id="hidden_monthly_installment" />
+      <input type="hidden" id="hidden_premium_amount" />
+      <input type="hidden" id="hidden_pay_amount" />
+      <input type="hidden" id="hidden_free_amount" />
+      <input type="hidden" id="hidden_total_amount" />
 
       <button type="submit" class="scheme-submit-btn">Submit</button>
-    </form>
+    {%- endform -%}
+
+    {% if form.posted_successfully? %}
+      <div class="form-feedback success">
+        Thank you! Our expert will contact you shortly.
+      </div>
+    {% elsif form.errors %}
+      <div class="form-feedback error">
+        <ul>
+          {% for field in form.errors %}
+            <li>{{ form.errors.messages[field] }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
   </div>
 </div>
-
 
 <script>
 function formatCurrency(amount) {
@@ -137,7 +74,7 @@ function updateCalculation(popupId) {
   document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
   document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
 
-  schemeShowPopup(popupId); // ✅ renamed function
+  schemeShowPopup(popupId);
 }
 
 function schemeShowPopup(id) {
@@ -200,17 +137,36 @@ function updateValues(installmentAmount) {
   document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
 }
 
-function submitSchemeForm(event) {
-  event.preventDefault();
-  const formData = new FormData(event.target);
-  const data = Object.fromEntries(formData.entries());
-  console.log('Form submitted:', data);
-  alert('Thank you! Our expert will contact you soon.');
-  schemeClosePopup('schemePopup'); // ✅ renamed function
-}
-
 document.addEventListener('DOMContentLoaded', function() {
   updateValues(10000);
+
+  // Add submit behavior like Talk-to-Expert
+  const form = document.getElementById('schemeForm');
+  const bodyField = document.getElementById('schemeBody');
+  const submitBtn = form.querySelector('.scheme-submit-btn');
+
+  form.addEventListener('submit', () => {
+    const monthly = document.getElementById('hidden_monthly_installment').value;
+    const premium = document.getElementById('hidden_premium_amount').value;
+    const pay = document.getElementById('hidden_pay_amount').value;
+    const free = document.getElementById('hidden_free_amount').value;
+    const total = document.getElementById('hidden_total_amount').value;
+    const phone = document.getElementById('schemePhone').value;
+
+    // Fill message body for Shopify contact form
+    bodyField.value =
+      `Scheme Calculator Request:\n` +
+      `Phone: ${phone}\n` +
+      `Monthly Installment: ${premium}\n` +
+      `Total Investment: ${pay}\n` +
+      `Free Premium: ${free}\n` +
+      `Total Redeemable: ${total}`;
+
+    // Disable button and show processing state
+    submitBtn.textContent = "Processing...";
+    submitBtn.style.opacity = "0.6";
+    submitBtn.disabled = true;
+  });
 });
 </script>
 
