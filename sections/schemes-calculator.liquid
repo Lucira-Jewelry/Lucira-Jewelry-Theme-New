@@ -26,11 +26,9 @@
                   oninput="handleInputChange(this)"
                 />
               </div>
-              <!-- NOTE: added popup ID here -->
               <button class="check-button" onclick="updateCalculation('schemePopup')">CHECK</button>
             </div>
 
-            <!-- Range Slider -->
             <div class="range-slider-container">
               <input
                 type="range"
@@ -45,7 +43,6 @@
 
             <p class="or-text">Or</p>
 
-            <!-- Price Tabs -->
             <div class="price-tabs">
               <button class="price-tab" onclick="selectTab(this, 2000)">₹2,000</button>
               <button class="price-tab" onclick="selectTab(this, 5000)">₹5,000</button>
@@ -91,17 +88,21 @@
   </div>
 </section>
 
+<!-- ==================== Scheme Popup ==================== -->
 <div id="schemePopup" class="scheme-popup-overlay">
   <div class="scheme-popup-content">
     <span class="scheme-popup-close" onclick="schemeClosePopup('schemePopup')">&times;</span>
     <h3>Get Your Scheme Details</h3>
 
     {%- form 'contact', id: 'schemeForm', class: 'scheme-form' -%}
+      <!-- Required hidden Shopify fields -->
       <input type="hidden" name="form_type" value="contact">
       <input type="hidden" name="utf8" value="✓">
       <input type="hidden" name="contact[subject]" value="Scheme Calculator Request - Lucira Jewelry">
       <input type="hidden" name="contact[tags]" value="Scheme Calculator">
       <input type="hidden" name="contact[email]" value="support@lucirajewelry.com">
+
+      <!-- Visible user inputs -->
       <input type="text" name="contact[name]" placeholder="Full Name" required />
       <input
         type="tel"
@@ -111,12 +112,17 @@
         required
         oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
       />
+
+      <!-- Hidden message body -->
       <textarea name="contact[body]" id="schemeBody" style="display:none;"></textarea>
+
+      <!-- Hidden calculation fields -->
       <input type="hidden" id="hidden_monthly_installment" />
       <input type="hidden" id="hidden_premium_amount" />
       <input type="hidden" id="hidden_pay_amount" />
       <input type="hidden" id="hidden_free_amount" />
       <input type="hidden" id="hidden_total_amount" />
+
       <button type="submit" class="scheme-submit-btn">Submit</button>
     {%- endform -%}
 
@@ -136,6 +142,7 @@
   </div>
 </div>
 
+<!-- ==================== JS Logic ==================== -->
 <script>
 function formatCurrency(amount) {
   return '₹' + amount.toLocaleString('en-IN');
@@ -225,7 +232,6 @@ function updateValues(installmentAmount) {
 document.addEventListener('DOMContentLoaded', function() {
   updateValues(10000);
 
-  // Add submit behavior like Talk-to-Expert
   const form = document.getElementById('schemeForm');
   const bodyField = document.getElementById('schemeBody');
   const submitBtn = form.querySelector('.scheme-submit-btn');
@@ -238,7 +244,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const total = document.getElementById('hidden_total_amount').value;
     const phone = document.getElementById('schemePhone').value;
 
-    // Fill message body for Shopify contact form
     bodyField.value =
       `Scheme Calculator Request:\n` +
       `Phone: ${phone}\n` +
@@ -247,7 +252,6 @@ document.addEventListener('DOMContentLoaded', function() {
       `Free Premium: ${free}\n` +
       `Total Redeemable: ${total}`;
 
-    // Disable button and show processing state
     submitBtn.textContent = "Processing...";
     submitBtn.style.opacity = "0.6";
     submitBtn.disabled = true;
@@ -255,128 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 </script>
 
-
-<script>
-function formatCurrency(amount) {
-  return '₹' + amount.toLocaleString('en-IN');
-}
-
-function handleInputChange(input) {
-  let value = input.value.replace(/[^0-9]/g, '');
-  if (value) input.value = value;
-}
-
-function updateCalculation(popupId) {
-  const input = document.getElementById('calculator_monthly_installment');
-  let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
-  value = Math.max(1000, Math.min(19000, value));
-  updateValues(value);
-
-  // Fill hidden fields for the popup form
-  document.getElementById('hidden_monthly_installment').value = value;
-  document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-  document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
-  document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
-  document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
-
-  schemeShowPopup(popupId);
-}
-
-function schemeShowPopup(id) {
-  const popup = document.getElementById(id);
-  if (popup) popup.style.display = 'flex';
-}
-
-function schemeClosePopup(id) {
-  const popup = document.getElementById(id);
-  if (popup) popup.style.display = 'none';
-}
-
-function updateFromSlider(value) {
-  const slider = document.getElementById('installment_slider');
-  const min = slider.min;
-  const max = slider.max;
-  const percentage = ((value - min) / (max - min)) * 100;
-  slider.style.setProperty('--slider-progress', percentage + '%');
-
-  document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
-  document.getElementById('calculator_monthly_installment').value = value;
-
-  const payAmount = value * 9;
-  const freeAmount = value;
-  const totalAmount = value * 10;
-  document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-  document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-  document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
-}
-
-function selectTab(button, value) {
-  document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
-  button.classList.add('active');
-  updateValues(value);
-}
-
-function updateValues(installmentAmount) {
-  const input = document.getElementById('calculator_monthly_installment');
-  input.value = installmentAmount;
-
-  const slider = document.getElementById('installment_slider');
-  slider.value = installmentAmount;
-  const min = slider.min;
-  const max = slider.max;
-  const percentage = ((installmentAmount - min) / (max - min)) * 100;
-  slider.style.setProperty('--slider-progress', percentage + '%');
-
-  document.querySelectorAll('.price-tab').forEach(tab => {
-    const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
-    tab.classList.toggle('active', tabValue === installmentAmount);
-  });
-
-  const payAmount = installmentAmount * 9;
-  const freeAmount = installmentAmount;
-  const totalAmount = installmentAmount * 10;
-
-  document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
-  document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-  document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-  document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  updateValues(10000);
-
-  // Add submit behavior like Talk-to-Expert
-  const form = document.getElementById('schemeForm');
-  const bodyField = document.getElementById('schemeBody');
-  const submitBtn = form.querySelector('.scheme-submit-btn');
-
-  form.addEventListener('submit', () => {
-    const monthly = document.getElementById('hidden_monthly_installment').value;
-    const premium = document.getElementById('hidden_premium_amount').value;
-    const pay = document.getElementById('hidden_pay_amount').value;
-    const free = document.getElementById('hidden_free_amount').value;
-    const total = document.getElementById('hidden_total_amount').value;
-    const phone = document.getElementById('schemePhone').value;
-
-    // Fill message body for Shopify contact form
-    bodyField.value =
-      `Scheme Calculator Request:\n` +
-      `Phone: ${phone}\n` +
-      `Monthly Installment: ${premium}\n` +
-      `Total Investment: ${pay}\n` +
-      `Free Premium: ${free}\n` +
-      `Total Redeemable: ${total}`;
-
-    // Disable button and show processing state
-    submitBtn.textContent = "Processing...";
-    submitBtn.style.opacity = "0.6";
-    submitBtn.disabled = true;
-  });
-});
-</script>
-
-
-<!-- ================= CSS (Isolated Popup) ================= -->
+<!-- ================= CSS (Popup + Section) ================= -->
 <style>
 .scheme-popup-overlay {
   position: fixed;
@@ -431,71 +314,6 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 </style>
 
-
-
-<style>
-    .scheme-calculator-section{padding:60px 0px;background:#fff}
-    .scheme-calculator-content{text-align:center;margin-bottom:50px}
-    .scheme-calculator-content h2{margin-bottom:15px;margin-top:0;font-weight:500;font-size:24px;line-height:150%;letter-spacing:.7px;text-align:center;vertical-align:middle;text-transform:uppercase}
-    .scheme-calculator-content p{color: #1a1a1a; max-width: 690px; margin: 0 auto; font-weight: 400; font-size: 16px; letter-spacing: 1px; text-align: center; vertical-align: middle; line-height: 1.6;}
-    .grid-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
-    .calculator-form-wrapper h3 {font-weight: 500; font-size: 20px; line-height: 150%; letter-spacing: 0.6px; vertical-align: middle; text-transform: capitalize; margin-top: 0; margin-bottom: 18px;}
-    .calculator_form_container label{display:block;font-size:14px;margin-bottom:10px;color:#1A1A1A;}
-    .input-group{display:flex;gap:10px;margin-bottom:20px; font-weight: 500;}
-    .input-wrapper{position:relative;flex:1;display:flex;align-items:center}
-    .currency-symbol{position:absolute;left:15px;font-size:16px;color:#666;font-family:'Futura Std';pointer-events:none}
-    .input-group input{flex:1;padding:12px 15px 12px 26px;border:1px solid #ddd;border-radius:8px;font-family:Futura Std;font-weight:400;font-size:16px;line-height:150%;vertical-align:middle;color:#666;letter-spacing:.7px}
-    .check-button{padding: 14px 30px; background: #b77766; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; text-transform: uppercase; transition: background .3s; font-family: 'Futura Std', sans-serif; letter-spacing: 1.2px;}
-    .check-button:hover{background:#b77766}
-    .range-slider-container{margin:25px 0;position:relative}
-    #installment_slider{width:100%;height:4px;background:#e0e0e0;outline:0;border-radius:3px;-webkit-appearance:none;appearance:none;margin:0;position:relative}
-    #installment_slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;background:#fff;cursor:pointer;border-radius:50%;border:3px solid #b67665;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-top:-10px}
-    #installment_slider::-moz-range-thumb{width:24px;height:24px;background:#fff;cursor:pointer;border-radius:50%;border:3px solid #b67665;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-top:0}
-    #installment_slider::-webkit-slider-runnable-track{background:linear-gradient(to right, #b67665 0%, #b67665 var(--slider-progress, 0%), #e0e0e0 var(--slider-progress, 0%), #e0e0e0 100%);height:4px;border-radius:3px}
-    #installment_slider::-moz-range-track{background:#e0e0e0;height:4px;border-radius:3px}
-    #installment_slider::-moz-range-progress{background:#b67665;height:4px;border-radius:3px}
-    .or-text{text-align:center;margin:20px 0;color:#1A1A1A;font-size:14px}
-    .price-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-    .price-tab { padding: 15px 10px; border: 0px solid #e0e0e0; background: #F2F2F2 !important; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 500; transition: all .3s; position: relative; font-family: 'Futura Std', sans-serif; color: #666666;}
-    .price-tab.popular-tab {color: #1A1A1A;}
-    .price-tab:hover{border-color:#b67665}
-    .price-tab.active { border-color: #b67665; background: #b67665 !important; color: #fff; }
-    .popular-badge {display: block; line-height: 18px; letter-spacing: 0.2px; text-align: center; vertical-align: middle; font-size: 10px; color: #b67665; margin-top: 0; padding-top: 48px; padding-bottom: 4px; font-weight: 400; position: absolute; bottom: -24px; left: 50%; width: 100%; transform: translateX(-50%); border: 1px solid #b67665; border-radius: 8px; z-index: 0;}
-    .calculator-results{background:#F4F0F0;padding:30px;border-radius:8px}
-    .result-item{display:flex;align-items:flex-start;gap:15px;margin-bottom:20px}
-    .check-icon{width:24px;height:24px;background:#008000;color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-    .result-text{flex:1;display:flex;justify-content:space-between;align-items:center}
-    .result-text span:first-child{color: #000000; font-weight: 400; font-size: 16px; line-height: 24px; letter-spacing: 0.6px;}
-    .result-amount{font-weight: 500; font-size: 16px; line-height: 24px; letter-spacing: 0.7px; color: #000000;}
-    .total-redeemable{margin-top:30px;padding-top:20px;border-top:2px solid #ddd;display:flex;justify-content:space-between;align-items:center}
-    .total-redeemable span:first-child { font-weight: 500; font-size: 20px; line-height: 24px; letter-spacing: 1px; color: #000000; text-transform: capitalize; }
-    .total-amount { color: #008000; background: #0080001A; padding: 8px 16px; font-weight: 600; font-size: 20px; line-height: 100%; vertical-align: middle; text-transform: uppercase; border-radius: 8px; }
-    .scheme-calculator-section .grid-row { display: grid ; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; max-width: 1200px; margin: 0 auto; }
-    
-
-    @media (max-width:768px){
-        .grid-row{grid-template-columns:1fr}
-        .price-tabs{grid-template-columns:repeat(4, 1fr); gap: 8px;}
-        .scheme-calculator-content h2 {margin-top: 0;font-size: 18px;width: 90%; margin-left: auto; margin-right: auto;}
-        .scheme-calculator-content p { max-width: 690px; color: #1a1a1a; margin: 0 auto; letter-spacing: 1px; vertical-align: middle; font-weight: 400; font-size: 12px; line-height: 150%; text-align: center; }
-        .scheme-calculator-content .grid-row {display: grid ; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; max-width: 1100px; margin: 0 auto;}
-        .calculator-form-wrapper h3 {font-size: 14px;}
-        .input-group input {font-size: 12px;}
-        .price-tab { padding: 16px 8px; border: 0px solid #e0e0e0; background: #F2F2F2 !important; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; transition: all .3s; position: relative; font-family: 'Futura Std', sans-serif; color: #1A1A1A; }
-        .calculator-results { background: #F4F0F0; padding: 16px 12px; border-radius: 8px; }
-        .result-text span:first-child {font-size: 14px;}
-        .total-redeemable span:first-child {font-size: 16px;}
-        .total-amount {font-size: 16px;}
-        .scheme-calculator-section{padding:30px 0px;background:#fff}
-        .featured-collections-tabs h2 { margin-bottom: 28px; font-size: 18px; line-height: 1.6; }
-        .tabs-nav {gap: 0.8rem;}
-        .scheme-calculator-section .grid-row {grid-template-columns: 1fr;} 
-        .popular-badge {padding-top: 40px;}
-        .talk-to-us-expert-title {margin-top: 0; font-size: 18px; width: 90%; margin-left: auto; margin-right: auto;}
-        .scheme-calculator-section {padding: 20px 0px;}
-    }
-</style>
-
 {% schema %}
 {
   "name": "Scheme Calculator",
@@ -510,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
       "type": "textarea",
       "id": "calculator_subtitle",
       "label": "Calculator Subtitle",
-      "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+      "default": "Plan your savings smartly and enjoy exclusive scheme benefits with Lucira Jewelry."
     }
   ],
   "presets": [
@@ -520,3 +338,5 @@ document.addEventListener('DOMContentLoaded', function() {
   ]
 }
 {% endschema %}
+
+
