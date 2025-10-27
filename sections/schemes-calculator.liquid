@@ -1,88 +1,3 @@
-<style>
-/* --- Base Layout --- */
-.scheme-calculator-section {
-  position: relative;
-}
-
-.calculator-results {
-  position: relative;
-  transition: filter 0.3s ease, opacity 0.3s ease;
-}
-
-/* --- Blur effect --- */
-.calculator-results.blur-active {
-  filter: blur(5px);
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-.calculator-results.revealed {
-  filter: none;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Optional: frosted overlay look */
-.calculator-results::after {
-  content: "";
-  display: none;
-  position: absolute;
-  inset: 0;
-  background: rgba(255, 255, 255, 0.3);
-  backdrop-filter: blur(5px);
-}
-.calculator-results.blur-active::after {
-  display: block;
-}
-
-/* Popup overlay */
-.scheme-popup-overlay {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  justify-content: center;
-  align-items: center;
-  z-index: 999;
-}
-
-.scheme-popup-content {
-  background: #fff;
-  padding: 30px;
-  border-radius: 12px;
-  max-width: 400px;
-  width: 100%;
-  position: relative;
-}
-
-.scheme-popup-close {
-  position: absolute;
-  top: 10px;
-  right: 15px;
-  cursor: pointer;
-  font-size: 24px;
-}
-
-/* Form styles */
-.scheme-form input,
-.scheme-form textarea {
-  width: 100%;
-  padding: 10px;
-  margin-bottom: 12px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-}
-
-.scheme-submit-btn {
-  background: #000;
-  color: #fff;
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-</style>
-
 <section class="scheme-calculator-section">
   <div class="page-width">
     <div class="scheme-calculator-content">
@@ -141,7 +56,7 @@
       </div>
 
       <div class="grid-column right-column">
-        <div class="calculator-results blur-active">
+        <div class="calculator-results">
           <div class="result-item">
             <div class="check-icon"><i class="fa-solid fa-check"></i></div>
             <div class="result-text">
@@ -227,153 +142,118 @@
 </div>
 
 <script>
-function formatCurrency(amount) {
-  return '₹' + amount.toLocaleString('en-IN');
-}
+  function formatCurrency(amount) {
+    return '₹' + amount.toLocaleString('en-IN');
+  }
 
-function handleInputChange(input) {
-  let value = input.value.replace(/[^0-9]/g, '');
-  if (value) input.value = value;
-}
+  function handleInputChange(input) {
+    let value = input.value.replace(/[^0-9]/g, '');
+    if (value) input.value = value;
+  }
 
-function updateCalculation(popupId) {
-  const input = document.getElementById('calculator_monthly_installment');
-  let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
-  value = Math.max(1000, Math.min(19000, value));
-  updateValues(value);
+  function updateCalculation(popupId) {
+    const input = document.getElementById('calculator_monthly_installment');
+    let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
+    value = Math.max(1000, Math.min(19000, value));
+    updateValues(value);
 
-  document.getElementById('hidden_monthly_installment').value = value;
-  document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-  document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
-  document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
-  document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
+    document.getElementById('hidden_monthly_installment').value = value;
+    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
+    document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
+    document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
+    document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
 
-  const results = document.querySelector('.calculator-results');
-  const isLoggedIn = {% if customer %}true{% else %}false{% endif %};
-
-  if (isLoggedIn) {
-    // Show instantly (remove blur)
-    results.classList.remove('blur-active');
-    results.classList.add('revealed');
-
-    // Auto-submit the form as lead
-    autoSubmitSchemeForm();
-  } else {
-    // Keep blurred and show popup
-    results.classList.remove('revealed');
-    results.classList.add('blur-active');
     schemeShowPopup(popupId);
   }
-}
 
-function autoSubmitSchemeForm() {
-  const form = document.getElementById('schemeForm');
-  const bodyField = document.getElementById('schemeBody');
-  const monthly = document.getElementById('hidden_monthly_installment').value;
-  const premium = document.getElementById('hidden_premium_amount').value;
-  const pay = document.getElementById('hidden_pay_amount').value;
-  const free = document.getElementById('hidden_free_amount').value;
-  const total = document.getElementById('hidden_total_amount').value;
+  function schemeShowPopup(id) {
+    const popup = document.getElementById(id);
+    if (popup) popup.style.display = 'flex';
+  }
 
-  bodyField.value =
-    `Scheme Calculator Request:\n` +
-    `Customer: Logged in\n` +
-    `Monthly Installment: ${premium}\n` +
-    `Total Investment: ${pay}\n` +
-    `Free Premium: ${free}\n` +
-    `Total Redeemable: ${total}`;
+  function schemeClosePopup(id) {
+    const popup = document.getElementById(id);
+    if (popup) popup.style.display = 'none';
+  }
 
-  form.submit();
-}
+  function updateFromSlider(value) {
+    const slider = document.getElementById('installment_slider');
+    const min = slider.min;
+    const max = slider.max;
+    const percentage = ((value - min) / (max - min)) * 100;
+    slider.style.setProperty('--slider-progress', percentage + '%');
 
-function schemeShowPopup(id) {
-  const popup = document.getElementById(id);
-  if (popup) popup.style.display = 'flex';
-}
+    document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
+    document.getElementById('calculator_monthly_installment').value = value;
 
-function schemeClosePopup(id) {
-  const popup = document.getElementById(id);
-  if (popup) popup.style.display = 'none';
-}
+    const payAmount = value * 9;
+    const freeAmount = value;
+    const totalAmount = value * 10;
+    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+  }
 
-function updateFromSlider(value) {
-  const slider = document.getElementById('installment_slider');
-  const min = slider.min;
-  const max = slider.max;
-  const percentage = ((value - min) / (max - min)) * 100;
-  slider.style.setProperty('--slider-progress', percentage + '%');
+  function selectTab(button, value) {
+    document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
+    button.classList.add('active');
+    updateValues(value);
+  }
 
-  document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
-  document.getElementById('calculator_monthly_installment').value = value;
+  function updateValues(installmentAmount) {
+    const input = document.getElementById('calculator_monthly_installment');
+    input.value = installmentAmount;
 
-  const payAmount = value * 9;
-  const freeAmount = value;
-  const totalAmount = value * 10;
-  document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-  document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-  document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
-}
+    const slider = document.getElementById('installment_slider');
+    slider.value = installmentAmount;
+    const min = slider.min;
+    const max = slider.max;
+    const percentage = ((installmentAmount - min) / (max - min)) * 100;
+    slider.style.setProperty('--slider-progress', percentage + '%');
 
-function selectTab(button, value) {
-  document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
-  button.classList.add('active');
-  updateValues(value);
-}
+    document.querySelectorAll('.price-tab').forEach(tab => {
+      const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
+      tab.classList.toggle('active', tabValue === installmentAmount);
+    });
 
-function updateValues(installmentAmount) {
-  const input = document.getElementById('calculator_monthly_installment');
-  input.value = installmentAmount;
+    const payAmount = installmentAmount * 9;
+    const freeAmount = installmentAmount;
+    const totalAmount = installmentAmount * 10;
 
-  const slider = document.getElementById('installment_slider');
-  slider.value = installmentAmount;
-  const min = slider.min;
-  const max = slider.max;
-  const percentage = ((installmentAmount - min) / (max - min)) * 100;
-  slider.style.setProperty('--slider-progress', percentage + '%');
+    document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
+    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+  }
 
-  document.querySelectorAll('.price-tab').forEach(tab => {
-    const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
-    tab.classList.toggle('active', tabValue === installmentAmount);
+  document.addEventListener('DOMContentLoaded', function() {
+    updateValues(10000);
+
+    const form = document.getElementById('schemeForm');
+    const bodyField = document.getElementById('schemeBody');
+    const submitBtn = form.querySelector('.scheme-submit-btn');
+
+    form.addEventListener('submit', () => {
+      const monthly = document.getElementById('hidden_monthly_installment').value;
+      const premium = document.getElementById('hidden_premium_amount').value;
+      const pay = document.getElementById('hidden_pay_amount').value;
+      const free = document.getElementById('hidden_free_amount').value;
+      const total = document.getElementById('hidden_total_amount').value;
+      const phone = document.getElementById('schemePhone').value;
+
+      bodyField.value =
+        `Scheme Calculator Request:\n` +
+        `Phone: ${phone}\n` +
+        `Monthly Installment: ${premium}\n` +
+        `Total Investment: ${pay}\n` +
+        `Free Premium: ${free}\n` +
+        `Total Redeemable: ${total}`;
+
+      submitBtn.textContent = "Processing...";
+      submitBtn.style.opacity = "0.6";
+      submitBtn.disabled = true;
+    });
   });
-
-  const payAmount = installmentAmount * 9;
-  const freeAmount = installmentAmount;
-  const totalAmount = installmentAmount * 10;
-
-  document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
-  document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-  document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-  document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-  updateValues(10000);
-
-  const form = document.getElementById('schemeForm');
-  const bodyField = document.getElementById('schemeBody');
-  const submitBtn = form.querySelector('.scheme-submit-btn');
-
-  form.addEventListener('submit', () => {
-    const monthly = document.getElementById('hidden_monthly_installment').value;
-    const premium = document.getElementById('hidden_premium_amount').value;
-    const pay = document.getElementById('hidden_pay_amount').value;
-    const free = document.getElementById('hidden_free_amount').value;
-    const total = document.getElementById('hidden_total_amount').value;
-    const phone = document.getElementById('schemePhone').value;
-
-    bodyField.value =
-      `Scheme Calculator Request:\n` +
-      `Phone: ${phone}\n` +
-      `Monthly Installment: ${premium}\n` +
-      `Total Investment: ${pay}\n` +
-      `Free Premium: ${free}\n` +
-      `Total Redeemable: ${total}`;
-
-    submitBtn.textContent = "Processing...";
-    submitBtn.style.opacity = "0.6";
-    submitBtn.disabled = true;
-  });
-});
 </script>
 
 <style>
