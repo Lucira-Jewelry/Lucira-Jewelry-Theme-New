@@ -81,7 +81,6 @@
           <div class="total-redeemable">
             <span>Total Redeemable Amount</span>
             <span class="total-amount blurred" id="total_amount">₹1,00,000</span>
-            <button class="hidden-popup-button" onclick="openSchemePopup()" style="display: none;">Open Popup</button>
           </div>
         </div>
       </div>
@@ -89,56 +88,55 @@
   </div>
 </section>
 
-<div id="schemePopup" class="scheme-popup-overlay">
-  <div class="scheme-popup-content">
-    <span class="scheme-popup-close" onclick="schemeClosePopup('schemePopup')">&times;</span>
-    <h3>Scheme</h3>
+<!-- Scheme Popup Overlay -->
+<div id="schemeOverlay" class="scheme-overlay">
+  <div class="scheme-form-container">
+    <span class="scheme-close-btn" onclick="closeSchemeOverlay()">&times;</span>
+    
+    <!-- Form Section -->
+    <div id="schemeFormSection">
+      <h3 class="scheme-topic">Scheme Calculator</h3>
+      <form id="schemeContactForm" class="scheme-form">
+        <div class="input-icon-wrapper">
+          {{- 'scheme-user.svg' | inline_asset_content -}}
+          <input type="text" id="scheme_name" placeholder="Full Name" required />
+        </div>
+        <div class="input-icon-wrapper">
+          {{- 'scheme-phone.svg' | inline_asset_content -}}
+          <input
+            type="number"
+            id="scheme_phone"
+            placeholder="Phone Number"
+            required
+            oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
+          />
+        </div>
+        <div class="input-icon-wrapper">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M2.5 6.66667L10 11.6667L17.5 6.66667M3.33333 15H16.6667C17.5871 15 18.3333 14.2538 18.3333 13.3333V6.66667C18.3333 5.74619 17.5871 5 16.6667 5H3.33333C2.41286 5 1.66667 5.74619 1.66667 6.66667V13.3333C1.66667 14.2538 2.41286 15 3.33333 15Z" stroke="#B77766" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <input type="email" id="scheme_email" placeholder="Email Address" required />
+        </div>
+        <p id="scheme_emailError" class="error-message" style="display: none;">Please enter a valid email</p>
+        <p id="scheme_phoneError" class="error-message" style="display: none;">Please enter a valid 10-digit phone number</p>
+        <button type="submit" id="schemeSubmitBtn" class="scheme-submit-btn" disabled>Submit</button>
+      </form>
+    </div>
 
-    {%- form 'contact', id: 'schemeForm', class: 'scheme-form' -%}
-      <input type="hidden" name="form_type" value="contact">
-      <input type="hidden" name="utf8" value="✓">
-      <input type="hidden" name="contact[subject]" value="Scheme Calculator Request - Lucira Jewelry">
-      <input type="hidden" name="contact[tags]" value="Scheme Calculator">
-      <input type="hidden" name="contact[email]" value="support@lucirajewelry.com">
-      <div class="input-icon-wrapper">
-        {{- 'scheme-user.svg' | inline_asset_content -}}
-        <input type="text" name="contact[name]" placeholder="Full Name" required />
+    <!-- Success Message Section -->
+    <div id="schemeSuccessMessage" class="scheme-success-message" style="display: none;">
+      <div class="success-icon">
+        <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="30" cy="30" r="28" fill="#4CAF50" stroke="#4CAF50" stroke-width="2"/>
+          <path d="M20 30L26 36L40 22" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
-      <div class="input-icon-wrapper">
-        {{- 'scheme-phone.svg' | inline_asset_content -}}
-        <input
-          type="number"
-          name="contact[phone]"
-          id="schemePhone"
-          placeholder="Phone Number"
-          required
-          oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
-        />
+      <h3>Thank You!</h3>
+      <p>Our expert will contact you shortly with scheme details.</p>
+      <div class="progress-bar-container">
+        <div class="progress-bar"></div>
       </div>
-
-      <textarea name="contact[body]" id="schemeBody" style="display:none;"></textarea>
-      <input type="hidden" id="hidden_monthly_installment" />
-      <input type="hidden" id="hidden_premium_amount" />
-      <input type="hidden" id="hidden_pay_amount" />
-      <input type="hidden" id="hidden_free_amount" />
-      <input type="hidden" id="hidden_total_amount" />
-
-      <button type="submit" class="scheme-submit-btn">Submit</button>
-    {%- endform -%}
-
-    {% if form.posted_successfully? %}
-      <div class="form-feedback success">
-        Thank you! Our expert will contact you shortly.
-      </div>
-    {% elsif form.errors %}
-      <div class="form-feedback error">
-        <ul>
-          {% for field in form.errors %}
-            <li>{{ form.errors.messages[field] }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-    {% endif %}
+    </div>
   </div>
 </div>
 
@@ -158,53 +156,30 @@
     value = Math.max(1000, Math.min(19000, value));
     updateValues(value);
 
-    // Remove blur effect when CHECK is clicked
+    // Remove blur and open form popup
     const totalAmount = document.getElementById('total_amount');
     totalAmount.classList.remove('blurred');
+    
+    // Open the form overlay
+    openSchemeOverlay();
   }
 
-  function openSchemePopup() {
-    const input = document.getElementById('calculator_monthly_installment');
-    let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
-    value = Math.max(1000, Math.min(19000, value));
-    updateValues(value);
-
-    document.getElementById('hidden_monthly_installment').value = value;
-    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-    document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
-    document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
-    document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
-
-    schemeShowPopup('schemePopup');
+  function openSchemeOverlay() {
+    const overlay = document.getElementById('schemeOverlay');
+    overlay.style.display = 'flex';
+    document.body.classList.add('no-scroll');
+    
+    // Reset form visibility
+    document.getElementById('schemeFormSection').style.display = 'block';
+    document.getElementById('schemeSuccessMessage').style.display = 'none';
+    document.getElementById('schemeContactForm').reset();
+    document.getElementById('schemeSubmitBtn').disabled = true;
   }
 
-  function updateCalculation(popupId) {
-    const input = document.getElementById('calculator_monthly_installment');
-    let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
-    value = Math.max(1000, Math.min(19000, value));
-    updateValues(value);
-
-    // Remove blur effect when CHECK is clicked
-    const totalAmount = document.getElementById('total_amount');
-    totalAmount.classList.remove('blurred');
-
-    document.getElementById('hidden_monthly_installment').value = value;
-    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-    document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
-    document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
-    document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
-
-    schemeShowPopup(popupId);
-  }
-
-  function schemeShowPopup(id) {
-    const popup = document.getElementById(id);
-    if (popup) popup.style.display = 'flex';
-  }
-
-  function schemeClosePopup(id) {
-    const popup = document.getElementById(id);
-    if (popup) popup.style.display = 'none';
+  function closeSchemeOverlay() {
+    const overlay = document.getElementById('schemeOverlay');
+    overlay.style.display = 'none';
+    document.body.classList.remove('no-scroll');
   }
 
   function updateFromSlider(value) {
@@ -260,29 +235,120 @@
   document.addEventListener('DOMContentLoaded', function() {
     updateValues(10000);
 
-    const form = document.getElementById('schemeForm');
-    const bodyField = document.getElementById('schemeBody');
-    const submitBtn = form.querySelector('.scheme-submit-btn');
+    const overlay = document.getElementById('schemeOverlay');
+    const contactForm = document.getElementById('schemeContactForm');
+    const emailInput = document.getElementById('scheme_email');
+    const phoneInput = document.getElementById('scheme_phone');
+    const nameInput = document.getElementById('scheme_name');
+    const successMessage = document.getElementById('schemeSuccessMessage');
+    const emailError = document.getElementById('scheme_emailError');
+    const phoneError = document.getElementById('scheme_phoneError');
+    const submitBtn = document.getElementById('schemeSubmitBtn');
 
-    form.addEventListener('submit', () => {
-      const monthly = document.getElementById('hidden_monthly_installment').value;
-      const premium = document.getElementById('hidden_premium_amount').value;
-      const pay = document.getElementById('hidden_pay_amount').value;
-      const free = document.getElementById('hidden_free_amount').value;
-      const total = document.getElementById('hidden_total_amount').value;
-      const phone = document.getElementById('schemePhone').value;
+    // Validation function
+    function validateInputs() {
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value.trim());
+      const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
+      const nameValid = nameInput.value.trim().length > 0;
+      submitBtn.disabled = !(emailValid && phoneValid && nameValid);
+    }
 
-      bodyField.value =
-        `Scheme Calculator Request:\n` +
-        `Phone: ${phone}\n` +
-        `Monthly Installment: ${premium}\n` +
-        `Total Investment: ${pay}\n` +
-        `Free Premium: ${free}\n` +
-        `Total Redeemable: ${total}`;
+    emailInput.addEventListener('input', validateInputs);
+    phoneInput.addEventListener('input', validateInputs);
+    nameInput.addEventListener('input', validateInputs);
 
-      submitBtn.textContent = "Processing...";
-      submitBtn.style.opacity = "0.6";
+    // Close overlay on background click
+    overlay.addEventListener('click', function(e) {
+      if (e.target === overlay) {
+        closeSchemeOverlay();
+      }
+    });
+
+    // Form submission
+    contactForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const email = emailInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const name = nameInput.value.trim();
+      const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+      const phoneValid = /^\d{10}$/.test(phone);
+
+      emailError.style.display = emailValid ? 'none' : 'block';
+      phoneError.style.display = phoneValid ? 'none' : 'block';
+
+      if (!emailValid || !phoneValid) return;
+
+      // Get current calculation values
+      const monthlyInstallment = document.getElementById('calculator_monthly_installment').value;
+      const premiumAmount = document.getElementById('premium_amount').textContent;
+      const payAmount = document.getElementById('pay_amount').textContent;
+      const freeAmount = document.getElementById('free_amount').textContent;
+      const totalAmount = document.getElementById('total_amount').textContent;
+
+      const payload = {
+        name,
+        email,
+        phone,
+        monthlyInstallment: premiumAmount,
+        totalInvestment: payAmount,
+        freePremium: freeAmount,
+        totalRedeemable: totalAmount,
+        pageUrl: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      // Show loading state
+      submitBtn.textContent = 'Submitting...';
       submitBtn.disabled = true;
+      submitBtn.style.opacity = '0.6';
+
+      // Replace this URL with your webhook endpoint
+      fetch('https://YOUR-WEBHOOK-URL.com/scheme-calculator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      .then(response => {
+        if (!response.ok) throw new Error('Submission failed');
+        return response.json();
+      })
+      .then(data => {
+        // Push to dataLayer for analytics
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "schemeCalculatorSubmit",
+          schemeData: payload,
+        });
+
+        // Show success message
+        document.getElementById('schemeFormSection').style.display = 'none';
+        successMessage.style.display = 'flex';
+
+        // Reset form
+        contactForm.reset();
+        submitBtn.textContent = 'Submit';
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '1';
+
+        // Reset progress bar animation
+        const progressBar = document.querySelector('.progress-bar');
+        progressBar.style.animation = 'none';
+        progressBar.offsetHeight; // trigger reflow
+        progressBar.style.animation = 'shrinkBar 5s linear forwards';
+
+        // Auto-close after 5s
+        setTimeout(() => {
+          closeSchemeOverlay();
+        }, 5000);
+      })
+      .catch(err => {
+        console.error('Error:', err);
+        alert('Something went wrong. Please try again.');
+        submitBtn.textContent = 'Submit';
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+      });
     });
   });
 </script>
@@ -300,7 +366,7 @@
     .currency-symbol{position:absolute;left:15px;font-size:16px;color:#666;font-family:'Futura Std';pointer-events:none}
     .input-group input{flex:1;padding:12px 15px 12px 26px;border:1px solid #ddd;border-radius:8px;font-family:Futura Std;font-weight:400;font-size:16px;line-height:150%;vertical-align:middle;color:#666;letter-spacing:.7px}
     .check-button{padding: 16px 30px; background: #b77766; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 500; text-transform: uppercase; transition: background .3s; font-family: 'Futura Std', sans-serif; letter-spacing: 1.2px;}
-    .check-button:hover{background:#b77766}
+    .check-button:hover{background:#a56655}
     .range-slider-container{margin:25px 0;position:relative}
     #installment_slider{width:100%;height:4px;background:#e0e0e0;outline:0;border-radius:3px;-webkit-appearance:none;appearance:none;margin:0;position:relative}
     #installment_slider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:24px;background:#fff;cursor:pointer;border-radius:50%;border:3px solid #b67665;box-shadow:0 2px 4px rgba(0,0,0,0.1);margin-top:-10px}
@@ -325,7 +391,6 @@
     .total-redeemable span:first-child { font-weight: 500; font-size: 20px; line-height: 24px; letter-spacing: 1px; color: #000000; text-transform: capitalize; }
     .total-amount { color: #008000; background: #0080001A; padding: 8px 16px; font-weight: 600; font-size: 20px; line-height: 100%; vertical-align: middle; text-transform: uppercase; border-radius: 8px; transition: filter 0.3s ease; }
     
-    /* Blur effect for total amount */
     .total-amount.blurred {
         filter: blur(6px);
         user-select: none;
@@ -333,18 +398,175 @@
     }
     
     .scheme-calculator-section .grid-row { display: grid ; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; max-width: 1200px; margin: 0 auto; }
-    .scheme-popup-overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.6);z-index:9999}
-    .scheme-popup-content{background:#fff;padding:25px;border-radius:12px;width:90%;max-width:420px;position:relative;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-    .scheme-popup-close{position:absolute;top:5px;right:15px;font-size:22px;cursor:pointer;color:#000}
-    .scheme-popup-content h3{margin-bottom:15px;text-align:center}
-    .scheme-popup-content input{display:block;width:100%;margin-bottom:12px;padding:10px;border:1px solid #ccc;border-radius:6px}
-    .scheme-submit-btn { background: #b77766; color: #fff; width: 100%; padding: 16px 12px; border: none; border-radius: 6px; cursor: pointer; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; text-transform: uppercase; letter-spacing: 1.3px; }
-    .scheme-submit-btn:hover{background:#b77766}
-    .scheme-popup-content input { display: block; width: 100%; margin-bottom: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1px; text-transform: uppercase; padding: 16px 20px 16px 50px; }
-    .scheme-popup-content h3 { margin-bottom: 15px; text-align: left; font-weight: 500; font-size: 16px; line-height: 1.4; letter-spacing: 1.2px; vertical-align: middle; text-transform: uppercase; margin-top: 0; }
-    .scheme-popup-content {background: #fff; padding: 25px; border-radius: 12px; width: 90%; max-width: 420px; position: relative; box-shadow: 0 10px 30px rgba(0, 0, 0, .2);}
-    .input-icon-wrapper {position: relative;}
-    .input-icon-wrapper svg { position: absolute; top: 50%; transform: translateY(-50%); left: 4%; }
+    .no-scroll { overflow: hidden; }
+
+    /* Overlay Styles */
+    .scheme-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .scheme-form-container {
+      background: #fff;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 420px;
+      padding: 30px 25px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .scheme-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 28px;
+      cursor: pointer;
+      color: #666;
+      line-height: 1;
+      transition: color 0.3s;
+    }
+
+    .scheme-close-btn:hover {
+      color: #000;
+    }
+
+    .scheme-topic {
+      font-weight: 500;
+      font-size: 18px;
+      line-height: 1.4;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin: 0 0 20px 0;
+      text-align: left;
+    }
+
+    .scheme-form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-icon-wrapper {
+      position: relative;
+      margin-bottom: 15px;
+    }
+
+    .input-icon-wrapper svg {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 16px;
+      pointer-events: none;
+    }
+
+    .input-icon-wrapper input {
+      width: 100%;
+      padding: 16px 20px 16px 50px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: 'Futura Std', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      box-sizing: border-box;
+    }
+
+    .input-icon-wrapper input:focus {
+      outline: none;
+      border-color: #b77766;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      font-size: 12px;
+      margin: -10px 0 10px 0;
+      font-family: 'Futura Std', sans-serif;
+    }
+
+    .scheme-submit-btn {
+      background: #b77766;
+      color: #fff;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Futura Std', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      transition: background 0.3s;
+      margin-top: 10px;
+    }
+
+    .scheme-submit-btn:hover:not(:disabled) {
+      background: #a56655;
+    }
+
+    .scheme-submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* Success Message Styles */
+    .scheme-success-message {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .success-icon {
+      margin-bottom: 20px;
+      animation: scaleIn 0.5s ease;
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    .scheme-success-message h3 {
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0 0 10px 0;
+      color: #4CAF50;
+      letter-spacing: 1px;
+    }
+
+    .scheme-success-message p {
+      font-size: 16px;
+      color: #666;
+      margin: 0 0 20px 0;
+      line-height: 1.5;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 20px;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #4CAF50;
+      width: 100%;
+      animation: shrinkBar 5s linear forwards;
+    }
+
+    @keyframes shrinkBar {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
 
     @media (max-width:768px){
         .grid-row{grid-template-columns:1fr}
@@ -360,12 +582,10 @@
         .total-redeemable span:first-child {font-size: 16px;}
         .total-amount {font-size: 16px;}
         .scheme-calculator-section{padding:30px 0px;background:#fff}
-        .featured-collections-tabs h2 { margin-bottom: 28px; font-size: 18px; line-height: 1.6; }
-        .tabs-nav {gap: 0.8rem;}
         .scheme-calculator-section .grid-row {grid-template-columns: 1fr;} 
         .popular-badge {padding-top: 40px;}
-        .talk-to-us-expert-title {margin-top: 0; font-size: 18px; width: 90%; margin-left: auto; margin-right: auto;}
         .scheme-calculator-section {padding: 20px 0px;}
+        .scheme-form-container {padding: 25px 20px;}
     }
 </style>
 
