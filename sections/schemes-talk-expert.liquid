@@ -40,40 +40,54 @@
 
 <script>
   // Function to get calculator values from the scheme calculator section
-  function getCalculatorValues() {
+ function getCalculatorValues() {
     // Get visible amounts
     const premiumAmountEl = document.getElementById('premium_amount');
     const totalInvestmentEl = document.getElementById('pay_amount');
     const freeAmountEl = document.getElementById('free_amount');
     const totalAmountEl = document.getElementById('total_amount');
     
-    // Get premium and total investment (these are always visible)
-    const premiumAmount = premiumAmountEl ? premiumAmountEl.textContent : '₹10,000';
-    const totalInvestment = totalInvestmentEl ? totalInvestmentEl.textContent : '₹90,000';
-    
-    // Get free premium and total redeemable from data attributes
+    // Default values
+    let premiumAmount = '₹10,000';
+    let totalInvestment = '₹90,000';
     let freePremium = '₹10,000';
     let totalRedeemable = '₹1,00,000';
     
+    // Get premium and total investment (these are always visible)
+    if (premiumAmountEl && premiumAmountEl.textContent) {
+      premiumAmount = premiumAmountEl.textContent.trim();
+    }
+    
+    if (totalInvestmentEl && totalInvestmentEl.textContent) {
+      totalInvestment = totalInvestmentEl.textContent.trim();
+    }
+    
+    // Get free premium from data attribute (even if hidden)
     if (freeAmountEl) {
       const freeValue = freeAmountEl.getAttribute('data-real-value');
       if (freeValue) {
         freePremium = '₹' + parseInt(freeValue).toLocaleString('en-IN');
-      } else if (!freeAmountEl.classList.contains('hidden-value')) {
-        // If not hidden, use text content
-        freePremium = freeAmountEl.textContent;
+      } else if (freeAmountEl.textContent && !freeAmountEl.classList.contains('hidden-value')) {
+        freePremium = freeAmountEl.textContent.trim();
       }
     }
     
+    // Get total redeemable from data attribute (even if hidden)
     if (totalAmountEl) {
       const totalValue = totalAmountEl.getAttribute('data-real-value');
       if (totalValue) {
         totalRedeemable = '₹' + parseInt(totalValue).toLocaleString('en-IN');
-      } else if (!totalAmountEl.classList.contains('hidden-value')) {
-        // If not hidden, use text content
-        totalRedeemable = totalAmountEl.textContent;
+      } else if (totalAmountEl.textContent && !totalAmountEl.classList.contains('hidden-value')) {
+        totalRedeemable = totalAmountEl.textContent.trim();
       }
     }
+    
+    console.log('Fetched Calculator Values:', {
+      premiumAmount,
+      totalInvestment,
+      freePremium,
+      totalRedeemable
+    });
     
     return {
       premiumAmount: premiumAmount,
@@ -84,255 +98,114 @@
   }
 
   // Main form submission handler
-  document.getElementById('talkToExpertForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('talkToExpertForm');
     
-    const form = e.target;
-    const submitButton = form.querySelector('.talk-to-us-expert-button');
-    const feedbackDiv = document.getElementById('formFeedback');
-    const phoneInput = document.getElementById('talkToExpertPhone');
+    if (!form) {
+      console.error('Talk to Expert form not found');
+      return;
+    }
     
-    // Get calculator values and populate hidden fields
-    const calcValues = getCalculatorValues();
-    
-    // Populate hidden fields
-    document.getElementById('expert_premium_amount').value = calcValues.premiumAmount;
-    document.getElementById('expert_total_investment').value = calcValues.totalInvestment;
-    document.getElementById('expert_free_premium').value = calcValues.freePremium;
-    document.getElementById('expert_total_redeemable').value = calcValues.totalRedeemable;
-    
-    console.log('Calculator Values:', calcValues); // Debug log
-    
-    // Disable button and show processing state
-    submitButton.disabled = true;
-    submitButton.style.opacity = '0.6';
-    const originalButtonHTML = submitButton.innerHTML;
-    submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Processing...';
-    
-    // Hide previous feedback
-    feedbackDiv.style.display = 'none';
-    
-    // Prepare data to send
-    const webhookData = {
-      phone: phoneInput.value,
-      email: 'support@lucirajewelry.com',
-      subject: 'Talk to Expert Request - Lucira Jewelry',
-      tags: 'Talk to Expert',
-      premiumAmount: calcValues.premiumAmount,
-      totalInvestment: calcValues.totalInvestment,
-      freePremium: calcValues.freePremium,
-      totalRedeemable: calcValues.totalRedeemable,
-      timestamp: new Date().toISOString(),
-      source: 'Lucira Jewelry Website',
-      pageUrl: window.location.href
-    };
-    
-    console.log('Webhook Data:', webhookData); // Debug log
-    
-    try {
-      // Replace with your actual webhook URL
-      const webhookURL = 'https://schemes-api-385594025448.europe-west1.run.app/';
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
       
-      const response = await fetch(webhookURL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(webhookData)
-      });
+      const submitButton = form.querySelector('.talk-to-us-expert-button');
+      const feedbackDiv = document.getElementById('formFeedback');
+      const phoneInput = document.getElementById('talkToExpertPhone');
       
-      if (response.ok) {
-        // Show success message
-        feedbackDiv.className = 'form-feedback success';
-        feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+      // Validate phone number
+      const phoneValue = phoneInput.value.trim();
+      if (!/^\d{10}$/.test(phoneValue)) {
+        feedbackDiv.className = 'form-feedback error';
+        feedbackDiv.innerHTML = '<ul><li>Please enter a valid 10-digit phone number</li></ul>';
         feedbackDiv.style.display = 'block';
+        return;
+      }
+      
+      // Get calculator values and populate hidden fields
+      const calcValues = getCalculatorValues();
+      
+      // Populate hidden fields
+      document.getElementById('expert_premium_amount').value = calcValues.premiumAmount;
+      document.getElementById('expert_total_investment').value = calcValues.totalInvestment;
+      document.getElementById('expert_free_premium').value = calcValues.freePremium;
+      document.getElementById('expert_total_redeemable').value = calcValues.totalRedeemable;
+      
+      console.log('Submitting with Calculator Values:', calcValues);
+      
+      // Disable button and show processing state
+      submitButton.disabled = true;
+      submitButton.style.opacity = '0.6';
+      const originalButtonHTML = submitButton.innerHTML;
+      submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Processing...';
+      
+      // Hide previous feedback
+      feedbackDiv.style.display = 'none';
+      
+      // Prepare data to send
+      const webhookData = {
+        phone: phoneValue,
+        email: 'support@lucirajewelry.com',
+        subject: 'Talk to Expert Request - Lucira Jewelry',
+        tags: 'Talk to Expert',
+        premiumAmount: calcValues.premiumAmount,
+        totalInvestment: calcValues.totalInvestment,
+        freePremium: calcValues.freePremium,
+        totalRedeemable: calcValues.totalRedeemable,
+        timestamp: new Date().toISOString(),
+        source: 'Lucira Jewelry Website - Talk to Expert Form',
+        pageUrl: window.location.href
+      };
+      
+      console.log('Webhook Data:', webhookData);
+      
+      try {
+        const webhookURL = 'https://schemes-api-385594025448.europe-west1.run.app/';
         
-        // Push to dataLayer for analytics
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "talkToExpertSubmit",
-          expertData: webhookData,
+        const response = await fetch(webhookURL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(webhookData)
         });
         
-        // Reset form
-        form.reset();
-      } else {
-        throw new Error('Failed to send');
+        if (response.ok) {
+          // Show success message
+          feedbackDiv.className = 'form-feedback success';
+          feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+          feedbackDiv.style.display = 'block';
+          
+          // Push to dataLayer for analytics
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: "talkToExpertSubmit",
+            expertData: webhookData,
+          });
+          
+          // Reset form
+          form.reset();
+          
+          // Hide success message after 5 seconds
+          setTimeout(() => {
+            feedbackDiv.style.display = 'none';
+          }, 5000);
+        } else {
+          throw new Error('Failed to send');
+        }
+      } catch (error) {
+        // Show error message
+        feedbackDiv.className = 'form-feedback error';
+        feedbackDiv.innerHTML = '<ul><li>Something went wrong. Please try again.</li></ul>';
+        feedbackDiv.style.display = 'block';
+        console.error('Webhook error:', error);
+      } finally {
+        // Re-enable button
+        submitButton.disabled = false;
+        submitButton.style.opacity = '1';
+        submitButton.innerHTML = originalButtonHTML;
       }
-    } catch (error) {
-      // Show error message
-      feedbackDiv.className = 'form-feedback error';
-      feedbackDiv.innerHTML = '<ul><li>Something went wrong. Please try again.</li></ul>';
-      feedbackDiv.style.display = 'block';
-      console.error('Webhook error:', error);
-    } finally {
-      // Re-enable button
-      submitButton.disabled = false;
-      submitButton.style.opacity = '1';
-      submitButton.innerHTML = originalButtonHTML;
-    }
-  });
-
-  function formatCurrency(amount) {
-    return '₹' + amount.toLocaleString('en-IN');
-  }
-
-  function handleInputChange(input) {
-    let value = input.value.replace(/[^0-9]/g, '');
-    if (value) input.value = value;
-  }
-
-  function updateCalculation(popupId) {
-    const input = document.getElementById('calculator_monthly_installment');
-    let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
-    value = Math.max(1000, Math.min(19000, value));
-    updateValues(value);
-
-    const hiddenMonthly = document.getElementById('hidden_monthly_installment');
-    const hiddenPremium = document.getElementById('hidden_premium_amount');
-    const hiddenPay = document.getElementById('hidden_pay_amount');
-    const hiddenFree = document.getElementById('hidden_free_amount');
-    const hiddenTotal = document.getElementById('hidden_total_amount');
-    
-    if (hiddenMonthly) hiddenMonthly.value = value;
-    if (hiddenPremium) hiddenPremium.value = document.getElementById('premium_amount').textContent;
-    if (hiddenPay) hiddenPay.value = document.getElementById('pay_amount').textContent;
-    if (hiddenFree) hiddenFree.value = document.getElementById('free_amount').textContent;
-    if (hiddenTotal) hiddenTotal.value = document.getElementById('total_amount').textContent;
-
-    schemeShowPopup(popupId);
-  }
-
-  function schemeShowPopup(id) {
-    const popup = document.getElementById(id);
-    if (popup) popup.style.display = 'flex';
-  }
-
-  function schemeClosePopup(id) {
-    const popup = document.getElementById(id);
-    if (popup) popup.style.display = 'none';
-  }
-
-  function updateFromSlider(value) {
-    const slider = document.getElementById('installment_slider');
-    if (!slider) return;
-    
-    const min = slider.min;
-    const max = slider.max;
-    const percentage = ((value - min) / (max - min)) * 100;
-    slider.style.setProperty('--slider-progress', percentage + '%');
-
-    const premiumEl = document.getElementById('premium_amount');
-    const inputEl = document.getElementById('calculator_monthly_installment');
-    const payAmountEl = document.getElementById('pay_amount');
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
-    
-    if (premiumEl) premiumEl.textContent = formatCurrency(parseInt(value));
-    if (inputEl) inputEl.value = value;
-
-    const payAmount = value * 9;
-    const freeAmount = value;
-    const totalAmount = value * 10;
-    
-    if (payAmountEl) payAmountEl.textContent = formatCurrency(payAmount);
-    
-    // Update data attributes
-    if (freeAmountEl) {
-      freeAmountEl.setAttribute('data-real-value', freeAmount);
-      if (!freeAmountEl.classList.contains('hidden-value')) {
-        freeAmountEl.textContent = formatCurrency(freeAmount);
-      }
-    }
-    
-    if (totalAmountEl) {
-      totalAmountEl.setAttribute('data-real-value', totalAmount);
-      if (!totalAmountEl.classList.contains('hidden-value')) {
-        totalAmountEl.textContent = formatCurrency(totalAmount);
-      }
-    }
-  }
-
-  function selectTab(button, value) {
-    document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
-    button.classList.add('active');
-    updateValues(value);
-  }
-
-  function updateValues(installmentAmount) {
-    const input = document.getElementById('calculator_monthly_installment');
-    if (input) input.value = installmentAmount;
-
-    const slider = document.getElementById('installment_slider');
-    if (slider) {
-      slider.value = installmentAmount;
-      const min = slider.min;
-      const max = slider.max;
-      const percentage = ((installmentAmount - min) / (max - min)) * 100;
-      slider.style.setProperty('--slider-progress', percentage + '%');
-    }
-
-    document.querySelectorAll('.price-tab').forEach(tab => {
-      const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
-      tab.classList.toggle('active', tabValue === installmentAmount);
     });
-
-    const payAmount = installmentAmount * 9;
-    const freeAmount = installmentAmount;
-    const totalAmount = installmentAmount * 10;
-
-    const premiumEl = document.getElementById('premium_amount');
-    const payAmountEl = document.getElementById('pay_amount');
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
-
-    if (premiumEl) premiumEl.textContent = formatCurrency(installmentAmount);
-    if (payAmountEl) payAmountEl.textContent = formatCurrency(payAmount);
-    
-    if (freeAmountEl) {
-      freeAmountEl.setAttribute('data-real-value', freeAmount);
-      if (!freeAmountEl.classList.contains('hidden-value')) {
-        freeAmountEl.textContent = formatCurrency(freeAmount);
-      }
-    }
-    
-    if (totalAmountEl) {
-      totalAmountEl.setAttribute('data-real-value', totalAmount);
-      if (!totalAmountEl.classList.contains('hidden-value')) {
-        totalAmountEl.textContent = formatCurrency(totalAmount);
-      }
-    }
-  }
-
-  function submitSchemeForm(event) {
-    event.preventDefault();
-    const form = event.target;
-    const submitBtn = form.querySelector('.scheme-submit-btn');
-
-    if (submitBtn) {
-      submitBtn.textContent = 'Processing...';
-      submitBtn.style.opacity = '0.6';
-      submitBtn.disabled = true;
-    }
-
-    setTimeout(() => {
-      alert('Thank you! Our expert will contact you soon.');
-
-      form.reset();
-      if (submitBtn) {
-        submitBtn.textContent = 'Submit';
-        submitBtn.style.opacity = '1';
-        submitBtn.disabled = false;
-      }
-
-      schemeClosePopup('schemePopup');
-    }, 1000);
-  }
-
-  document.addEventListener('DOMContentLoaded', function() {
-    if (typeof updateValues === 'function') {
-      updateValues(10000);
-    }
   });
 </script>
 
