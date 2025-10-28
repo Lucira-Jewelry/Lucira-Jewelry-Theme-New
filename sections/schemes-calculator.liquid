@@ -75,12 +75,12 @@
             <div class="check-icon"><i class="fa-solid fa-check"></i></div>
             <div class="result-text">
               <span>We Pay your 10th Premium</span>
-              <span class="result-amount hidden-value" id="free_amount" data-real-value="">XXXXXXX</span>
+              <span class="result-amount blurred" id="free_amount">₹10,000</span>
             </div>
           </div>
           <div class="total-redeemable">
             <span>Total Redeemable Amount</span>
-            <span class="total-amount hidden-value" id="total_amount" data-real-value="">XXXXXXX</span>
+            <span class="total-amount blurred" id="total_amount">₹1,00,000</span>
           </div>
         </div>
       </div>
@@ -88,10 +88,12 @@
   </div>
 </section>
 
+<!-- Scheme Popup Overlay -->
 <div id="schemeOverlay" class="scheme-overlay">
   <div class="scheme-form-container">
     <span class="scheme-close-btn" onclick="closeSchemeOverlay()">&times;</span>
     
+    <!-- Form Section -->
     <div id="schemeFormSection">
       <h3 class="scheme-topic">Scheme Calculator</h3>
       <form id="schemeContactForm" class="scheme-form">
@@ -109,13 +111,6 @@
             oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
           />
         </div>
-        
-        <!-- Hidden Fields for Calculator Data -->
-        <input type="hidden" id="hidden_premium_amount" name="premium_amount" />
-        <input type="hidden" id="hidden_total_investment" name="total_investment" />
-        <input type="hidden" id="hidden_free_premium" name="free_premium" />
-        <input type="hidden" id="hidden_total_redeemable" name="total_redeemable" />
-        
         <p id="scheme_phoneError" class="error-message" style="display: none;">Please enter a valid 10-digit phone number</p>
         <button type="submit" id="schemeSubmitBtn" class="scheme-submit-btn" disabled>Submit</button>
       </form>
@@ -148,17 +143,6 @@
     if (value) input.value = value;
   }
 
-  function populateHiddenFields() {
-    // Get real values from data attributes
-    const freeAmount = document.getElementById('free_amount').getAttribute('data-real-value');
-    const totalAmount = document.getElementById('total_amount').getAttribute('data-real-value');
-    
-    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-    document.getElementById('hidden_total_investment').value = document.getElementById('pay_amount').textContent;
-    document.getElementById('hidden_free_premium').value = formatCurrency(parseInt(freeAmount));
-    document.getElementById('hidden_total_redeemable').value = formatCurrency(parseInt(totalAmount));
-  }
-
   function revealTotalAmount() {
     const input = document.getElementById('calculator_monthly_installment');
     let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
@@ -173,9 +157,6 @@
     const overlay = document.getElementById('schemeOverlay');
     overlay.style.display = 'flex';
     document.body.classList.add('no-scroll');
-    
-    // Populate hidden fields with current calculator values
-    populateHiddenFields();
     
     // Reset form visibility
     document.getElementById('schemeFormSection').style.display = 'block';
@@ -203,23 +184,9 @@
     const payAmount = value * 9;
     const freeAmount = value;
     const totalAmount = value * 10;
-    
     document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    
-    // Update data attributes but keep display as XXXXXXX
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
-    
-    freeAmountEl.setAttribute('data-real-value', freeAmount);
-    totalAmountEl.setAttribute('data-real-value', totalAmount);
-    
-    // Don't change text content - CSS ::before will show XXXXXXX
-    if (freeAmountEl.classList.contains('hidden-value')) {
-        freeAmountEl.textContent = '';
-    }
-    if (totalAmountEl.classList.contains('hidden-value')) {
-        totalAmountEl.textContent = '';
-    }
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
   }
 
   function selectTab(button, value) {
@@ -250,45 +217,12 @@
 
     document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
     document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    
-    // Update data attributes but keep display as XXXXXXX
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
-    
-    freeAmountEl.setAttribute('data-real-value', freeAmount);
-    totalAmountEl.setAttribute('data-real-value', totalAmount);
-    
-    // Don't change text content - CSS ::before will show XXXXXXX
-    if (freeAmountEl.classList.contains('hidden-value')) {
-        freeAmountEl.textContent = '';
-    }
-    if (totalAmountEl.classList.contains('hidden-value')) {
-        totalAmountEl.textContent = '';
-    }
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    // Initialize values on load - keep XXXXXXX visible via CSS
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
-    
-    // Set initial data attributes
-    freeAmountEl.setAttribute('data-real-value', '10000');
-    totalAmountEl.setAttribute('data-real-value', '100000');
-    
-    // Empty text content - CSS ::before will show XXXXXXX
-    freeAmountEl.textContent = '';
-    totalAmountEl.textContent = '';
-    
-    // Update visible amounts
-    document.getElementById('premium_amount').textContent = formatCurrency(10000);
-    document.getElementById('pay_amount').textContent = formatCurrency(90000);
-    
-    // Set slider initial position
-    const slider = document.getElementById('installment_slider');
-    slider.value = 10000;
-    const percentage = ((10000 - slider.min) / (slider.max - slider.min)) * 100;
-    slider.style.setProperty('--slider-progress', percentage + '%');
+    updateValues(10000);
 
     const overlay = document.getElementById('schemeOverlay');
     const contactForm = document.getElementById('schemeContactForm');
@@ -327,11 +261,12 @@
 
       if (!phoneValid) return;
 
-      // Get current calculation values from hidden fields (already populated when overlay opened)
-      const premiumAmount = document.getElementById('hidden_premium_amount').value;
-      const payAmount = document.getElementById('hidden_total_investment').value;
-      const freeAmount = document.getElementById('hidden_free_premium').value;
-      const totalAmount = document.getElementById('hidden_total_redeemable').value;
+      // Get current calculation values
+      const monthlyInstallment = document.getElementById('calculator_monthly_installment').value;
+      const premiumAmount = document.getElementById('premium_amount').textContent;
+      const payAmount = document.getElementById('pay_amount').textContent;
+      const freeAmount = document.getElementById('free_amount').textContent;
+      const totalAmount = document.getElementById('total_amount').textContent;
 
       const payload = {
         name,
@@ -350,7 +285,7 @@
       submitBtn.style.opacity = '0.6';
 
       // Send data to webhook
-      fetch('https://schemes-api-385594025448.europe-west1.run.app/', {
+      fetch('https://schemes-webhook-385594025448.asia-south1.run.app/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -366,25 +301,6 @@
           event: "schemeCalculatorSubmit",
           schemeData: payload,
         });
-
-        // Reveal both amounts immediately after successful submission
-        const freeAmountEl = document.getElementById('free_amount');
-        const totalAmountEl = document.getElementById('total_amount');
-        
-        const freeValue = freeAmountEl.getAttribute('data-real-value');
-        const totalValue = totalAmountEl.getAttribute('data-real-value');
-        
-        // Remove hidden-value class to show real values
-        freeAmountEl.classList.remove('hidden-value');
-        totalAmountEl.classList.remove('hidden-value');
-        
-        // Set actual text content
-        freeAmountEl.textContent = formatCurrency(parseInt(freeValue));
-        totalAmountEl.textContent = formatCurrency(parseInt(totalValue));
-        
-        // Restore original styling for total amount
-        totalAmountEl.style.fontSize = '';
-        totalAmountEl.style.color = '#008000';
 
         // Show success message
         document.getElementById('schemeFormSection').style.display = 'none';
@@ -402,9 +318,14 @@
         progressBar.offsetHeight; // trigger reflow
         progressBar.style.animation = 'shrinkBar 5s linear forwards';
 
-        // Auto-close after 5s
+        // Auto-close after 5s and reveal the price
         setTimeout(() => {
           closeSchemeOverlay();
+          // Reveal the total amount and free amount after popup closes
+          const freeAmount = document.getElementById('free_amount');
+          const totalAmount = document.getElementById('total_amount');
+          freeAmount.classList.remove('blurred');
+          totalAmount.classList.remove('blurred');
         }, 5000);
       })
       .catch(err => {
@@ -454,68 +375,179 @@
     .result-amount{font-weight: 500; font-size: 16px; line-height: 24px; letter-spacing: 0.7px; color: #000000;}
     .total-redeemable{margin-top:30px;padding-top:20px;border-top:2px solid #ddd;display:flex;justify-content:space-between;align-items:center}
     .total-redeemable span:first-child { font-weight: 500; font-size: 20px; line-height: 24px; letter-spacing: 1px; color: #000000; text-transform: capitalize; }
-    .total-amount { color: #008000; padding: 0; font-weight: 600; font-size: 20px; line-height: 100%; vertical-align: middle; text-transform: uppercase; border-radius: 8px; transition: all 0.3s ease; }
+    .total-amount { color: #008000; background: #0080001A; padding: 8px 16px; font-weight: 600; font-size: 20px; line-height: 100%; vertical-align: middle; text-transform: uppercase; border-radius: 8px; transition: filter 0.3s ease; }
     
-    .hidden-value {
-        letter-spacing: 3px;
+    .result-amount.blurred,
+    .total-amount.blurred {
+        filter: blur(6px);
         user-select: none;
-        color: #666 !important;
+        pointer-events: none;
     }
     
-    .hidden-value::before { content: 'XXXXXXX' !important; right: 0; position: absolute; }
-    
-    /* Force XXXXXXX display for hidden values */
-    #free_amount.hidden-value,
-    #total_amount.hidden-value {
-        font-size: 0;
-    }
-    
-    #free_amount.hidden-value::before,
-    #total_amount.hidden-value::before {
-        font-size: 16px;
-        letter-spacing: 3px;
-    }
-    
-    #total_amount.hidden-value::before {
-        font-size: 20px;
-        color: #008000 !important;
-        padding: 0;
-        border-radius: 8px;
+    .scheme-calculator-section .grid-row { display: grid ; grid-template-columns: 1fr 1fr; gap: 40px; align-items: start; max-width: 1200px; margin: 0 auto; }
+    .no-scroll { overflow: hidden; }
+
+    /* Overlay Styles */
+    .scheme-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
     }
 
-    .result-amount {position: relative;}
-    
-    .scheme-calculator-section .grid-row{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start;max-width:1200px;margin:0 auto}
-    .no-scroll{overflow:hidden}
-    .scheme-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9999}
-    .scheme-form-container{background:#fff;border-radius:12px;width:90%;max-width:420px;padding:30px 25px;position:relative;box-shadow:0 10px 30px rgba(0,0,0,.2)}
-    .scheme-close-btn{position:absolute;top:10px;right:15px;font-size:28px;cursor:pointer;color:#666;line-height:1;transition:color .3s}
-    .scheme-close-btn:hover{color:#000}
-    .scheme-topic{font-weight:500;font-size:18px;line-height:1.4;letter-spacing:1.2px;text-transform:uppercase;margin:0 0 20px 0;text-align:left}
-    .scheme-form{display:flex;flex-direction:column}
-    .input-icon-wrapper{position:relative;margin-bottom:15px}
-    .input-icon-wrapper svg{position:absolute;top:50%;transform:translateY(-50%);left:16px;pointer-events:none}
-    .input-icon-wrapper input{width:100%;padding:16px 20px 16px 50px;border:1px solid #ddd;border-radius:8px;font-family:'Futura Std',sans-serif;font-size:14px;letter-spacing:.5px;box-sizing:border-box}
-    .input-icon-wrapper input:focus{outline:0;border-color:#b77766}
-    .error-message{color:#e74c3c;font-size:12px;margin:-10px 0 10px 0;font-family:'Futura Std',sans-serif}
-    .scheme-submit-btn{background:#b77766;color:#fff;padding:16px;border:none;border-radius:8px;cursor:pointer;font-family:'Futura Std',sans-serif;font-weight:500;font-size:14px;text-transform:uppercase;letter-spacing:1.3px;transition:background .3s;margin-top:10px}
-    .scheme-submit-btn:hover:not(:disabled){background:#a56655}
-    .scheme-submit-btn:disabled{background:#ccc;cursor:not-allowed;opacity:.6}
-    .scheme-success-message{display:none;flex-direction:column;align-items:center;text-align:center;padding:20px 0}
-    .success-icon{margin-bottom:20px;animation:scaleIn .5s ease}
-    .total-redeemable {position: relative;}
-    @keyframes scaleIn{
-    from{transform:scale(0)}
-    to{transform:scale(1)}
+    .scheme-form-container {
+      background: #fff;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 420px;
+      padding: 30px 25px;
+      position: relative;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
     }
-    .scheme-success-message h3{font-size:24px;font-weight:600;margin:0 0 10px 0;color:#1a1a1a;letter-spacing:0}
-    .scheme-success-message p{font-size:16px;color:#666;margin:0 0 0;line-height:1.5}
-    .progress-bar-container{width:100%;height:4px;background:#e0e0e0;border-radius:2px;overflow:hidden;margin-top:20px;position:absolute;bottom:0;left:0}
-    .scheme-form-container{overflow:hidden}
-    .progress-bar{height:100%;background:#4caf50;width:100%;animation:shrinkBar 5s linear forwards}
-    @keyframes shrinkBar{
-    from{width:100%}
-    to{width:0%}
+
+    .scheme-close-btn {
+      position: absolute;
+      top: 10px;
+      right: 15px;
+      font-size: 28px;
+      cursor: pointer;
+      color: #666;
+      line-height: 1;
+      transition: color 0.3s;
+    }
+
+    .scheme-close-btn:hover {
+      color: #000;
+    }
+
+    .scheme-topic {
+      font-weight: 500;
+      font-size: 18px;
+      line-height: 1.4;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      margin: 0 0 20px 0;
+      text-align: left;
+    }
+
+    .scheme-form {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .input-icon-wrapper {
+      position: relative;
+      margin-bottom: 15px;
+    }
+
+    .input-icon-wrapper svg {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      left: 16px;
+      pointer-events: none;
+    }
+
+    .input-icon-wrapper input {
+      width: 100%;
+      padding: 16px 20px 16px 50px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-family: 'Futura Std', sans-serif;
+      font-size: 14px;
+      letter-spacing: 0.5px;
+      box-sizing: border-box;
+    }
+
+    .input-icon-wrapper input:focus {
+      outline: none;
+      border-color: #b77766;
+    }
+
+    .error-message {
+      color: #e74c3c;
+      font-size: 12px;
+      margin: -10px 0 10px 0;
+      font-family: 'Futura Std', sans-serif;
+    }
+
+    .scheme-submit-btn {
+      background: #b77766;
+      color: #fff;
+      padding: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Futura Std', sans-serif;
+      font-weight: 500;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      transition: background 0.3s;
+      margin-top: 10px;
+    }
+
+    .scheme-submit-btn:hover:not(:disabled) {
+      background: #a56655;
+    }
+
+    .scheme-submit-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    /* Success Message Styles */
+    .scheme-success-message {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 20px 0;
+    }
+
+    .success-icon {
+      margin-bottom: 20px;
+      animation: scaleIn 0.5s ease;
+    }
+
+    @keyframes scaleIn {
+      from { transform: scale(0); }
+      to { transform: scale(1); }
+    }
+
+    .scheme-success-message h3 { font-size: 24px; font-weight: 600; margin: 0 0 10px 0; color: #1a1a1a; letter-spacing: 0px; }
+
+    .scheme-success-message p {
+      font-size: 16px;
+      color: #666;
+      margin: 0 0 20px 0;
+      line-height: 1.5;
+    }
+
+    .progress-bar-container {
+      width: 100%;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+      margin-top: 20px;
+      position: relative;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: #4CAF50;
+      width: 100%;
+      animation: shrinkBar 5s linear forwards;
+    }
+
+    @keyframes shrinkBar {
+      from { width: 100%; }
+      to { width: 0%; }
     }
 
     @media (max-width:768px){
@@ -533,12 +565,11 @@
         .total-amount {font-size: 16px;}
         .scheme-calculator-section{padding:30px 0px;background:#fff}
         .scheme-calculator-section .grid-row {grid-template-columns: 1fr;} 
-        .popular-badge {padding-top: 31px;}
+        .popular-badge {padding-top: 40px;}
         .scheme-calculator-section {padding: 40px 0px 20px;}
         .scheme-form-container {padding: 25px 20px;}
         .scheme-calculator-content { text-align: center; margin-bottom: 40px; } 
         .check-button {padding: 14px 30px;}
-        .price-tab {padding: 7px 8px;}
     }
 </style>
 
@@ -566,13 +597,3 @@
   ]
 }
 {% endschema %}
-
-<!-- 
-KEY FEATURES:
-1. "We Pay your 10th Premium" shows XXXXXXX until form submission
-2. "Total Redeemable Amount" shows XXXXXXX until form submission
-3. Real values stored in data-real-value attributes
-4. Hidden form fields capture actual values for webhook
-5. After successful form submission, both values are revealed
-6. Values update dynamically when slider/tabs change but remain hidden as XXXXXXX
--->
