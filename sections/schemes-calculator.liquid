@@ -153,17 +153,14 @@
     let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
     value = Math.max(1000, Math.min(19000, value));
     updateValues(value);
-    
-    // Open the form overlay (price will be revealed after form submission)
-    openSchemeOverlay();
+    openSchemeOverlay(); // Open form overlay
   }
 
   function openSchemeOverlay() {
     const overlay = document.getElementById('schemeOverlay');
     overlay.style.display = 'flex';
     document.body.classList.add('no-scroll');
-    
-    // Reset form visibility
+
     document.getElementById('schemeFormSection').style.display = 'block';
     document.getElementById('schemeSuccessMessage').style.display = 'none';
     document.getElementById('schemeContactForm').reset();
@@ -176,22 +173,33 @@
     document.body.classList.remove('no-scroll');
   }
 
-  function updateFromSlider(value) {
+  // ✅ Update values and link slider ↔ tabs
+  function updateValues(installmentAmount) {
+    const input = document.getElementById('calculator_monthly_installment');
     const slider = document.getElementById('installment_slider');
-    const min = slider.min;
-    const max = slider.max;
-    const percentage = ((value - min) / (max - min)) * 100;
+    input.value = installmentAmount;
+    slider.value = installmentAmount;
+
+    // Update slider progress
+    const percentage = ((installmentAmount - slider.min) / (slider.max - slider.min)) * 100;
     slider.style.setProperty('--slider-progress', percentage + '%');
 
-    document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
-    document.getElementById('calculator_monthly_installment').value = value;
+    // Activate matching tab
+    document.querySelectorAll('.price-tab').forEach(tab => {
+      const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
+      tab.classList.toggle('active', tabValue === installmentAmount);
+    });
 
-    const payAmount = value * 9;
-    const freeAmount = value;
-    const totalAmount = value * 10;
+    // Update visible result values (but keep last 2 hidden)
+    const payAmount = installmentAmount * 9;
+    document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
     document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+
+    // Set hidden data attributes for later reveal
+    document.getElementById('free_amount').dataset.realValue = formatCurrency(installmentAmount);
+    document.getElementById('total_amount').dataset.realValue = formatCurrency(installmentAmount * 10);
+    document.getElementById('free_amount').textContent = 'XXXXXXX';
+    document.getElementById('total_amount').textContent = 'XXXXXXX';
   }
 
   function selectTab(button, value) {
@@ -200,33 +208,11 @@
     updateValues(value);
   }
 
-  function updateValues(installmentAmount) {
-    const input = document.getElementById('calculator_monthly_installment');
-    input.value = installmentAmount;
-
-    const slider = document.getElementById('installment_slider');
-    slider.value = installmentAmount;
-    const min = slider.min;
-    const max = slider.max;
-    const percentage = ((installmentAmount - min) / (max - min)) * 100;
-    slider.style.setProperty('--slider-progress', percentage + '%');
-
-    document.querySelectorAll('.price-tab').forEach(tab => {
-      const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
-      tab.classList.toggle('active', tabValue === installmentAmount);
-    });
-
-    const payAmount = installmentAmount * 9;
-    const freeAmount = installmentAmount;
-    const totalAmount = installmentAmount * 10;
-
-    document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
-    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+  function updateFromSlider(value) {
+    updateValues(parseInt(value));
   }
 
-  document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
     updateValues(10000);
 
     const overlay = document.getElementById('schemeOverlay');
@@ -237,7 +223,6 @@
     const phoneError = document.getElementById('scheme_phoneError');
     const submitBtn = document.getElementById('schemeSubmitBtn');
 
-    // Validation function (only name and phone)
     function validateInputs() {
       const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
       const nameValid = nameInput.value.trim().length > 0;
@@ -247,102 +232,88 @@
     phoneInput.addEventListener('input', validateInputs);
     nameInput.addEventListener('input', validateInputs);
 
-    // Close overlay on background click
-    overlay.addEventListener('click', function(e) {
-      if (e.target === overlay) {
-        closeSchemeOverlay();
-      }
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeSchemeOverlay();
     });
 
-    // Form submission
-    contactForm.addEventListener('submit', function(e) {
+    contactForm.addEventListener('submit', function (e) {
       e.preventDefault();
 
       const phone = phoneInput.value.trim();
       const name = nameInput.value.trim();
       const phoneValid = /^\d{10}$/.test(phone);
-
       phoneError.style.display = phoneValid ? 'none' : 'block';
-
       if (!phoneValid) return;
 
-      // Get current calculation values
-      const monthlyInstallment = document.getElementById('calculator_monthly_installment').value;
       const premiumAmount = document.getElementById('premium_amount').textContent;
       const payAmount = document.getElementById('pay_amount').textContent;
-      const freeAmount = document.getElementById('free_amount').textContent;
-      const totalAmount = document.getElementById('total_amount').textContent;
+      const freeAmount = document.getElementById('free_amount').dataset.realValue;
+      const totalAmount = document.getElementById('total_amount').dataset.realValue;
 
       const payload = {
         name,
         phone,
-        monthlyInstallment: premiumAmount,
-        totalInvestment: payAmount,
-        freePremium: freeAmount,
-        totalRedeemable: totalAmount,
+        premiumAmount,
+        payAmount,
+        freeAmount,
+        totalAmount,
         pageUrl: window.location.href,
         timestamp: new Date().toISOString()
       };
 
-      // Show loading state
       submitBtn.textContent = 'Submitting...';
       submitBtn.disabled = true;
       submitBtn.style.opacity = '0.6';
 
-      // Send data to webhook
       fetch('https://schemes-webhook-385594025448.asia-south1.run.app/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      .then(response => {
-        if (!response.ok) throw new Error('Submission failed');
-        return response.json();
-      })
-      .then(data => {
-        // Push to dataLayer for analytics
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "schemeCalculatorSubmit",
-          schemeData: payload,
+        .then(response => {
+          if (!response.ok) throw new Error('Submission failed');
+          return response.json();
+        })
+        .then(() => {
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: 'schemeCalculatorSubmit',
+            schemeData: payload,
+          });
+
+          document.getElementById('schemeFormSection').style.display = 'none';
+          successMessage.style.display = 'flex';
+
+          contactForm.reset();
+          submitBtn.textContent = 'Submit';
+          submitBtn.disabled = true;
+          submitBtn.style.opacity = '1';
+
+          const progressBar = document.querySelector('.progress-bar');
+          progressBar.style.animation = 'none';
+          progressBar.offsetHeight; // reflow
+          progressBar.style.animation = 'shrinkBar 5s linear forwards';
+
+          // ✅ Reveal the hidden values after 5s (when popup closes)
+          setTimeout(() => {
+            closeSchemeOverlay();
+            document.getElementById('free_amount').textContent =
+              document.getElementById('free_amount').dataset.realValue;
+            document.getElementById('total_amount').textContent =
+              document.getElementById('total_amount').dataset.realValue;
+          }, 5000);
+        })
+        .catch(err => {
+          console.error('Error:', err);
+          alert('Something went wrong. Please try again.');
+          submitBtn.textContent = 'Submit';
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
         });
-
-        // Show success message
-        document.getElementById('schemeFormSection').style.display = 'none';
-        successMessage.style.display = 'flex';
-
-        // Reset form
-        contactForm.reset();
-        submitBtn.textContent = 'Submit';
-        submitBtn.disabled = true;
-        submitBtn.style.opacity = '1';
-
-        // Reset progress bar animation
-        const progressBar = document.querySelector('.progress-bar');
-        progressBar.style.animation = 'none';
-        progressBar.offsetHeight; // trigger reflow
-        progressBar.style.animation = 'shrinkBar 5s linear forwards';
-
-        // Auto-close after 5s and reveal the price
-        setTimeout(() => {
-          closeSchemeOverlay();
-          // Reveal the total amount and free amount after popup closes
-          const freeAmount = document.getElementById('free_amount');
-          const totalAmount = document.getElementById('total_amount');
-          freeAmount.classList.remove('blurred');
-          totalAmount.classList.remove('blurred');
-        }, 5000);
-      })
-      .catch(err => {
-        console.error('Error:', err);
-        alert('Something went wrong. Please try again.');
-        submitBtn.textContent = 'Submit';
-        submitBtn.disabled = false;
-        submitBtn.style.opacity = '1';
-      });
     });
   });
 </script>
+
 
 <style>
     .scheme-calculator-section{padding:60px 0px;background:#fff}
