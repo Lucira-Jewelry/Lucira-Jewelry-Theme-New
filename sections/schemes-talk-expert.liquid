@@ -39,174 +39,227 @@
 </div>
 
 <script>
-  // Function to get calculator values from the scheme calculator section
- function getCalculatorValues() {
-    // Get visible amounts
-    const premiumAmountEl = document.getElementById('premium_amount');
-    const totalInvestmentEl = document.getElementById('pay_amount');
-    const freeAmountEl = document.getElementById('free_amount');
-    const totalAmountEl = document.getElementById('total_amount');
+  (function() {
+    'use strict';
     
-    // Default values
-    let premiumAmount = '₹10,000';
-    let totalInvestment = '₹90,000';
-    let freePremium = '₹10,000';
-    let totalRedeemable = '₹1,00,000';
-    
-    // Get premium and total investment (these are always visible)
-    if (premiumAmountEl && premiumAmountEl.textContent) {
-      premiumAmount = premiumAmountEl.textContent.trim();
-    }
-    
-    if (totalInvestmentEl && totalInvestmentEl.textContent) {
-      totalInvestment = totalInvestmentEl.textContent.trim();
-    }
-    
-    // Get free premium from data attribute (even if hidden)
-    if (freeAmountEl) {
-      const freeValue = freeAmountEl.getAttribute('data-real-value');
-      if (freeValue) {
-        freePremium = '₹' + parseInt(freeValue).toLocaleString('en-IN');
-      } else if (freeAmountEl.textContent && !freeAmountEl.classList.contains('hidden-value')) {
-        freePremium = freeAmountEl.textContent.trim();
+    // Wait for calculator to be ready
+    function waitForCalculator(callback, maxAttempts) {
+      maxAttempts = maxAttempts || 50; // Try for 5 seconds max
+      var attempts = 0;
+      
+      function checkCalculator() {
+        attempts++;
+        
+        if (typeof window.getSchemeCalculatorValues === 'function') {
+          console.log('✓ Calculator function found!');
+          callback();
+        } else if (attempts < maxAttempts) {
+          console.log('Waiting for calculator... attempt ' + attempts);
+          setTimeout(checkCalculator, 100);
+        } else {
+          console.error('Calculator function not found after ' + maxAttempts + ' attempts');
+          // Still initialize the form with default values
+          callback();
+        }
       }
+      
+      checkCalculator();
     }
-    
-    // Get total redeemable from data attribute (even if hidden)
-    if (totalAmountEl) {
-      const totalValue = totalAmountEl.getAttribute('data-real-value');
-      if (totalValue) {
-        totalRedeemable = '₹' + parseInt(totalValue).toLocaleString('en-IN');
-      } else if (totalAmountEl.textContent && !totalAmountEl.classList.contains('hidden-value')) {
-        totalRedeemable = totalAmountEl.textContent.trim();
-      }
-    }
-    
-    console.log('Fetched Calculator Values:', {
-      premiumAmount,
-      totalInvestment,
-      freePremium,
-      totalRedeemable
-    });
-    
-    return {
-      premiumAmount: premiumAmount,
-      totalInvestment: totalInvestment,
-      freePremium: freePremium,
-      totalRedeemable: totalRedeemable
-    };
-  }
 
-  // Main form submission handler
-  document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('talkToExpertForm');
-    
-    if (!form) {
-      console.error('Talk to Expert form not found');
-      return;
+    // Get calculator values - with fallback if global function doesn't exist
+    function getCalculatorValues() {
+      // Try to use the global function first
+      if (typeof window.getSchemeCalculatorValues === 'function') {
+        console.log('Using global calculator function');
+        var values = window.getSchemeCalculatorValues();
+        console.log('Calculator values from global function:', values);
+        return values;
+      }
+      
+      // Fallback: try to get values directly
+      console.log('Falling back to direct element access');
+      var premiumAmountEl = document.getElementById('premium_amount');
+      var totalInvestmentEl = document.getElementById('pay_amount');
+      var freeAmountEl = document.getElementById('free_amount');
+      var totalAmountEl = document.getElementById('total_amount');
+      
+      var premiumAmount = '₹10,000';
+      var totalInvestment = '₹90,000';
+      var freePremium = '₹10,000';
+      var totalRedeemable = '₹1,00,000';
+      
+      if (premiumAmountEl && premiumAmountEl.textContent) {
+        premiumAmount = premiumAmountEl.textContent.trim();
+        console.log('Found premium amount:', premiumAmount);
+      }
+      
+      if (totalInvestmentEl && totalInvestmentEl.textContent) {
+        totalInvestment = totalInvestmentEl.textContent.trim();
+        console.log('Found total investment:', totalInvestment);
+      }
+      
+      if (freeAmountEl) {
+        var freeValue = freeAmountEl.getAttribute('data-real-value');
+        console.log('Free amount data-real-value:', freeValue);
+        if (freeValue) {
+          freePremium = '₹' + parseInt(freeValue).toLocaleString('en-IN');
+        }
+      }
+      
+      if (totalAmountEl) {
+        var totalValue = totalAmountEl.getAttribute('data-real-value');
+        console.log('Total amount data-real-value:', totalValue);
+        if (totalValue) {
+          totalRedeemable = '₹' + parseInt(totalValue).toLocaleString('en-IN');
+        }
+      }
+      
+      return {
+        premiumAmount: premiumAmount,
+        totalInvestment: totalInvestment,
+        freePremium: freePremium,
+        totalRedeemable: totalRedeemable
+      };
     }
-    
-    form.addEventListener('submit', async function(e) {
-      e.preventDefault();
+
+    // Initialize the form
+    function initTalkToExpertForm() {
+      console.log('Initializing Talk to Expert form...');
       
-      const submitButton = form.querySelector('.talk-to-us-expert-button');
-      const feedbackDiv = document.getElementById('formFeedback');
-      const phoneInput = document.getElementById('talkToExpertPhone');
+      var form = document.getElementById('talkToExpertForm');
       
-      // Validate phone number
-      const phoneValue = phoneInput.value.trim();
-      if (!/^\d{10}$/.test(phoneValue)) {
-        feedbackDiv.className = 'form-feedback error';
-        feedbackDiv.innerHTML = '<ul><li>Please enter a valid 10-digit phone number</li></ul>';
-        feedbackDiv.style.display = 'block';
+      if (!form) {
+        console.error('Talk to Expert form not found');
         return;
       }
       
-      // Get calculator values and populate hidden fields
-      const calcValues = getCalculatorValues();
+      console.log('Form found, attaching event listener');
       
-      // Populate hidden fields
-      document.getElementById('expert_premium_amount').value = calcValues.premiumAmount;
-      document.getElementById('expert_total_investment').value = calcValues.totalInvestment;
-      document.getElementById('expert_free_premium').value = calcValues.freePremium;
-      document.getElementById('expert_total_redeemable').value = calcValues.totalRedeemable;
-      
-      console.log('Submitting with Calculator Values:', calcValues);
-      
-      // Disable button and show processing state
-      submitButton.disabled = true;
-      submitButton.style.opacity = '0.6';
-      const originalButtonHTML = submitButton.innerHTML;
-      submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Processing...';
-      
-      // Hide previous feedback
-      feedbackDiv.style.display = 'none';
-      
-      // Prepare data to send
-      const webhookData = {
-        phone: phoneValue,
-        email: 'support@lucirajewelry.com',
-        subject: 'Talk to Expert Request - Lucira Jewelry',
-        tags: 'Talk to Expert',
-        premiumAmount: calcValues.premiumAmount,
-        totalInvestment: calcValues.totalInvestment,
-        freePremium: calcValues.freePremium,
-        totalRedeemable: calcValues.totalRedeemable,
-        timestamp: new Date().toISOString(),
-        source: 'Lucira Jewelry Website - Talk to Expert Form',
-        pageUrl: window.location.href
-      };
-      
-      console.log('Webhook Data:', webhookData);
-      
-      try {
-        const webhookURL = 'https://schemes-api-385594025448.europe-west1.run.app/';
+      form.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        console.log('=== Form Submitted ===');
         
-        const response = await fetch(webhookURL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(webhookData)
-        });
+        var submitButton = form.querySelector('.talk-to-us-expert-button');
+        var feedbackDiv = document.getElementById('formFeedback');
+        var phoneInput = document.getElementById('talkToExpertPhone');
         
-        if (response.ok) {
-          // Show success message
-          feedbackDiv.className = 'form-feedback success';
-          feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+        // Validate phone number
+        var phoneValue = phoneInput.value.trim();
+        console.log('Phone number:', phoneValue);
+        
+        if (!/^\d{10}$/.test(phoneValue)) {
+          console.log('Invalid phone number');
+          feedbackDiv.className = 'form-feedback error';
+          feedbackDiv.innerHTML = '<ul><li>Please enter a valid 10-digit phone number</li></ul>';
           feedbackDiv.style.display = 'block';
+          return;
+        }
+        
+        // Get calculator values
+        console.log('Fetching calculator values...');
+        var calcValues = getCalculatorValues();
+        console.log('Retrieved Calculator Values:', calcValues);
+        
+        // Populate hidden fields
+        document.getElementById('expert_premium_amount').value = calcValues.premiumAmount;
+        document.getElementById('expert_total_investment').value = calcValues.totalInvestment;
+        document.getElementById('expert_free_premium').value = calcValues.freePremium;
+        document.getElementById('expert_total_redeemable').value = calcValues.totalRedeemable;
+        
+        console.log('Hidden fields populated');
+        
+        // Disable button and show processing state
+        submitButton.disabled = true;
+        submitButton.style.opacity = '0.6';
+        var originalButtonHTML = submitButton.innerHTML;
+        submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Processing...';
+        
+        // Hide previous feedback
+        feedbackDiv.style.display = 'none';
+        
+        // Prepare data to send
+        var webhookData = {
+          phone: phoneValue,
+          email: 'support@lucirajewelry.com',
+          subject: 'Talk to Expert Request - Lucira Jewelry',
+          tags: 'Talk to Expert',
+          premiumAmount: calcValues.premiumAmount,
+          totalInvestment: calcValues.totalInvestment,
+          freePremium: calcValues.freePremium,
+          totalRedeemable: calcValues.totalRedeemable,
+          timestamp: new Date().toISOString(),
+          source: 'Lucira Jewelry Website - Talk to Expert Form',
+          pageUrl: window.location.href
+        };
+        
+        console.log('=== Webhook Data ===');
+        console.log(JSON.stringify(webhookData, null, 2));
+        
+        try {
+          var webhookURL = 'https://schemes-api-385594025448.europe-west1.run.app/';
           
-          // Push to dataLayer for analytics
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: "talkToExpertSubmit",
-            expertData: webhookData,
+          var response = await fetch(webhookURL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(webhookData)
           });
           
-          // Reset form
-          form.reset();
+          console.log('Response status:', response.status);
           
-          // Hide success message after 5 seconds
-          setTimeout(() => {
-            feedbackDiv.style.display = 'none';
-          }, 5000);
-        } else {
-          throw new Error('Failed to send');
+          if (response.ok) {
+            console.log('✓ Submission successful!');
+            
+            // Show success message
+            feedbackDiv.className = 'form-feedback success';
+            feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+            feedbackDiv.style.display = 'block';
+            
+            // Push to dataLayer for analytics
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: "talkToExpertSubmit",
+              expertData: webhookData,
+            });
+            
+            // Reset form
+            form.reset();
+            
+            // Hide success message after 5 seconds
+            setTimeout(function() {
+              feedbackDiv.style.display = 'none';
+            }, 5000);
+          } else {
+            throw new Error('Failed to send - Status: ' + response.status);
+          }
+        } catch (error) {
+          console.error('✗ Submission error:', error);
+          
+          // Show error message
+          feedbackDiv.className = 'form-feedback error';
+          feedbackDiv.innerHTML = '<ul><li>Something went wrong. Please try again.</li></ul>';
+          feedbackDiv.style.display = 'block';
+        } finally {
+          // Re-enable button
+          submitButton.disabled = false;
+          submitButton.style.opacity = '1';
+          submitButton.innerHTML = originalButtonHTML;
+          console.log('=== Form Submission Complete ===');
         }
-      } catch (error) {
-        // Show error message
-        feedbackDiv.className = 'form-feedback error';
-        feedbackDiv.innerHTML = '<ul><li>Something went wrong. Please try again.</li></ul>';
-        feedbackDiv.style.display = 'block';
-        console.error('Webhook error:', error);
-      } finally {
-        // Re-enable button
-        submitButton.disabled = false;
-        submitButton.style.opacity = '1';
-        submitButton.innerHTML = originalButtonHTML;
-      }
-    });
-  });
+      });
+    }
+
+    // Start initialization when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        waitForCalculator(initTalkToExpertForm);
+      });
+    } else {
+      // DOM already loaded
+      waitForCalculator(initTalkToExpertForm);
+    }
+  })();
 </script>
 
 <style>
