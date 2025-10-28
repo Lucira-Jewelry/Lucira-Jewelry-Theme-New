@@ -136,14 +136,48 @@ document.addEventListener('DOMContentLoaded', function() {
   const isMobile = window.innerWidth <= 768;
   const currentVideo = isMobile ? mobileVideo : desktopVideo;
   const stopOnEnd = {{ section.settings.stop_on_end | json }};
+  const autoplay = {{ section.settings.autoplay | json }};
 
-  if(currentVideo){
-    currentVideo.autoplay = false;
-    currentVideo.pause();
+  if (currentVideo) {
+    currentVideo.autoplay = autoplay;
+    currentVideo.muted = true; // ✅ ensure autoplay works
+    currentVideo.preload = "auto"; // ✅ load video faster
+    currentVideo.play().catch(() => {
+      console.log("Autoplay prevented by browser, user interaction required.");
+    });
+
+    // Update icons
+    function updatePlayIcons() {
+      if (currentVideo.paused) {
+        playIcon.style.display = 'block';
+        pauseIcon.style.display = 'none';
+      } else {
+        playIcon.style.display = 'none';
+        pauseIcon.style.display = 'block';
+      }
+    }
+
+    function updateMuteIcons() {
+      if (currentVideo.muted) {
+        unmuteIcon.style.display = 'block';
+        muteIcon.style.display = 'none';
+      } else {
+        unmuteIcon.style.display = 'none';
+        muteIcon.style.display = 'block';
+      }
+    }
+
+    currentVideo.addEventListener('play', updatePlayIcons);
+    currentVideo.addEventListener('pause', updatePlayIcons);
+    currentVideo.addEventListener('volumechange', updateMuteIcons);
+    currentVideo.addEventListener('loadeddata', () => {
+      updatePlayIcons();
+      updateMuteIcons();
+    });
 
     // Stop video on end if setting enabled
     currentVideo.addEventListener('ended', () => {
-      if(stopOnEnd){
+      if (stopOnEnd) {
         currentVideo.pause();
         playIcon.style.display = 'block';
         pauseIcon.style.display = 'none';
@@ -151,44 +185,17 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  window.addEventListener('load', () => {
-    setTimeout(() => {
-      if(currentVideo && currentVideo.paused){
-        currentVideo.play().catch(err => console.log('Autoplay failed:', err));
-      }
-    }, 500);
-  });
-
+  // ✅ Controls
   playPauseBtn?.addEventListener('click', () => {
-    if(!currentVideo) return;
-    if(currentVideo.paused){ currentVideo.play(); } else { currentVideo.pause(); }
+    if (!currentVideo) return;
+    if (currentVideo.paused) currentVideo.play();
+    else currentVideo.pause();
   });
 
   muteUnmuteBtn?.addEventListener('click', () => {
-    if(!currentVideo) return;
+    if (!currentVideo) return;
     currentVideo.muted = !currentVideo.muted;
-    updateMuteIcons();
-  });
-
-  function updatePlayIcons(){
-    if(!currentVideo) return;
-    if(currentVideo.paused){ playIcon.style.display='block'; pauseIcon.style.display='none'; }
-    else { playIcon.style.display='none'; pauseIcon.style.display='block'; }
-  }
-
-  function updateMuteIcons(){
-    if(!currentVideo) return;
-    if(currentVideo.muted){ unmuteIcon.style.display='block'; muteIcon.style.display='none'; }
-    else { unmuteIcon.style.display='none'; muteIcon.style.display='block'; }
-  }
-
-  [desktopVideo, mobileVideo].forEach(video=>{
-    if(video){
-      video.addEventListener('play', updatePlayIcons);
-      video.addEventListener('pause', updatePlayIcons);
-      video.addEventListener('volumechange', updateMuteIcons);
-      video.addEventListener('loadeddata', ()=>{updatePlayIcons();updateMuteIcons();});
-    }
+    currentVideo.volume = currentVideo.muted ? 0 : 1;
   });
 });
 </script>
