@@ -1,76 +1,211 @@
-{% if section.settings.talk_to_us_expert_banner_title != blank %}
-  {{ section.settings.talk_to_us_expert_banner_title }}
-{% endif %}
+<div class="talk-to-us-expert-section">
+  <div class="page-width">
+    <div class="talk-to-us-expert-wrapper">
+      {% if section.settings.talk_to_us_expert_banner_title != blank %}
+        <h2 class="talk-to-us-expert-title">
+          {{ section.settings.talk_to_us_expert_banner_title }}
+        </h2>
+      {% endif %}
 
-<div class="talk-to-us-expert-input-wrapper">
-  <form id="talkToExpertForm">
-    <input type="text" name="name" placeholder="Your Name" required>
-    <input type="email" name="email" placeholder="Your Email" required>
-    <input type="tel" name="phone" placeholder="Your Phone" required>
-    <textarea name="message" placeholder="Your Message"></textarea>
-    <button type="submit">Talk to an Expert</button>
-  </form>
+      <form id="talkToExpertForm" class="talk-to-us-expert-input-wrapper">
+        <!-- Only visible input: phone number -->
+        <input
+          type="number"
+          name="phone"
+          id="talkToExpertPhone"
+          placeholder="Mobile Number"
+          required
+          class="talk-to-us-expert-input"
+          oninput="if(this.value.length > 10) this.value = this.value.slice(0, 10);"
+        />
+
+        <button type="submit" class="talk-to-us-expert-button">
+          <svg width="24" height="24">
+            <use href="#icon-bell"></use>
+          </svg>
+          Talk to an Expert
+        </button>
+      </form>
+
+      <div id="formFeedback" class="form-feedback" style="display: none;"></div>
+    </div>
+  </div>
 </div>
 
-<div id="responseMessage" style="display: none;"></div>
-
 <script>
-document.getElementById('talkToExpertForm').addEventListener('submit', async function(e) {
-  e.preventDefault();
-  
-  const form = e.target;
-  const submitButton = form.querySelector('button[type="submit"]');
-  const responseDiv = document.getElementById('responseMessage');
-  
-  // Disable button during submission
-  submitButton.disabled = true;
-  submitButton.textContent = 'Sending...';
-  
-  // Collect form data
-  const formData = {
-    name: form.name.value,
-    email: form.email.value,
-    phone: form.phone.value,
-    message: form.message.value,
-    timestamp: new Date().toISOString()
-  };
-  
-  try {
-    // Replace with your actual webhook URL
-    const webhookURL = 'YOUR_WEBHOOK_URL_HERE';
+  document.getElementById('talkToExpertForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
     
-    const response = await fetch(webhookURL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(formData)
-    });
+    const form = e.target;
+    const submitButton = form.querySelector('.talk-to-us-expert-button');
+    const feedbackDiv = document.getElementById('formFeedback');
+    const phoneInput = document.getElementById('talkToExpertPhone');
     
-    if (response.ok) {
-      // Show success message
-      responseDiv.style.display = 'block';
-      responseDiv.style.color = 'green';
-      responseDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+    // Disable button and show processing state
+    submitButton.disabled = true;
+    submitButton.style.opacity = '0.6';
+    const originalButtonHTML = submitButton.innerHTML;
+    submitButton.innerHTML = '<svg width="24" height="24"><use href="#icon-bell"></use></svg> Processing...';
+    
+    // Hide previous feedback
+    feedbackDiv.style.display = 'none';
+    
+    // Prepare data to send
+    const webhookData = {
+      phone: phoneInput.value,
+      email: 'support@lucirajewelry.com',
+      subject: 'Talk to Expert Request - Lucira Jewelry',
+      tags: 'Talk to Expert',
+      timestamp: new Date().toISOString(),
+      source: 'Lucira Jewelry Website'
+    };
+    
+    try {
+      // Replace with your actual webhook URL
+      const webhookURL = 'YOUR_WEBHOOK_URL_HERE';
       
-      // Reset form
-      form.reset();
-    } else {
-      throw new Error('Failed to send');
+      const response = await fetch(webhookURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(webhookData)
+      });
+      
+      if (response.ok) {
+        // Show success message
+        feedbackDiv.className = 'form-feedback success';
+        feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
+        feedbackDiv.style.display = 'block';
+        
+        // Reset form
+        form.reset();
+      } else {
+        throw new Error('Failed to send');
+      }
+    } catch (error) {
+      // Show error message
+      feedbackDiv.className = 'form-feedback error';
+      feedbackDiv.innerHTML = '<ul><li>Something went wrong. Please try again.</li></ul>';
+      feedbackDiv.style.display = 'block';
+      console.error('Webhook error:', error);
+    } finally {
+      // Re-enable button
+      submitButton.disabled = false;
+      submitButton.style.opacity = '1';
+      submitButton.innerHTML = originalButtonHTML;
     }
-  } catch (error) {
-    // Show error message
-    responseDiv.style.display = 'block';
-    responseDiv.style.color = 'red';
-    responseDiv.textContent = 'Something went wrong. Please try again.';
-  } finally {
-    // Re-enable button
-    submitButton.disabled = false;
-    submitButton.textContent = 'Talk to an Expert';
-  }
-});
-</script>
+  });
 
+  function formatCurrency(amount) {
+    return '₹' + amount.toLocaleString('en-IN');
+  }
+
+  function handleInputChange(input) {
+    let value = input.value.replace(/[^0-9]/g, '');
+    if (value) input.value = value;
+  }
+
+  function updateCalculation(popupId) {
+    const input = document.getElementById('calculator_monthly_installment');
+    let value = parseInt(input.value.replace(/[^0-9]/g, '')) || 10000;
+    value = Math.max(1000, Math.min(19000, value));
+    updateValues(value);
+
+    document.getElementById('hidden_monthly_installment').value = value;
+    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
+    document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
+    document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
+    document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
+
+    schemeShowPopup(popupId);
+  }
+
+  function schemeShowPopup(id) {
+    const popup = document.getElementById(id);
+    if (popup) popup.style.display = 'flex';
+  }
+
+  function schemeClosePopup(id) {
+    const popup = document.getElementById(id);
+    if (popup) popup.style.display = 'none';
+  }
+
+  function updateFromSlider(value) {
+    const slider = document.getElementById('installment_slider');
+    const min = slider.min;
+    const max = slider.max;
+    const percentage = ((value - min) / (max - min)) * 100;
+    slider.style.setProperty('--slider-progress', percentage + '%');
+
+    document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
+    document.getElementById('calculator_monthly_installment').value = value;
+
+    const payAmount = value * 9;
+    const freeAmount = value;
+    const totalAmount = value * 10;
+    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+  }
+
+  function selectTab(button, value) {
+    document.querySelectorAll('.price-tab').forEach(tab => tab.classList.remove('active'));
+    button.classList.add('active');
+    updateValues(value);
+  }
+
+  function updateValues(installmentAmount) {
+    const input = document.getElementById('calculator_monthly_installment');
+    input.value = installmentAmount;
+
+    const slider = document.getElementById('installment_slider');
+    slider.value = installmentAmount;
+    const min = slider.min;
+    const max = slider.max;
+    const percentage = ((installmentAmount - min) / (max - min)) * 100;
+    slider.style.setProperty('--slider-progress', percentage + '%');
+
+    document.querySelectorAll('.price-tab').forEach(tab => {
+      const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
+      tab.classList.toggle('active', tabValue === installmentAmount);
+    });
+
+    const payAmount = installmentAmount * 9;
+    const freeAmount = installmentAmount;
+    const totalAmount = installmentAmount * 10;
+
+    document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
+    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
+    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
+    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+  }
+
+  function submitSchemeForm(event) {
+    event.preventDefault();
+    const form = event.target;
+    const submitBtn = form.querySelector('.scheme-submit-btn');
+
+    submitBtn.textContent = 'Processing...';
+    submitBtn.style.opacity = '0.6';
+    submitBtn.disabled = true;
+
+    setTimeout(() => {
+      alert('Thank you! Our expert will contact you soon.');
+
+      form.reset();
+      submitBtn.textContent = 'Submit';
+      submitBtn.style.opacity = '1';
+      submitBtn.disabled = false;
+
+      schemeClosePopup('schemePopup');
+    }, 1000);
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    updateValues(10000);
+  });
+</script>
 
 <style>
 .talk-to-us-expert-button[disabled] {
@@ -78,22 +213,38 @@ document.getElementById('talkToExpertForm').addEventListener('submit', async fun
   transition: opacity 0.3s ease;
   padding: 17px 40px;
 }
-
-
 </style>
-
-
 
 <style>
   .input-group { display: flex ; gap: 12px; align-items: center; justify-content: center; flex-wrap: wrap; width: 100%; }
-  .talk-to-us-expert-input { flex: 1; min-width: 200px; } .form-feedback {
-  margin-top: 12px; padding: 8px 12px; border-radius: 4px; font-size: 14px; }
-  .form-feedback.error { background-color: #ffe6e6; color: #d8000c; border: 1px
-  solid #d8000c; } .form-feedback.success { background-color: #e6ffe6; color:
-  #2d8515; border: 1px solid #2d8515; } .sr-only { position: absolute; width: 1px;
-  height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0);
-  white-space: nowrap; border: 0; }
-
+  .talk-to-us-expert-input { flex: 1; min-width: 200px; } 
+  .form-feedback {
+    margin-top: 12px; 
+    padding: 8px 12px; 
+    border-radius: 4px; 
+    font-size: 14px; 
+  }
+  .form-feedback.error { 
+    background-color: #ffe6e6; 
+    color: #d8000c; 
+    border: 1px solid #d8000c; 
+  } 
+  .form-feedback.success { 
+    background-color: #e6ffe6; 
+    color: #2d8515; 
+    border: 1px solid #2d8515; 
+  } 
+  .sr-only { 
+    position: absolute; 
+    width: 1px; 
+    height: 1px; 
+    padding: 0; 
+    margin: -1px; 
+    overflow: hidden; 
+    clip: rect(0, 0, 0, 0); 
+    white-space: nowrap; 
+    border: 0; 
+  }
 
 /* Responsive design */
 @media (max-width: 768px) {
@@ -102,7 +253,6 @@ document.getElementById('talkToExpertForm').addEventListener('submit', async fun
 }
 </style>
 
-
 <style>
   .talk-to-us-expert-section {padding: 30px 0;}
   .talk-to-us-expert-title {margin-bottom: 28px; margin-top: 0; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: .7px; text-align: center; vertical-align: middle; text-transform: uppercase;}
@@ -110,7 +260,7 @@ document.getElementById('talkToExpertForm').addEventListener('submit', async fun
   input.talk-to-us-expert-input { padding: 14px 28px 14px 20px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; border: 1px solid #666666; max-width: 300px; width: 100%;}
   .talk-to-us-expert-input-wrapper { text-align: center; display: flex ; align-items: center; justify-content: center; gap: 8px; }
   input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; -moz-appearance: none; appearance: none; margin: 0; }
-  h2.talk-to-us-expert-title { margin-top: 0; font-size: 24px; width: 90%; margin-left: auto; margin-right: auto;     letter-spacing: 1.4px; }
+  h2.talk-to-us-expert-title { margin-top: 0; font-size: 24px; width: 90%; margin-left: auto; margin-right: auto; letter-spacing: 1.4px; }
   .tab-link {letter-spacing: 1.4px;}
   @media only screen and (min-width:0) and (max-width:767px){
     .talk-to-us-expert-button { background: #b67665; color: #fff; border: 0; padding: 14px 12px; font-family: Futura Std; font-weight: 500; font-size: 14px; line-height: 100%; letter-spacing: 1.4px; text-transform: uppercase; border-radius: 8px; display: inline-flex ; align-items: center; justify-content: center; gap: 10px; width: 100%; }
@@ -133,7 +283,7 @@ document.getElementById('talkToExpertForm').addEventListener('submit', async fun
       "type": "text",
       "label": "heading",
       "id": "talk_to_us_expert_banner_title"
-    },
+    }
   ],
   "presets": [
     {
