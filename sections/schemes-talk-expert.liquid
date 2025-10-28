@@ -39,6 +39,51 @@
 </div>
 
 <script>
+  // Function to get calculator values from the scheme calculator section
+  function getCalculatorValues() {
+    // Get visible amounts
+    const premiumAmountEl = document.getElementById('premium_amount');
+    const totalInvestmentEl = document.getElementById('pay_amount');
+    const freeAmountEl = document.getElementById('free_amount');
+    const totalAmountEl = document.getElementById('total_amount');
+    
+    // Get premium and total investment (these are always visible)
+    const premiumAmount = premiumAmountEl ? premiumAmountEl.textContent : '₹10,000';
+    const totalInvestment = totalInvestmentEl ? totalInvestmentEl.textContent : '₹90,000';
+    
+    // Get free premium and total redeemable from data attributes
+    let freePremium = '₹10,000';
+    let totalRedeemable = '₹1,00,000';
+    
+    if (freeAmountEl) {
+      const freeValue = freeAmountEl.getAttribute('data-real-value');
+      if (freeValue) {
+        freePremium = '₹' + parseInt(freeValue).toLocaleString('en-IN');
+      } else if (!freeAmountEl.classList.contains('hidden-value')) {
+        // If not hidden, use text content
+        freePremium = freeAmountEl.textContent;
+      }
+    }
+    
+    if (totalAmountEl) {
+      const totalValue = totalAmountEl.getAttribute('data-real-value');
+      if (totalValue) {
+        totalRedeemable = '₹' + parseInt(totalValue).toLocaleString('en-IN');
+      } else if (!totalAmountEl.classList.contains('hidden-value')) {
+        // If not hidden, use text content
+        totalRedeemable = totalAmountEl.textContent;
+      }
+    }
+    
+    return {
+      premiumAmount: premiumAmount,
+      totalInvestment: totalInvestment,
+      freePremium: freePremium,
+      totalRedeemable: totalRedeemable
+    };
+  }
+
+  // Main form submission handler
   document.getElementById('talkToExpertForm').addEventListener('submit', async function(e) {
     e.preventDefault();
     
@@ -46,6 +91,17 @@
     const submitButton = form.querySelector('.talk-to-us-expert-button');
     const feedbackDiv = document.getElementById('formFeedback');
     const phoneInput = document.getElementById('talkToExpertPhone');
+    
+    // Get calculator values and populate hidden fields
+    const calcValues = getCalculatorValues();
+    
+    // Populate hidden fields
+    document.getElementById('expert_premium_amount').value = calcValues.premiumAmount;
+    document.getElementById('expert_total_investment').value = calcValues.totalInvestment;
+    document.getElementById('expert_free_premium').value = calcValues.freePremium;
+    document.getElementById('expert_total_redeemable').value = calcValues.totalRedeemable;
+    
+    console.log('Calculator Values:', calcValues); // Debug log
     
     // Disable button and show processing state
     submitButton.disabled = true;
@@ -62,9 +118,16 @@
       email: 'support@lucirajewelry.com',
       subject: 'Talk to Expert Request - Lucira Jewelry',
       tags: 'Talk to Expert',
+      premiumAmount: calcValues.premiumAmount,
+      totalInvestment: calcValues.totalInvestment,
+      freePremium: calcValues.freePremium,
+      totalRedeemable: calcValues.totalRedeemable,
       timestamp: new Date().toISOString(),
-      source: 'Lucira Jewelry Website'
+      source: 'Lucira Jewelry Website',
+      pageUrl: window.location.href
     };
+    
+    console.log('Webhook Data:', webhookData); // Debug log
     
     try {
       // Replace with your actual webhook URL
@@ -83,6 +146,13 @@
         feedbackDiv.className = 'form-feedback success';
         feedbackDiv.textContent = 'Thank you! Our expert will contact you shortly.';
         feedbackDiv.style.display = 'block';
+        
+        // Push to dataLayer for analytics
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "talkToExpertSubmit",
+          expertData: webhookData,
+        });
         
         // Reset form
         form.reset();
@@ -118,11 +188,17 @@
     value = Math.max(1000, Math.min(19000, value));
     updateValues(value);
 
-    document.getElementById('hidden_monthly_installment').value = value;
-    document.getElementById('hidden_premium_amount').value = document.getElementById('premium_amount').textContent;
-    document.getElementById('hidden_pay_amount').value = document.getElementById('pay_amount').textContent;
-    document.getElementById('hidden_free_amount').value = document.getElementById('free_amount').textContent;
-    document.getElementById('hidden_total_amount').value = document.getElementById('total_amount').textContent;
+    const hiddenMonthly = document.getElementById('hidden_monthly_installment');
+    const hiddenPremium = document.getElementById('hidden_premium_amount');
+    const hiddenPay = document.getElementById('hidden_pay_amount');
+    const hiddenFree = document.getElementById('hidden_free_amount');
+    const hiddenTotal = document.getElementById('hidden_total_amount');
+    
+    if (hiddenMonthly) hiddenMonthly.value = value;
+    if (hiddenPremium) hiddenPremium.value = document.getElementById('premium_amount').textContent;
+    if (hiddenPay) hiddenPay.value = document.getElementById('pay_amount').textContent;
+    if (hiddenFree) hiddenFree.value = document.getElementById('free_amount').textContent;
+    if (hiddenTotal) hiddenTotal.value = document.getElementById('total_amount').textContent;
 
     schemeShowPopup(popupId);
   }
@@ -139,20 +215,42 @@
 
   function updateFromSlider(value) {
     const slider = document.getElementById('installment_slider');
+    if (!slider) return;
+    
     const min = slider.min;
     const max = slider.max;
     const percentage = ((value - min) / (max - min)) * 100;
     slider.style.setProperty('--slider-progress', percentage + '%');
 
-    document.getElementById('premium_amount').textContent = formatCurrency(parseInt(value));
-    document.getElementById('calculator_monthly_installment').value = value;
+    const premiumEl = document.getElementById('premium_amount');
+    const inputEl = document.getElementById('calculator_monthly_installment');
+    const payAmountEl = document.getElementById('pay_amount');
+    const freeAmountEl = document.getElementById('free_amount');
+    const totalAmountEl = document.getElementById('total_amount');
+    
+    if (premiumEl) premiumEl.textContent = formatCurrency(parseInt(value));
+    if (inputEl) inputEl.value = value;
 
     const payAmount = value * 9;
     const freeAmount = value;
     const totalAmount = value * 10;
-    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+    
+    if (payAmountEl) payAmountEl.textContent = formatCurrency(payAmount);
+    
+    // Update data attributes
+    if (freeAmountEl) {
+      freeAmountEl.setAttribute('data-real-value', freeAmount);
+      if (!freeAmountEl.classList.contains('hidden-value')) {
+        freeAmountEl.textContent = formatCurrency(freeAmount);
+      }
+    }
+    
+    if (totalAmountEl) {
+      totalAmountEl.setAttribute('data-real-value', totalAmount);
+      if (!totalAmountEl.classList.contains('hidden-value')) {
+        totalAmountEl.textContent = formatCurrency(totalAmount);
+      }
+    }
   }
 
   function selectTab(button, value) {
@@ -163,14 +261,16 @@
 
   function updateValues(installmentAmount) {
     const input = document.getElementById('calculator_monthly_installment');
-    input.value = installmentAmount;
+    if (input) input.value = installmentAmount;
 
     const slider = document.getElementById('installment_slider');
-    slider.value = installmentAmount;
-    const min = slider.min;
-    const max = slider.max;
-    const percentage = ((installmentAmount - min) / (max - min)) * 100;
-    slider.style.setProperty('--slider-progress', percentage + '%');
+    if (slider) {
+      slider.value = installmentAmount;
+      const min = slider.min;
+      const max = slider.max;
+      const percentage = ((installmentAmount - min) / (max - min)) * 100;
+      slider.style.setProperty('--slider-progress', percentage + '%');
+    }
 
     document.querySelectorAll('.price-tab').forEach(tab => {
       const tabValue = parseInt(tab.textContent.replace(/[^0-9]/g, ''));
@@ -181,10 +281,27 @@
     const freeAmount = installmentAmount;
     const totalAmount = installmentAmount * 10;
 
-    document.getElementById('premium_amount').textContent = formatCurrency(installmentAmount);
-    document.getElementById('pay_amount').textContent = formatCurrency(payAmount);
-    document.getElementById('free_amount').textContent = formatCurrency(freeAmount);
-    document.getElementById('total_amount').textContent = formatCurrency(totalAmount);
+    const premiumEl = document.getElementById('premium_amount');
+    const payAmountEl = document.getElementById('pay_amount');
+    const freeAmountEl = document.getElementById('free_amount');
+    const totalAmountEl = document.getElementById('total_amount');
+
+    if (premiumEl) premiumEl.textContent = formatCurrency(installmentAmount);
+    if (payAmountEl) payAmountEl.textContent = formatCurrency(payAmount);
+    
+    if (freeAmountEl) {
+      freeAmountEl.setAttribute('data-real-value', freeAmount);
+      if (!freeAmountEl.classList.contains('hidden-value')) {
+        freeAmountEl.textContent = formatCurrency(freeAmount);
+      }
+    }
+    
+    if (totalAmountEl) {
+      totalAmountEl.setAttribute('data-real-value', totalAmount);
+      if (!totalAmountEl.classList.contains('hidden-value')) {
+        totalAmountEl.textContent = formatCurrency(totalAmount);
+      }
+    }
   }
 
   function submitSchemeForm(event) {
@@ -192,24 +309,30 @@
     const form = event.target;
     const submitBtn = form.querySelector('.scheme-submit-btn');
 
-    submitBtn.textContent = 'Processing...';
-    submitBtn.style.opacity = '0.6';
-    submitBtn.disabled = true;
+    if (submitBtn) {
+      submitBtn.textContent = 'Processing...';
+      submitBtn.style.opacity = '0.6';
+      submitBtn.disabled = true;
+    }
 
     setTimeout(() => {
       alert('Thank you! Our expert will contact you soon.');
 
       form.reset();
-      submitBtn.textContent = 'Submit';
-      submitBtn.style.opacity = '1';
-      submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.textContent = 'Submit';
+        submitBtn.style.opacity = '1';
+        submitBtn.disabled = false;
+      }
 
       schemeClosePopup('schemePopup');
     }, 1000);
   }
 
   document.addEventListener('DOMContentLoaded', function() {
-    updateValues(10000);
+    if (typeof updateValues === 'function') {
+      updateValues(10000);
+    }
   });
 </script>
 
