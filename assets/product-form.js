@@ -724,6 +724,39 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 100);
 });
 
+function luciraLocateMe() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.address && data.address.postcode) {
+              document.getElementById("lucira-delivery-zipcode").value =
+                data.address.postcode;
+
+              document
+                .getElementById("lucira-delivery-zipcode")
+                .dispatchEvent(new Event("input", { bubbles: true }));
+            } else {
+              alert("Pincode not found for your location.");
+            }
+          })
+          .catch((error) => console.error("Error fetching pincode:", error));
+      },
+      (error) => {
+        alert("Unable to retrieve location. Please allow location access.");
+      }
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+  }
+}
 
 document.addEventListener("DOMContentLoaded", function () {
   const container = document.querySelector("#pdp-delivery-check");
@@ -1078,111 +1111,4 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   window.addEventListener("scroll", toggleStickyBar);
-});
-
-
-// pdp-delivery-details
-function luciraLocateMe() {
-  const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
-  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-
-  // Show loading state
-  submitBtn.innerHTML = "Locating...";
-  submitBtn.disabled = true;
-
-  if (navigator.geolocation) {
-    // Force fresh and accurate location
-    const geoOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&timestamp=${Date.now()}`;
-
-        fetch(url)
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.address && data.address.postcode) {
-              pincodeInput.value = data.address.postcode;
-
-              // Trigger input event to update button to Submit
-              pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-              // Push GA4 event
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                event: "promoClick",
-                promoClick: {
-                  promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-                  promo_name: "{{ product.title }}",
-                  creative_name: "Locate Me Clicked"
-                }
-              });
-            } else {
-              alert("Pincode not found for your location.");
-              resetToLocateMe();
-            }
-          })
-          .catch((error) => {
-            console.error("Error fetching pincode:", error);
-            alert("Error fetching pincode. Please try again.");
-            resetToLocateMe();
-          });
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        alert("Unable to retrieve location. Please allow location access.");
-        resetToLocateMe();
-      },
-      geoOptions
-    );
-  } else {
-    alert("Geolocation is not supported by this browser.");
-    resetToLocateMe();
-  }
-
-  // helper function to reset button back to "Locate Me"
-  function resetToLocateMe() {
-    submitBtn.innerHTML = `
-      <svg width="16" height="16" class="icon icon-locate">
-        <use xlink:href="#icon-locate"></use>
-      </svg> Locate Me
-    `;
-    submitBtn.disabled = false;
-  }
-}
-
-// ✅ Input listener: handles button text switching logic
-document.addEventListener("DOMContentLoaded", function () {
-  const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
-  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-
-  if (!submitBtn || !pincodeInput) return;
-
-  pincodeInput.addEventListener("input", () => {
-    const val = pincodeInput.value.trim();
-    const isValid = val.length === 6 && /^\d+$/.test(val);
-
-    if (isValid) {
-      // Small delay for smoother transition when autofilled
-      setTimeout(() => {
-        submitBtn.textContent = "Submit";
-        submitBtn.disabled = false;
-      }, 200);
-    } else {
-      // Reset back to "Locate Me" state when pincode cleared or invalid
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locate Me
-      `;
-      submitBtn.disabled = false;
-    }
-  });
 });
