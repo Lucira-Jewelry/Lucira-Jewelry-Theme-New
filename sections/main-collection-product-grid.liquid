@@ -39,32 +39,61 @@
   }
 {%- endstyle -%}
 
-<div class="store-tabs">
-  <button class="store-tab active" data-store="all">All</button>
-  <button class="store-tab" data-store="Chembur Store">Chembur Store</button>
-  <button class="store-tab" data-store="Pune Store">Pune Store</button>
-  <button class="store-tab" data-store="Delhi Store">Delhi Store</button>
+<div class="availability-filter">
+  <div class="tabs">
+    <button class="tab active" data-type="try" data-filter="try-at-home">Try at Home</button>
+    <button class="tab" data-type="store" data-filter="visit-store">Visit Store</button>
+  </div>
+
+  <div class="pincode-form">
+    <input type="text" id="pincodeInput" placeholder="Enter your pincode" maxlength="6">
+    <button id="checkPincodeBtn">Submit</button>
+  </div>
 </div>
 
-<style>
-  .store-tabs {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-  }
-  .store-tab {
-    border: 1px solid #ccc;
-    background: white;
-    padding: 8px 16px;
-    cursor: pointer;
-    border-radius: 4px;
-  }
-  .store-tab.active {
-    background: black;
-    color: white;
-  }
-</style>
-
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const tabs = document.querySelectorAll('.tab');
+    const facetForm = document.querySelector('.facets-vertical-form') || document.querySelector('facet-filters-form form');
+    
+    tabs.forEach(tab => {
+      tab.addEventListener('click', function() {
+        // Remove active class from all tabs
+        tabs.forEach(t => t.classList.remove('active'));
+        
+        // Add active class to clicked tab
+        this.classList.add('active');
+        
+        // Get the filter value
+        const filterValue = this.dataset.filter;
+        
+        // Update the facet form with the new filter
+        if (facetForm) {
+          const url = new URL(window.location.href);
+          
+          // Add or update the availability filter parameter
+          url.searchParams.set('filter.p.tag', filterValue);
+          
+          // Update the URL and reload the collection
+          window.location.href = url.toString();
+        }
+      });
+    });
+    
+    // Check URL on page load to set active tab
+    const urlParams = new URLSearchParams(window.location.search);
+    const activeFilter = urlParams.get('filter.p.tag');
+    
+    if (activeFilter) {
+      tabs.forEach(tab => {
+        tab.classList.remove('active');
+        if (tab.dataset.filter === activeFilter) {
+          tab.classList.add('active');
+        }
+      });
+    }
+  });
+</script>
 
 <div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
   {%- paginate collection.products by section.settings.products_per_page -%}
@@ -224,7 +253,7 @@
                 {% endunless %}
                 {% unless product.tags contains 'hidden' %}
                 <li
-                  class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"data-store="{{ product.metafields.custom.in_store_available | escape }}"
+                  class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
                   {% if settings.animations_reveal_on_scroll %}
                     data-cascade
                     style="--animation-order: {{ forloop.index }};"
@@ -271,59 +300,6 @@
 </div>
 
 {% render 'product-collection-card' %}
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const tabs = document.querySelectorAll(".store-tab");
-  
-  function filterProducts() {
-    // Get all product grid items (excluding banner)
-    const products = document.querySelectorAll("#product-grid .grid__item:not(.lucira-collec-banner)");
-    
-    tabs.forEach(tab => {
-      tab.addEventListener("click", () => {
-        const selectedStore = tab.getAttribute("data-store");
-        
-        // Update active tab
-        tabs.forEach(t => t.classList.remove("active"));
-        tab.classList.add("active");
-
-        // Filter products
-        products.forEach(item => {
-          const itemStore = item.getAttribute("data-store");
-          
-          console.log("Item store:", itemStore, "Selected:", selectedStore); // Debug line
-          
-          if (selectedStore === "all") {
-            item.style.display = "";
-          } else if (itemStore && itemStore.includes(selectedStore)) {
-            item.style.display = "";
-          } else {
-            item.style.display = "none";
-          }
-        });
-      });
-    });
-  }
-  
-  // Initialize filter
-  filterProducts();
-  
-  // Re-initialize when new products load (for infinite scroll)
-  const observer = new MutationObserver(function(mutations) {
-    filterProducts();
-  });
-  
-  const productGrid = document.getElementById('product-grid');
-  if (productGrid) {
-    observer.observe(productGrid, {
-      childList: true,
-      subtree: true
-    });
-  }
-});
-</script>
-
 
 <script>
   window.dataLayer = window.dataLayer || [];
