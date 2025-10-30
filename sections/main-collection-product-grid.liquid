@@ -39,6 +39,95 @@
   }
 {%- endstyle -%}
 
+
+{% comment %}
+  Tab Filter Section
+  - Filters products by tag or custom condition
+  - Works with Shopify product grid
+  - Uses pure Liquid + CSS (no JS reload)
+{% endcomment %}
+
+<style>
+  .tab-filter-wrapper {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+  .tab-filter {
+    display: inline-flex;
+    gap: 12px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 6px;
+    margin-bottom: 20px;
+  }
+  .tab-filter button {
+    background: none;
+    border: none;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 8px 16px;
+    color: #555;
+    transition: all 0.2s;
+  }
+  .tab-filter button.active {
+    border-bottom: 2px solid #000;
+    font-weight: 600;
+    color: #000;
+  }
+  .tab-products {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 20px;
+  }
+  .tab-products.active {
+    display: grid;
+  }
+</style>
+
+<div class="tab-filter-wrapper" id="TabFilter">
+  <div class="tab-filter">
+    {% assign tabs = "All,Necklaces,Rings,Bracelets" | split: "," %}
+    {% for tab in tabs %}
+      <button class="{% if forloop.first %}active{% endif %}" data-tab="{{ tab | handleize }}">{{ tab }}</button>
+    {% endfor %}
+  </div>
+
+  {% assign all_products = collection.products %}
+
+  {% for tab in tabs %}
+    <div class="tab-products {% if forloop.first %}active{% endif %}" id="tab-{{ tab | handleize }}">
+      {% for product in all_products %}
+        {% if tab == 'All' or product.tags contains tab %}
+          <div class="product-card">
+            <a href="{{ product.url }}">
+              {{ product.featured_image | image_url: width: 400 | image_tag: alt: product.title }}
+              <h3>{{ product.title }}</h3>
+              <p>{{ product.price | money }}</p>
+            </a>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  {% endfor %}
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const buttons = document.querySelectorAll('#TabFilter .tab-filter button');
+    const tabs = document.querySelectorAll('#TabFilter .tab-products');
+
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        tabs.forEach(t => t.classList.remove('active'));
+
+        btn.classList.add('active');
+        document.querySelector('#tab-' + btn.dataset.tab).classList.add('active');
+      });
+    });
+  });
+</script>
+
+
 <div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
   {%- paginate collection.products by section.settings.products_per_page -%}
     {% comment %} Sort is the first tabbable element when filter type is vertical {% endcomment %}
