@@ -298,54 +298,162 @@
 
 {% render 'product-collection-card' %}
 
+<!-- Add this empty state message after the store tabs -->
+<div class="store-tabs">
+  <button class="store-tab active" data-store="all">All</button>
+  <button class="store-tab" data-store="Chembur Store">Chembur Store</button>
+  <button class="store-tab" data-store="Pune Store">Pune Store</button>
+  <button class="store-tab" data-store="Delhi Store">Delhi Store</button>
+</div>
+
+<!-- Add this empty state div -->
+<div id="no-products-message" style="display: none; text-align: center; padding: 60px 20px;">
+  <h3 style="font-size: 24px; margin-bottom: 10px; color: #333;">No Products Available</h3>
+  <p style="font-size: 16px; color: #666;">There are currently no products available for this store location.</p>
+</div>
+
+<style>
+  .store-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .store-tab {
+    border: 1px solid #d4d4d4;
+    background: white;
+    color: #333;
+    padding: 8px 18px;
+    border-radius: 30px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  .store-tab.active {
+    background: #000;
+    color: #fff;
+    border-color: #000;
+  }
+  
+  /* Hide tabs that have no products */
+  .store-tab.no-products {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+</style>
+
+<!-- Replace your existing script with this improved version -->
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-  console.log("Store filter initialized"); // Debug log
-  
   const tabs = document.querySelectorAll(".store-tab");
   const productGrid = document.querySelector("#product-grid");
+  const noProductsMessage = document.querySelector("#no-products-message");
+  const productGridContainer = document.querySelector("#ProductGridContainer");
   
   if (!productGrid) {
     console.error("Product grid not found");
     return;
   }
   
-  const products = productGrid.querySelectorAll(".grid__item[data-store]");
-  console.log("Found products:", products.length); // Debug log
+  // Get all product items (exclude banner items)
+  const products = Array.from(productGrid.querySelectorAll(".grid__item[data-store]"));
   
-  // Log all store values to debug
-  products.forEach((item, index) => {
+  console.log("Total products found:", products.length);
+  
+  // Count products per store
+  const storeCounts = {};
+  products.forEach(item => {
     const store = item.getAttribute("data-store");
-    console.log(`Product ${index}: store = "${store}"`);
+    if (store) {
+      storeCounts[store] = (storeCounts[store] || 0) + 1;
+    }
   });
-
+  
+  console.log("Products per store:", storeCounts);
+  
+  // Disable tabs with no products
   tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
+    const store = tab.getAttribute("data-store");
+    if (store !== "all" && (!storeCounts[store] || storeCounts[store] === 0)) {
+      tab.classList.add("no-products");
+      tab.title = "No products available for this store";
+    }
+  });
+  
+  // Filter function
+  function filterProducts(selectedStore) {
+    let visibleCount = 0;
+    
+    products.forEach(item => {
+      const itemStore = item.getAttribute("data-store");
+      
+      if (selectedStore === "all") {
+        item.style.display = "";
+        visibleCount++;
+      } else if (itemStore && itemStore.trim() === selectedStore) {
+        item.style.display = "";
+        visibleCount++;
+      } else {
+        item.style.display = "none";
+      }
+    });
+    
+    console.log("Visible products for", selectedStore + ":", visibleCount);
+    
+    // Show/hide empty state message
+    if (visibleCount === 0) {
+      if (noProductsMessage) noProductsMessage.style.display = "block";
+      if (productGrid) productGrid.style.display = "none";
+    } else {
+      if (noProductsMessage) noProductsMessage.style.display = "none";
+      if (productGrid) productGrid.style.display = "";
+    }
+    
+    return visibleCount;
+  }
+  
+  // Tab click handlers
+  tabs.forEach(tab => {
+    tab.addEventListener("click", (e) => {
       const selectedStore = tab.getAttribute("data-store");
-      console.log("Selected store:", selectedStore); // Debug log
+      
+      // Prevent clicking on disabled tabs
+      if (tab.classList.contains("no-products")) {
+        e.preventDefault();
+        return;
+      }
       
       // Update active tab
       tabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-
-      // Filter products
-      products.forEach(item => {
-        const itemStore = item.getAttribute("data-store");
-        
-        if (selectedStore === "all") {
-          item.style.display = "";
-        } else if (itemStore && itemStore.trim() === selectedStore) {
-          item.style.display = "";
-        } else {
-          item.style.display = "none";
-        }
-      });
       
-      // Count visible products
-      const visibleCount = Array.from(products).filter(p => p.style.display !== "none").length;
-      console.log("Visible products:", visibleCount);
+      // Filter products
+      filterProducts(selectedStore);
     });
   });
+  
+  // Initial filter (show all on page load)
+  filterProducts("all");
+});
+</script>
+
+<!-- DEBUGGING: Add this temporary script to see what data-store values exist -->
+<script>
+// REMOVE THIS AFTER DEBUGGING
+document.addEventListener("DOMContentLoaded", function() {
+  setTimeout(() => {
+    const allItems = document.querySelectorAll("#product-grid .grid__item");
+    console.log("=== DEBUGGING INFO ===");
+    console.log("Total grid items:", allItems.length);
+    
+    allItems.forEach((item, index) => {
+      const store = item.getAttribute("data-store");
+      const hasStore = item.hasAttribute("data-store");
+      console.log(`Item ${index + 1}: has data-store=${hasStore}, value="${store}"`);
+    });
+    console.log("=== END DEBUG ===");
+  }, 500);
 });
 </script>
 
