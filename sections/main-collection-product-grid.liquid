@@ -301,26 +301,97 @@
 <script>
 document.addEventListener("DOMContentLoaded", function() {
   const tabs = document.querySelectorAll(".store-tab");
-  const products = document.querySelectorAll(".collection-product-card");
-
+  const productGrid = document.querySelector("#product-grid");
+  const noProductsMessage = document.querySelector("#no-products-message");
+  const productGridContainer = document.querySelector("#ProductGridContainer");
+  
+  if (!productGrid) {
+    console.error("Product grid not found");
+    return;
+  }
+  
+  // Get all product items (exclude banner items)
+  const products = Array.from(productGrid.querySelectorAll(".grid__item[data-store]"));
+  
+  console.log("Total products found:", products.length);
+  
+  // Count products per store
+  const storeCounts = {};
+  products.forEach(item => {
+    const store = item.getAttribute("data-store");
+    if (store) {
+      storeCounts[store] = (storeCounts[store] || 0) + 1;
+    }
+  });
+  
+  console.log("Products per store:", storeCounts);
+  
+  // Disable tabs with no products
   tabs.forEach(tab => {
-    tab.addEventListener("click", () => {
+    const store = tab.getAttribute("data-store");
+    if (store !== "all" && (!storeCounts[store] || storeCounts[store] === 0)) {
+      tab.classList.add("no-products");
+      tab.title = "No products available for this store";
+    }
+  });
+  
+  // Filter function
+  function filterProducts(selectedStore) {
+    let visibleCount = 0;
+    
+    products.forEach(item => {
+      const itemStore = item.getAttribute("data-store");
+      
+      if (selectedStore === "all") {
+        item.style.display = "";
+        visibleCount++;
+      } else if (itemStore && itemStore.trim() === selectedStore) {
+        item.style.display = "";
+        visibleCount++;
+      } else {
+        item.style.display = "none";
+      }
+    });
+    
+    console.log("Visible products for", selectedStore + ":", visibleCount);
+    
+    // Show/hide empty state message
+    if (visibleCount === 0) {
+      if (noProductsMessage) noProductsMessage.style.display = "block";
+      if (productGrid) productGrid.style.display = "none";
+    } else {
+      if (noProductsMessage) noProductsMessage.style.display = "none";
+      if (productGrid) productGrid.style.display = "";
+    }
+    
+    return visibleCount;
+  }
+  
+  // Tab click handlers
+  tabs.forEach(tab => {
+    tab.addEventListener("click", (e) => {
       const selectedStore = tab.getAttribute("data-store");
+      
+      // Prevent clicking on disabled tabs
+      if (tab.classList.contains("no-products")) {
+        e.preventDefault();
+        return;
+      }
+      
+      // Update active tab
       tabs.forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
-
-      products.forEach(item => {
-        const itemStore = item.getAttribute("data-store");
-        if (selectedStore === "all" || itemStore === selectedStore) {
-          item.style.display = "";
-        } else {
-          item.style.display = "none";
-        }
-      });
+      
+      // Filter products
+      filterProducts(selectedStore);
     });
   });
+  
+  // Initial filter (show all on page load)
+  filterProducts("all");
 });
 </script>
+
 
 <script>
   window.dataLayer = window.dataLayer || [];
