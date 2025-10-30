@@ -96,6 +96,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+
   function setResponsiveImages() {
     const cards = document.querySelectorAll('.lucira-wc-card');
     const isMobile = window.innerWidth <= 768;
@@ -103,19 +104,15 @@ document.addEventListener('DOMContentLoaded', function() {
     cards.forEach(function(card) {
       const desktopImg = card.getAttribute('data-desktop-img');
       const mobileImg = card.getAttribute('data-mobile-img');
-      
-      if (isMobile && mobileImg && mobileImg !== '') {
-        card.style.backgroundImage = `url('${mobileImg}')`;
-      } else if (desktopImg && desktopImg !== '') {
-        card.style.backgroundImage = `url('${desktopImg}')`;
-      }
+      card.style.backgroundImage = isMobile && mobileImg ? `url('${mobileImg}')` : `url('${desktopImg}')`;
     });
   }
 
   function initLuciraWCCarousel() {
+    const $grid = $('.lucira-wc-grid');
     if (window.innerWidth <= 768) {
-      if (!$('.lucira-wc-grid').hasClass('owl-loaded')) {
-        $('.lucira-wc-grid').owlCarousel({
+      if (!$grid.hasClass('owl-loaded')) {
+        $grid.owlCarousel({
           loop: true,
           margin: 15,
           nav: false,
@@ -123,22 +120,25 @@ document.addEventListener('DOMContentLoaded', function() {
           items: 1,
           autoplay: false,
           stagePadding: 30,
-          center: false,
           touchDrag: true,
           mouseDrag: true,
           pullDrag: true,
-          freeDrag: false,
-          responsive: {
-            0: {
-              items: 1,
-              stagePadding: 30
-            }
-          }
         });
-        
-        // Fix for click events on carousel items
-        $('.lucira-wc-grid').on('click', '.lucira-wc-card', function(e) {
-          e.preventDefault();
+
+        // --- Fix: Prevent swipe from blocking click ---
+        let dragging = false;
+        $grid.on('drag.owl.carousel', function() {
+          dragging = true;
+        });
+        $grid.on('dragged.owl.carousel', function() {
+          setTimeout(() => { dragging = false; }, 100);
+        });
+
+        $grid.on('click', '.lucira-wc-card', function(e) {
+          if (dragging) {
+            e.preventDefault();
+            return;
+          }
           const link = $(this).attr('href');
           if (link && link !== '#') {
             window.location.href = link;
@@ -146,17 +146,17 @@ document.addEventListener('DOMContentLoaded', function() {
         });
       }
     } else {
-      if ($('.lucira-wc-grid').hasClass('owl-loaded')) {
-        $('.lucira-wc-grid').trigger('destroy.owl.carousel');
-        $('.lucira-wc-grid').removeClass('owl-carousel owl-loaded owl-drag');
-        $('.lucira-wc-grid').find('.owl-stage-outer').children().unwrap();
+      if ($grid.hasClass('owl-loaded')) {
+        $grid.trigger('destroy.owl.carousel');
+        $grid.removeClass('owl-carousel owl-loaded owl-drag');
+        $grid.find('.owl-stage-outer').children().unwrap();
       }
     }
   }
 
   setResponsiveImages();
   initLuciraWCCarousel();
-  
+
   let resizeTimer;
   $(window).on('resize', function() {
     clearTimeout(resizeTimer);
@@ -166,28 +166,24 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 250);
   });
 
-  // GTM tracking
-  const whyChooseTiles = document.querySelectorAll('.why-choose-tile');
-  whyChooseTiles.forEach(function(tile) {
-    tile.addEventListener('click', function(e) {
-      const titleElement = tile.querySelector('.lucira-wc-card-title');
-      const promoName = titleElement ? titleElement.textContent.trim() : 'Unknown Feature';
-      const index = Array.from(whyChooseTiles).indexOf(tile) + 1;
-      const promoId = `why-choose-${index}`;
-      
-      const promoData = {
+  // --- GTM Tracking ---
+  const prefix = '{{ section.settings.gtm-prefix }}';
+  const tiles = document.querySelectorAll('.' + prefix);
+  tiles.forEach((tile, i) => {
+    tile.addEventListener('click', function() {
+      const title = tile.querySelector('.lucira-wc-card-title')?.textContent.trim() || 'Unknown Feature';
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
         event: 'promoClick',
         promoClick: {
-          promo_id: promoId,
+          promo_id: `${prefix}-${i + 1}`,
           creative_name: 'why_choose_feature',
-          promo_name: promoName,
-        }
-      };
-      
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push(promoData);
+          promo_name: title,
+        },
+      });
     });
   });
 });
 </script>
+
 
