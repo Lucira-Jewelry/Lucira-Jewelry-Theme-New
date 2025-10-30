@@ -1042,26 +1042,6 @@ function initEngraving() {
 }
 
 
-
-
-//customise button clicked datalayer
-document.addEventListener("DOMContentLoaded", function () {
-  var customizeBtn = document.getElementById("product_variant_drawer");
-
-  if (customizeBtn) {
-    customizeBtn.addEventListener("click", function () {
-      window.dataLayer = window.dataLayer || [];
-
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          creative_name: "Customize Button Clicked"
-        }
-      });
-    });
-  }
-});
-
 document.addEventListener("DOMContentLoaded", function () {
   const stickyBar = document.getElementById("sticky-add-to-cart");
   const targetEl = document.querySelector(".small-devicePosition");
