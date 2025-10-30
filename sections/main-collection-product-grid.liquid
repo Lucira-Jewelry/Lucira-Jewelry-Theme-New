@@ -37,55 +37,6 @@
       padding-bottom: {{ section.settings.padding_bottom }}px;
     }
   }
-
-  .availability-filter-facet {
-    background: #f9f9f9;
-    padding: 1rem;
-    margin-bottom: 1.5rem;
-    border-radius: 8px;
-  }
-
-  .availability-filter-facet__header {
-    font-size: 0.875rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.75rem;
-    color: #333;
-  }
-
-  .availability-filter-facet__list {
-    display: flex;
-    gap: 0.5rem;
-    flex-wrap: wrap;
-  }
-
-  .availability-filter-facet__button {
-    padding: 0.5rem 1.25rem;
-    border: 2px solid #ddd;
-    background: white;
-    border-radius: 20px;
-    cursor: pointer;
-    font-size: 0.875rem;
-    font-weight: 500;
-    transition: all 0.2s ease;
-    color: #555;
-  }
-
-  .availability-filter-facet__button:hover {
-    border-color: #999;
-    background: #f5f5f5;
-  }
-
-  .availability-filter-facet__button.active {
-    background: #333;
-    color: white;
-    border-color: #333;
-  }
-
-  .availability-filter-facet__button input[type="checkbox"] {
-    display: none;
-  }
 {%- endstyle -%}
 
 <div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
@@ -152,7 +103,6 @@
     <div class="{% if section.settings.filter_type == 'vertical' %} facets-vertical page-width{% endif %}">
       {{ 'component-facets.css' | asset_url | stylesheet_tag: preload: true }}
       <script src="{{ 'facets.js' | asset_url }}" defer="defer"></script>
-      
       {%- if section.settings.enable_filtering or section.settings.enable_sorting -%}
         <aside
           aria-labelledby="verticalTitle"
@@ -160,49 +110,6 @@
           id="main-collection-filters"
           data-id="{{ section.id }}"
         >
-          {% comment %} Custom Availability Filter {% endcomment %}
-          <div class="availability-filter-facet{% if section.settings.filter_type != 'vertical' %} page-width{% endif %}">
-            <div class="availability-filter-facet__header">Availability</div>
-            <facet-filters-form>
-              <form id="FacetFiltersFormAvailability">
-                <div class="availability-filter-facet__list">
-                  {% assign current_filter = '' %}
-                  {% for filter in collection.filters %}
-                    {% if filter.param_name == 'filter.p.m.custom.in_store_available' %}
-                      {% for value in filter.values %}
-                        {% if value.active %}
-                          {% assign current_filter = value.value %}
-                        {% endif %}
-                      {% endfor %}
-                    {% endif %}
-                  {% endfor %}
-
-                  <label class="availability-filter-facet__button {% if current_filter == '' %}active{% endif %}">
-                    <input 
-                      type="radio" 
-                      name="availability_filter" 
-                      value=""
-                      {% if current_filter == '' %}checked{% endif %}
-                      onchange="updateAvailabilityFilter(this.value)"
-                    >
-                    Try at Home
-                  </label>
-
-                  <label class="availability-filter-facet__button {% if current_filter == 'true' %}active{% endif %}">
-                    <input 
-                      type="radio" 
-                      name="availability_filter" 
-                      value="true"
-                      {% if current_filter == 'true' %}checked{% endif %}
-                      onchange="updateAvailabilityFilter(this.value)"
-                    >
-                    Visit Store
-                  </label>
-                </div>
-              </form>
-            </facet-filters-form>
-          </div>
-
           {% render 'facets',
             results: collection,
             enable_filtering: section.settings.enable_filtering,
@@ -291,8 +198,6 @@
                 {% unless product.tags contains 'hidden' %}
                 <li
                   class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
-                  data-in-store="{{ product.metafields.custom.in_store_available }}"
-                  data-product-item
                   {% if settings.animations_reveal_on_scroll %}
                     data-cascade
                     style="--animation-order: {{ forloop.index }};"
@@ -324,6 +229,10 @@
               </a>
             {%- endif -%}
           </infinite-scroll>
+
+            {% comment %} {%- if paginate.pages > 1 -%}
+              {% render 'pagination', paginate: paginate, anchor: '' %}
+            {%- endif -%} {% endcomment %}
           </div>
         {%- endif -%}
       </div>
@@ -335,44 +244,6 @@
 </div>
 
 {% render 'product-collection-card' %}
-
-<script>
-  function updateAvailabilityFilter(value) {
-    const url = new URL(window.location.href);
-    const params = url.searchParams;
-    
-    // Remove existing in_store_available filter
-    const keysToDelete = [];
-    for (let key of params.keys()) {
-      if (key.includes('filter.p.m.custom.in_store_available')) {
-        keysToDelete.push(key);
-      }
-    }
-    keysToDelete.forEach(key => params.delete(key));
-    
-    // Add new filter if "Visit Store" is selected
-    if (value === 'true') {
-      params.set('filter.p.m.custom.in_store_available', 'true');
-    }
-    
-    // Reset to page 1 when filter changes
-    params.delete('page');
-    
-    // Update URL and reload
-    window.location.href = url.toString();
-  }
-
-  // Update active state on page load based on URL
-  document.addEventListener('DOMContentLoaded', function() {
-    const buttons = document.querySelectorAll('.availability-filter-facet__button');
-    buttons.forEach(button => {
-      button.addEventListener('click', function() {
-        buttons.forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-      });
-    });
-  });
-</script>
 
 <script>
   window.dataLayer = window.dataLayer || [];
@@ -392,10 +263,12 @@
       {% endfor %}
     ];
 
+    // Filter out any products with missing essential details (optional safety)
     products = products.filter(function(p) {
       return p.item_id && p.item_name && p.price != null;
     });
 
+    // Push to dataLayer asynchronously to avoid blocking rendering
     setTimeout(function() {
       window.dataLayer.push({
         event: 'productImpression',
@@ -437,6 +310,7 @@
   ]
 }
 </script>
+
 
 {% schema %}
 {
