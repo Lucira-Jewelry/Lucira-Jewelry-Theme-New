@@ -31,7 +31,7 @@
         <span class="popup-close-btn" onclick="closeTryAtHomeOverlay()">&times;</span>
         
         <div id="tryAtHomeFormSection">
-            <h3 class="popup-topic">Try at Home Appointment</h3>
+            <h3 class="popup-topic">try at home Appointment</h3>
             <form id="tryAtHomeContactForm" class="popup-form">
                 <div class="input-icon-wrapper">
                     {{- 'scheme-user.svg' | inline_asset_content -}}
@@ -48,37 +48,9 @@
                     />
                 </div>
 
-                <!-- Pincode Input with Location Fetch -->
-                <div class="input-icon-wrapper">
-                    {{- 'scheme-location.svg' | inline_asset_content -}}
-                    <input
-                        type="number"
-                        id="try_at_home_pincode"
-                        placeholder="Pincode"
-                        required
-                        oninput="if(this.value.length > 6) this.value = this.value.slice(0, 6);"
-                    />
-                    <button type="button" class="fetch-location-btn" onclick="fetchLocationFromPincode('try_at_home')">
-                        Fetch Location
-                    </button>
-                </div>
-
-                <!-- Location Display -->
-                <div class="input-icon-wrapper">
-                    {{- 'scheme-location.svg' | inline_asset_content -}}
-                    <input
-                        type="text"
-                        id="try_at_home_location"
-                        placeholder="Location (Auto-filled)"
-                        readonly
-                        required
-                    />
-                </div>
-
                 <input type="hidden" id="try_at_home_product_title" value="{{ product.title }}" />
 
                 <p id="try_at_home_phoneError" class="error-message" style="display: none;">Please enter a valid 10-digit phone number</p>
-                <p id="try_at_home_pincodeError" class="error-message" style="display: none;">Please enter a valid 6-digit pincode</p>
                 
                 <button type="submit" id="tryAtHomeSubmitBtn" class="popup-submit-btn" disabled>Submit</button>
             </form>
@@ -129,50 +101,13 @@
           Please enter a valid 10-digit phone number
         </p>
 
-        <!-- Dynamic Store Location Dropdown -->
+        <!-- Store Location Dropdown -->
         <div class="input-icon-wrapper">
           {{- 'scheme-location.svg' | inline_asset_content -}}
           <select id="visit_store_location" required>
             <option value="" disabled selected>Select Store Location</option>
-            {% comment %} Dynamically populate from variant metafields {% endcomment %}
-            {% assign available_stores = '' %}
-            {% for variant in product.variants %}
-              {% if variant.metafields.custom.in_store_available != blank %}
-                {% assign store_name = variant.metafields.custom.in_store_available %}
-                {% unless available_stores contains store_name %}
-                  {% if available_stores == '' %}
-                    {% assign available_stores = store_name %}
-                  {% else %}
-                    {% assign available_stores = available_stores | append: '||' | append: store_name %}
-                  {% endif %}
-                {% endunless %}
-              {% endif %}
-            {% endfor %}
-            
-            {% comment %} Also check product tags {% endcomment %}
-            {% assign tag_stores = '' %}
-            {% for tag in product.tags %}
-              {% if tag contains 'Store Available' %}
-                {% assign store_from_tag = tag | remove: ' Available' %}
-                {% unless available_stores contains store_from_tag %}
-                  {% if available_stores == '' %}
-                    {% assign available_stores = store_from_tag %}
-                  {% else %}
-                    {% assign available_stores = available_stores | append: '||' | append: store_from_tag %}
-                  {% endif %}
-                {% endunless %}
-              {% endif %}
-            {% endfor %}
-            
-            {% comment %} Output options {% endcomment %}
-            {% if available_stores != '' %}
-              {% assign store_array = available_stores | split: '||' %}
-              {% for store in store_array %}
-                <option value="{{ store }}">{{ store }}</option>
-              {% endfor %}
-            {% else %}
-              <option value="Chembur Store">Chembur Store</option>
-            {% endif %}
+            <option value="Chembur - Mumbai">Chembur - Mumbai</option>
+            {% comment %} <option value="JM Road - Pune">JM Road - Pune</option> {% endcomment %}
           </select>
         </div>
 
@@ -197,87 +132,6 @@
     </div>
   </div>
 </div>
-
-<script>
-// Fetch location from pincode
-async function fetchLocationFromPincode(formType) {
-    const pincodeInput = document.getElementById(`${formType}_pincode`);
-    const locationInput = document.getElementById(`${formType}_location`);
-    const errorElement = document.getElementById(`${formType}_pincodeError`);
-    
-    const pincode = pincodeInput.value.trim();
-    
-    if (pincode.length !== 6) {
-        errorElement.textContent = 'Please enter a valid 6-digit pincode';
-        errorElement.style.display = 'block';
-        locationInput.value = '';
-        return;
-    }
-    
-    try {
-        errorElement.style.display = 'none';
-        locationInput.value = 'Fetching...';
-        
-        const response = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-        const data = await response.json();
-        
-        if (data[0].Status === 'Success' && data[0].PostOffice && data[0].PostOffice.length > 0) {
-            const postOffice = data[0].PostOffice[0];
-            const location = `${postOffice.Name}, ${postOffice.District}, ${postOffice.State}`;
-            locationInput.value = location;
-        } else {
-            errorElement.textContent = 'Invalid pincode or location not found';
-            errorElement.style.display = 'block';
-            locationInput.value = '';
-        }
-    } catch (error) {
-        console.error('Error fetching location:', error);
-        errorElement.textContent = 'Error fetching location. Please try again.';
-        errorElement.style.display = 'block';
-        locationInput.value = '';
-    }
-}
-
-// Auto-fetch on pincode completion
-document.addEventListener('DOMContentLoaded', function() {
-    const tryAtHomePincode = document.getElementById('try_at_home_pincode');
-    
-    if (tryAtHomePincode) {
-        tryAtHomePincode.addEventListener('input', function() {
-            if (this.value.length === 6) {
-                fetchLocationFromPincode('try_at_home');
-            }
-        });
-    }
-});
-
-// Update form validation to include pincode and location
-function validateTryAtHomeForm() {
-    const name = document.getElementById('try_at_home_name').value.trim();
-    const phone = document.getElementById('try_at_home_phone').value.trim();
-    const pincode = document.getElementById('try_at_home_pincode').value.trim();
-    const location = document.getElementById('try_at_home_location').value.trim();
-    const submitBtn = document.getElementById('tryAtHomeSubmitBtn');
-    
-    const isValid = name.length > 0 && 
-                    phone.length === 10 && 
-                    pincode.length === 6 && 
-                    location.length > 0;
-    
-    submitBtn.disabled = !isValid;
-}
-
-// Add event listeners for form validation
-document.addEventListener('DOMContentLoaded', function() {
-    const tryAtHomeInputs = ['try_at_home_name', 'try_at_home_phone', 'try_at_home_pincode', 'try_at_home_location'];
-    tryAtHomeInputs.forEach(id => {
-        const element = document.getElementById(id);
-        if (element) {
-            element.addEventListener('input', validateTryAtHomeForm);
-        }
-    });
-});
-</script>
 
 <style>
     .try-at-home-section .grid-row { display: grid ; grid-template-columns: repeat(2, 1fr); gap: 14px; }
