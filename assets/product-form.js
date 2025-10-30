@@ -1040,7 +1040,52 @@ function initEngraving() {
     console.log('=====================');
   };
 }
+//customise button clicked datalayer
+document.addEventListener("DOMContentLoaded", function () {
+  var customizeBtn = document.getElementById("product_variant_drawer");
 
+  if (customizeBtn) {
+    customizeBtn.addEventListener("click", function () {
+      window.dataLayer = window.dataLayer || [];
+
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          creative_name: "Customize Button Clicked"
+        }
+      });
+    });
+  }
+});
+
+function share() {
+  const shareData = {
+    title: "Lucira",
+    url: "{{ shop.url }}{{ product.url }}"
+  };
+
+  const shareEventData = {
+    promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+    promo_name: "{{ product.title | escape }}",
+    creative_name: "share",
+  };
+
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: "promoClick",
+    promoClick: shareEventData
+  });
+
+  console.log("✅ Share dataLayer pushed:", shareEventData);
+
+  if (navigator.share) {
+    navigator.share(shareData).catch((error) => {
+      console.warn("Sharing failed:", error);
+    });
+  } else {
+    console.log("Web Share API not supported.");
+  }
+}
 
 document.addEventListener("DOMContentLoaded", function () {
   const stickyBar = document.getElementById("sticky-add-to-cart");
