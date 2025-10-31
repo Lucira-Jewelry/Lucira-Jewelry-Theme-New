@@ -1029,32 +1029,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-function share() {
-  const shareData = {
-    title: "Lucira",
-    url: "{{ product.url }}"
-  };
-  const shareEventData = {
-    promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-    promo_name: "{{ product.title }}",
-    creative_name: "share",
-  };
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: "promoClick",
-    promoClick: shareEventData
-  });
-  console.log("✅ Share dataLayer pushed:", shareEventData);
-  // Proceed with native share if supported
-  if (navigator.share) {
-    navigator.share(shareData).catch((error) => {
-      console.warn("Sharing failed:", error);
-    });
-  } else {
-    console.log("Web Share API not supported.");
-  }
-}
-
 document.addEventListener("DOMContentLoaded", function () {
   const stickyBar = document.getElementById("sticky-add-to-cart");
   const targetEl = document.querySelector(".small-devicePosition");
