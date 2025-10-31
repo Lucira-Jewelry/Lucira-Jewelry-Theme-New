@@ -96,23 +96,24 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+  const $grid = $('.lucira-wc-grid');
 
+  // ✅ Set background image (desktop / mobile)
   function setResponsiveImages() {
-    const cards = document.querySelectorAll('.lucira-wc-card');
     const isMobile = window.innerWidth <= 768;
-    
-    cards.forEach(function(card) {
+    document.querySelectorAll('.lucira-wc-card').forEach(card => {
       const desktopImg = card.getAttribute('data-desktop-img');
       const mobileImg = card.getAttribute('data-mobile-img');
-      card.style.backgroundImage = isMobile && mobileImg ? `url('${mobileImg}')` : `url('${desktopImg}')`;
+      const chosen = isMobile && mobileImg ? mobileImg : desktopImg;
+      card.style.backgroundImage = `url('${chosen}')`;
     });
   }
 
+  // ✅ Initialize Owl Carousel (mobile only)
   function initLuciraWCCarousel() {
-    const $grid = $('.lucira-wc-grid');
     if (window.innerWidth <= 768) {
       if (!$grid.hasClass('owl-loaded')) {
-        $grid.owlCarousel({
+        $grid.addClass('owl-carousel').owlCarousel({
           loop: true,
           margin: 15,
           nav: false,
@@ -125,19 +126,17 @@ document.addEventListener('DOMContentLoaded', function() {
           pullDrag: true,
         });
 
-        // --- Fix: Prevent swipe from blocking click ---
-        let dragging = false;
-        $grid.on('drag.owl.carousel', function() {
-          dragging = true;
-        });
-        $grid.on('dragged.owl.carousel', function() {
-          setTimeout(() => { dragging = false; }, 100);
+        // ✅ Fix double-tap bug / prevent click on swipe
+        let isDragging = false;
+        $grid.on('drag.owl.carousel', () => isDragging = true);
+        $grid.on('dragged.owl.carousel', () => {
+          setTimeout(() => { isDragging = false; }, 100);
         });
 
         $grid.on('click', '.lucira-wc-card', function(e) {
-          if (dragging) {
+          if (isDragging) {
             e.preventDefault();
-            return;
+            return false;
           }
           const link = $(this).attr('href');
           if (link && link !== '#') {
@@ -154,34 +153,38 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 
-  setResponsiveImages();
-  initLuciraWCCarousel();
-
-  let resizeTimer;
-  $(window).on('resize', function() {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(function() {
-      setResponsiveImages();
-      initLuciraWCCarousel();
-    }, 250);
-  });
-
-  // --- GTM Tracking ---
-  const prefix = '{{ section.settings.gtm-prefix }}';
-  const tiles = document.querySelectorAll('.' + prefix);
-  tiles.forEach((tile, i) => {
-    tile.addEventListener('click', function() {
-      const title = tile.querySelector('.lucira-wc-card-title')?.textContent.trim() || 'Unknown Feature';
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'promoClick',
-        promoClick: {
-          promo_id: `${prefix}-${i + 1}`,
-          creative_name: 'why_choose_feature',
-          promo_name: title,
-        },
+  // ✅ GTM Tracking
+  function setupGTMTracking() {
+    const prefix = '{{ section.settings.gtm-prefix }}';
+    document.querySelectorAll('.' + prefix).forEach((tile, i) => {
+      tile.addEventListener('click', function() {
+        const title = tile.querySelector('.lucira-wc-card-title')?.textContent.trim() || 'Unknown Feature';
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'promoClick',
+          promoClick: {
+            promo_id: `${prefix}-${i + 1}`,
+            creative_name: 'why_choose_feature',
+            promo_name: title,
+          },
+        });
       });
     });
+  }
+
+  // ✅ Initial load
+  setResponsiveImages();
+  initLuciraWCCarousel();
+  setupGTMTracking();
+
+  // ✅ Handle resize (with debounce)
+  let resizeTimer;
+  window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      setResponsiveImages();
+      initLuciraWCCarousel();
+    }, 300);
   });
 });
 </script>
