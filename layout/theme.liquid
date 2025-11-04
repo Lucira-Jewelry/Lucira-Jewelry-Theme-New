@@ -769,7 +769,6 @@
         const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
         return match ? decodeURIComponent(match[2]) : null;
       }
-
       const utm_source = getParam('utm_source');
       const utm_medium = getParam('utm_medium');
       const utm_campaign = getParam('utm_campaign');
@@ -783,8 +782,8 @@
       const isReferral = referrer && !hasUTM && !referrer.includes(window.location.hostname);
       const existingSource = getCookie('utm_source');
       const existingMedium = getCookie('utm_medium');
-
       if (hasUTM) {
+        // Always overwrite with UTM if present
         setCookie('utm_source', utm_source);
         setCookie('utm_medium', utm_medium);
         setCookie('utm_campaign', utm_campaign);
@@ -793,6 +792,7 @@
         if (gclid) setCookie('gclid', gclid);
         if (fbclid) setCookie('fbclid', fbclid);
       } else if (isReferral) {
+        // Only store referral if UTM not already stored
         if (!existingSource || !existingMedium) {
           const link = document.createElement('a');
           link.href = referrer;
@@ -800,57 +800,13 @@
           setCookie('utm_medium', 'referral');
         }
       } else if (isDirect) {
+        // Direct traffic does not overwrite existing cookies
         if (!existingSource) {
           console.log('Direct traffic, first-time visitor, no cookies stored.');
         }
       }
     })();
-    </script>
-
-    <script>
-    (function() {
-      function getCookie(name) {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        return match ? decodeURIComponent(match[2]) : null;
-      }
-
-      function collectCookies() {
-        return document.cookie.split(';').reduce((acc, c) => {
-          const [key, value] = c.trim().split('=');
-          if (key) acc[key] = decodeURIComponent(value || '');
-          return acc;
-        }, {});
-      }
-
-      function sendWebhook(eventType, data) {
-        fetch('https://cookies-webhook-385594025448.asia-south1.run.app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventType, ...data })
-        }).catch(console.error);
-      }
-
-      // ✅ Only proceed if fbclid cookie is present
-      const fbclid = getCookie('fbclid');
-      if (!fbclid) return; // Stop script execution if no fbclid
-
-      // --- Product View ---
-      if (window.location.pathname.includes('/products/')) {
-        const productHandle = window.location.pathname.split('/products/')[1].split('/')[0];
-        sendWebhook('product_view', { cookies: collectCookies() });
-      }
-
-      // --- Add To Cart ---
-      document.addEventListener('submit', function(e) {
-        const form = e.target.closest('form[action^="/cart/add"]');
-        if(!form) return;
-        const formData = new FormData(form);
-        const productId = formData.get('id');
-        sendWebhook('add_to_cart', { product_id: productId, cookies: collectCookies() });
-      });
-    })();
   </script>
-
   {% render 'gokwik' %}
   </body>
 </html>
