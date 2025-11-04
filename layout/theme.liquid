@@ -807,86 +807,46 @@
       }
     })();
   </script>
-  <script>
-    (function() {
-      // --- Helpers ---
-      function getParam(name) {
-        try { return new URLSearchParams(window.location.search).get(name); } catch(e){ return null; }
-      }
-      function getCookie(name) {
-        const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-        return match ? decodeURIComponent(match[2]) : null;
-      }
-
-      // Collect all cookies into an object
-      function collectAllCookies() {
-        return document.cookie.split(';').reduce((acc, c) => {
-          const [key, value] = c.trim().split('=');
-          if (key) acc[key] = decodeURIComponent(value || '');
-          return acc;
-        }, {});
-      }
-
-      // Collect only Facebook identifiers
-      function collectFbIdentifiers() {
-        return {
-          fbclid: getParam('fbclid') || getCookie('fbclid') || null,
-          fbp: getCookie('_fbp') || null,
-          fbc: getCookie('_fbc') || null
-        };
-      }
-
-      // Check if this visitor came from a Facebook click
-      function isFacebookTraffic() {
-        const fb = collectFbIdentifiers();
-        return fb.fbclid || fb.fbp || fb.fbc;
-      }
-
-      // Send webhook
-      function sendWebhook(eventType, data) {
-        fetch('https://cookies-webhook-385594025448.asia-south1.run.app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ event: eventType, ...data }),
-          keepalive: true
-        }).catch(console.error);
-      }
-
-      // --- Product View ---
-      if (window.location.pathname.includes('/products/')) {
-        const productHandle = window.location.pathname.split('/products/')[1].split('/')[0];
-        const payload = { product_handle: productHandle };
-
-        if (isFacebookTraffic()) {
-          payload.cookies = collectAllCookies(); // send everything
-        } else {
-          payload.cookies = collectFbIdentifiers(); // minimal identifiers (mostly nulls)
+      <script>
+      (function() {
+        function getCookie(name) {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          return match ? decodeURIComponent(match[2]) : null;
         }
 
-        sendWebhook('product_view', payload);
-      }
-
-      // --- Add To Cart ---
-      document.addEventListener('submit', function(e) {
-        const form = e.target.closest('form[action^="/cart/add"]');
-        if (!form) return;
-
-        const formData = new FormData(form);
-        const productId = formData.get('id');
-
-        const payload = { product_id: productId };
-
-        if (isFacebookTraffic()) {
-          payload.cookies = collectAllCookies(); // send everything
-        } else {
-          payload.cookies = collectFbIdentifiers();
+        function collectCookies() {
+          return document.cookie.split(';').reduce((acc, c) => {
+            const [key, value] = c.trim().split('=');
+            acc[key] = decodeURIComponent(value);
+            return acc;
+          }, {});
         }
 
-        sendWebhook('add_to_cart', payload);
-      }, true);
-    })();
-  </script>
 
+        function sendWebhook(eventType, data) {
+          fetch('https://cookies-webhook-385594025448.asia-south1.run.app', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ event: eventType, ...data })
+          }).catch(console.error);
+        }
+
+        // --- Product View ---
+        if (window.location.pathname.includes('/products/')) {
+          const productHandle = window.location.pathname.split('/products/')[1].split('/')[0];
+          sendWebhook('product_view', { product_handle: productHandle, cookies: collectCookies() });
+        }
+
+        // --- Add To Cart ---
+        document.addEventListener('submit', function(e) {
+          const form = e.target.closest('form[action^="/cart/add"]');
+          if(!form) return;
+          const formData = new FormData(form);
+          const productId = formData.get('id');
+          sendWebhook('add_to_cart', { product_id: productId, cookies: collectCookies() });
+        });
+      })();
+    </script>
   {% render 'gokwik' %}
   </body>
 </html>
