@@ -831,120 +831,62 @@
 </script>
 
 <script>
-(function () {
-  // Wait until PriceGuideManager exists
-  function ready(fn) {
-    if (document.readyState !== 'loading') return fn();
-    document.addEventListener('DOMContentLoaded', fn);
-  }
+  (function () {
+    function ready(fn){ if(document.readyState!=='loading') return fn(); document.addEventListener('DOMContentLoaded', fn); }
 
-  ready(function () {
-    if (typeof PriceGuideManager === 'undefined') return;
+    ready(function () {
+      if (typeof PriceGuideManager === 'undefined') return;
 
-    // --- SAFE setter: won't overwrite with 0/blank when value is missing ---
-    function safeSetHidden(id, val) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      if (val === undefined || val === null || val === '' || Number.isNaN(val)) return;
-      el.value = String(val);
-    }
+      // keep original method
+      const _updateHiddenInputs = PriceGuideManager.prototype.updateHiddenInputs;
 
-    // --- Override calculateStonePricing to include totalPcs & totalCarat ---
-    PriceGuideManager.prototype.calculateStonePricing = function (variantConfig, stoneType) {
-      if (!variantConfig || !variantConfig.advanced_stone_config) {
-        return { totalCost: 0, compareCost: 0, stones: [], totalPcs: 0, totalCarat: 0 };
-      }
-
-      let totalCost = 0;
-      let compareCost = 0;
-      let totalPcs = 0;
-      let totalCarat = 0;
-      const stones = [];
-
-      const relevantStones = variantConfig.advanced_stone_config.filter((stone) =>
-        String(stone.stone_type || '').toLowerCase() === String(stoneType || '').toLowerCase()
-      );
-
-      for (const stoneConfig of relevantStones) {
-        try {
-          const found = this.fetchStonePricingSlab(stoneConfig);
-          const slab = found && found.slab;
-          const title = found && found.title;
-          if (!slab) continue;
-
-          const qty   = Number(stoneConfig.stone_quantity) || 0;
-          const carat = Number(stoneConfig.stone_weight)   || 0;
-
-          let stoneCost = (Number(slab.price) || 0) * carat;
-          const compareStonePrice = stoneCost;
-
-          if (stoneType === 'diamond' && Number(variantConfig.diamond_discount)) {
-            stoneCost -= stoneCost * (Number(variantConfig.diamond_discount) || 0) / 100;
-          } else if (Number(slab.discount)) {
-            stoneCost -= stoneCost * (Number(slab.discount) || 0) / 100;
-          }
-
-          totalCost   += stoneCost;
-          compareCost += compareStonePrice;
-          totalPcs    += qty;
-          totalCarat  += carat;
-
-          stones.push({
-            title,
-            quantity: qty,
-            weight: carat,
-            pricePerCarat: Number(slab.price) || 0,
-            totalCost: stoneCost,
-            compareCost: compareStonePrice,
-            discount: stoneType === 'diamond'
-              ? (Number(variantConfig.diamond_discount) || 0)
-              : (Number(slab.discount) || 0)
-          });
-        } catch (e) {
-          console.warn(`Error calculating ${stoneType} pricing:`, e);
-        }
-      }
-
-      return { totalCost, compareCost, stones, totalPcs, totalCarat };
-    };
-
-    // --- Override updateHiddenInputs to use safeSetHidden and include pcs/carat ---
-    PriceGuideManager.prototype.updateHiddenInputs = function (data) {
-      if (!data) return;
-      try {
-        // Metal
-        safeSetHidden('prop-gold-price-per-gram', data.metalData && data.metalData.pricePerGram);
-        safeSetHidden('prop-gold-weight',         data.metalData && data.metalData.weight);
-        safeSetHidden('prop-gold-price',          data.metalData && data.metalData.totalCost);
-
-        // Making
-        safeSetHidden('prop-making-charges', data.makingData && data.makingData.totalCost);
-
-        // Diamonds
-        safeSetHidden('prop-diamond-charges',     data.diamondData && data.diamondData.totalCost);
-        safeSetHidden('prop-diamond-total-pcs',   data.diamondData && data.diamondData.totalPcs);
-        // Optional — add a hidden input with id="prop-diamond-total-carat" if you want this too
-        safeSetHidden('prop-diamond-total-carat', data.diamondData && data.diamondData.totalCarat);
-
-        // Totals
-        safeSetHidden('prop-gst',         data.totalData && data.totalData.taxes);
-        safeSetHidden('prop-final-price', data.totalData && data.totalData.finalPrice);
-
-        // console.log('[Patch] Hidden inputs updated (pcs:', data.diamondData && data.diamondData.totalPcs, ')');
-      } catch (err) {
-        console.error('[Patch] Error updating hidden inputs:', err);
-      }
-    };
-
-    // --- Optional debug helper (run in console) ---
-    window.debugDiamondHiddenInputs = function () {
-      ['prop-diamond-charges','prop-diamond-total-pcs','prop-diamond-total-carat'].forEach(id => {
+      // helper: safe set (don’t overwrite with empty/NaN)
+      function safeSet(id, val){
         const el = document.getElementById(id);
-        console.log(id, '=>', el ? el.value : 'NOT FOUND');
-      });
-    };
-  });
-})();
+        if (!el) return;
+        if (val === undefined || val === null || val === '' || Number.isNaN(val)) return;
+        el.value = String(val);
+      }
+
+      // helper: compute total pcs from stones if totalPcs wasn’t provided
+      function getDiamondPcs(diamondData){
+        if (!diamondData) return 0;
+        if (typeof diamondData.totalPcs === 'number') return diamondData.totalPcs;
+        if (Array.isArray(diamondData.stones)) {
+          return diamondData.stones.reduce((sum, s) => sum + (Number(s.quantity) || 0), 0);
+        }
+        return 0;
+      }
+
+      // wrap the original updater so we always set pcs as well
+      PriceGuideManager.prototype.updateHiddenInputs = function (data) {
+        try {
+          // call your original method first
+          _updateHiddenInputs.call(this, data);
+        } catch(e) {
+          console.warn('[PCS patch] original updateHiddenInputs error (continuing):', e);
+        }
+
+        try {
+          const pcs = getDiamondPcs(data && data.diamondData);
+          // only set if > 0
+          if (pcs > 0) {
+            safeSet('prop-diamond-total-pcs', pcs);
+            // optional: also set total carat if you add the input
+            const totalCarat = (data && data.diamondData && typeof data.diamondData.totalCarat === 'number')
+              ? data.diamondData.totalCarat
+              : (Array.isArray(data && data.diamondData && data.diamondData.stones)
+                  ? data.diamondData.stones.reduce((sum, s) => sum + (Number(s.weight) || 0), 0)
+                  : 0);
+            safeSet('prop-diamond-total-carat', totalCarat);
+            // console.log('[PCS patch] set pcs:', pcs, 'carat:', totalCarat);
+          }
+        } catch(err){
+          console.error('[PCS patch] failed to set pcs:', err);
+        }
+      };
+    });
+  })();
 </script>
 
 
