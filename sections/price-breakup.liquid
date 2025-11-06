@@ -830,6 +830,90 @@
   }
 </script>
 
+<script>
+(function () {
+  // id of the hidden input you already have in the form
+  var HIDDEN_PCS_ID = 'prop-diamond-total-pcs';
+
+  function setHiddenPcs(val) {
+    var el = document.getElementById(HIDDEN_PCS_ID);
+    if (!el) return;
+    if (val === undefined || val === null || Number.isNaN(val)) return;
+    el.value = String(val);
+    // console.log('[PCS from table] ->', el.value);
+  }
+
+  // Read pcs by scanning the Diamond table rows
+  function readPcsFromDiamondTable() {
+    var table = document.getElementById('diamond-table');
+    if (!table) return null;
+
+    var rows = table.querySelectorAll('tr');
+    var total = 0;
+    var re = /(\d+)\s*pcs?/i; // matches "1 Pcs." / "2 Pcs"
+    rows.forEach(function (tr, idx) {
+      // skip header row if present
+      if (tr.classList.contains('table-header')) return;
+      var cell = tr.cells && tr.cells[0]; // first col has "SC - 1 Pcs."
+      if (!cell) return;
+
+      var m = String(cell.textContent || '').match(re);
+      if (m && m[1]) total += Number(m[1]) || 0;
+    });
+
+    return total;
+  }
+
+  function updatePcsNow() {
+    var pcs = readPcsFromDiamondTable();
+    if (typeof pcs === 'number' && pcs >= 0) setHiddenPcs(pcs);
+  }
+
+  // Observe changes to the diamond table (re-renders, variant switches, etc.)
+  function observeDiamondTable() {
+    var table = document.getElementById('diamond-table');
+    if (!table || typeof MutationObserver === 'undefined') return;
+
+    var obs = new MutationObserver(function () {
+      updatePcsNow();
+    });
+    obs.observe(table, { childList: true, subtree: true, characterData: true });
+  }
+
+  // Also hook into common events from your code
+  function hookVariantAndDrawer() {
+    // when URL changes (variant switch), re-check after a tick
+    window.addEventListener('popstate', function () {
+      setTimeout(updatePcsNow, 50);
+    });
+
+    // listen to generic change events (variant selectors)
+    document.addEventListener('change', function (e) {
+      if (e.target && (e.target.name === 'id' || e.target.closest('[data-product-select]'))) {
+        setTimeout(updatePcsNow, 150);
+      }
+    });
+  }
+
+  // Kickoff
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function () {
+      updatePcsNow();
+      observeDiamondTable();
+      hookVariantAndDrawer();
+    });
+  } else {
+    updatePcsNow();
+    observeDiamondTable();
+    hookVariantAndDrawer();
+  }
+
+  // expose tiny debug helper
+  window.debugPcsFromTable = updatePcsNow;
+})();
+</script>
+
+
 
 {% schema %}
 {

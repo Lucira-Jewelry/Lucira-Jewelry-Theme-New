@@ -234,49 +234,95 @@
   .you-may-also-like-swiper-{{ section.id }} a.product-card-link { display: none; }
 }
 </style>
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  // ----------------------------
-  // Lazy initialize Swiper
-  // ----------------------------
+  function firePromoClick(card) {
+    const link = card.querySelector('a[href*="/products/"]');
+    if (!link) return;
+    
+    const productHandle = link.href.split('/products/')[1]?.split('?')[0];
+    const productTitle = card.querySelector('.card__heading')?.innerText?.trim() || '';
+    
+    if (!productHandle) return;
+    
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: 'you-may-also-like-{{ section.id }}-product',
+        creative_name: 'you_may_also_like_feature', 
+        promo_position: 'product_page_you_may_also_like',
+        promo_name: productTitle
+      }
+    });
+    console.log('GTM promoClick fired:', productHandle, productTitle);
+  }
+
+  function bindPromoClickDelegation() {
+    // Try multiple possible containers
+    const containers = [
+      '.you-may-also-like-swiper-{{ section.id }}',
+      '#you-may-also-like-{{ section.id }}',
+      '.you-may-also-like-collection'
+    ];
+    
+    let container = null;
+    for (const selector of containers) {
+      container = document.querySelector(selector);
+      if (container) break;
+    }
+    
+    if (!container) {
+      console.log('Container not found for promo click tracking');
+      return;
+    }
+
+    console.log('Binding promo click to container:', container);
+    
+    container.addEventListener('click', function(e) {
+      // Find the closest card-wrapper
+      const card = e.target.closest('.card-wrapper');
+      if (!card) return;
+      
+      console.log('Card clicked, firing promo click');
+      firePromoClick(card);
+    }, { capture: true }); // Use capture to ensure we get the event
+  }
+
   const swiperElement = document.querySelector('.you-may-also-like-swiper-{{ section.id }}');
+  
   if (swiperElement) {
-    // Intersection Observer triggers Swiper init when section is in viewport
     const observer = new IntersectionObserver((entries, obs) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           if (!swiperElement.classList.contains('swiper-initialized')) {
-            const swiper{{ section.id | replace: '-', '_' }} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
+            const swiper{{section.id|replace:'-','_'}} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
               breakpoints: {
-                320: {
-                  slidesPerView: {{ section.settings.columns_mobile }},
-                  spaceBetween: 15
-                },
-                750: {
-                  slidesPerView: {% if section.settings.columns_desktop > 3 %}3{% else %}{{ section.settings.columns_desktop }}{% endif %},
-                  spaceBetween: 20
-                },
-                990: {
-                  slidesPerView: {{ section.settings.columns_desktop }},
-                  spaceBetween: 20
-                }
+                320: { slidesPerView: {{section.settings.columns_mobile}}, spaceBetween: 15 },
+                750: { slidesPerView: {% if section.settings.columns_desktop>3%}3{%else%}{{section.settings.columns_desktop}}{%endif%}, spaceBetween: 20 },
+                990: { slidesPerView: {{section.settings.columns_desktop}}, spaceBetween: 20 }
               },
               navigation: {
                 nextEl: '.swiper-button-next-{{ section.id }}',
-                prevEl: '.swiper-button-prev-{{ section.id }}',
+                prevEl: '.swiper-button-prev-{{ section.id }}'
               },
               pagination: {
                 el: '.swiper-pagination-{{ section.id }}',
-                clickable: true,
+                clickable: true
               },
               loop: true,
               grabCursor: true,
               slidesPerGroup: 1,
-              lazy: {
-                loadPrevNext: true
-              },
+              lazy: { loadPrevNext: true },
               watchSlidesProgress: true,
               watchSlidesVisibility: true,
+              on: {
+                init: function() {
+                  // Bind promo click AFTER Swiper is initialized
+                  setTimeout(bindPromoClickDelegation, 100);
+                }
+              }
             });
             swiperElement.classList.add('swiper-initialized');
           }
@@ -284,35 +330,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
       });
     }, { threshold: 0.1 });
+    
     observer.observe(swiperElement);
+  } else {
+    // No swiper - bind immediately
+    setTimeout(bindPromoClickDelegation, 500);
   }
 
-  // ----------------------------
-  // Video Modal
-  // ----------------------------
+  // Rest of your video modal code remains the same...
   let modal = document.getElementById('VideoModal');
   if (!modal) {
     modal = document.createElement('div');
     modal.id = 'VideoModal';
     modal.className = 'video-modal hidden';
-    modal.innerHTML = `
-      <div class="video-modal__overlay">
-        <div class="video-modal__content">
-          <button class="video-modal__close"><i class="fa-solid fa-xmark"></i></button>
-          <div class="video-modal__video-container"></div>
-        </div>
-      </div>
-    `;
+    modal.innerHTML = `<div class="video-modal__overlay"><div class="video-modal__content"><button class="video-modal__close"><i class="fa-solid fa-xmark"></i></button><div class="video-modal__video-container"></div></div></div>`;
     document.body.appendChild(modal);
-
+    
     const style = document.createElement('style');
-    style.textContent = `
-      .video-modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: rgba(0, 0, 0, 0); backdrop-filter: blur(0px); opacity: 0; visibility: hidden; transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-      .video-modal:not(.hidden) { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(10px); opacity: 1; visibility: visible; }
-      .video-modal__content { position: relative; max-width: 100vw; max-height: 90vh; margin: 0 auto; }
-      .video-modal__close { position: absolute; top: -40px; right: 0; background: none; border: none; color: white; font-size: 24px; cursor: pointer; z-index: 10001; }
-      .video-modal__video-container video { width: 100%; height: auto; max-height: 90vh; }
-    `;
+    style.textContent = `.video-modal{position:fixed;top:0;left:0;width:100%;height:100%;z-index:9999;background:rgba(0,0,0,0);backdrop-filter:blur(0px);opacity:0;visibility:hidden;transition:all 0.5s ease}.video-modal:not(.hidden){background:rgba(0,0,0,0.8);backdrop-filter:blur(10px);opacity:1;visibility:visible}.video-modal__content{position:relative;max-width:100vw;max-height:90vh;margin:0 auto}.video-modal__close{position:absolute;top:-40px;right:0;background:none;border:none;color:white;font-size:24px;cursor:pointer;z-index:10001}.video-modal__video-container video{width:100%;height:auto;max-height:90vh}`;
     document.head.appendChild(style);
   }
 
@@ -323,39 +358,30 @@ document.addEventListener('DOMContentLoaded', function() {
   function openVideoModal(productHandle, videoId) {
     videoContainer.innerHTML = '';
     fetch(`/products/${productHandle}.js`)
-      .then((response) => response.json())
-      .then((product) => {
-        const video = product.media.find(
-          (media) => media.media_type === 'video' && media.id.toString() === videoId.toString()
-        );
-        if (video && video.sources && video.sources.length > 0) {
+      .then(res => res.json())
+      .then(product => {
+        const video = product.media.find(m => m.media_type === 'video' && m.id.toString() === videoId.toString());
+        if (video && video.sources && video.sources.length) {
           const videoUrl = video.sources[0].url;
-          videoContainer.innerHTML = `
-            <video autoplay muted playsinline loop>
-              <source src="${videoUrl}" type="video/mp4">
-              Your browser does not support the video tag.
-            </video>
-          `;
+          videoContainer.innerHTML = `<video autoplay muted playsinline loop><source src="${videoUrl}" type="video/mp4">Your browser does not support the video tag.</video>`;
           modal.style.display = 'block';
-          requestAnimationFrame(() => { modal.classList.remove('hidden'); });
+          requestAnimationFrame(() => modal.classList.remove('hidden'));
           document.body.style.overflow = 'hidden';
         }
       })
-      .catch((error) => console.error('Error fetching product data:', error));
+      .catch(err => console.error('Error fetching product data:', err));
   }
 
   function closeModal() {
     modal.classList.add('hidden');
     setTimeout(() => {
-      if (modal.classList.contains('hidden')) {
-        modal.style.display = 'none';
-        videoContainer.innerHTML = '';
-      }
+      modal.style.display = 'none';
+      videoContainer.innerHTML = '';
     }, 600);
     document.body.style.overflow = '';
   }
 
-  document.addEventListener('click', function (e) {
+  document.addEventListener('click', e => {
     const videoIcon = e.target.closest('.product-video-icon-wrapper');
     if (videoIcon) {
       e.preventDefault();
@@ -366,10 +392,15 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }, true);
 
-  if (overlay) overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
-  if (closeBtn) closeBtn.addEventListener('click', closeModal);
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal(); });
+  overlay?.addEventListener('click', e => {
+    if (e.target === overlay) closeModal();
+  });
 
+  closeBtn?.addEventListener('click', closeModal);
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+  });
 });
 </script>
 

@@ -100,6 +100,43 @@
                 >
                   {{- block.settings.text -}}
                 </p>
+              {%- when 'rating' -%}
+              {%- if product.metafields.reviews.rating.value != blank -%}
+
+              <a href="#nector-reviews" class="rating-wrapper-customs" style="text-decoration: none;">
+              {% liquid
+                assign rating_decimal = 0
+                assign decimal = product.metafields.reviews.rating.value.rating | modulo: 1
+                if decimal >= 0.3 and decimal <= 0.7
+                  assign rating_decimal = 0.5
+                elsif decimal > 0.7
+                  assign rating_decimal = 1
+                endif
+              %}
+                 <span>
+                <svg class="rating-summary-customs"  class ="plprating" width="16" height="16" >
+                <use href ="#plp-rating-1"></use>
+                </svg>
+              </span>
+
+                  <p class="rating-summary-customs"><span class="rating-value">{{ product.metafields.reviews.rating.value.rating }}
+                    </span>
+                    <span class="rating-divider">|</span><span class="rating-count">{{ product.metafields.reviews.rating_count }}</span>
+                      </p>
+                  
+                </a>
+              <style>
+              .rating-wrapper-customs{ cursor: pointer;display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:60px;border:1px solid rgba(26,26,26,.2);background:rgba(255,255,255,.2);backdrop-filter:blur(10px);width:fit-content;height:36px;box-sizing:border-box;margin-bottom:12px;}
+              .rating-star-icon{font-size:16px;line-height:1;display:flex;align-items:center}
+              .rating-summary-customs{margin:0;align-items:center;gap:4px;font-size:13px;font-weight:400;line-height:1;white-space:nowrap}
+               .rating-summary-customs .plprating{padding-bottom:-1px;}
+              .rating-summary-customs .rating-value{font-weight:500;color:#1a1a1a}
+              .rating-summary-customs .rating-divider{font-weight:400;color:#666;padding:0 2px}
+              .rating-summary-customs .rating-count{font-weight:400;color:#666}
+             
+              @media(max-width:749px)  {.rating-wrapper-customs{margin-bottom:8px; display:none;}  }
+              </style> 
+              {%- endif -%}
               {%- when 'title' -%}
                 <div class="product__title" {{ block.shopify_attributes }}>
                   <h1>{{ product.title | escape }}</h1>
@@ -217,11 +254,51 @@
                   <span class="visually-hidden">{{ 'products.product.sku' | t }}:</span>
                   {{- product.selected_or_first_available_variant.sku -}}
                 </p>
-              {% when 'promo_text' %}
-                <div class="product-promo-text">
+            {% when 'promo_text' %}
+              <div class="product-promo-text">
+                {% assign product_price = product.price | divided_by: 100 %}
+                {% if product_price < 30000 %}
+                  {%- assign desktop_image = block.settings.promo_image_below_desktop -%}
+                  {%- assign mobile_image = block.settings.promo_image_below_mobile -%}
+                  {%- assign promo_text = block.settings.promo_message_below -%}
+                {% else %}
+                  {%- assign desktop_image = block.settings.promo_image_above_desktop -%}
+                  {%- assign mobile_image = block.settings.promo_image_above_mobile -%}
+                  {%- assign promo_text = block.settings.promo_message_above -%}
+                {% endif %}
+
+                {% if desktop_image != blank or mobile_image != blank %}
+                  <div 
+                    class="promo-image-wrapper"
+                    style="
+                      background-image:url('{{ desktop_image | image_url: width: 1200 }}');
+                      width:600px;
+                      height:auto;
+                      background-size:contain;
+                      background-repeat:no-repeat;
+                      background-position:center;
+                      aspect-ratio:3/1;
+                      display:block;
+                      margin:0 auto;
+                    "
+                  ></div>
+
+                  <style>
+                    @media (max-width: 767px) {
+                      .product-promo-text .promo-image-wrapper {
+                        background-image: url('{{ mobile_image | image_url: width: 800 }}') !important;
+                        width: 410px !important;
+                        aspect-ratio: 3 / 1 !important;
+                      }
+                    }
+                  </style>
+                {% else %}
                   <div class="svg-wrapper">{{- 'icon-promo.svg' | inline_asset_content -}}</div>
-                  {{ block.settings.promo_message }}
-                </div>
+                  <span class="promo-message">{{ promo_text }}</span>
+                {% endif %}
+              </div>
+
+
               {%- when 'custom_liquid' -%}
                 {{ block.settings.custom_liquid }}
               {%- when 'collapsible_tab' -%}
@@ -529,6 +606,7 @@
               {% endif %}
 
 
+
               {% unless product.price <= 1000000 %}
                 {% render 'comparison-table' %}
               {% endunless %}
@@ -574,37 +652,6 @@
 
               {% render 'pdp-certification-block' %}
 
-              {%- when 'rating' -%}
-                {%- if product.metafields.reviews.rating.value != blank -%}
-                  <div class="rating-wrapper">
-                    {% liquid
-                      assign rating_decimal = 0
-                      assign decimal = product.metafields.reviews.rating.value.rating | modulo: 1
-                      if decimal >= 0.3 and decimal <= 0.7
-                        assign rating_decimal = 0.5
-                      elsif decimal > 0.7
-                        assign rating_decimal = 1
-                      endif
-                    %}
-
-                    <div
-                      class="rating"
-                      role="img"
-                      aria-label="{{ 'accessibility.star_reviews_info' | t: rating_value: product.metafields.reviews.rating.value.rating, rating_max: product.metafields.reviews.rating.value.scale_max }}"
-                    >
-                      <span
-                        aria-hidden="true"
-                        class="rating-star"
-                        style="--rating: {{ product.metafields.reviews.rating.value.rating | floor }}; --rating-max: {{ product.metafields.reviews.rating.value.scale_max }}; --rating-decimal: {{ rating_decimal }};"
-                      ></span>
-                    </div>
-
-                    <!-- Compact rating format -->
-                    <p class="rating-summary caption">
-                      <span>{{ product.metafields.reviews.rating.value.rating }}</span> ({{ product.metafields.reviews.rating_count }})
-                    </p>
-                  </div>
-                {%- endif -%}
               {%- when 'complementary' -%}
                 <product-recommendations
                   class="complementary-products quick-add-hidden{% if block.settings.make_collapsible_row %} is-accordion{% endif %}{% if block.settings.enable_quick_add %} complementary-products-contains-quick-add{% endif %}"
@@ -976,6 +1023,34 @@
 </script>
 
 <script>
+  function share() {
+    const shareData = {
+      title: "Lucira",
+      url: "{{ product.url }}"
+    };
+    const shareEventData = {
+      promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+      promo_name: "{{ product.title }}",
+      creative_name: "share",
+    };
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: shareEventData
+    });
+    console.log("✅ Share dataLayer pushed:", shareEventData);
+    // Proceed with native share if supported
+    if (navigator.share) {
+      navigator.share(shareData).catch((error) => {
+        console.warn("Sharing failed:", error);
+      });
+    } else {
+      console.log("Web Share API not supported.");
+    }
+  }
+</script>
+
+<script>
 document.addEventListener("DOMContentLoaded", function () {
 
   const wishlistBtns = document.querySelectorAll(".product-form .iWishAdd");
@@ -1166,15 +1241,41 @@ document.addEventListener("DOMContentLoaded", function () {
       "name": "t:sections.main-product.blocks.price.name",
       "limit": 1
     },
-    {
+     {
       "type": "promo_text",
       "name": "Promo text",
       "settings": [
         {
+          "type": "image_picker",
+          "id": "promo_image_below_desktop",
+          "label": "Promo Image (Below ₹30,000 - Desktop)"
+        },
+        {
+          "type": "image_picker",
+          "id": "promo_image_below_mobile",
+          "label": "Promo Image (Below ₹30,000 - Mobile)"
+        },
+        {
+          "type": "image_picker",
+          "id": "promo_image_above_desktop",
+          "label": "Promo Image (Above ₹30,000 - Desktop)"
+        },
+        {
+          "type": "image_picker",
+          "id": "promo_image_above_mobile",
+          "label": "Promo Image (Above ₹30,000 - Mobile)"
+        },
+        {
           "type": "text",
-          "id": "promo_message",
-          "label": "Promo message",
-          "default": "Flat 100% OFF on Making Charges"
+          "id": "promo_message_below",
+          "label": "Promo Message (Below ₹30,000)",
+          "default": "Flat 15% OFF on Diamond Prices"
+        },
+        {
+          "type": "text",
+          "id": "promo_message_above",
+          "label": "Promo Message (Above ₹30,000)",
+          "default": "Flat 15% OFF on Making & Diamond Prices"
         }
       ]
     },
@@ -2655,3 +2756,5 @@ document.addEventListener("DOMContentLoaded", function () {
   ]
 }
 {% endschema %}
+
+

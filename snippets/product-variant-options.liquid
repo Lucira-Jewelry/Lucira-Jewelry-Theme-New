@@ -207,3 +207,52 @@
     </option>
   {%- endif -%}
 {%- endfor -%}
+
+<script>
+  window.variantStockData = window.variantStockData || {};
+  {% for v in product.variants %}
+    window.variantStockData['{{ v.option1 | escape }}'] = window.variantStockData['{{ v.option1 | escape }}'] || {};
+    window.variantStockData['{{ v.option1 | escape }}']['{{ v.option2 | escape }}'] = {
+      available: {{ v.available | json }},
+      inventory: {{ v.inventory_quantity | default: 0 | json }}
+    };
+  {% endfor %}
+
+  function updateSizeStockStatus(colorValue) {
+    document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(function(el) {
+      var size = el.getAttribute('data-size');
+      var stock = (window.variantStockData[colorValue] || {})[size];
+      
+      // Clear any old text
+      el.innerHTML = '';
+
+      // Show "In Stock" only when available and inventory > 0
+      if (stock && stock.available && Number(stock.inventory) > 0) {
+        el.innerHTML = '<span class="stock-active">In Stock</span>';
+      }
+
+      // Optional: visually disable unavailable sizes (uncomment if needed)
+      /*
+      var sizeInput = document.querySelector('input[name^="Size"][value="'+ size +'"]');
+      if (sizeInput) sizeInput.disabled = !(stock && stock.available);
+      */
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    // Initial render based on current selected color
+    updateSizeStockStatus('{{ product.selected_or_first_available_variant.option1 | escape }}');
+
+    // Trigger update when color changes (radio buttons)
+    document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
+      radio.addEventListener('change', function(){ updateSizeStockStatus(this.value); });
+    });
+
+    // Also react to Shopify variant:change event (Dawn theme support)
+    document.addEventListener('variant:change', function (evt) {
+      if (evt.detail && evt.detail.variant) {
+        updateSizeStockStatus(evt.detail.variant.option1);
+      }
+    });
+  });
+</script>
