@@ -1007,10 +1007,6 @@ function initEngraving() {
     console.log('=====================');
   };
 }
-
-
-
-
 //customise button clicked datalayer
 document.addEventListener("DOMContentLoaded", function () {
   var customizeBtn = document.getElementById("product_variant_drawer");
