@@ -1132,31 +1132,3 @@ function luciraLocateMe() {
   }
 }
 
-// ✅ Input listener: handles button text switching logic
-document.addEventListener("DOMContentLoaded", function () {
-  const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
-  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-
-  if (!submitBtn || !pincodeInput) return;
-
-  pincodeInput.addEventListener("input", () => {
-    const val = pincodeInput.value.trim();
-    const isValid = val.length === 6 && /^\d+$/.test(val);
-
-    if (isValid) {
-      // Small delay for smoother transition when autofilled
-      setTimeout(() => {
-        submitBtn.textContent = "Submit";
-        submitBtn.disabled = false;
-      }, 200);
-    } else {
-      // Reset back to "Locate Me" state when pincode cleared or invalid
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locate Me
-      `;
-      submitBtn.disabled = false;
-    }
-  });
-});

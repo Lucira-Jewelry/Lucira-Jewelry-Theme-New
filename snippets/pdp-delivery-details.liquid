@@ -37,70 +37,171 @@
 </div>
 
 <script>
-  window.delivery_days_from_metafield = {{ delivery_days }};
-  document.addEventListener("DOMContentLoaded", function () {
-    const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
-    const pincodeInput = document.querySelector("#lucira-delivery-zipcode");
-    const metafieldDays = window.delivery_days_from_metafield || 4;
+(() => {
+  // --- Elements ---
+  const container     = document.getElementById("pdp-delivery-check");
+  if (!container) return;
 
-    pincodeInput.addEventListener("input", () => {
-      const val = pincodeInput.value.trim();
-      const isValid = val.length === 6 && /^\d+$/.test(val);
-      submitBtn.disabled = !isValid;
-      if (isValid) {
-        submitBtn.textContent = "Submit";
-      } else {
-        submitBtn.innerHTML = '<svg width="16" height="16" class="icon icon-locate"> <use xlink:href="#icon-locate"></use> </svg> Locate Me';
-      }
-    });
+  const submitBtn     = container.querySelector(".submitButton");
+  const pincodeInput  = document.getElementById("lucira-delivery-zipcode");
+  const dateSpan      = container.querySelector(".lucira-delivery-time .delivry_txt");
 
-    submitBtn.addEventListener("click", function () {
-      const pincode = pincodeInput?.value?.trim();
-      const buttonText = submitBtn.textContent.trim();
-      
-      // If button says "Locate Me" or pincode is empty, trigger locate me
-      if (buttonText.includes("Locate Me") || !pincode || pincode.length !== 6) {
-        luciraLocateMe();
-        return;
-      }
-      
-      // If valid pincode and button says Submit, submit
-      if (!submitBtn.disabled && buttonText === "Submit") {
-        const productData = {
-          promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-          promo_name: "{{ product.title }}",
+  // --- Config (metafield days from data-attribute or Liquid fallback injected below) ---
+  const META_DAYS = Number(container.dataset.deliveryDays || {{ delivery_days | default: 4 }});
+
+  // --- Utils ---
+  const fmt = (plusDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(plusDays));
+    return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  };
+
+  // Determine if current selected variant is in stock
+  function isVariantInStock() {
+    // 1) From the prebuilt map (most reliable)
+    const colorInput = document.querySelector('input[name^="Color"]:checked');
+    const sizeInput  = document.querySelector('input[name^="Size"]:checked');
+    if (colorInput && sizeInput && window.variantStockData) {
+      const node = (window.variantStockData[colorInput.value] || {})[sizeInput.value];
+      if (node && node.available && Number(node.inventory) > 0) return true;
+    }
+
+    // 2) From adjacent label badges
+    const colorBadge = document.querySelector('input[name^="Color"]:checked + label .Variant_Stock_Status .stock-active');
+    const sizeBadge  = document.querySelector('input[name^="Size"]:checked + label .Variant_Stock_Status .stock-active');
+    if (colorBadge && sizeBadge) return true;
+
+    // 3) From dataset inventory (if theme keeps it updated)
+    const qty = Number(container.dataset.inventoryQuantity || 0);
+    if (qty > 0) return true;
+
+    return false;
+  }
+
+  // Compute days: 2 if in stock, else metafield days
+  const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
+
+  // Paint the date (only the date text)
+  function repaint() {
+    if (!dateSpan) return;
+    dateSpan.textContent = fmt(computeDays());
+  }
+
+  // --- Input UX (keep Locate Me clickable) ---
+  function setLocateView() {
+    submitBtn.innerHTML = `
+      <svg width="16" height="16" class="icon icon-locate">
+        <use xlink:href="#icon-locate"></use>
+      </svg> Locate Me
+    `;
+    submitBtn.disabled = false;
+  }
+  function setSubmitView() {
+    submitBtn.textContent = "Submit";
+    submitBtn.disabled = false;
+  }
+
+  // Sanitize and toggle button
+  pincodeInput.addEventListener("input", () => {
+    const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
+    pincodeInput.value = val;
+    if (val.length === 6) {
+      setTimeout(() => {
+        setSubmitView();
+        submitBtn.dispatchEvent(new Event("pincode:ready", { bubbles: true }));
+      }, 150);
+    } else {
+      setLocateView();
+    }
+  });
+
+  submitBtn.addEventListener("click", (e) => {
+    // Own the click so no other attached handlers can rewrite the date
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    const pin = (pincodeInput.value || "").trim();
+    const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
+
+    // If still in locate mode or invalid pin → run geolocation
+    if (isLocate || pin.length !== 6) {
+      if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
+      return;
+    }
+
+    // optional analytics (unchanged)
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_id: container.dataset.productSku,
+          promo_name: container.dataset.productTitle,
           creative_name: "pincodeEntered",
-          location_id: "{{ product.selected_or_first_available_variant.id }}",
-          promo_position: pincode,
-          pincode: pincode
-        };
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "promoClick",
-          promoClick: productData
-        });
-
-        const totalDays = metafieldDays + 2;
-        const deliveryDate = new Date();
-        deliveryDate.setDate(deliveryDate.getDate() + totalDays);
-
-        const formattedDate = deliveryDate.toLocaleDateString('en-US', {
-          day: 'numeric',
-          month: 'long',
-          year: 'numeric'
-        });
-
-        const deliveryTextElement = document.querySelector(".lucira-delivery-time");
-        if (deliveryTextElement) {
-          deliveryTextElement.innerHTML = `Expected Delivery By <span style="color:#147217;font-weight:bold;">${formattedDate}</span>`;
+          location_id: container.dataset.variantId,
+          promo_position: pin,
+          pincode: pin
         }
-      }
-    });
+      });
+    } catch(_) {}
+
+    // --- compute using the in-stock rule (2 days) ---
+    // isVariantInStock() uses variantStockData → badges → dataset as fallbacks
+    const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || {{ delivery_days | default: 4 }});
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const formatted = d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+
+    // Only change the date text
+    if (dateSpan) dateSpan.textContent = formatted;
+
+    // Guard repaint to outlast any late writers on the same node
+    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
+    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
   });
 
-  document.getElementById("lucira-delivery-zipcode").addEventListener("input", function () {
-    this.value = this.value.replace(/\D/g, "").slice(0, 6);
+
+  // --- Variant change wiring (keeps inventoryQuantity fresh if theme emits it) ---
+  function onVariantChange(e) {
+    const v = e?.detail?.variant;
+    if (v) {
+      container.dataset.variantId = String(v.id || "");
+      if (typeof v.inventory_quantity === "number") {
+        container.dataset.inventoryQuantity = String(v.inventory_quantity);
+      }
+      repaint();
+    } else {
+      repaint();
+    }
+  }
+  document.addEventListener("variant:change", onVariantChange);
+  document.addEventListener("variant:changed", onVariantChange);
+
+  // Also repaint when user toggles radios (in case theme doesn't emit events)
+  document.addEventListener("change", (evt) => {
+    const n = evt.target?.name || "";
+    if (n.startsWith("Color") || n.startsWith("Size")) repaint();
   });
+
+  // Patch Locate Me to repaint after it fills the pincode
+  if (typeof window.luciraLocateMe === "function") {
+    const _orig = window.luciraLocateMe;
+    window.luciraLocateMe = async function(...args) {
+      try { await _orig.apply(this, args); } catch(_) {}
+      setTimeout(() => {
+        // If locate filled a valid pin, flip button to Submit
+        if ((pincodeInput.value || "").replace(/\D/g, "").length === 6) setSubmitView();
+        repaint();
+      }, 50);
+    };
+  }
+
+  // --- Initial state ---
+  setLocateView();
+  // Repaint now and after a short delay to catch badge rendering
+  repaint();
+  setTimeout(repaint, 120);
+})();
 </script>
+
 
