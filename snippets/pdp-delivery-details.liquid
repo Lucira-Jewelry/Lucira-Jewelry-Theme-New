@@ -39,55 +39,105 @@
 <script>
 (() => {
   // --- Elements ---
-  const container     = document.getElementById("pdp-delivery-check");
+  const container = document.getElementById("pdp-delivery-check");
   if (!container) return;
 
-  const submitBtn     = container.querySelector(".submitButton");
-  const pincodeInput  = document.getElementById("lucira-delivery-zipcode");
-  const dateSpan      = container.querySelector(".lucira-delivery-time .delivry_txt");
+  const submitBtn    = container.querySelector(".submitButton");
+  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
+  const dateSpan     = container.querySelector(".lucira-delivery-time .delivry_txt");
 
-  // --- Config (metafield days from data-attribute or Liquid fallback injected below) ---
-  const META_DAYS = Number(container.dataset.deliveryDays || {{ delivery_days | default: 4 }});
+  // --- Config (fallback to 4 if not present) ---
+  const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
 
-  // --- Utils ---
-  const fmt = (plusDays) => {
+  // --- Helpers ---
+  const fmtDatePlus = (plusDays) => {
     const d = new Date();
     d.setDate(d.getDate() + Number(plusDays));
     return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
   };
 
-  // Determine if current selected variant is in stock
+  const getSelected = (label) => {
+    // Works for radios or selects; label can be "Color" or "Size"
+    const radio = document.querySelector(`input[name*="${label}"]:checked`);
+    if (radio) return radio.value;
+    const sel = document.querySelector(`select[name*="${label}"]`);
+    if (sel) return sel.value;
+    return null;
+  };
+
+  const hasPicker = (label) =>
+    !!document.querySelector(`input[name*="${label}"], select[name*="${label}"]`);
+
+  const getBadgeActive = (label) =>
+    document.querySelector(
+      `input[name*="${label}"]:checked + label .Variant_Stock_Status .stock-active,` +
+      `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
+    );
+
+  // Try to read current dataset ground truth (kept fresh on variant change)
+  const ds = () => {
+    const avail = String(container.dataset.available || "").toLowerCase();
+    const qty   = Number(container.dataset.inventoryQuantity || 0);
+    const variantCount = Number(container.dataset.variantCount || 0);
+    return { avail, qty, variantCount };
+  };
+
+  // --- Stock logic that supports Color-only / Size-only / single-variant ---
   function isVariantInStock() {
-    // 1) From the prebuilt map (most reliable)
-    const colorInput = document.querySelector('input[name^="Color"]:checked');
-    const sizeInput  = document.querySelector('input[name^="Size"]:checked');
-    if (colorInput && sizeInput && window.variantStockData) {
-      const node = (window.variantStockData[colorInput.value] || {})[sizeInput.value];
-      if (node && node.available && Number(node.inventory) > 0) return true;
+    const colorVal = getSelected("Color");
+    const sizeVal  = getSelected("Size");
+    const hasColor = hasPicker("Color");
+    const hasSize  = hasPicker("Size");
+    const { avail, qty, variantCount } = ds();
+
+    // 1) Use a prebuilt map if store provides it
+    if (window.variantStockData) {
+      // 1a) Two-dimensional (Color x Size)
+      if (colorVal && sizeVal && window.variantStockData[colorVal]) {
+        const node = window.variantStockData[colorVal][sizeVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
+      }
+      // 1b) One-dimensional (Color only)
+      if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
+        const node = window.variantStockData[colorVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
+      }
+      // 1c) One-dimensional (Size only)
+      if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
+        const node = window.variantStockData[sizeVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
+      }
     }
 
-    // 2) From adjacent label badges
-    const colorBadge = document.querySelector('input[name^="Color"]:checked + label .Variant_Stock_Status .stock-active');
-    const sizeBadge  = document.querySelector('input[name^="Size"]:checked + label .Variant_Stock_Status .stock-active');
-    if (colorBadge && sizeBadge) return true;
+    // 2) Badge hints
+    if (hasColor && !hasSize && getBadgeActive("Color")) return true;
+    if (!hasColor && hasSize && getBadgeActive("Size")) return true;
+    if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
 
-    // 3) From dataset inventory (if theme keeps it updated)
-    const qty = Number(container.dataset.inventoryQuantity || 0);
+    // 3) Single-option / single-variant / no pickers → trust dataset
+    const singleOptionContext =
+      (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
+
+    if (singleOptionContext) {
+      if ((avail === "true" || avail === "1") && qty > 0) return true;
+      if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
+    }
+
+    // 4) Generic dataset fallback
     if (qty > 0) return true;
 
     return false;
   }
 
-  // Compute days: 2 if in stock, else metafield days
+  // --- Compute / repaint ---
   const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
 
-  // Paint the date (only the date text)
   function repaint() {
     if (!dateSpan) return;
-    dateSpan.textContent = fmt(computeDays());
+    dateSpan.textContent = fmtDatePlus(computeDays());
   }
 
-  // --- Input UX (keep Locate Me clickable) ---
+  // --- Button UX ---
   function setLocateView() {
     submitBtn.innerHTML = `
       <svg width="16" height="16" class="icon icon-locate">
@@ -96,72 +146,69 @@
     `;
     submitBtn.disabled = false;
   }
+
   function setSubmitView() {
     submitBtn.textContent = "Submit";
     submitBtn.disabled = false;
   }
 
-  // Sanitize and toggle button
-  pincodeInput.addEventListener("input", () => {
-    const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
-    pincodeInput.value = val;
-    if (val.length === 6) {
-      setTimeout(() => {
-        setSubmitView();
-        submitBtn.dispatchEvent(new Event("pincode:ready", { bubbles: true }));
-      }, 150);
-    } else {
-      setLocateView();
-    }
-  });
+  // --- Pincode input handling ---
+  if (pincodeInput) {
+    pincodeInput.addEventListener("input", () => {
+      const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
+      pincodeInput.value = val;
+      if (val.length === 6) {
+        setTimeout(() => {
+          setSubmitView();
+          submitBtn?.dispatchEvent(new Event("pincode:ready", { bubbles: true }));
+        }, 150);
+      } else {
+        setLocateView();
+      }
+    });
+  }
 
-  submitBtn.addEventListener("click", (e) => {
-    // Own the click so no other attached handlers can rewrite the date
-    e.preventDefault();
-    e.stopImmediatePropagation();
+  // --- Submit / Locate Me click ---
+  if (submitBtn) {
+    submitBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
 
-    const pin = (pincodeInput.value || "").trim();
-    const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
+      const pin = (pincodeInput?.value || "").trim();
+      const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
 
-    // If still in locate mode or invalid pin → run geolocation
-    if (isLocate || pin.length !== 6) {
-      if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
-      return;
-    }
+      // Locate Me path or incomplete pin
+      if (isLocate || pin.length !== 6) {
+        if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
+        return;
+      }
 
-    // optional analytics (unchanged)
-    try {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          promo_id: container.dataset.productSku,
-          promo_name: container.dataset.productTitle,
-          creative_name: "pincodeEntered",
-          location_id: container.dataset.variantId,
-          promo_position: pin,
-          pincode: pin
-        }
-      });
-    } catch(_) {}
+      // optional analytics
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: container.dataset.productSku,
+            promo_name: container.dataset.productTitle,
+            creative_name: "pincodeEntered",
+            location_id: container.dataset.variantId,
+            promo_position: pin,
+            pincode: pin
+          }
+        });
+      } catch (_) {}
 
-    // --- compute using the in-stock rule (2 days) ---
-    // isVariantInStock() uses variantStockData → badges → dataset as fallbacks
-    const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || {{ delivery_days | default: 4 }});
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    const formatted = d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+      const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
+      const formatted = fmtDatePlus(days);
 
-    // Only change the date text
-    if (dateSpan) dateSpan.textContent = formatted;
+      if (dateSpan) dateSpan.textContent = formatted;
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
+    });
+  }
 
-    // Guard repaint to outlast any late writers on the same node
-    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
-    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
-  });
-
-
-  // --- Variant change wiring (keeps inventoryQuantity fresh if theme emits it) ---
+  // --- Variant change wiring (updates dataset + repaint) ---
   function onVariantChange(e) {
     const v = e?.detail?.variant;
     if (v) {
@@ -169,28 +216,28 @@
       if (typeof v.inventory_quantity === "number") {
         container.dataset.inventoryQuantity = String(v.inventory_quantity);
       }
-      repaint();
-    } else {
-      repaint();
+      if (typeof v.available !== "undefined") {
+        container.dataset.available = String(!!v.available);
+      }
     }
+    repaint();
   }
   document.addEventListener("variant:change", onVariantChange);
   document.addEventListener("variant:changed", onVariantChange);
 
-  // Also repaint when user toggles radios (in case theme doesn't emit events)
+  // Also repaint on any Color/Size change if theme doesn't emit events
   document.addEventListener("change", (evt) => {
     const n = evt.target?.name || "";
-    if (n.startsWith("Color") || n.startsWith("Size")) repaint();
+    if (n.includes("Color") || n.includes("Size")) repaint();
   });
 
-  // Patch Locate Me to repaint after it fills the pincode
+  // Patch Locate Me to flip to Submit + repaint after it fills pincode
   if (typeof window.luciraLocateMe === "function") {
     const _orig = window.luciraLocateMe;
-    window.luciraLocateMe = async function(...args) {
-      try { await _orig.apply(this, args); } catch(_) {}
+    window.luciraLocateMe = async function (...args) {
+      try { await _orig.apply(this, args); } catch (_) {}
       setTimeout(() => {
-        // If locate filled a valid pin, flip button to Submit
-        if ((pincodeInput.value || "").replace(/\D/g, "").length === 6) setSubmitView();
+        if ((pincodeInput?.value || "").replace(/\D/g, "").length === 6) setSubmitView();
         repaint();
       }, 50);
     };
@@ -198,10 +245,7 @@
 
   // --- Initial state ---
   setLocateView();
-  // Repaint now and after a short delay to catch badge rendering
   repaint();
   setTimeout(repaint, 120);
 })();
 </script>
-
-
