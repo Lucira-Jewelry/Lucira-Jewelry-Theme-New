@@ -254,49 +254,68 @@
                   <span class="visually-hidden">{{ 'products.product.sku' | t }}:</span>
                   {{- product.selected_or_first_available_variant.sku -}}
                 </p>
-            {% when 'promo_text' %}
-              <div class="product-promo-text">
-                {% assign product_price = product.price | divided_by: 100 %}
-                {% if product_price < 30000 %}
-                  {%- assign desktop_image = block.settings.promo_image_below_desktop -%}
-                  {%- assign mobile_image = block.settings.promo_image_below_mobile -%}
-                  {%- assign promo_text = block.settings.promo_message_below -%}
-                {% else %}
-                  {%- assign desktop_image = block.settings.promo_image_above_desktop -%}
-                  {%- assign mobile_image = block.settings.promo_image_above_mobile -%}
-                  {%- assign promo_text = block.settings.promo_message_above -%}
+              {% when 'promo_text' %}
+                {% assign v = product.selected_or_first_available_variant %}
+                {% assign price_rupees = v.price | divided_by: 100 %}
+                {% assign threshold = 30000 %}
+
+                {%- if price_rupees < threshold -%}
+                  {% assign desktop_obj = block.settings.promo_image_below_desktop %}
+                  {% assign mobile_obj  = block.settings.promo_image_below_mobile %}
+                  {% assign promo_copy  = block.settings.promo_message_below %}
+                {%- else -%}
+                  {% assign desktop_obj = block.settings.promo_image_above_desktop %}
+                  {% assign mobile_obj  = block.settings.promo_image_above_mobile %}
+                  {% assign promo_copy  = block.settings.promo_message_above %}
+                {%- endif -%}
+
+                {%- comment %} Build URLs safely only if image objects exist {% endcomment -%}
+                {% assign desktop_url = '' %}
+                {% if desktop_obj != blank %}
+                  {% assign desktop_url = desktop_obj | image_url: width: 1200 %}
                 {% endif %}
 
-                {% if desktop_image != blank or mobile_image != blank %}
-                  <div 
-                    class="promo-image-wrapper"
-                    style="
-                      background-image:url('{{ desktop_image | image_url: width: 1200 }}');
-                      width:600px;
-                      height:auto;
-                      background-size:contain;
-                      background-repeat:no-repeat;
-                      background-position:center;
-                      aspect-ratio:3/1;
-                      display:block;
-                      margin:0 auto;
-                    "
-                  ></div>
+                {% assign mobile_url = '' %}
+                {% if mobile_obj != blank %}
+                  {% assign mobile_url = mobile_obj | image_url: width: 800 %}
+                {% endif %}
+                
+                <div class="product-promo-text"
+                    id="promoTextBlock-{{ block.id }}"
+                    data-threshold="{{ threshold }}"
+                    data-below-desktop="{% if block.settings.promo_image_below_desktop != blank %}{{ block.settings.promo_image_below_desktop | image_url: width: 1200 }}{% endif %}"
+                    data-below-mobile="{% if block.settings.promo_image_below_mobile  != blank %}{{ block.settings.promo_image_below_mobile  | image_url: width: 800  }}{% endif %}"
+                    data-above-desktop="{% if block.settings.promo_image_above_desktop != blank %}{{ block.settings.promo_image_above_desktop | image_url: width: 1200 }}{% endif %}"
+                    data-above-mobile="{% if block.settings.promo_image_above_mobile  != blank %}{{ block.settings.promo_image_above_mobile  | image_url: width: 800  }}{% endif %}"
+                    data-msg-below="{{ block.settings.promo_message_below | escape }}"
+                    data-msg-above="{{ block.settings.promo_message_above | escape }}"
+                    data-initial-price="{{ v.price }}">
+
+                  {% if desktop_url != '' or mobile_url != '' %}
+                    <div class="promo-image-wrapper"
+                        style="
+                          --promo-desktop: url('{{ desktop_url }}');
+                          --promo-mobile:  url('{{ mobile_url }}');
+                          background-image: var(--promo-desktop);
+                          width:600px;height:auto;background-size:contain;background-repeat:no-repeat;background-position:center;
+                          aspect-ratio:3/1;display:block;margin:0 auto;">
+                    </div>
+                  {% else %}
+                    <div class="svg-wrapper">{{ 'icon-promo.svg' | inline_asset_content }}</div>
+                  {% endif %}
+
+                  <span class="promo-message">{{ promo_copy }}</span>
 
                   <style>
                     @media (max-width: 767px) {
-                      .product-promo-text .promo-image-wrapper {
-                        background-image: url('{{ mobile_image | image_url: width: 800 }}') !important;
+                      #promoTextBlock-{{ block.id }} .promo-image-wrapper {
+                        background-image: var(--promo-mobile) !important;
                         width: 410px !important;
                         aspect-ratio: 3 / 1 !important;
                       }
                     }
                   </style>
-                {% else %}
-                  <div class="svg-wrapper">{{- 'icon-promo.svg' | inline_asset_content -}}</div>
-                  <span class="promo-message">{{ promo_text }}</span>
-                {% endif %}
-              </div>
+                </div>
 
 
               {%- when 'custom_liquid' -%}
