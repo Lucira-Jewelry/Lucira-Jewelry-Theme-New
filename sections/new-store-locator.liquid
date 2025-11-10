@@ -1,0 +1,239 @@
+<section class="store-locator-section brad_{{ section.id }}">
+  <div class="page-width">
+    <div class="store-locator-box">
+      <h2 class="store-locator-heading">LOCATE OUR NEARBY STORE</h2>
+      <label for="store-locator-input" class="store-locator-label">Enter your City or Pincode</label>
+      <div class="store-locator-input-wrapper">
+        <input
+          id="store-locator-input"
+          type="text"
+          placeholder="Enter City Or Pincode"
+          class="store-locator-input"
+        >
+        <button id="store-locator-btn" class="store-locator-btn" type="button">
+          <span class="btn-text">Locate Me</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<style>
+  .brad_{{ section.id }} {
+    padding-top: {{ section.settings.padding_top_desktop }}px;
+    padding-bottom: {{ section.settings.padding_bottom_desktop }}px;
+  }
+
+  @media (max-width: 767px) {
+    .brad_{{ section.id }} {
+      padding-top: {{ section.settings.padding_top_mobile }}px;
+      padding-bottom: {{ section.settings.padding_bottom_mobile }}px;
+    }
+  }
+
+  .store-locator-section {
+    text-align: center;
+    background-color: #f7f5f4;
+  }
+
+  .store-locator-box {
+    border: 2px solid #0096db;
+    padding: 30px;
+    max-width: 700px;
+    margin: 0 auto;
+    border-radius: 6px;
+    background: #fff;
+  }
+
+  .store-locator-heading {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  .store-locator-label {
+    display: block;
+    text-align: left;
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #555;
+  }
+
+  .store-locator-input-wrapper {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .store-locator-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: none;
+    outline: none;
+    font-size: 14px;
+  }
+
+  .store-locator-btn {
+    background-color: #f2f2f2;
+    border: none;
+    padding: 0 18px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.3s;
+  }
+
+  .store-locator-btn:hover {
+    background-color: #e6e6e6;
+  }
+
+  .store-locator-btn .btn-text::before {
+    content: "📍";
+    margin-right: 4px;
+  }
+
+  .store-locator-btn.submit .btn-text::before {
+    content: "✅";
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const input = document.getElementById('store-locator-input');
+    const button = document.getElementById('store-locator-btn');
+    const text = button.querySelector('.btn-text');
+
+    // Detect typing → change button to Submit
+    input.addEventListener('input', () => {
+      if (input.value.trim() !== '') {
+        button.classList.add('submit');
+        text.textContent = 'Submit';
+      } else {
+        button.classList.remove('submit');
+        text.textContent = 'Locate Me';
+      }
+    });
+
+    // Locate Me / Submit logic
+    button.addEventListener('click', () => {
+      // If it's in submit mode
+      if (button.classList.contains('submit')) {
+        const pincode = input.value.trim();
+        if (pincode) {
+          const event = new CustomEvent('pincodeDetected', { detail: { pincode } });
+          document.dispatchEvent(event);
+          console.log('Submitted pincode:', pincode);
+        } else {
+          console.log('No pincode entered');
+        }
+        return; // ✅ Stop here — do NOT run "Locate Me" logic
+      }
+
+      // Locate Me mode
+      if (!navigator.geolocation) {
+        alert('Geolocation is not supported by your browser.');
+        return;
+      }
+
+      text.textContent = 'Locating...';
+
+      navigator.geolocation.getCurrentPosition(success, error);
+
+      function success(position) {
+        const latitude = position.coords.latitude;
+        const longitude = position.coords.longitude;
+
+        // Using OpenStreetMap (no API key required)
+        const geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
+
+        fetch(geocodeUrl, {
+          headers: {
+            'User-Agent': 'ShopifyStoreLocator/1.0'
+          }
+        })
+          .then(response => response.json())
+          .then(data => {
+            console.log('Geocode response:', data);
+
+            if (data && data.address && data.address.postcode) {
+              const pincode = data.address.postcode;
+              input.value = pincode;
+              input.dispatchEvent(new Event('input'));
+
+              // Dispatch event for store filtering
+              const event = new CustomEvent('pincodeDetected', { detail: { pincode } });
+              document.dispatchEvent(event);
+            } else {
+              alert('Could not detect your pincode. Please enter manually.');
+            }
+
+            text.textContent = 'Locate Me';
+          })
+          .catch(err => {
+            console.error('Geocode fetch failed:', err);
+            alert('Failed to fetch location data.');
+            text.textContent = 'Locate Me';
+          });
+      }
+
+      function error() {
+        alert('Unable to retrieve your location.');
+        text.textContent = 'Locate Me';
+      }
+    });
+  });
+</script>
+
+
+{% schema %}
+{
+  "name": "New Store Locator",
+  "settings": [
+    {
+      "type": "range",
+      "id": "padding_top_desktop",
+      "label": "Padding Top (Desktop)",
+      "min": 0,
+      "max": 200,
+      "step": 5,
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_desktop",
+      "label": "Padding Bottom (Desktop)",
+      "min": 0,
+      "max": 200,
+      "step": 5,
+      "default": 60
+    },
+    {
+      "type": "range",
+      "id": "padding_top_mobile",
+      "label": "Padding Top (Mobile)",
+      "min": 0,
+      "max": 150,
+      "step": 5,
+      "default": 40
+    },
+    {
+      "type": "range",
+      "id": "padding_bottom_mobile",
+      "label": "Padding Bottom (Mobile)",
+      "min": 0,
+      "max": 150,
+      "step": 5,
+      "default": 40
+    }
+  ],
+  "presets": [
+    {
+      "name": "New Store Locator"
+    }
+  ]
+}
+{% endschema %}
