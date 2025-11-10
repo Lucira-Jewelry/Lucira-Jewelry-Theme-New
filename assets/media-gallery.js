@@ -118,7 +118,7 @@ if (!customElements.get('media-gallery')) {
 // Optimized initialization with CLS prevention
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mq", "ci", "mh", "mv", "360v"];
+  const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
