@@ -209,6 +209,95 @@
     </div>
   </div>
 {% endif %} {% endcomment %}
+/
+
+{% assign displayed_count = 0 %}
+
+{%- for related_product in selected_collection.products -%}
+  {% if related_product.id != product.id %}
+    
+    {%- assign match_found = false -%}
+    {%- for tag in related_product.tags -%}
+      {% assign clean_tag = tag | strip | downcase %}
+      {% assign found_tag = false %}
+      {%- for product_tag in product.tags -%}
+        {% assign product_clean_tag = product_tag | strip | downcase %}
+        {% if clean_tag == product_clean_tag %}
+          {% assign match_found = true %}
+          {% break %}
+        {% endif %}
+      {%- endfor -%}
+      {% if match_found %}{% break %}{% endif %}
+    {%- endfor -%}
+    
+    {% if match_found or displayed_count < section.settings.products_to_display %}
+      {%- if use_slider -%}
+        <div class="swiper-slide">
+      {%- else -%}
+        <li class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
+            {% if settings.animations_reveal_on_scroll %}
+              data-cascade
+              style="--animation-order: {{ displayed_count | plus: 1 }};"
+            {% endif %}>
+      {%- endif -%}
+
+      {% render 'card-product',
+        card_product: related_product,
+        media_aspect_ratio: section.settings.image_ratio,
+        image_shape: section.settings.image_shape,
+        show_secondary_image: section.settings.show_secondary_image,
+        show_vendor: section.settings.show_vendor,
+        show_rating: section.settings.show_rating,
+        skip_styles: displayed_count > 0,
+        section_id: section.id,
+        quick_add: section.settings.quick_add
+      %}
+
+      {%- if use_slider -%}
+        </div>
+      {%- else -%}
+        </li>
+      {%- endif -%}
+
+      {% assign displayed_count = displayed_count | plus: 1 %}
+      {% if displayed_count >= section.settings.products_to_display %}
+        {% break %}
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{%- endfor -%}
+
+{%- comment -%} Fallback if no products found {% endcomment -%}
+{% if displayed_count == 0 %}
+  {%- for related_product in selected_collection.products limit: section.settings.products_to_display -%}
+    {% if related_product.id != product.id %}
+      {%- if use_slider -%}
+        <div class="swiper-slide">
+      {%- else -%}
+        <li class="grid__item">
+      {%- endif -%}
+
+      {% render 'card-product',
+        card_product: related_product,
+        media_aspect_ratio: section.settings.image_ratio,
+        image_shape: section.settings.image_shape,
+        show_vendor: section.settings.show_vendor,
+        skip_styles: displayed_count > 0,
+        section_id: section.id,
+        quick_add: section.settings.quick_add
+      %}
+
+      {%- if use_slider -%}
+        </div>
+      {%- else -%}
+        </li>
+      {%- endif -%}
+
+      {% assign displayed_count = displayed_count | plus: 1 %}
+    {% endif %}
+  {%- endfor -%}
+{% endif %}
+
 
 <style>
 
