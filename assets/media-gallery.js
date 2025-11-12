@@ -267,16 +267,48 @@ if (!customElements.get('media-gallery')) {
     dotsContainer.className = 'custom-slider-dots';
 
     for (let i = 0; i < totalSlides; i++) {
-      const dot = document.createElement('span');
+      const dot = document.createElement('button'); // better for a11y
       dot.className = 'slider-dot';
+      dot.type = 'button';
       dot.dataset.index = i;
-      if (i === currentSlide) dot.classList.add('active');
+
+      const slide = visibleSlides[i];
+      const isVideo = !!slide && (slide.querySelector('video') || slide.querySelector('.video'));
+      const baseLabel = `Slide ${i + 1} of ${totalSlides}`;
+      dot.setAttribute('aria-label', isVideo ? `${baseLabel}, video` : baseLabel);
+
+      if (i === currentSlide) {
+        dot.classList.add('active');
+        dot.setAttribute('aria-current', 'true');
+      }
+
+      // inner dot visual
+      const dotInner = document.createElement('span');
+      dotInner.className = 'slider-dot__inner';
+      dot.appendChild(dotInner);
+
+      // video icon placed centered inside the dot when slide has video
+      if (isVideo) {
+        const videoIcon = document.createElement('span');
+        videoIcon.className = 'slider-dot__video-icon';
+        videoIcon.innerHTML = `
+          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" focusable="false">
+            <path d="M4 2v20l18-10L4 2z" fill="currentColor"/>
+          </svg>
+        `;
+        dot.appendChild(videoIcon);
+      }
+
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
     }
     
-    mediaList.parentNode.appendChild(dotsContainer);
+    // center the dots container relative to the media area
+    const parent = mediaList.parentNode;
+    parent.appendChild(dotsContainer);
   }
+
+
 
   function updateDots() {
     if (!dotsContainer) return;
