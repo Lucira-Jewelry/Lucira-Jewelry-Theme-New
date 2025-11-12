@@ -604,3 +604,30 @@ if (!customElements.get('media-gallery')) {
 
   window.addEventListener('beforeunload', cleanup);
 })();
+
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Select all video modal openers
+  const videoModalOpeners = document.querySelectorAll('.product__modal-opener--video');
+
+  videoModalOpeners.forEach((opener) => {
+    opener.addEventListener('click', () => {
+      const modalSelector = opener.dataset.modal;
+      const modal = document.querySelector(modalSelector);
+
+      if (!modal) return;
+
+      // Wait until modal is visible
+      setTimeout(() => {
+        const video = modal.querySelector('video');
+
+        if (video) {
+          video.muted = true; // Optional: autoplay only works if muted in some browsers
+          video.play().catch((error) => {
+            console.warn('Autoplay blocked:', error);
+          });
+        }
+      }, 300); // small delay to ensure modal opens first
+    });
+  });
+});
