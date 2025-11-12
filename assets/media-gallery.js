@@ -607,58 +607,154 @@ if (!customElements.get('media-gallery')) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Select all video modal openers
-  const videoModalOpeners = document.querySelectorAll('.product__modal-opener--video');
+  // Target modal openers that open video media
+  const openers = document.querySelectorAll('.product__modal-opener--video, modal-opener[data-modal]');
 
-  videoModalOpeners.forEach((opener) => {
+  openers.forEach(opener => {
     opener.addEventListener('click', () => {
       const modalSelector = opener.dataset.modal;
+      if (!modalSelector) return;
       const modal = document.querySelector(modalSelector);
-
       if (!modal) return;
 
-      // Wait until modal is visible
-      setTimeout(() => {
-        const video = modal.querySelector('video');
-
-        if (video) {
-          video.muted = true; // Optional: autoplay only works if muted in some browsers
-          video.play().catch((error) => {
-            console.warn('Autoplay blocked:', error);
-          });
-        }
-      }, 300); // small delay to ensure modal opens first
+      // Wait until modal becomes visible, then bootstrap media autoplay
+      waitForModalVisible(modal, 2000 /*ms timeout*/).then(() => {
+        handleDeferredMediaInModal(modal);
+      }).catch(() => {
+        // fallback: still try once after a short delay
+        setTimeout(() => handleDeferredMediaInModal(modal), 400);
+      });
     });
   });
-});
-document.addEventListener('DOMContentLoaded', () => {
-  const deferredButtons = document.querySelectorAll('.deferred-media__poster');
 
-  deferredButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const wrapper = button.closest('deferred-media');
-      if (!wrapper) return;
+  // --- helpers ---
+  function waitForModalVisible(modalEl, timeout = 2000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
 
-      // Wait for Shopify to inject the video iframe or video element
-      setTimeout(() => {
-        const iframe = wrapper.querySelector('iframe');
-        const video = wrapper.querySelector('video');
+      function isVisible(el) {
+        // consider aria-hidden, display, or presence in layout
+        if (!el) return false;
+        if (el.getAttribute('aria-hidden') === 'true') return false;
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        // check bounding box
+        const rect = el.getBoundingClientRect();
+        return (rect.width > 0 && rect.height > 0);
+      }
 
-        // --- YouTube or Vimeo ---
-        if (iframe) {
-          const src = iframe.getAttribute('src') || '';
-          if (!src.includes('autoplay=1')) {
-            const connector = src.includes('?') ? '&' : '?';
-            iframe.setAttribute('src', `${src}${connector}autoplay=1`);
-          }
+      if (isVisible(modalEl)) return resolve();
+
+      const interval = setInterval(() => {
+        if (isVisible(modalEl)) {
+          clearInterval(interval);
+          return resolve();
         }
-
-        // --- Native <video> ---
-        if (video) {
-          video.muted = true; // browsers block autoplay without mute
-          video.play().catch((err) => console.warn('Autoplay blocked:', err));
+        if (Date.now() - start > timeout) {
+          clearInterval(interval);
+          return reject(new Error('modal not visible within timeout'));
         }
-      }, 300); // small delay ensures the iframe/video is added
+      }, 80);
     });
-  });
+  }
+
+  function handleDeferredMediaInModal(modalEl) {
+    // Find deferred-media inside modal (Dawn uses <deferred-media> or .deferred-media__poster)
+    const deferred = modalEl.querySelector('deferred-media, .deferred-media, [data-deferred-media]');
+    const posterBtn = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
+
+    // If poster button exists, click it to let Shopify inject iframe/video
+    if (posterBtn) {
+      // hide poster quickly (so it doesn't cover the injected iframe) — we'll still trigger click so Shopify loads the media
+      posterBtn.classList.add('deferred-media__poster--hidden');
+      const spinner = modalEl.querySelector('.loading__spinner');
+      if (spinner) spinner.classList.remove('hidden'); // show spinner while loading
+      try { posterBtn.click(); } catch (e) { /* ignore */ }
+    } else if (deferred) {
+      // if deferred tag present but no poster btn, we'll continue to look for iframe/video
+    } else {
+      // no deferred media found
+      return;
+    }
+
+    // After injection, attempt to autoplay. Use MutationObserver to detect insertion of iframe/video
+    const observerTarget = deferred || modalEl;
+    const observer = new MutationObserver((mutations, obs) => {
+      // look for iframe/video now
+      const iframe = modalEl.querySelector('iframe');
+      const video = modalEl.querySelector('video');
+
+      if (iframe || video) {
+        obs.disconnect();
+        finalizeAutoplay(modalEl, iframe, video);
+      }
+    });
+
+    observer.observe(observerTarget, { childList: true, subtree: true });
+
+    // also fallback: try after fixed delay if MutationObserver didn't trigger
+    setTimeout(() => {
+      const iframe = modalEl.querySelector('iframe');
+      const video = modalEl.querySelector('video');
+      if (iframe || video) {
+        try { observer.disconnect() } catch(e){}
+        finalizeAutoplay(modalEl, iframe, video);
+      } else {
+        // give one more attempt: unhide poster if still nothing
+        const posterBtn2 = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
+        if (posterBtn2) posterBtn2.classList.remove('deferred-media__poster--hidden');
+        const spinner2 = modalEl.querySelector('.loading__spinner');
+        if (spinner2) spinner2.classList.add('hidden');
+      }
+    }, 700); // tune this if needed
+  }
+
+  function finalizeAutoplay(modalEl, iframe, video) {
+    // Hide poster/spinner
+    const poster = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
+    if (poster) poster.classList.add('hidden');
+
+    const spinner = modalEl.querySelector('.loading__spinner');
+    if (spinner) spinner.classList.add('hidden');
+
+    // If iframe (YouTube/Vimeo), append autoplay param
+    if (iframe) {
+      const src = iframe.getAttribute('src') || iframe.src || '';
+      if (!src) return;
+      // If src already contains autoplay=, still try to ensure it's 1
+      let newSrc;
+      if (src.includes('autoplay=')) {
+        newSrc = src.replace(/autoplay=\d/, 'autoplay=1');
+      } else {
+        const connector = src.includes('?') ? '&' : '?';
+        newSrc = src + connector + 'autoplay=1';
+      }
+      // assign only if changed (reassigning will reload iframe which stops previous play; that's OK)
+      if (newSrc !== src) {
+        iframe.setAttribute('src', newSrc);
+      } else {
+        // If same, force a reload to ensure autoplay param recognized
+        iframe.setAttribute('src', src);
+      }
+      // For YouTube, ensure muted for autoplay on some browsers:
+      // YouTube autoplay respects the URL param 'mute=1' in some players; add if missing
+      if (!/mute=1/.test(newSrc)) {
+        const connector2 = newSrc.includes('?') ? '&' : '?';
+        iframe.setAttribute('src', newSrc + connector2 + 'mute=1');
+      }
+    }
+
+    // If native video element
+    if (video) {
+      // browsers usually require muted to allow autoplay
+      video.muted = true;
+      // try to play
+      const p = video.play();
+      if (p && p.catch) {
+        p.catch(err => {
+          console.warn('Video autoplay failed:', err);
+        });
+      }
+    }
+  }
 });
