@@ -115,7 +115,6 @@ if (!customElements.get('media-gallery')) {
   );
 }
 
-// Optimized initialization with CLS prevention
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
   const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
@@ -127,10 +126,12 @@ if (!customElements.get('media-gallery')) {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
+  let visibleSlides = [];
   
   let touchStartX = 0;
   let touchEndX = 0;
   let isSwiping = false;
+  let isTransitioning = false;
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -237,14 +238,17 @@ if (!customElements.get('media-gallery')) {
     const container = allItems[0]?.parentNode;
     if (!container) return;
 
-    const activeIndex = Array.from(container.children).findIndex(item => item.classList.contains('is-active'));
-
-    // Use DocumentFragment for better performance
     const fragment = document.createDocumentFragment();
     ordered.forEach(node => fragment.appendChild(node));
     container.appendChild(fragment);
 
-    return ordered.findIndex(item => activeIndex >= 0 && item === allItems[activeIndex]);
+    return ordered;
+  }
+
+  function getVisibleSlides() {
+    if (!mediaList) return [];
+    return Array.from(mediaList.querySelectorAll('.product__media-item'))
+      .filter(slide => slide.style.display !== 'none');
   }
 
   function createDotsNavigation() {
@@ -254,76 +258,90 @@ if (!customElements.get('media-gallery')) {
     }
     if (!mediaList) return;
 
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
-    totalSlides = slides.length;
+    visibleSlides = getVisibleSlides();
+    totalSlides = visibleSlides.length;
+    
     if (totalSlides <= 1) return;
 
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
 
-    const fragment = document.createDocumentFragment();
     for (let i = 0; i < totalSlides; i++) {
       const dot = document.createElement('span');
       dot.className = 'slider-dot';
+      dot.dataset.index = i;
       if (i === currentSlide) dot.classList.add('active');
       dot.addEventListener('click', () => goToSlide(i));
-      fragment.appendChild(dot);
+      dotsContainer.appendChild(dot);
     }
     
-    dotsContainer.appendChild(fragment);
     mediaList.parentNode.appendChild(dotsContainer);
   }
 
   function updateDots() {
     if (!dotsContainer) return;
     const dots = dotsContainer.querySelectorAll('.slider-dot');
-    dots.forEach((dot, i) => dot.classList.toggle('active', i === currentSlide));
+    dots.forEach((dot, i) => {
+      dot.classList.toggle('active', i === currentSlide);
+    });
+  }
+
+  function setActiveSlide(index) {
+    visibleSlides.forEach((slide, i) => {
+      slide.classList.toggle('is-active', i === index);
+    });
   }
 
   function goToSlide(index) {
-    if (index < 0 || index >= totalSlides) return;
+    if (index < 0 || index >= totalSlides || isReordering) return;
+    
     currentSlide = index;
-    if (!mediaList) return;
-
-    const slides = Array.from(mediaList.querySelectorAll('.product__media-item')).filter(slide => slide.style.display !== 'none');
-    slides.forEach((slide, i) => slide.classList.toggle('is-active', i === index));
-
+    visibleSlides = getVisibleSlides();
+    
+    // Update slide classes
+    setActiveSlide(currentSlide);
+    
+    // Update dots
     updateDots();
 
-    if (slides[index]) {
-      slides[index].scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
+    // Scroll to slide
+    const targetSlide = visibleSlides[currentSlide];
+    if (targetSlide) {
+      // Temporarily disable scroll sync during programmatic scroll
+      const scrollHandler = () => {
+        targetSlide.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'nearest', 
+          inline: 'center' 
+        });
+      };
+      
+      scrollHandler();
 
-    const activeVideo = slides[index]?.querySelector('video');
-    if (activeVideo) {
-      activeVideo.loop = true;
-      activeVideo.muted = true;
-      activeVideo.play().catch(() => {});
+      // Play video if present
+      const activeVideo = targetSlide.querySelector('video');
+      if (activeVideo) {
+        activeVideo.loop = true;
+        activeVideo.muted = true;
+        activeVideo.play().catch(() => {});
+      }
     }
   }
 
   function nextSlide() {
-    goToSlide((currentSlide + 1) % totalSlides);
+    const nextIndex = (currentSlide + 1) % totalSlides;
+    goToSlide(nextIndex);
   }
 
   function prevSlide() {
-    goToSlide((currentSlide - 1 + totalSlides) % totalSlides);
+    const prevIndex = (currentSlide - 1 + totalSlides) % totalSlides;
+    goToSlide(prevIndex);
   }
 
   function setupSwipeDetection() {
     if (!mediaList) return;
     
-    mediaList.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-      isSwiping = true;
-    }, { passive: true });
-
-    mediaList.addEventListener('touchmove', (e) => {
-      if (!isSwiping) return;
-      touchEndX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    mediaList.addEventListener('touchend', () => {
+    const handleSwipe = () => {
       if (!isSwiping) return;
       isSwiping = false;
       
@@ -336,20 +354,90 @@ if (!customElements.get('media-gallery')) {
         } else {
           prevSlide();
         }
+      } else {
+        // Small swipe, sync to nearest slide
+        setTimeout(() => syncSlideFromScroll(), 200);
       }
+    };
+    
+    mediaList.addEventListener('touchstart', (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+      isSwiping = true;
     }, { passive: true });
+
+    mediaList.addEventListener('touchmove', (e) => {
+      if (!isSwiping) return;
+      touchEndX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchend', handleSwipe, { passive: true });
+  }
+
+  // Detect scroll-based slide changes
+  function setupScrollSync() {
+    if (!mediaList) return;
+    
+    let scrollTimeout;
+    let isManualScroll = false;
+    
+    mediaList.addEventListener('scrollstart', () => {
+      isManualScroll = true;
+    }, { passive: true });
+    
+    mediaList.addEventListener('scroll', () => {
+      if (isReordering) return;
+      
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        if (!isReordering) {
+          syncSlideFromScroll();
+        }
+        isManualScroll = false;
+      }, 100);
+    }, { passive: true });
+  }
+
+  function syncSlideFromScroll() {
+    if (!mediaList || isReordering || isSwiping) return;
+    
+    const currentVisibleSlides = getVisibleSlides();
+    if (currentVisibleSlides.length === 0) return;
+
+    const containerRect = mediaList.getBoundingClientRect();
+    const containerCenter = containerRect.left + containerRect.width / 2;
+
+    let closestIndex = currentSlide; // Start with current instead of 0
+    let closestDistance = Infinity;
+
+    currentVisibleSlides.forEach((slide, index) => {
+      const slideRect = slide.getBoundingClientRect();
+      const slideCenter = slideRect.left + slideRect.width / 2;
+      const distance = Math.abs(slideCenter - containerCenter);
+
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    });
+
+    // Only update if actually changed
+    if (closestIndex !== currentSlide && closestDistance < containerRect.width * 0.6) {
+      currentSlide = closestIndex;
+      visibleSlides = currentVisibleSlides;
+      setActiveSlide(currentSlide);
+      updateDots();
+    }
   }
 
   function initSliderNavigation() {
     if (!mediaList) return;
+    
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
     
-    // Use requestAnimationFrame to batch DOM updates
-    requestAnimationFrame(() => {
-      createDotsNavigation();
-      setupSwipeDetection();
-    });
+    createDotsNavigation();
+    setupSwipeDetection();
+    setupScrollSync();
   }
 
   function playAllVideos() {
@@ -371,25 +459,24 @@ if (!customElements.get('media-gallery')) {
       return; 
     }
 
-    // Use requestAnimationFrame to prevent layout thrashing
-    requestAnimationFrame(() => {
-      const newActiveIndex = reorderByColor(targetColor);
-      currentSlide = 0;
-      
-      initSliderNavigation();
-      
-      if (newActiveIndex >= 0) { 
-        currentSlide = newActiveIndex; 
-        goToSlide(newActiveIndex); 
-      }
+    // Store current slide index before reordering
+    const previousSlide = currentSlide;
+    
+    reorderByColor(targetColor);
+    
+    // Reset to first slide only on color change
+    currentSlide = 0;
+    
+    initSliderNavigation();
+    
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+      goToSlide(currentSlide);
+      playAllVideos();
+      isReordering = false;
+    }, 150);
 
-      requestAnimationFrame(() => {
-        playAllVideos();
-        isReordering = false;
-      });
-
-      mediaList.setAttribute('data-media-reordered', 'true');
-    });
+    mediaList.setAttribute('data-media-reordered', 'true');
   }
 
   function getSelectedColor() {
@@ -421,11 +508,8 @@ if (!customElements.get('media-gallery')) {
     if (!selectedColor || selectedColor === currentSelectedColor) return;
 
     currentSelectedColor = selectedColor;
-
-    requestAnimationFrame(() => {
-      safeReorderByColor(selectedColor);
-    });
-  }, 50);
+    safeReorderByColor(selectedColor);
+  }, 100);
 
   function setupVariantChangeListeners() {
     document.addEventListener('change', debouncedHandleColorChange);
@@ -436,7 +520,9 @@ if (!customElements.get('media-gallery')) {
     if (mediaList) {
       if (observer) observer.disconnect();
       observer = new MutationObserver(() => {
-        safeReorderByColor(currentSelectedColor);
+        if (!isReordering) {
+          safeReorderByColor(currentSelectedColor);
+        }
       });
       observer.observe(mediaList, { childList: true, subtree: true });
     }
@@ -458,22 +544,17 @@ if (!customElements.get('media-gallery')) {
 
     currentSelectedColor = getSelectedColor();
     
-    // Prevent CLS by hiding skeleton only after content is ready
     const wrapper = mediaList.closest('.media-gallery-wrapper');
     if (wrapper) {
       wrapper.classList.add('loaded');
     }
 
-    // Batch all initial operations
-    requestAnimationFrame(() => {
-      safeReorderByColor(currentSelectedColor);
-      playAllVideos();
-      setupVariantChangeListeners();
-      isInitialized = true;
-    });
+    safeReorderByColor(currentSelectedColor);
+    playAllVideos();
+    setupVariantChangeListeners();
+    isInitialized = true;
   }
 
-  // Start initialization as early as possible
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initialize);
   } else {
