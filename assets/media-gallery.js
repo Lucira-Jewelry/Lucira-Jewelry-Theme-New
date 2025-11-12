@@ -613,13 +613,9 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', () => {
       const wrapper = button.closest('deferred-media');
       if (!wrapper) return;
-
-      // Wait for Shopify to inject the video iframe or video element
       setTimeout(() => {
         const iframe = wrapper.querySelector('iframe');
         const video = wrapper.querySelector('video');
-
-        // --- YouTube or Vimeo ---
         if (iframe) {
           const src = iframe.getAttribute('src') || '';
           if (!src.includes('autoplay=1')) {
@@ -627,13 +623,11 @@ document.addEventListener('DOMContentLoaded', () => {
             iframe.setAttribute('src', `${src}${connector}autoplay=1`);
           }
         }
-
-        // --- Native <video> ---
         if (video) {
-          video.muted = true; // browsers block autoplay without mute
+          video.muted = true;
           video.play().catch((err) => console.warn('Autoplay blocked:', err));
         }
-      }, 300); // small delay ensures the iframe/video is added
+      }, 300);
     });
   });
 });
