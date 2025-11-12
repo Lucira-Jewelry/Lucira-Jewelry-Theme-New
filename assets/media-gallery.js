@@ -607,27 +607,34 @@ if (!customElements.get('media-gallery')) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Select all video modal openers
-  const videoModalOpeners = document.querySelectorAll('.product__modal-opener--video');
+  const deferredButtons = document.querySelectorAll('.deferred-media__poster');
 
-  videoModalOpeners.forEach((opener) => {
-    opener.addEventListener('click', () => {
-      const modalSelector = opener.dataset.modal;
-      const modal = document.querySelector(modalSelector);
+  deferredButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      const wrapper = button.closest('deferred-media');
+      if (!wrapper) return;
 
-      if (!modal) return;
-
-      // Wait until modal is visible
+      // Wait for Shopify to inject the video iframe or video element
       setTimeout(() => {
-        const video = modal.querySelector('video');
+        const iframe = wrapper.querySelector('iframe');
+        const video = wrapper.querySelector('video');
 
-        if (video) {
-          video.muted = true; // Optional: autoplay only works if muted in some browsers
-          video.play().catch((error) => {
-            console.warn('Autoplay blocked:', error);
-          });
+        // --- YouTube or Vimeo ---
+        if (iframe) {
+          const src = iframe.getAttribute('src') || '';
+          if (!src.includes('autoplay=1')) {
+            const connector = src.includes('?') ? '&' : '?';
+            iframe.setAttribute('src', `${src}${connector}autoplay=1`);
+          }
         }
-      }, 300); // small delay to ensure modal opens first
+
+        // --- Native <video> ---
+        if (video) {
+          video.muted = true; // browsers block autoplay without mute
+          video.play().catch((err) => console.warn('Autoplay blocked:', err));
+        }
+      }, 300); // small delay ensures the iframe/video is added
     });
   });
 });
+
