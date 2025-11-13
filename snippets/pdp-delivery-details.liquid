@@ -38,7 +38,6 @@
 
 <script>
 (() => {
-  // --- Elements ---
   const container = document.getElementById("pdp-delivery-check");
   if (!container) return;
 
@@ -46,10 +45,8 @@
   const pincodeInput = document.getElementById("lucira-delivery-zipcode");
   const dateSpan     = container.querySelector(".lucira-delivery-time .delivry_txt");
 
-  // --- Config (fallback to 4 if not present) ---
   const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
 
-  // --- Helpers ---
   const fmtDatePlus = (plusDays) => {
     const d = new Date();
     d.setDate(d.getDate() + Number(plusDays));
@@ -74,7 +71,6 @@
       `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
     );
 
-  // Try to read current dataset ground truth (kept fresh on variant change)
   const ds = () => {
     const avail = String(container.dataset.available || "").toLowerCase();
     const qty   = Number(container.dataset.inventoryQuantity || 0);
@@ -82,7 +78,6 @@
     return { avail, qty, variantCount };
   };
 
-  // --- Stock logic that supports Color-only / Size-only / single-variant ---
   function isVariantInStock() {
     const colorVal = getSelected("Color");
     const sizeVal  = getSelected("Size");
@@ -90,31 +85,27 @@
     const hasSize  = hasPicker("Size");
     const { avail, qty, variantCount } = ds();
 
-    // 1) Use a prebuilt map if store provides it
     if (window.variantStockData) {
-      // 1a) Two-dimensional (Color x Size)
       if (colorVal && sizeVal && window.variantStockData[colorVal]) {
         const node = window.variantStockData[colorVal][sizeVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
-      // 1b) One-dimensional (Color only)
+
       if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
         const node = window.variantStockData[colorVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
-      // 1c) One-dimensional (Size only)
+
       if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
         const node = window.variantStockData[sizeVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
     }
 
-    // 2) Badge hints
     if (hasColor && !hasSize && getBadgeActive("Color")) return true;
     if (!hasColor && hasSize && getBadgeActive("Size")) return true;
     if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
 
-    // 3) Single-option / single-variant / no pickers → trust dataset
     const singleOptionContext =
       (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
 
@@ -123,13 +114,11 @@
       if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
     }
 
-    // 4) Generic dataset fallback
     if (qty > 0) return true;
 
     return false;
   }
 
-  // --- Compute / repaint ---
   const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
 
   function repaint() {
@@ -137,7 +126,6 @@
     dateSpan.textContent = fmtDatePlus(computeDays());
   }
 
-  // --- Button UX ---
   function setLocateView() {
     submitBtn.innerHTML = `
       <svg width="16" height="16" class="icon icon-locate">
@@ -152,7 +140,6 @@
     submitBtn.disabled = false;
   }
 
-  // --- Pincode input handling ---
   if (pincodeInput) {
     pincodeInput.addEventListener("input", () => {
       const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
@@ -168,7 +155,6 @@
     });
   }
 
-  // --- Submit / Locate Me click ---
   if (submitBtn) {
     submitBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -177,13 +163,11 @@
       const pin = (pincodeInput?.value || "").trim();
       const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
 
-      // Locate Me path or incomplete pin
       if (isLocate || pin.length !== 6) {
         if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
         return;
       }
 
-      // optional analytics
       try {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -208,7 +192,6 @@
     });
   }
 
-  // --- Variant change wiring (updates dataset + repaint) ---
   function onVariantChange(e) {
     const v = e?.detail?.variant;
     if (v) {
@@ -225,13 +208,11 @@
   document.addEventListener("variant:change", onVariantChange);
   document.addEventListener("variant:changed", onVariantChange);
 
-  // Also repaint on any Color/Size change if theme doesn't emit events
   document.addEventListener("change", (evt) => {
     const n = evt.target?.name || "";
     if (n.includes("Color") || n.includes("Size")) repaint();
   });
 
-  // Patch Locate Me to flip to Submit + repaint after it fills pincode
   if (typeof window.luciraLocateMe === "function") {
     const _orig = window.luciraLocateMe;
     window.luciraLocateMe = async function (...args) {
@@ -243,7 +224,6 @@
     };
   }
 
-  // --- Initial state ---
   setLocateView();
   repaint();
   setTimeout(repaint, 120);
