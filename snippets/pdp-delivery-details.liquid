@@ -1,20 +1,14 @@
-{%- assign delivery_days = product.metafields.custom.shipping | default: 4 -%}
-{%- assign selected_variant = product.selected_or_first_available_variant -%}
-{%- assign variant_count = product.variants.size -%}
-{%- assign sel_available = selected_variant.available -%}
-{%- assign sel_qty = selected_variant.inventory_quantity | default: 0 -%}
+{% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
 
 <div 
   class="lucira-delivery-container" 
   id="pdp-delivery-check"
   data-delivery-days="{{ delivery_days }}"
-  data-product-sku="{{ selected_variant.sku }}"
+  data-product-sku="{{ product.selected_or_first_available_variant.sku }}"
   data-product-title="{{ product.title | escape }}"
-  data-available="{{ sel_available }}"
-  data-inventory-quantity="{{ sel_qty }}"
-  data-variant-count="{{ variant_count }}"
-  data-variant-id="{{ selected_variant.id }}"
 >
+
+
   <div class="lucira-delivery-input-container">
     <div class="input-wrapper">
       <svg class="pin-beside-pincode" width="18" height="18"> <use href="#icon-location"></use> </svg>
@@ -26,44 +20,44 @@
         inputmode="numeric"
         title="enter pincode"
       >
-      <button class="submitButton">
-        <svg class="locate-me-icon" width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg>
-        Locate Me
-      </button>
+      <button class="submitButton"> <svg class="locate-me-icon" width="16" height="16" class="icon icon-locate"> <use xlink:href="#icon-locate"></use> </svg> Locate Me</button>
     </div>
   </div>
 
+  {% assign total_seconds = delivery_days | times: 86400 %}
+  {% assign now = 'now' | date: '%s' %}
+  {% assign future_timestamp = now | plus: total_seconds %}
+  {% assign delivery_date = future_timestamp | date: '%B %d, %Y' %}
+
   <div class="lucira-delivery-info">
-    <span class="lucira-delivery-time">
-      <span class="dispatch-prefix">Estimated Free Dispatch by</span>
-      <span class="delivry_txt" aria-live="polite"></span>
+    <span class="lucira-delivery-time">Estimated Free Dispatch by 
+      <span class="delivry_txt">{{ delivery_date }}</span>
     </span>
-    <span class="lucira-outofstock" style="display:none;">Out of stock</span>
   </div>
 </div>
 
 <script>
 (() => {
+  // --- Elements ---
   const container = document.getElementById("pdp-delivery-check");
   if (!container) return;
 
   const submitBtn    = container.querySelector(".submitButton");
   const pincodeInput = document.getElementById("lucira-delivery-zipcode");
   const dateSpan     = container.querySelector(".lucira-delivery-time .delivry_txt");
-  const outSpan      = container.querySelector(".lucira-outofstock");
 
+  // --- Config (fallback to 4 if not present) ---
   const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
 
+  // --- Helpers ---
   const fmtDatePlus = (plusDays) => {
     const d = new Date();
     d.setDate(d.getDate() + Number(plusDays));
     return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
   };
 
-  // helpers for variant pickers (unchanged)
   const getSelected = (label) => {
+    // Works for radios or selects; label can be "Color" or "Size"
     const radio = document.querySelector(`input[name*="${label}"]:checked`);
     if (radio) return radio.value;
     const sel = document.querySelector(`select[name*="${label}"]`);
@@ -80,7 +74,7 @@
       `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
     );
 
-  // read dataset snapshot
+  // Try to read current dataset ground truth (kept fresh on variant change)
   const ds = () => {
     const avail = String(container.dataset.available || "").toLowerCase();
     const qty   = Number(container.dataset.inventoryQuantity || 0);
@@ -88,7 +82,7 @@
     return { avail, qty, variantCount };
   };
 
-  // stock detection (keeps your existing logic but we will use it to decide whether to show a date)
+  // --- Stock logic that supports Color-only / Size-only / single-variant ---
   function isVariantInStock() {
     const colorVal = getSelected("Color");
     const sizeVal  = getSelected("Size");
@@ -96,63 +90,54 @@
     const hasSize  = hasPicker("Size");
     const { avail, qty, variantCount } = ds();
 
+    // 1) Use a prebuilt map if store provides it
     if (window.variantStockData) {
+      // 1a) Two-dimensional (Color x Size)
       if (colorVal && sizeVal && window.variantStockData[colorVal]) {
         const node = window.variantStockData[colorVal][sizeVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
+      // 1b) One-dimensional (Color only)
       if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
         const node = window.variantStockData[colorVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
+      // 1c) One-dimensional (Size only)
       if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
         const node = window.variantStockData[sizeVal];
         if (node && node.available && Number(node.inventory) > 0) return true;
       }
     }
 
+    // 2) Badge hints
     if (hasColor && !hasSize && getBadgeActive("Color")) return true;
     if (!hasColor && hasSize && getBadgeActive("Size")) return true;
     if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
 
+    // 3) Single-option / single-variant / no pickers → trust dataset
     const singleOptionContext =
       (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
 
     if (singleOptionContext) {
       if ((avail === "true" || avail === "1") && qty > 0) return true;
-      if (avail === "true" && !Number.isFinite(qty)) return true;
+      if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
     }
 
+    // 4) Generic dataset fallback
     if (qty > 0) return true;
+
     return false;
   }
 
-  // NEW: computeDays returns a number or null (null => show Out of stock)
-  const computeDays = () => {
-    // If in stock -> short estimate (2 days). Otherwise do NOT show metafield estimate.
-    // If you want backorderable items to still show META_DAYS, change this logic accordingly.
-    return isVariantInStock() ? 2 : null;
-  };
+  // --- Compute / repaint ---
+  const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
 
   function repaint() {
-    if (!dateSpan || !outSpan) return;
-    const days = computeDays();
-    if (days === null) {
-      // show Out of stock (hide date)
-      dateSpan.textContent = "";
-      outSpan.style.display = "";
-      // optionally hide the prefix too:
-      const prefix = container.querySelector('.dispatch-prefix');
-      if (prefix) prefix.style.display = "none";
-    } else {
-      outSpan.style.display = "none";
-      const prefix = container.querySelector('.dispatch-prefix');
-      if (prefix) prefix.style.display = "";
-      dateSpan.textContent = fmtDatePlus(days);
-    }
+    if (!dateSpan) return;
+    dateSpan.textContent = fmtDatePlus(computeDays());
   }
 
-  // Button UX helpers (unchanged)
+  // --- Button UX ---
   function setLocateView() {
     submitBtn.innerHTML = `
       <svg width="16" height="16" class="icon icon-locate">
@@ -167,6 +152,7 @@
     submitBtn.disabled = false;
   }
 
+  // --- Pincode input handling ---
   if (pincodeInput) {
     pincodeInput.addEventListener("input", () => {
       const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
@@ -182,6 +168,7 @@
     });
   }
 
+  // --- Submit / Locate Me click ---
   if (submitBtn) {
     submitBtn.addEventListener("click", (e) => {
       e.preventDefault();
@@ -190,11 +177,13 @@
       const pin = (pincodeInput?.value || "").trim();
       const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
 
+      // Locate Me path or incomplete pin
       if (isLocate || pin.length !== 6) {
         if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
         return;
       }
 
+      // optional analytics
       try {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -210,24 +199,16 @@
         });
       } catch (_) {}
 
-      // When user submits pin, we only show a date if variant is in stock
-      const days = computeDays();
-      if (days === null) {
-        dateSpan.textContent = "";
-        outSpan.style.display = "";
-      } else {
-        const formatted = fmtDatePlus(days);
-        dateSpan.textContent = formatted;
-        outSpan.style.display = "none";
-      }
+      const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
+      const formatted = fmtDatePlus(days);
 
-      // small visual ticks to ensure repaint shows
-      setTimeout(repaint, 60);
-      setTimeout(repaint, 250);
+      if (dateSpan) dateSpan.textContent = formatted;
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
     });
   }
 
-  // Variant change wiring (same - updates dataset + repaint)
+  // --- Variant change wiring (updates dataset + repaint) ---
   function onVariantChange(e) {
     const v = e?.detail?.variant;
     if (v) {
@@ -244,11 +225,13 @@
   document.addEventListener("variant:change", onVariantChange);
   document.addEventListener("variant:changed", onVariantChange);
 
+  // Also repaint on any Color/Size change if theme doesn't emit events
   document.addEventListener("change", (evt) => {
     const n = evt.target?.name || "";
     if (n.includes("Color") || n.includes("Size")) repaint();
   });
 
+  // Patch Locate Me to flip to Submit + repaint after it fills pincode
   if (typeof window.luciraLocateMe === "function") {
     const _orig = window.luciraLocateMe;
     window.luciraLocateMe = async function (...args) {
@@ -260,6 +243,7 @@
     };
   }
 
+  // --- Initial state ---
   setLocateView();
   repaint();
   setTimeout(repaint, 120);
