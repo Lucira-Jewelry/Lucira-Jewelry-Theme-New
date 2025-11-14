@@ -37,228 +37,195 @@
 </div>
 
 <script>
-/* Improved delivery widget script — more robust & debuggable */
-document.addEventListener("DOMContentLoaded", () => {
-  try {
-    console.log("[lucira] delivery script init");
+(() => {
+  const container = document.getElementById("pdp-delivery-check");
+  if (!container) return;
 
-    const container = document.getElementById("pdp-delivery-check");
-    if (!container) {
-      console.warn("[lucira] #pdp-delivery-check not found — aborting.");
-      return;
-    }
+  const submitBtn    = container.querySelector(".submitButton");
+  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
+  const dateSpan     = container.querySelector(".lucira-delivery-time .delivry_txt");
 
-    const submitBtn    = container.querySelector(".submitButton");
-    const pincodeInput = container.querySelector("#lucira-delivery-zipcode");
-    const dateSpan     = container.querySelector(".lucira-delivery-time .delivry_txt");
+  const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
 
-    // defensive checks
-    if (!dateSpan) console.warn("[lucira] .delivry_txt not found — date won't be updated.");
-    if (!submitBtn) console.warn("[lucira] .submitButton not found — submission won't work.");
-    if (!pincodeInput) console.warn("[lucira] #lucira-delivery-zipcode not found — locate/submit logic limited.");
+  const fmtDatePlus = (plusDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(plusDays));
+    return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+  };
 
-    const META_DAYS = Number(container?.dataset?.deliveryDays ?? 4);
-    console.log("[lucira] META_DAYS =", META_DAYS, "dataset:", container.dataset);
+  const getSelected = (label) => {
+    // Works for radios or selects; label can be "Color" or "Size"
+    const radio = document.querySelector(`input[name*="${label}"]:checked`);
+    if (radio) return radio.value;
+    const sel = document.querySelector(`select[name*="${label}"]`);
+    if (sel) return sel.value;
+    return null;
+  };
 
-    const fmtDatePlus = (plusDays) => {
-      const d = new Date();
-      d.setDate(d.getDate() + Number(plusDays || 0));
-      return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-    };
+  const hasPicker = (label) =>
+    !!document.querySelector(`input[name*="${label}"], select[name*="${label}"]`);
 
-    const getSelected = (label) => {
-      const radio = document.querySelector(`input[name*="${label}"]:checked`);
-      if (radio) return radio.value;
-      const sel = document.querySelector(`select[name*="${label}"]`);
-      if (sel) return sel.value;
-      return null;
-    };
+  const getBadgeActive = (label) =>
+    document.querySelector(
+      `input[name*="${label}"]:checked + label .Variant_Stock_Status .stock-active,` +
+      `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
+    );
 
-    const hasPicker = (label) => !!document.querySelector(`input[name*="${label}"], select[name*="${label}"]`);
+  const ds = () => {
+    const avail = String(container.dataset.available || "").toLowerCase();
+    const qty   = Number(container.dataset.inventoryQuantity || 0);
+    const variantCount = Number(container.dataset.variantCount || 0);
+    return { avail, qty, variantCount };
+  };
 
-    const getBadgeActive = (label) =>
-      document.querySelector(
-        `input[name*="${label}"]:checked + label .Variant_Stock_Status .stock-active,` +
-        `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
-      );
+  function isVariantInStock() {
+    const colorVal = getSelected("Color");
+    const sizeVal  = getSelected("Size");
+    const hasColor = hasPicker("Color");
+    const hasSize  = hasPicker("Size");
+    const { avail, qty, variantCount } = ds();
 
-    const ds = () => {
-      const avail = String(container.dataset.available || "").toLowerCase();
-      const qty   = Number(container.dataset.inventoryQuantity || 0);
-      const variantCount = Number(container.dataset.variantCount || 0);
-      return { avail, qty, variantCount };
-    };
-
-    function isVariantInStock() {
-      try {
-        const colorVal = getSelected("Color");
-        const sizeVal  = getSelected("Size");
-        const hasColor = hasPicker("Color");
-        const hasSize  = hasPicker("Size");
-        const { avail, qty, variantCount } = ds();
-
-        if (window.variantStockData) {
-          if (colorVal && sizeVal && window.variantStockData[colorVal]) {
-            const node = window.variantStockData[colorVal][sizeVal];
-            if (node && node.available && Number(node.inventory) > 0) return true;
-          }
-
-          if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
-            const node = window.variantStockData[colorVal];
-            if (node && node.available && Number(node.inventory) > 0) return true;
-          }
-
-          if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
-            const node = window.variantStockData[sizeVal];
-            if (node && node.available && Number(node.inventory) > 0) return true;
-          }
-        }
-
-        if (hasColor && !hasSize && getBadgeActive("Color")) return true;
-        if (!hasColor && hasSize && getBadgeActive("Size")) return true;
-        if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
-
-        const singleOptionContext =
-          (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
-
-        if (singleOptionContext) {
-          if ((avail === "true" || avail === "1") && qty > 0) return true;
-          if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
-        }
-
-        if (qty > 0) return true;
-      } catch (err) {
-        console.error("[lucira] isVariantInStock error:", err);
+    if (window.variantStockData) {
+      if (colorVal && sizeVal && window.variantStockData[colorVal]) {
+        const node = window.variantStockData[colorVal][sizeVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
       }
-      return false;
-    }
 
-    const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
-
-    function repaint() {
-      if (!dateSpan) return;
-      const days = computeDays();
-      const formatted = fmtDatePlus(days);
-      dateSpan.textContent = formatted;
-      console.log("[lucira] repaint ->", formatted, "(days:", days, ")");
-    }
-
-    function setLocateView() {
-      if (!submitBtn) return;
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate" aria-hidden="true">
-          <use xlink:href="#icon-locate"></use>
-        </svg>
-        Locate Me
-      `;
-      submitBtn.disabled = false;
-    }
-
-    function setSubmitView() {
-      if (!submitBtn) return;
-      submitBtn.textContent = "Submit";
-      submitBtn.disabled = false;
-    }
-
-    if (pincodeInput) {
-      pincodeInput.addEventListener("input", () => {
-        const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
-        pincodeInput.value = val;
-        if (val.length === 6) {
-          setTimeout(() => {
-            setSubmitView();
-            submitBtn?.dispatchEvent(new Event("pincode:ready", { bubbles: true }));
-          }, 150);
-        } else {
-          setLocateView();
-        }
-      });
-    }
-
-    if (submitBtn) {
-      submitBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        const pin = (pincodeInput?.value || "").trim();
-        const btnText = (submitBtn.textContent || submitBtn.innerText || "").toLowerCase();
-        const isLocate = btnText.includes("locate");
-
-        if (isLocate || pin.length !== 6) {
-          console.log("[lucira] locate action triggered");
-          if (typeof window.luciraLocateMe === "function") {
-            try { window.luciraLocateMe(); } catch (err) { console.error("[lucira] luciraLocateMe error:", err); }
-          } else {
-            console.warn("[lucira] luciraLocateMe() not defined on window");
-          }
-          return;
-        }
-
-        try {
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: "promoClick",
-            promoClick: {
-              promo_id: container.dataset.productSku,
-              promo_name: container.dataset.productTitle,
-              creative_name: "pincodeEntered",
-              location_id: container.dataset.variantId,
-              promo_position: pin,
-              pincode: pin
-            }
-          });
-        } catch (_) { console.warn("[lucira] datalayer push failed"); }
-
-        const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
-        const formatted = fmtDatePlus(days);
-        if (dateSpan) dateSpan.textContent = formatted;
-        // extra repaints for UI race conditions
-        setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
-        setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
-        console.log("[lucira] pincode submitted ->", pin, "days:", days);
-      });
-    }
-
-    function onVariantChange(e) {
-      const v = e?.detail?.variant;
-      if (v) {
-        container.dataset.variantId = String(v.id || "");
-        if (typeof v.inventory_quantity === "number") {
-          container.dataset.inventoryQuantity = String(v.inventory_quantity);
-        }
-        if (typeof v.available !== "undefined") {
-          container.dataset.available = String(!!v.available);
-        }
+      if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
+        const node = window.variantStockData[colorVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
       }
-      repaint();
-    }
-    document.addEventListener("variant:change", onVariantChange);
-    document.addEventListener("variant:changed", onVariantChange);
 
-    document.addEventListener("change", (evt) => {
-      const n = evt.target?.name || "";
-      if (n.includes("Color") || n.includes("Size")) repaint();
-    });
-
-    if (typeof window.luciraLocateMe === "function") {
-      const _orig = window.luciraLocateMe;
-      window.luciraLocateMe = async function (...args) {
-        try { await _orig.apply(this, args); } catch (err) { console.error("[lucira] luciraLocateMe wrapper error:", err); }
-        setTimeout(() => {
-          if ((pincodeInput?.value || "").replace(/\D/g, "").length === 6) setSubmitView();
-          repaint();
-        }, 50);
-      };
+      if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
+        const node = window.variantStockData[sizeVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
+      }
     }
 
-    // boot
-    setLocateView();
-    repaint();
-    setTimeout(repaint, 120);
+    if (hasColor && !hasSize && getBadgeActive("Color")) return true;
+    if (!hasColor && hasSize && getBadgeActive("Size")) return true;
+    if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
 
-    console.log("[lucira] delivery script ready");
-  } catch (err) {
-    console.error("[lucira] delivery script crashed:", err);
+    const singleOptionContext =
+      (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
+
+    if (singleOptionContext) {
+      if ((avail === "true" || avail === "1") && qty > 0) return true;
+      if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
+    }
+
+    if (qty > 0) return true;
+
+    return false;
   }
-});
+
+  const computeDays = () => (isVariantInStock() ? 2 : META_DAYS);
+
+  function repaint() {
+    if (!dateSpan) return;
+    dateSpan.textContent = fmtDatePlus(computeDays());
+  }
+
+  function setLocateView() {
+    submitBtn.innerHTML = `
+      <svg width="16" height="16" class="icon icon-locate">
+        <use xlink:href="#icon-locate"></use>
+      </svg> Locate Me
+    `;
+    submitBtn.disabled = false;
+  }
+
+  function setSubmitView() {
+    submitBtn.textContent = "Submit";
+    submitBtn.disabled = false;
+  }
+
+  if (pincodeInput) {
+    pincodeInput.addEventListener("input", () => {
+      const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
+      pincodeInput.value = val;
+      if (val.length === 6) {
+        setTimeout(() => {
+          setSubmitView();
+          submitBtn?.dispatchEvent(new Event("pincode:ready", { bubbles: true }));
+        }, 150);
+      } else {
+        setLocateView();
+      }
+    });
+  }
+
+  if (submitBtn) {
+    submitBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      const pin = (pincodeInput?.value || "").trim();
+      const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
+
+      if (isLocate || pin.length !== 6) {
+        if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
+        return;
+      }
+
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: container.dataset.productSku,
+            promo_name: container.dataset.productTitle,
+            creative_name: "pincodeEntered",
+            location_id: container.dataset.variantId,
+            promo_position: pin,
+            pincode: pin
+          }
+        });
+      } catch (_) {}
+
+      const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
+      const formatted = fmtDatePlus(days);
+
+      if (dateSpan) dateSpan.textContent = formatted;
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
+    });
+  }
+
+  function onVariantChange(e) {
+    const v = e?.detail?.variant;
+    if (v) {
+      container.dataset.variantId = String(v.id || "");
+      if (typeof v.inventory_quantity === "number") {
+        container.dataset.inventoryQuantity = String(v.inventory_quantity);
+      }
+      if (typeof v.available !== "undefined") {
+        container.dataset.available = String(!!v.available);
+      }
+    }
+    repaint();
+  }
+  document.addEventListener("variant:change", onVariantChange);
+  document.addEventListener("variant:changed", onVariantChange);
+
+  document.addEventListener("change", (evt) => {
+    const n = evt.target?.name || "";
+    if (n.includes("Color") || n.includes("Size")) repaint();
+  });
+
+  if (typeof window.luciraLocateMe === "function") {
+    const _orig = window.luciraLocateMe;
+    window.luciraLocateMe = async function (...args) {
+      try { await _orig.apply(this, args); } catch (_) {}
+      setTimeout(() => {
+        if ((pincodeInput?.value || "").replace(/\D/g, "").length === 6) setSubmitView();
+        repaint();
+      }, 50);
+    };
+  }
+
+  setLocateView();
+  repaint();
+  setTimeout(repaint, 120);
+})();
 </script>
