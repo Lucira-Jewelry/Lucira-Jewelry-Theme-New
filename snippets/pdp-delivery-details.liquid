@@ -54,6 +54,7 @@
   };
 
   const getSelected = (label) => {
+    // Works for radios or selects; label can be "Color" or "Size"
     const radio = document.querySelector(`input[name*="${label}"]:checked`);
     if (radio) return radio.value;
     const sel = document.querySelector(`select[name*="${label}"]`);
@@ -110,7 +111,7 @@
 
     if (singleOptionContext) {
       if ((avail === "true" || avail === "1") && qty > 0) return true;
-      if (avail === "true" && !Number.isFinite(qty)) return true;
+      if (avail === "true" && !Number.isFinite(qty)) return true; // if qty hidden
     }
 
     if (qty > 0) return true;
@@ -139,14 +140,6 @@
     submitBtn.disabled = false;
   }
 
-  // helper to push analytics/dataLayer safely
-  function pushPromoEvent(promoData) {
-    try {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({ event: "promoClick", promoClick: promoData });
-    } catch (e) { /* ignore */ }
-  }
-
   if (pincodeInput) {
     pincodeInput.addEventListener("input", () => {
       const val = pincodeInput.value.replace(/\D/g, "").slice(0, 6);
@@ -163,7 +156,7 @@
   }
 
   if (submitBtn) {
-    submitBtn.addEventListener("click", async (e) => {
+    submitBtn.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopImmediatePropagation();
 
@@ -171,56 +164,10 @@
       const isLocate = (submitBtn.textContent || "").toLowerCase().includes("locate");
 
       if (isLocate || pin.length !== 6) {
-        // --- LOCATE FLOW ---
-        // Immediately send a locate analytics event (no pincode yet)
-        pushPromoEvent({
-          promo_id: container.dataset.productSku,
-          promo_name: container.dataset.productTitle,
-          creative_name: "locateMe",
-          location_id: container.dataset.variantId,
-          promo_position: "", // unknown until locate resolves
-          pincode: "" // may be filled after locate
-        });
-
-        // Call locate function if available (may populate the pincode input asynchronously)
-        if (typeof window.luciraLocateMe === "function") {
-          try {
-            // If locate returns a promise we await it
-            const result = window.luciraLocateMe();
-            if (result && typeof result.then === "function") {
-              await result;
-            }
-          } catch (_) { /* ignore locate errors */ }
-        }
-
-        // after locate completes, if a pincode is present, switch to submit and push another event
-        const locatedPin = (pincodeInput?.value || "").replace(/\D/g, "");
-        if (locatedPin.length === 6) {
-          // update button text so user can submit if they want to change
-          setSubmitView();
-
-          // send another analytics event now that we have a pincode from locate
-          pushPromoEvent({
-            promo_id: container.dataset.productSku,
-            promo_name: container.dataset.productTitle,
-            creative_name: "locateMe:foundPincode",
-            location_id: container.dataset.variantId,
-            promo_position: locatedPin,
-            pincode: locatedPin
-          });
-
-          // also immediately update delivery date UI
-          const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
-          const formatted = fmtDatePlus(days);
-          if (dateSpan) dateSpan.textContent = formatted;
-          setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
-          setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
-        }
-
+        if (typeof window.luciraLocateMe === "function") window.luciraLocateMe();
         return;
       }
 
-      // --- SUBMIT FLOW (existing behaviour) ---
       try {
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
