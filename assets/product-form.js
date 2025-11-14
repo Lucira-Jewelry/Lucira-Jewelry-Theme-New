@@ -1128,3 +1128,58 @@ function luciraLocateMe() {
   }
 }
 
+
+
+(function () {
+
+  function initAudioPlayers() {
+    const audioPlayers = document.querySelectorAll('.product-audio-player');
+
+    audioPlayers.forEach((wrapper) => {
+
+      const button = wrapper.querySelector('.audio-play-button');
+      const audio = wrapper.querySelector('audio');
+
+      if (!button || !audio) return;
+
+      // Replace existing listeners
+      const newBtn = button.cloneNode(true);
+      button.replaceWith(newBtn);
+
+      const playIcon = newBtn.querySelector('.icon-play');
+      const pauseIcon = newBtn.querySelector('.icon-pause');
+
+      // Ensure initial state
+      playIcon.style.display = "block";
+      pauseIcon.style.display = "none";
+
+      newBtn.addEventListener("click", () => {
+        if (audio.paused) {
+          audio.play();
+          playIcon.style.display = "none";
+          pauseIcon.style.display = "block";
+        } else {
+          audio.pause();
+          playIcon.style.display = "block";
+          pauseIcon.style.display = "none";
+        }
+      });
+
+      audio.addEventListener("ended", () => {
+        playIcon.style.display = "block";
+        pauseIcon.style.display = "none";
+      });
+    });
+  }
+
+  // Load event
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAudioPlayers);
+  } else {
+    initAudioPlayers();
+  }
+
+  // Re-initialize on variant change
+  document.addEventListener('variant:change', initAudioPlayers);
+
+})();
