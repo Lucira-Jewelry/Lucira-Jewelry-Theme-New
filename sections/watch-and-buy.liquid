@@ -37,7 +37,7 @@
                   <img
                     src="{{ product_image | img_url: '400x300' }}"
                     alt="{{ product_title }}"
-                     title="{{ product_title }}"
+                    title="{{ product_title }}"
                     class="media-placeholder"
                     loading="lazy"
                     width="400"
@@ -55,7 +55,7 @@
                   <img
                     src="{{ product_image | img_url: '400x300' }}"
                     alt="{{ product_title }}"
-                     title="{{ product_title }}"
+                    title="{{ product_title }}"
                     class="media-placeholder"
                     loading="lazy"
                     width="400"
@@ -65,7 +65,7 @@
                   <img
                     src="{{ block.settings.image | img_url: '400x300' }}"
                     alt="{{ product_title }}"
-                title="{{ product_title }}"
+                    title="{{ product_title }}"
                     class="media-placeholder"
                     loading="lazy"
                     width="400"
@@ -123,7 +123,7 @@
 
             <div class="item-content">
               {% if product_title != blank %}
-              <h3 class="item-title">{{ product_title }}</h3>
+                <h3 class="item-title">{{ product_title }}</h3>
               {% endif %}
               <div class="item-bottom">
                 <div class="item-price-wrapper">
@@ -241,7 +241,7 @@
       } else if (videoSrc) {
         const video = document.createElement('video');
         video.loop = true;
-        video.muted = true;
+        video.muted = true; // Keep muted in carousel
         video.autoplay = true;
         video.playsInline = true;
         const source = document.createElement('source');
@@ -336,195 +336,282 @@
         });
       }
     }, 2000);
+
+    let _lastDPR = window.devicePixelRatio || 1;
+    let _lastInnerWidth = window.innerWidth || document.documentElement.clientWidth;
+    const ZOOM_DETECT_THRESHOLD = 0.05; // devicePixelRatio fractional change considered a "zoom"
+    const RESIZE_WIDTH_THRESHOLD = 40; // px change in width considered a "layout change"
+
+    // Pause + mute all carousel/popup videos
+    function pauseAndMuteAllVideos(markAsZoom = false) {
+      document.querySelectorAll('.watch-and-buy-section video, video.popup-video, .mobile-popup-video').forEach((v) => {
+        try {
+          v.pause();
+          // ensure muted to prevent sound if autoplay later runs
+          v.muted = true;
+          // flag so we know we paused due to zoom/resize (useful if you want to resume later)
+          if (markAsZoom) v.dataset.pausedByZoom = 'true';
+        } catch (e) {
+          /* ignore */
+        }
+      });
+    }
+
+    // Optionally resume videos that weren't paused by user when zoom/resize settles
+    function resumeVideosAfterZoom() {
+      document.querySelectorAll('.watch-and-buy-section video, video.popup-video, .mobile-popup-video').forEach((v) => {
+        try {
+          // only resume if we previously paused it due to zoom, and user didn't manually pause it
+          if (v.dataset.pausedByZoom === 'true') {
+            // leave muted true (only unmute on explicit user interaction)
+            v.play().catch(() => {
+              /* autoplay prevented - fine */
+            });
+            delete v.dataset.pausedByZoom;
+          }
+        } catch (e) {}
+      });
+    }
+
+    // Detect zoom / big resize and pause videos immediately
+    function handlePossibleZoomOrLayoutChange() {
+      const dpr = window.devicePixelRatio || 1;
+      const iw = window.innerWidth || document.documentElement.clientWidth;
+
+      const dprChange = Math.abs(dpr - _lastDPR);
+      const widthChange = Math.abs(iw - _lastInnerWidth);
+
+      if (dprChange > ZOOM_DETECT_THRESHOLD || widthChange > RESIZE_WIDTH_THRESHOLD) {
+        // It's likely a zoom or large layout shift → pause & mute to avoid accidental autoplay / audio
+        pauseAndMuteAllVideos(true);
+
+        // Debounced resume: try to resume after the user finishes resizing/zooming (optional)
+        if (window._zoomResumeTimeout) clearTimeout(window._zoomResumeTimeout);
+        window._zoomResumeTimeout = setTimeout(() => {
+          resumeVideosAfterZoom();
+          // refresh last-known values
+          _lastDPR = window.devicePixelRatio || 1;
+          _lastInnerWidth = window.innerWidth || document.documentElement.clientWidth;
+        }, 700);
+      } else {
+        // small resize only — just update values
+        _lastDPR = dpr;
+        _lastInnerWidth = iw;
+      }
+    }
+
+    // Debounce resize event to avoid thrash
+    let _resizeDebounce;
+    window.addEventListener('resize', function () {
+      clearTimeout(_resizeDebounce);
+      _resizeDebounce = setTimeout(handlePossibleZoomOrLayoutChange, 120);
+    });
+
+    // Some browsers expose zoom via 'zoom' gesture events (not standardized) — listen to gesturechange if present
+    window.addEventListener('gesturechange', () => {
+      handlePossibleZoomOrLayoutChange();
+    });
+
+    // Ensure videos created by your lazy loader are always muted by default and only play when intended.
+    // Add a delegated handler: when you create videos, set muted=true. If you already create them elsewhere, this will enforce it.
+    document.addEventListener(
+      'play',
+      function (e) {
+        const target = e.target;
+        if (target && target.tagName === 'VIDEO') {
+          // If this play was triggered without user interaction and the video has audio, force mute
+          if (!target.dataset.userInteracted) {
+            target.muted = true; // ensures no audio plays unexpectedly
+          }
+        }
+      },
+      true
+    ); // capture phase to run early
+
+    // Allow user to unmute with an explicit click / tap - mark that as user interaction
+    document.addEventListener('click', function (e) {
+      const v = e.target.closest('video');
+      if (v) {
+        // User explicitly clicked a video → unmute and mark as user-interacted
+        try {
+          v.muted = false;
+          v.dataset.userInteracted = 'true';
+          // if it was paused, play it (explicit user gesture should allow autoplay with sound)
+          v.play().catch(() => {});
+        } catch (err) {}
+      }
+    });
   });
 </script>
 
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
-  // Lazy loading functionality
-  const watchAndBuySection = document.getElementById("watchAndBuySection");
-  let sectionLoaded = false;
+  document.addEventListener('DOMContentLoaded', function () {
+    // Lazy loading functionality
+    const watchAndBuySection = document.getElementById('watchAndBuySection');
+    let sectionLoaded = false;
 
-  // Intersection observer for lazy loading
-  const sectionObserver = new IntersectionObserver(
-    (entries) => {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting && !sectionLoaded) {
-          sectionLoaded = true;
-          initializeWatchAndBuy();
-          watchAndBuySection.classList.add("loaded");
-        }
-      });
-    },
-    {
-      rootMargin: "50px 0px",
-    }
-  );
-
-  // Observe the section
-  sectionObserver.observe(watchAndBuySection);
-
-  function initializeWatchAndBuy() {
-    // Check if jQuery is available
-    if (typeof jQuery === "undefined") {
-      console.error("jQuery is not loaded");
-      return;
-    }
-
-    let currentVideoIndex = 0;
-    let videoItems = [];
-    let currentProductUrl = "";
-    let currentProductAvailable = false;
-    let isMobile = window.innerWidth <= 768;
-    let mobileSwiper = null;
-
-    // Mobile touch handling variables
-    let touchStartY = 0;
-    let touchEndY = 0;
-    let isScrolling = false;
-    let scrollTimeout;
-
-    // Initialize Owl Carousel for desktop
-    var watchBuySlider = $(".watch-buy-slider");
-    watchBuySlider.owlCarousel({
-      items: 5,
-      margin: 20,
-      speed: 1000,
-      loop: true,
-      nav: false,
-      center: true,
-      dots: false,
-      navText: [
-        "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_back_ios_new.svg?v=1750503882 'title='Previous'  alt='Previous'/>",
-        "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_forward_ios.svg?v=1750503882' title='Next'alt='Next' />",
-      ],
-      autoplay: false,
-      responsive: {
-        0: {
-          items: 1.5,
-          loop: true,
-          nav: false,
-          center: true,
-        },
-        600: {
-          items: 3,
-          nav: false,
-          center: true,
-        },
-        992: {
-          items: 4.5,
-          nav: false,
-          center: false,
-        },
-        1200: {
-          items: 5,
-          nav: true,
-          center: false,
-        },
-        1300: {
-          items: 5,
-          nav: true,
-          center: false,
-        },
+    // Intersection observer for lazy loading
+    const sectionObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !sectionLoaded) {
+            sectionLoaded = true;
+            initializeWatchAndBuy();
+            watchAndBuySection.classList.add('loaded');
+          }
+        });
       },
-    });
-
-    // Update mobile detection on resize
-    function updateMobileDetection() {
-      isMobile = window.innerWidth <= 768;
-    }
-
-    // Force navigation visibility on desktop screens
-    function handleNavigationVisibility() {
-      const screenWidth = window.innerWidth;
-      const navButtons = watchBuySlider.find(".owl-nav button");
-      updateMobileDetection();
-
-      if (screenWidth >= 1200) {
-        navButtons.removeClass("disabled").show();
-        watchBuySlider.find(".owl-nav").show();
-      } else {
-        watchBuySlider.find(".owl-nav").hide();
+      {
+        rootMargin: '50px 0px',
       }
-    }
+    );
 
-    setTimeout(handleNavigationVisibility, 100);
+    // Observe the section
+    sectionObserver.observe(watchAndBuySection);
 
-    $(window).on("resize", function () {
-      clearTimeout(window.navResizeTimeout);
-      window.navResizeTimeout = setTimeout(handleNavigationVisibility, 150);
-    });
+    function initializeWatchAndBuy() {
+      // Check if jQuery is available
+      if (typeof jQuery === 'undefined') {
+        console.error('jQuery is not loaded');
+        return;
+      }
 
-    // Carousel shopping bag click handlers
-    document.querySelectorAll(".carousel-shopping-bag").forEach((button) => {
-      button.addEventListener("click", function (e) {
-        e.stopPropagation();
-        e.preventDefault();
-        const productUrl = this.getAttribute("data-product-url");
-        if (
-          productUrl &&
-          productUrl !== "null" &&
-          productUrl !== "undefined"
-        ) {
-          window.open(productUrl, "_blank");
+      let currentVideoIndex = 0;
+      let videoItems = [];
+      let currentProductUrl = '';
+      let currentProductAvailable = false;
+      let isMobile = window.innerWidth <= 768;
+      let mobileSwiper = null;
+
+      // Mobile touch handling variables
+      let touchStartY = 0;
+      let touchEndY = 0;
+      let isScrolling = false;
+      let scrollTimeout;
+
+      // Initialize Owl Carousel for desktop
+      var watchBuySlider = $('.watch-buy-slider');
+      watchBuySlider.owlCarousel({
+        items: 5,
+        margin: 20,
+        speed: 1000,
+        loop: true,
+        nav: false,
+        center: true,
+        dots: false,
+        navText: [
+          "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_back_ios_new.svg?v=1750503882 'title='Previous'  alt='Previous'/>",
+          "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_forward_ios.svg?v=1750503882' title='Next'alt='Next' />",
+        ],
+        autoplay: false,
+        responsive: {
+          0: {
+            items: 1.5,
+            loop: true,
+            nav: false,
+            center: true,
+          },
+          600: {
+            items: 3,
+            nav: false,
+            center: true,
+          },
+          992: {
+            items: 4.5,
+            nav: false,
+            center: false,
+          },
+          1200: {
+            items: 5,
+            nav: true,
+            center: false,
+          },
+          1300: {
+            items: 5,
+            nav: true,
+            center: false,
+          },
+        },
+      });
+
+      // Update mobile detection on resize
+      function updateMobileDetection() {
+        isMobile = window.innerWidth <= 768;
+      }
+
+      // Force navigation visibility on desktop screens
+      function handleNavigationVisibility() {
+        const screenWidth = window.innerWidth;
+        const navButtons = watchBuySlider.find('.owl-nav button');
+        updateMobileDetection();
+
+        if (screenWidth >= 1200) {
+          navButtons.removeClass('disabled').show();
+          watchBuySlider.find('.owl-nav').show();
+        } else {
+          watchBuySlider.find('.owl-nav').hide();
         }
+      }
+
+      setTimeout(handleNavigationVisibility, 100);
+
+      $(window).on('resize', function () {
+        clearTimeout(window.navResizeTimeout);
+        window.navResizeTimeout = setTimeout(handleNavigationVisibility, 150);
       });
-    });
 
-    // Video popup functionality
-    const popup = document.getElementById("videoPopup");
-    const popupOverlay = document.getElementById("popupOverlay");
-    const popupContent = document.getElementById("popupContent");
-    const popupVideoContainer = document.getElementById(
-      "popupVideoContainer"
-    );
-    const popupIframe = document.getElementById("popupIframe");
-    const closePopup = document.getElementById("closePopup");
-    const popupProductImage = document.getElementById("popupProductImage");
-    const popupProductTitle = document.getElementById("popupProductTitle");
-    const popupProductPrice = document.getElementById("popupProductPrice");
-    const popupProductComparePrice = document.getElementById(
-      "popupProductComparePrice"
-    );
-    const popupProductInfo = document.getElementById("popupProductInfo");
-    const popupPrev = document.getElementById("popupPrev");
-    const popupNext = document.getElementById("popupNext");
-    const videoProgressFill = document.getElementById("videoProgressFill");
-    const popupProductCard = document.getElementById("popupProductCard");
-
-    
-
-    // Collect all video items - now also check for iframe URLs
-    function collectVideoItems() {
-      videoItems = Array.from(
-        document.querySelectorAll(".watch-and-buy-section .watch-buy-item")
-      ).filter((item) => {
-        const videoSrc = item.getAttribute("data-video");
-        const iframeSrc = item.getAttribute("data-iframe-url");
-        return (
-          (videoSrc &&
-            videoSrc !== "null" &&
-            videoSrc !== "" &&
-            videoSrc !== "undefined") ||
-          (iframeSrc &&
-            iframeSrc !== "null" &&
-            iframeSrc !== "" &&
-            iframeSrc !== "undefined")
-        );
+      // Carousel shopping bag click handlers
+      document.querySelectorAll('.carousel-shopping-bag').forEach((button) => {
+        button.addEventListener('click', function (e) {
+          e.stopPropagation();
+          e.preventDefault();
+          const productUrl = this.getAttribute('data-product-url');
+          if (productUrl && productUrl !== 'null' && productUrl !== 'undefined') {
+            window.open(productUrl, '_blank');
+          }
+        });
       });
-      console.log("Collected video items:", videoItems.length);
-    }
 
-    // Initialize video items collection
-    collectVideoItems();
+      // Video popup functionality
+      const popup = document.getElementById('videoPopup');
+      const popupOverlay = document.getElementById('popupOverlay');
+      const popupContent = document.getElementById('popupContent');
+      const popupVideoContainer = document.getElementById('popupVideoContainer');
+      const popupIframe = document.getElementById('popupIframe');
+      const closePopup = document.getElementById('closePopup');
+      const popupProductImage = document.getElementById('popupProductImage');
+      const popupProductTitle = document.getElementById('popupProductTitle');
+      const popupProductPrice = document.getElementById('popupProductPrice');
+      const popupProductComparePrice = document.getElementById('popupProductComparePrice');
+      const popupProductInfo = document.getElementById('popupProductInfo');
+      const popupPrev = document.getElementById('popupPrev');
+      const popupNext = document.getElementById('popupNext');
+      const videoProgressFill = document.getElementById('videoProgressFill');
+      const popupProductCard = document.getElementById('popupProductCard');
 
-    // Create exact swipe indicator from image
-    function createSwipeIndicator() {
-      if (!document.getElementById("swipeIndicator") && isMobile) {
-        const indicator = document.createElement("div");
-        indicator.id = "swipeIndicator";
-        indicator.className = "swipe-indicator-container";
-        indicator.innerHTML = `
+      // Collect all video items - now also check for iframe URLs
+      function collectVideoItems() {
+        videoItems = Array.from(document.querySelectorAll('.watch-and-buy-section .watch-buy-item')).filter((item) => {
+          const videoSrc = item.getAttribute('data-video');
+          const iframeSrc = item.getAttribute('data-iframe-url');
+          return (
+            (videoSrc && videoSrc !== 'null' && videoSrc !== '' && videoSrc !== 'undefined') ||
+            (iframeSrc && iframeSrc !== 'null' && iframeSrc !== '' && iframeSrc !== 'undefined')
+          );
+        });
+        console.log('Collected video items:', videoItems.length);
+      }
+
+      // Initialize video items collection
+      collectVideoItems();
+
+      // Create exact swipe indicator from image
+      function createSwipeIndicator() {
+        if (!document.getElementById('swipeIndicator') && isMobile) {
+          const indicator = document.createElement('div');
+          indicator.id = 'swipeIndicator';
+          indicator.className = 'swipe-indicator-container';
+          indicator.innerHTML = `
           <div class="swipe-indicator-bg">
             <div class="swipe-arrow-wrapper">
               <svg class="swipe-arrow" width="14" height="8" viewBox="0 0 14 8" fill="none">
@@ -539,834 +626,754 @@
             </div>
           </div>
         `;
-        popupContent.appendChild(indicator);
+          popupContent.appendChild(indicator);
 
-        // Initial hidden state (below view)
-        indicator.style.transform = "translateY(40px)";
-        indicator.style.opacity = "0";
-        indicator.style.transition =
-          "transform 0.5s ease-out, opacity 0.5s ease-out";
+          // Initial hidden state (below view)
+          indicator.style.transform = 'translateY(40px)';
+          indicator.style.opacity = '0';
+          indicator.style.transition = 'transform 0.5s ease-out, opacity 0.5s ease-out';
 
-        // Show after 3 seconds (animate up)
-        setTimeout(() => {
-          if (document.getElementById("swipeIndicator")) {
-            indicator.style.transform = "translateY(0)";
-            indicator.style.opacity = "1";
+          // Show after 3 seconds (animate up)
+          setTimeout(() => {
+            if (document.getElementById('swipeIndicator')) {
+              indicator.style.transform = 'translateY(0)';
+              indicator.style.opacity = '1';
 
-            // Hide after another 3 seconds (animate down)
-            setTimeout(() => {
-              if (document.getElementById("swipeIndicator")) {
-                indicator.style.transform = "translateY(40px)";
-                indicator.style.opacity = "0";
+              // Hide after another 3 seconds (animate down)
+              setTimeout(() => {
+                if (document.getElementById('swipeIndicator')) {
+                  indicator.style.transform = 'translateY(40px)';
+                  indicator.style.opacity = '0';
 
-                // Remove after animation completes
-                setTimeout(() => {
-                  if (indicator.parentNode) {
-                    indicator.parentNode.removeChild(indicator);
-                  }
-                }, 500);
+                  // Remove after animation completes
+                  setTimeout(() => {
+                    if (indicator.parentNode) {
+                      indicator.parentNode.removeChild(indicator);
+                    }
+                  }, 500);
+                }
+              }, 3000);
+            }
+          }, 3000);
+        }
+      }
+
+      // Initialize mobile vertical swiper
+      function initializeMobileSwiper() {
+        console.log('Initializing mobile swiper, isMobile:', isMobile, 'existing swiper:', !!mobileSwiper);
+
+        if (!isMobile || mobileSwiper) return;
+
+        // Make sure we have video items
+        if (videoItems.length === 0) {
+          collectVideoItems();
+        }
+
+        if (videoItems.length === 0) {
+          console.error('No video items found for mobile swiper');
+          return;
+        }
+
+        // Create swiper container for mobile
+        const swiperContainer = document.createElement('div');
+        swiperContainer.className = 'mobile-video-swiper';
+        swiperContainer.innerHTML = `
+    <div class="swiper-wrapper" id="mobileVideoWrapper">
+      ${videoItems
+        .map((item, index) => {
+          const iframeSrc = item.getAttribute('data-iframe-url');
+          const videoSrc = item.getAttribute('data-video');
+          const productImage = item.getAttribute('data-product-image');
+          const productTitle = item.getAttribute('data-product-title');
+          const productPrice = item.getAttribute('data-product-price');
+          const productComparePrice = item.getAttribute('data-product-compare-price');
+          const productUrl = item.getAttribute('data-product-url');
+          const noImagePlaceholder = 'no-image-2048-a2addb12_200x200.gif';
+
+          // Validate image
+          const hasImage =
+            productImage &&
+            productImage !== 'null' &&
+            productImage !== 'undefined' &&
+            !productImage.includes(noImagePlaceholder);
+
+          // Check if we have any valid product data
+          const hasValidData = hasImage || productTitle || productPrice;
+
+          return `
+          <div class="swiper-slide" data-index="${index}">
+            <div class="mobile-video-container">
+              ${
+                iframeSrc
+                  ? `<iframe class="mobile-popup-iframe" 
+                        data-src="${iframeSrc}"
+                        ${index === currentVideoIndex ? `src="${iframeSrc}"` : ''}
+                        frameborder="0" 
+                        allow="autoplay; fullscreen; picture-in-picture" 
+                        allowfullscreen>
+                </iframe>`
+                  : `<video class="mobile-popup-video" 
+                      data-src="${videoSrc}"
+                      ${index === currentVideoIndex ? 'autoplay' : ''}  
+                      playsinline 
+                      loop
+                      muted
+                      controls>
+                  <source src="${videoSrc}" type="video/mp4">
+                </video>`
               }
-            }, 3000);
-          }
-        }, 3000);
-      }
-    }
-
-    // Initialize mobile vertical swiper
-    function initializeMobileSwiper() {
-      console.log(
-        "Initializing mobile swiper, isMobile:",
-        isMobile,
-        "existing swiper:",
-        !!mobileSwiper
-      );
-
-      if (!isMobile || mobileSwiper) return;
-
-      // Make sure we have video items
-      if (videoItems.length === 0) {
-        collectVideoItems();
-      }
-
-      if (videoItems.length === 0) {
-        console.error("No video items found for mobile swiper");
-        return;
-      }
-
-      // Create swiper container for mobile
-      const swiperContainer = document.createElement("div");
-      swiperContainer.className = "mobile-video-swiper";
-      swiperContainer.innerHTML = `
-        <div class="swiper-wrapper" id="mobileVideoWrapper">
-          ${videoItems
-            .map((item, index) => {
-              const iframeSrc = item.getAttribute("data-iframe-url");
-              const videoSrc = item.getAttribute("data-video");
-              const productImage = item.getAttribute("data-product-image");
-              const productTitle = item.getAttribute("data-product-title");
-              const productPrice = item.getAttribute("data-product-price");
-              const productComparePrice = item.getAttribute("data-product-compare-price");
-              const productUrl = item.getAttribute("data-product-url");
-              const noImagePlaceholder = "no-image-2048-a2addb12_200x200.gif";
-              
-              // Validate image
-              const hasImage = productImage && 
-                productImage !== "null" && 
-                productImage !== "undefined" && 
-                !productImage.includes(noImagePlaceholder);
-              
-              // Check if we have any valid product data
-              const hasValidData = hasImage || productTitle || productPrice;
-
-              return `
-              <div class="swiper-slide" data-index="${index}">
-                <div class="mobile-video-container">
-                  ${
-                    iframeSrc
-                      ? `<iframe class="mobile-popup-iframe" 
-                            data-src="${iframeSrc}"
-                            ${
-                              index === currentVideoIndex
-                                ? `src="${iframeSrc}"`
-                                : ""
-                            }
-                            frameborder="0" 
-                            allow="autoplay; fullscreen; picture-in-picture" 
-                            allowfullscreen>
-                    </iframe>`
-                      : `<video class="mobile-popup-video" 
-                          data-src="${videoSrc}"
-                          ${index === currentVideoIndex ? "autoplay" : ""}  
-                          playsinline 
-                          loop
-                          controls>
-                      <source src="${videoSrc}" type="video/mp4">
-                    </video>`
-                  }
-                </div>
-                ${hasValidData ? `
-                <div class="mobile-product-card" data-product-url="${productUrl || ""}" style="cursor: pointer;">
-                  ${hasImage ? `<img class="mobile-product-image" src="${productImage}" alt="Product">` : ''}
-                  <div class="mobile-product-info">
-                    <h3 class="mobile-product-title">${productTitle || ""}</h3>
-                    <div class="mobile-product-actions">
-                      <div class="mobile-price-wrapper">
-                        <span class="mobile-product-price">${productPrice || ""}</span>
-                        ${productComparePrice ? `<del class="mobile-compare-price">${productComparePrice}</del>` : ""}
-                      </div>
-                    </div>
+            </div>
+            ${
+              hasValidData
+                ? `
+            <div class="mobile-product-card" data-product-url="${productUrl || ''}" style="cursor: pointer;">
+              ${hasImage ? `<img class="mobile-product-image" src="${productImage}" alt="Product">` : ''}
+              <div class="mobile-product-info">
+                <h3 class="mobile-product-title">${productTitle || ''}</h3>
+                <div class="mobile-product-actions">
+                  <div class="mobile-price-wrapper">
+                    <span class="mobile-product-price">${productPrice || ''}</span>
+                    ${productComparePrice ? `<del class="mobile-compare-price">${productComparePrice}</del>` : ''}
                   </div>
                 </div>
-                ` : ''}
               </div>
-              `;
-            })
-            .join("")}
-        </div>
-      `;
-
-      // Hide desktop elements and add mobile swiper
-      if (popupVideoContainer) popupVideoContainer.style.display = "none";
-      if (popupProductCard) popupProductCard.style.display = "none";
-      popupContent.appendChild(swiperContainer);
-
-      // Check if Swiper is available
-      if (typeof Swiper === "undefined") {
-        console.error("Swiper library not found. Please include Swiper.js");
-        return;
-      }
-
-      // Initialize Swiper
-      setTimeout(() => {
-        try {
-          mobileSwiper = new Swiper(".mobile-video-swiper", {
-            direction: "vertical",
-            slidesPerView: 1,
-            spaceBetween: 0,
-            speed: 400,
-            followFinger: true,
-            threshold: 10,
-            touchRatio: 1,
-            touchAngle: 90,
-            grabCursor: false,
-            resistance: true,
-            resistanceRatio: 0.85,
-            freeMode: false,
-            loop: videoItems.length > 1,
-            initialSlide: currentVideoIndex,
-            mousewheel: {
-              enabled: true,
-              sensitivity: 1,
-              thresholdDelta: 50,
-            },
-            on: {
-              slideChange: function () {
-                handleVideoChange(this.realIndex);
-              },
-              init: function () {
-                console.log("Mobile swiper initialized");
-                handleVideoChange(currentVideoIndex);
-              },
-            },
-          });
-
-          // Setup mobile product click handlers
-          setupMobileProductClickHandlers();
-        } catch (error) {
-          console.error("Error initializing mobile swiper:", error);
-        }
-      }, 100);
-    }
-
-    // Setup mobile product click handlers
-    function setupMobileProductClickHandlers() {
-      setTimeout(() => {
-        const mobileProductCards = document.querySelectorAll(
-          ".mobile-product-card"
-        );
-
-        mobileProductCards.forEach((card, index) => {
-          card.addEventListener("click", function (e) {
-            e.stopPropagation();
-            const productUrl = this.getAttribute("data-product-url");
-
-            if (
-              productUrl &&
-              productUrl !== "null" &&
-              productUrl !== "undefined" &&
-              productUrl !== "" &&
-              productUrl !== "javascript:void(0)"
-            ) {
-              window.open(productUrl, "_blank");
+            </div>
+            `
+                : ''
             }
+          </div>
+          `;
+        })
+        .join('')}
+    </div>
+  `;
+
+        // Hide desktop elements and add mobile swiper
+        if (popupVideoContainer) popupVideoContainer.style.display = 'none';
+        if (popupProductCard) popupProductCard.style.display = 'none';
+        popupContent.appendChild(swiperContainer);
+
+        // Check if Swiper is available
+        if (typeof Swiper === 'undefined') {
+          console.error('Swiper library not found. Please include Swiper.js');
+          return;
+        }
+
+        // Initialize Swiper
+        setTimeout(() => {
+          try {
+            mobileSwiper = new Swiper('.mobile-video-swiper', {
+              direction: 'vertical',
+              slidesPerView: 1,
+              spaceBetween: 0,
+              speed: 400,
+              followFinger: true,
+              threshold: 10,
+              touchRatio: 1,
+              touchAngle: 90,
+              grabCursor: false,
+              resistance: true,
+              resistanceRatio: 0.85,
+              freeMode: false,
+              loop: videoItems.length > 1,
+              initialSlide: currentVideoIndex,
+              mousewheel: {
+                enabled: true,
+                sensitivity: 1,
+                thresholdDelta: 50,
+              },
+              on: {
+                slideChange: function () {
+                  handleVideoChange(this.realIndex);
+                },
+                init: function () {
+                  console.log('Mobile swiper initialized');
+                  handleVideoChange(currentVideoIndex);
+                },
+              },
+            });
+
+            // Setup mobile product click handlers
+            setupMobileProductClickHandlers();
+          } catch (error) {
+            console.error('Error initializing mobile swiper:', error);
+          }
+        }, 100);
+      }
+
+      // Setup mobile product click handlers
+      function setupMobileProductClickHandlers() {
+        setTimeout(() => {
+          const mobileProductCards = document.querySelectorAll('.mobile-product-card');
+
+          mobileProductCards.forEach((card, index) => {
+            card.addEventListener('click', function (e) {
+              e.stopPropagation();
+              const productUrl = this.getAttribute('data-product-url');
+
+              if (
+                productUrl &&
+                productUrl !== 'null' &&
+                productUrl !== 'undefined' &&
+                productUrl !== '' &&
+                productUrl !== 'javascript:void(0)'
+              ) {
+                window.open(productUrl, '_blank');
+              }
+            });
           });
+        }, 200);
+      }
+
+      // Handle content change in mobile swiper (videos and iframes)
+      function handleVideoChange(newIndex) {
+        if (newIndex < 0 || newIndex >= videoItems.length) return;
+
+        const videos = document.querySelectorAll('.mobile-popup-video');
+        const iframes = document.querySelectorAll('.mobile-popup-iframe');
+
+        // Pause all videos
+        videos.forEach((video) => {
+          video.pause();
+          video.currentTime = 0;
         });
-      }, 200);
-    }
 
-    // Handle content change in mobile swiper (videos and iframes)
-    function handleVideoChange(newIndex) {
-      if (newIndex < 0 || newIndex >= videoItems.length) return;
+        // Load iframe for current slide if it's an iframe
+        const currentSlide = document.querySelector(`.swiper-slide[data-index="${newIndex}"]`);
+        if (currentSlide) {
+          const currentIframe = currentSlide.querySelector('.mobile-popup-iframe');
+          const currentVideo = currentSlide.querySelector('.mobile-popup-video');
 
-      const videos = document.querySelectorAll(".mobile-popup-video");
-      const iframes = document.querySelectorAll(".mobile-popup-iframe");
-
-      // Pause all videos
-      videos.forEach((video) => {
-        video.pause();
-        video.currentTime = 0;
-      });
-
-      // Load iframe for current slide if it's an iframe
-      const currentSlide = document.querySelector(
-        `.swiper-slide[data-index="${newIndex}"]`
-      );
-      if (currentSlide) {
-        const currentIframe = currentSlide.querySelector(
-          ".mobile-popup-iframe"
-        );
-        const currentVideo = currentSlide.querySelector(
-          ".mobile-popup-video"
-        );
-
-        if (currentIframe && !currentIframe.src) {
-          const dataSrc = currentIframe.getAttribute("data-src");
-          if (dataSrc) {
-            currentIframe.src = dataSrc;
+          if (currentIframe && !currentIframe.src) {
+            const dataSrc = currentIframe.getAttribute('data-src');
+            if (dataSrc) {
+              currentIframe.src = dataSrc;
+            }
+          } else if (currentVideo) {
+            const dataSrc = currentVideo.getAttribute('data-src');
+            if (dataSrc && !currentVideo.src) {
+              currentVideo.src = dataSrc;
+            }
+            currentVideo.currentTime = 0;
+            currentVideo.play().catch((e) => console.log('Autoplay prevented:', e));
+            currentVideo.addEventListener('timeupdate', updateVideoProgress);
+            currentVideo.addEventListener('loadedmetadata', resetVideoProgress);
           }
-        } else if (currentVideo) {
-          const dataSrc = currentVideo.getAttribute("data-src");
-          if (dataSrc && !currentVideo.src) {
-            currentVideo.src = dataSrc;
-          }
-          currentVideo.currentTime = 0;
-          currentVideo
-            .play()
-            .catch((e) => console.log("Autoplay prevented:", e));
-            currentVideo.addEventListener("timeupdate", updateVideoProgress);
-            currentVideo.addEventListener("loadedmetadata", resetVideoProgress);
+        }
+
+        currentVideoIndex = newIndex;
+      }
+
+      function updateVideoProgress() {
+        let popupVideo = document.getElementById('popupVideo');
+        if (isMobile) {
+          popupVideo = document.querySelector(`.swiper-slide[data-index="${currentVideoIndex}"] .mobile-popup-video`);
+        }
+        if (popupVideo && popupVideo.duration && videoProgressFill) {
+          const progress = (popupVideo.currentTime / popupVideo.duration) * 100;
+          videoProgressFill.style.width = progress + '%';
         }
       }
 
-      currentVideoIndex = newIndex;
-    }
-
-    function updateVideoProgress() {
-      let popupVideo = document.getElementById("popupVideo");
-      if (isMobile) {
-        popupVideo = document.querySelector(
-          `.swiper-slide[data-index="${currentVideoIndex}"] .mobile-popup-video`
-        );
-      }
-      if (popupVideo && popupVideo.duration && videoProgressFill) {
-        const progress = (popupVideo.currentTime / popupVideo.duration) * 100;
-        videoProgressFill.style.width = progress + "%";
-      }
-    }
-
-    function resetVideoProgress() {
-      if (videoProgressFill) {
-        videoProgressFill.style.width = "0%";
-      }
-    }
-
-    // Desktop iframe functions
-    function loadVideoAtIndex(index) {
-      if (index < 0 || index >= videoItems.length) return;
-
-      currentVideoIndex = index;
-      const item = videoItems[index];
-
-      const iframeSrc = item.getAttribute("data-iframe-url");
-      const videoSrc = item.getAttribute("data-video");
-      const productImage = item.getAttribute("data-product-image");
-      const productTitle = item.getAttribute("data-product-title");
-      const productPrice = item.getAttribute("data-product-price");
-      const productComparePrice = item.getAttribute(
-        "data-product-compare-price"
-      );
-      const productUrl = item.getAttribute("data-product-url");
-      const productAvailable =
-        item.getAttribute("data-product-available") === "true";
-
-      currentProductUrl = productUrl;
-      currentProductAvailable = productAvailable;
-
-      // Get or create video element
-      let popupVideo = document.getElementById("popupVideo");
-      if (!popupVideo) {
-        popupVideo = createVideoElement();
-        popupVideoContainer.appendChild(popupVideo);
-      }
-
-      // Handle iframe vs video
-      if (
-        iframeSrc &&
-        iframeSrc !== "null" &&
-        iframeSrc !== "undefined" &&
-        iframeSrc !== ""
-      ) {
-        // Show iframe, hide video and progress bar
-        popupIframe.src = iframeSrc;
-        popupIframe.style.display = "block";
-        popupVideo.style.display = "none";
-
-        // Hide progress bar for iframes since we can't track their progress
-        const progressContainer = document.querySelector(
-          ".video-progress-container"
-        );
-        if (progressContainer) {
-          progressContainer.style.display = "none";
-        }
-      } else if (
-        videoSrc &&
-        videoSrc !== "null" &&
-        videoSrc !== "undefined" &&
-        videoSrc !== ""
-      ) {
-        // Show video, hide iframe
-        popupIframe.style.display = "none";
-        popupVideo.style.display = "block";
-
-        // Show progress bar for videos
-        const progressContainer = document.querySelector(
-          ".video-progress-container"
-        );
-        if (progressContainer) {
-          progressContainer.style.display = "block";
-        }
-
-        // Set video source
-        popupVideo.src = videoSrc;
-
-        // Reset progress
+      function resetVideoProgress() {
         if (videoProgressFill) {
-          videoProgressFill.style.width = "0%";
-        }
-
-        // Remove existing event listeners to prevent duplicates
-        popupVideo.removeEventListener("timeupdate", updateVideoProgress);
-        popupVideo.removeEventListener("loadedmetadata", resetVideoProgress);
-
-        // Add event listeners for progress tracking
-        popupVideo.addEventListener("timeupdate", updateVideoProgress);
-        popupVideo.addEventListener("loadedmetadata", resetVideoProgress);
-
-        // Auto-play video with controls enabled
-        popupVideo.play().catch((e) => console.log("Autoplay prevented:", e));
-      }
-
-
-      // ✅ Put this at the top of your script (once)
-      const noImagePlaceholder = "no-image-2048-a2addb12_200x200.gif";
-
-      function updatePopupCard(imageEl, titleEl, priceEl, cardEl, productImage, productTitle, productPrice) {
-        // Validate image
-        const hasImage =
-          productImage &&
-          productImage !== "null" &&
-          productImage !== "undefined" &&
-          !productImage.includes(noImagePlaceholder);
-
-        if (hasImage) {
-          imageEl.src = productImage;
-          imageEl.style.display = "block";
-        } else {
-          imageEl.removeAttribute("src"); 
-          imageEl.style.display = "none";
-        }
-
-        // Title & Price
-        titleEl.textContent = productTitle || "";
-        priceEl.textContent = productPrice || "";
-
-        // Final check → hide card if nothing valid
-        if (!hasImage && !productTitle && !productPrice) {
-          cardEl.style.setProperty("display", "none", "important");
-        } else {
-          cardEl.style.setProperty("display", "flex", "important");
+          videoProgressFill.style.width = '0%';
         }
       }
 
-      // ✅ Desktop popup
-      updatePopupCard(
-        popupProductImage, 
-        popupProductTitle, 
-        popupProductPrice, 
-        popupProductCard, 
-        productImage, 
-        productTitle, 
-        productPrice
-      );
+      // Desktop iframe functions
+      function loadVideoAtIndex(index) {
+        if (index < 0 || index >= videoItems.length) return;
 
-      // ✅ Mobile swiper popup
-      updatePopupCard(
-        popupProductImageMobile, 
-        popupProductTitleMobile, 
-        popupProductPriceMobile, 
-        popupProductCardMobile, 
-        productImage, 
-        productTitle, 
-        productPrice
-      );
+        currentVideoIndex = index;
+        const item = videoItems[index];
 
-      
+        const iframeSrc = item.getAttribute('data-iframe-url');
+        const videoSrc = item.getAttribute('data-video');
+        const productImage = item.getAttribute('data-product-image');
+        const productTitle = item.getAttribute('data-product-title');
+        const productPrice = item.getAttribute('data-product-price');
+        const productComparePrice = item.getAttribute('data-product-compare-price');
+        const productUrl = item.getAttribute('data-product-url');
+        const productAvailable = item.getAttribute('data-product-available') === 'true';
 
+        currentProductUrl = productUrl;
+        currentProductAvailable = productAvailable;
 
+        // Get or create video element
+        let popupVideo = document.getElementById('popupVideo');
+        if (!popupVideo) {
+          popupVideo = createVideoElement();
+          popupVideoContainer.appendChild(popupVideo);
+        }
 
-    }
+        // Handle iframe vs video
+        if (iframeSrc && iframeSrc !== 'null' && iframeSrc !== 'undefined' && iframeSrc !== '') {
+          // Show iframe, hide video and progress bar
+          popupIframe.src = iframeSrc;
+          popupIframe.style.display = 'block';
+          popupVideo.style.display = 'none';
 
-    function showPrevVideo() {
-      const prevIndex =
-        currentVideoIndex > 0 ? currentVideoIndex - 1 : videoItems.length - 1;
-      loadVideoAtIndex(prevIndex);
-    }
+          // Hide progress bar for iframes since we can't track their progress
+          const progressContainer = document.querySelector('.video-progress-container');
+          if (progressContainer) {
+            progressContainer.style.display = 'none';
+          }
+        } else if (videoSrc && videoSrc !== 'null' && videoSrc !== 'undefined' && videoSrc !== '') {
+          // Show video, hide iframe
+          popupIframe.style.display = 'none';
+          popupVideo.style.display = 'block';
 
-    function showNextVideo() {
-      const nextIndex =
-        currentVideoIndex < videoItems.length - 1 ? currentVideoIndex + 1 : 0;
-      loadVideoAtIndex(nextIndex);
-    }
+          // Show progress bar for videos
+          const progressContainer = document.querySelector('.video-progress-container');
+          if (progressContainer) {
+            progressContainer.style.display = 'block';
+          }
 
-    // Enhanced popup opening function
-    function openVideoPopup(clickedIndex) {
-      console.log(
-        "Opening popup for index:",
-        clickedIndex,
-        "isMobile:",
-        isMobile
-      );
+          // Set video source
+          popupVideo.src = videoSrc;
 
-      // Update mobile detection
-      updateMobileDetection();
+          // Reset progress
+          if (videoProgressFill) {
+            videoProgressFill.style.width = '0%';
+          }
 
-      // Set current index
-      currentVideoIndex = clickedIndex;
+          // Remove existing event listeners to prevent duplicates
+          popupVideo.removeEventListener('timeupdate', updateVideoProgress);
+          popupVideo.removeEventListener('loadedmetadata', resetVideoProgress);
 
-      // Show popup
-      popup.style.display = "block";
-      document.body.style.overflow = "hidden";
+          // Add event listeners for progress tracking
+          popupVideo.addEventListener('timeupdate', updateVideoProgress);
+          popupVideo.addEventListener('loadedmetadata', resetVideoProgress);
 
-      // Pause all carousel videos
-      document
-        .querySelectorAll(".watch-and-buy-section .watch-buy-item video")
-        .forEach((vid) => {
+          // Auto-play video with controls enabled
+          popupVideo.play().catch((e) => console.log('Autoplay prevented:', e));
+        }
+
+        // ✅ Put this at the top of your script (once)
+        const noImagePlaceholder = 'no-image-2048-a2addb12_200x200.gif';
+
+        function updatePopupCard(imageEl, titleEl, priceEl, cardEl, productImage, productTitle, productPrice) {
+          // Validate image
+          const hasImage =
+            productImage &&
+            productImage !== 'null' &&
+            productImage !== 'undefined' &&
+            !productImage.includes(noImagePlaceholder);
+
+          if (hasImage) {
+            imageEl.src = productImage;
+            imageEl.style.display = 'block';
+          } else {
+            imageEl.removeAttribute('src');
+            imageEl.style.display = 'none';
+          }
+
+          // Title & Price
+          titleEl.textContent = productTitle || '';
+          priceEl.textContent = productPrice || '';
+
+          // Final check → hide card if nothing valid
+          if (!hasImage && !productTitle && !productPrice) {
+            cardEl.style.setProperty('display', 'none', 'important');
+          } else {
+            cardEl.style.setProperty('display', 'flex', 'important');
+          }
+        }
+
+        // ✅ Desktop popup
+        updatePopupCard(
+          popupProductImage,
+          popupProductTitle,
+          popupProductPrice,
+          popupProductCard,
+          productImage,
+          productTitle,
+          productPrice
+        );
+
+        // ✅ Mobile swiper popup
+        updatePopupCard(
+          popupProductImageMobile,
+          popupProductTitleMobile,
+          popupProductPriceMobile,
+          popupProductCardMobile,
+          productImage,
+          productTitle,
+          productPrice
+        );
+      }
+
+      function showPrevVideo() {
+        const prevIndex = currentVideoIndex > 0 ? currentVideoIndex - 1 : videoItems.length - 1;
+        loadVideoAtIndex(prevIndex);
+      }
+
+      function showNextVideo() {
+        const nextIndex = currentVideoIndex < videoItems.length - 1 ? currentVideoIndex + 1 : 0;
+        loadVideoAtIndex(nextIndex);
+      }
+
+      // Enhanced popup opening function
+      function openVideoPopup(clickedIndex) {
+        console.log('Opening popup for index:', clickedIndex, 'isMobile:', isMobile);
+
+        // Update mobile detection
+        updateMobileDetection();
+
+        // Set current index
+        currentVideoIndex = clickedIndex;
+
+        // Show popup
+        popup.style.display = 'block';
+        document.body.style.overflow = 'hidden';
+
+        // Pause all carousel videos
+        document.querySelectorAll('.watch-and-buy-section .watch-buy-item video').forEach((vid) => {
           vid.pause();
         });
 
-      if (isMobile) {
-        console.log("Initializing mobile popup");
-        initializeMobileSwiper();
-        createSwipeIndicator();
-      } else {
-        console.log("Initializing desktop popup");
-        loadVideoAtIndex(currentVideoIndex);
+        if (isMobile) {
+          console.log('Initializing mobile popup');
+          initializeMobileSwiper();
+          createSwipeIndicator();
+        } else {
+          console.log('Initializing desktop popup');
+          loadVideoAtIndex(currentVideoIndex);
+        }
       }
-    }
 
-    // Handle item clicks - FIXED VERSION
-    function setupItemClickHandlers() {
-      document
-        .querySelectorAll(".watch-and-buy-section .watch-buy-item")
-        .forEach((item, index) => {
+      // Handle item clicks - FIXED VERSION
+      function setupItemClickHandlers() {
+        document.querySelectorAll('.watch-and-buy-section .watch-buy-item').forEach((item, index) => {
           // Remove any existing click handlers
-          item.removeEventListener("click", handleItemClick);
+          item.removeEventListener('click', handleItemClick);
 
           // Add new click handler
-          item.addEventListener("click", handleItemClick);
+          item.addEventListener('click', handleItemClick);
 
           function handleItemClick(e) {
-            console.log("Item clicked:", index, "Target:", e.target);
+            console.log('Item clicked:', index, 'Target:', e.target);
 
             // Check if the click was on the shopping bag or its children
-            if (e.target.closest(".carousel-shopping-bag")) {
-              console.log("Shopping bag clicked, preventing popup");
+            if (e.target.closest('.carousel-shopping-bag')) {
+              console.log('Shopping bag clicked, preventing popup');
               return;
             }
 
             e.preventDefault();
             e.stopPropagation();
 
-            const videoSrc = this.getAttribute("data-video");
-            const iframeSrc = this.getAttribute("data-iframe-url");
+            const videoSrc = this.getAttribute('data-video');
+            const iframeSrc = this.getAttribute('data-iframe-url');
 
-            console.log("Video src:", videoSrc, "Iframe src:", iframeSrc);
+            console.log('Video src:', videoSrc, 'Iframe src:', iframeSrc);
 
             if (
-              (videoSrc &&
-                videoSrc !== "null" &&
-                videoSrc !== "" &&
-                videoSrc !== "undefined") ||
-              (iframeSrc &&
-                iframeSrc !== "null" &&
-                iframeSrc !== "" &&
-                iframeSrc !== "undefined")
+              (videoSrc && videoSrc !== 'null' && videoSrc !== '' && videoSrc !== 'undefined') ||
+              (iframeSrc && iframeSrc !== 'null' && iframeSrc !== '' && iframeSrc !== 'undefined')
             ) {
               // Find the index in videoItems array
-              const videoIndex = videoItems.findIndex(
-                (videoItem) => videoItem === this
-              );
-              console.log("Found video index:", videoIndex);
+              const videoIndex = videoItems.findIndex((videoItem) => videoItem === this);
+              console.log('Found video index:', videoIndex);
 
               if (videoIndex !== -1) {
                 openVideoPopup(videoIndex);
               } else {
-                console.error("Could not find video item in array");
+                console.error('Could not find video item in array');
                 // Fallback: use the DOM index
-                const allItems = Array.from(
-                  document.querySelectorAll(
-                    ".watch-and-buy-section .watch-buy-item"
-                  )
-                );
+                const allItems = Array.from(document.querySelectorAll('.watch-and-buy-section .watch-buy-item'));
                 const domIndex = allItems.indexOf(this);
                 if (domIndex !== -1) {
                   openVideoPopup(domIndex);
                 }
               }
             } else {
-              console.log("No valid video or iframe source found");
+              console.log('No valid video or iframe source found');
             }
           }
         });
-    }
-
-    // Initialize click handlers
-    setTimeout(setupItemClickHandlers, 500);
-
-    // Desktop navigation
-    if (popupPrev) {
-      popupPrev.addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (!isMobile) {
-          showPrevVideo();
-        }
-      });
-    }
-
-    if (popupNext) {
-      popupNext.addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (!isMobile) {
-          showNextVideo();
-        }
-      });
-    }
-
-    // Product info click (desktop)
-    if (popupProductInfo) {
-      popupProductInfo.addEventListener("click", function (e) {
-        e.stopPropagation();
-        if (
-          currentProductUrl &&
-          currentProductUrl !== "null" &&
-          currentProductUrl !== "undefined"
-        ) {
-          window.open(currentProductUrl, "_blank");
-        }
-      });
-    }
-
-    // Enhanced close popup functionality
-    function closeVideoPopup() {
-      console.log("Closing popup");
-
-      popup.style.display = "none";
-      document.body.style.overflow = "auto";
-
-      // Clean up desktop video
-      const popupVideo = document.getElementById("popupVideo");
-      if (popupVideo) {
-        popupVideo.pause();
-        popupVideo.currentTime = 0;
-        popupVideo.removeEventListener("timeupdate", updateVideoProgress);
-        popupVideo.removeEventListener("loadedmetadata", resetVideoProgress);
-        popupVideo.muted = false; // ✅ unmute only after user interaction
-        popupVideo.play().catch((e) =>
-          console.log("Autoplay with sound still blocked:", e)
-        );
-        popupVideo.src = "";
-        popupVideo.load();
       }
 
-      // Clean up desktop iframe
-      if (popupIframe) {
-        popupIframe.src = "";
-      }
+      // Initialize click handlers
+      setTimeout(setupItemClickHandlers, 500);
 
-      // Reset progress bar
-      if (videoProgressFill) {
-        videoProgressFill.style.width = "0%";
-      }
-
-      // Remove swipe indicator if it exists
-      const swipeIndicator = document.getElementById("swipeIndicator");
-      if (swipeIndicator && swipeIndicator.parentNode) {
-        swipeIndicator.parentNode.removeChild(swipeIndicator);
-      }
-
-      // Handle mobile swiper cleanup
-      if (mobileSwiper) {
-        try {
-          console.log("Cleaning up mobile swiper");
-
-          // Pause all mobile videos and clear iframes
-          const mobileVideos = document.querySelectorAll(
-            ".mobile-popup-video"
-          );
-          const mobileIframes = document.querySelectorAll(
-            ".mobile-popup-iframe"
-          );
-
-          mobileVideos.forEach((video) => {
-            video.pause();
-            video.currentTime = 0;
-            video.removeEventListener("timeupdate", updateVideoProgress);
-            video.removeEventListener("loadedmetadata", resetVideoProgress);
-            video.removeAttribute("src");
-            video.load();
-          });
-
-          mobileIframes.forEach((iframe) => {
-            iframe.src = "";
-          });
-
-          // Destroy swiper instance
-          mobileSwiper.destroy(true, true);
-          mobileSwiper = null;
-
-          // Remove mobile swiper container
-          const swiperContainer = document.querySelector(
-            ".mobile-video-swiper"
-          );
-          if (swiperContainer && swiperContainer.parentNode) {
-            swiperContainer.parentNode.removeChild(swiperContainer);
-          }
-
-          // Restore desktop elements
-          if (popupVideoContainer)
-            popupVideoContainer.style.display = "block";
-          if (popupProductCard) popupProductCard.style.display = "block";
-        } catch (error) {
-          console.error("Error destroying mobile swiper:", error);
-        }
-      }
-
-      // Reset current video index
-      currentVideoIndex = 0;
-
-      // Resume carousel content after popup closes
-      resumeCarouselContent();
-    }
-
-    function createVideoElement() {
-      const videoElement = document.createElement("video");
-      videoElement.id = "popupVideo";
-      videoElement.className = "popup-video";
-      videoElement.controls = true; // Enable controls for desktop
-      videoElement.loop = true;
-      videoElement.muted = true; // Enable audio
-      videoElement.playsInline = true;
-      videoElement.style.width = "100%";
-      videoElement.style.objectFit = "cover";
-      videoElement.style.borderRadius = "8px";
-      videoElement.style.display = "none";
-      return videoElement;
-    }
-
-    // Close popup event listeners
-    if (closePopup) {
-      closePopup.addEventListener("click", function (e) {
-        e.stopPropagation();
-        closeVideoPopup();
-      });
-    }
-
-    if (popupOverlay) {
-      popupOverlay.addEventListener("click", function (e) {
-        if (e.target === popupOverlay) {
-          closeVideoPopup();
-        }
-      });
-    }
-
-    if (popupContent) {
-      popupContent.addEventListener("click", function (e) {
-        e.stopPropagation();
-      });
-    }
-
-    // Keyboard navigation
-    document.addEventListener("keydown", function (e) {
-      if (popup.style.display === "block") {
-        if (e.key === "Escape") {
-          closeVideoPopup();
-        } else if (!isMobile) {
-          if (e.key === "ArrowLeft") {
-            e.preventDefault();
+      // Desktop navigation
+      if (popupPrev) {
+        popupPrev.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (!isMobile) {
             showPrevVideo();
-          } else if (e.key === "ArrowRight") {
-            e.preventDefault();
+          }
+        });
+      }
+
+      if (popupNext) {
+        popupNext.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (!isMobile) {
             showNextVideo();
           }
-        }
+        });
       }
-    });
 
-    // Enhanced carousel content intersection observer for both videos and iframes
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          const video = entry.target.querySelector("video");
-          const iframe = entry.target.querySelector(".carousel-iframe");
-
-          if (entry.isIntersecting) {
-            if (video) {
-              video.play().catch(console.error);
-            }
-            if (iframe) {
-              iframe.style.opacity = "1";
-            }
-          } else {
-            if (video) {
-              video.pause();
-            }
-            if (iframe) {
-              iframe.style.opacity = "0.7";
-            }
+      // Product info click (desktop)
+      if (popupProductInfo) {
+        popupProductInfo.addEventListener('click', function (e) {
+          e.stopPropagation();
+          if (currentProductUrl && currentProductUrl !== 'null' && currentProductUrl !== 'undefined') {
+            window.open(currentProductUrl, '_blank');
           }
         });
-      },
-      {
-        threshold: 0.5,
       }
-    );
 
-    // Observe carousel items for content autoplay/visibility
-    document
-      .querySelectorAll(".watch-and-buy-section .watch-buy-item")
-      .forEach((item) => {
+      // Enhanced close popup functionality
+      function closeVideoPopup() {
+        console.log('Closing popup');
+
+        popup.style.display = 'none';
+        document.body.style.overflow = 'auto';
+
+        // Clean up desktop video
+        const popupVideo = document.getElementById('popupVideo');
+        if (popupVideo) {
+          popupVideo.pause();
+          popupVideo.currentTime = 0;
+          popupVideo.removeEventListener('timeupdate', updateVideoProgress);
+          popupVideo.removeEventListener('loadedmetadata', resetVideoProgress);
+          popupVideo.muted = false; // ✅ unmute only after user interaction
+          popupVideo.play().catch((e) => console.log('Autoplay with sound still blocked:', e));
+          popupVideo.src = '';
+          popupVideo.load();
+        }
+
+        // Clean up desktop iframe
+        if (popupIframe) {
+          popupIframe.src = '';
+        }
+
+        // Reset progress bar
+        if (videoProgressFill) {
+          videoProgressFill.style.width = '0%';
+        }
+
+        // Remove swipe indicator if it exists
+        const swipeIndicator = document.getElementById('swipeIndicator');
+        if (swipeIndicator && swipeIndicator.parentNode) {
+          swipeIndicator.parentNode.removeChild(swipeIndicator);
+        }
+
+        // Handle mobile swiper cleanup
+        if (mobileSwiper) {
+          try {
+            console.log('Cleaning up mobile swiper');
+
+            // Pause all mobile videos and clear iframes
+            const mobileVideos = document.querySelectorAll('.mobile-popup-video');
+            const mobileIframes = document.querySelectorAll('.mobile-popup-iframe');
+
+            mobileVideos.forEach((video) => {
+              video.pause();
+              video.currentTime = 0;
+              video.removeEventListener('timeupdate', updateVideoProgress);
+              video.removeEventListener('loadedmetadata', resetVideoProgress);
+              video.removeAttribute('src');
+              video.load();
+            });
+
+            mobileIframes.forEach((iframe) => {
+              iframe.src = '';
+            });
+
+            // Destroy swiper instance
+            mobileSwiper.destroy(true, true);
+            mobileSwiper = null;
+
+            // Remove mobile swiper container
+            const swiperContainer = document.querySelector('.mobile-video-swiper');
+            if (swiperContainer && swiperContainer.parentNode) {
+              swiperContainer.parentNode.removeChild(swiperContainer);
+            }
+
+            // Restore desktop elements
+            if (popupVideoContainer) popupVideoContainer.style.display = 'block';
+            if (popupProductCard) popupProductCard.style.display = 'block';
+          } catch (error) {
+            console.error('Error destroying mobile swiper:', error);
+          }
+        }
+
+        // Reset current video index
+        currentVideoIndex = 0;
+
+        // Resume carousel content after popup closes
+        resumeCarouselContent();
+      }
+
+      function createVideoElement() {
+        const videoElement = document.createElement('video');
+        videoElement.id = 'popupVideo';
+        videoElement.className = 'popup-video';
+        videoElement.controls = true;
+        videoElement.loop = true;
+        videoElement.muted = false; // ENABLE AUDIO FOR POPUP
+        videoElement.playsInline = true;
+        videoElement.style.width = '100%';
+        videoElement.style.objectFit = 'cover';
+        videoElement.style.borderRadius = '8px';
+        videoElement.style.display = 'none';
+
+        // Add event listener to ensure audio stays enabled
+        videoElement.addEventListener('loadedmetadata', function () {
+          this.muted = false;
+        });
+
+        return videoElement;
+      }
+
+      // Close popup event listeners
+      if (closePopup) {
+        closePopup.addEventListener('click', function (e) {
+          e.stopPropagation();
+          closeVideoPopup();
+        });
+      }
+
+      if (popupOverlay) {
+        popupOverlay.addEventListener('click', function (e) {
+          if (e.target === popupOverlay) {
+            closeVideoPopup();
+          }
+        });
+      }
+
+      if (popupContent) {
+        popupContent.addEventListener('click', function (e) {
+          e.stopPropagation();
+        });
+      }
+
+      // Keyboard navigation
+      document.addEventListener('keydown', function (e) {
+        if (popup.style.display === 'block') {
+          if (e.key === 'Escape') {
+            closeVideoPopup();
+          } else if (!isMobile) {
+            if (e.key === 'ArrowLeft') {
+              e.preventDefault();
+              showPrevVideo();
+            } else if (e.key === 'ArrowRight') {
+              e.preventDefault();
+              showNextVideo();
+            }
+          }
+        }
+      });
+
+      // Enhanced carousel content intersection observer for both videos and iframes
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            const video = entry.target.querySelector('video');
+            const iframe = entry.target.querySelector('.carousel-iframe');
+
+            if (entry.isIntersecting) {
+              if (video) {
+                video.play().catch(console.error);
+              }
+              if (iframe) {
+                iframe.style.opacity = '1';
+              }
+            } else {
+              if (video) {
+                video.pause();
+              }
+              if (iframe) {
+                iframe.style.opacity = '0.7';
+              }
+            }
+          });
+        },
+        {
+          threshold: 0.5,
+        }
+      );
+
+      // Observe carousel items for content autoplay/visibility
+      document.querySelectorAll('.watch-and-buy-section .watch-buy-item').forEach((item) => {
         observer.observe(item);
       });
 
-    // Initialize iframe visibility
-    document.querySelectorAll(".carousel-iframe").forEach((iframe) => {
-      iframe.style.opacity = "0.7";
-      iframe.style.transition = "opacity 0.3s ease";
-    });
-
-    // Set initial active item iframe to full opacity
-    setTimeout(() => {
-      const activeItem = document.querySelector(
-        ".watch-and-buy-section .owl-item.active.center .carousel-iframe"
-      );
-      if (activeItem) {
-        activeItem.style.opacity = "1";
-      }
-    }, 500);
-
-    // Handle Owl Carousel events for iframe visibility
-    watchBuySlider.on("changed.owl.carousel", function (event) {
-      // Reset all iframe opacity
-      document.querySelectorAll(".carousel-iframe").forEach((iframe) => {
-        iframe.style.opacity = "0.7";
+      // Initialize iframe visibility
+      document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
+        iframe.style.opacity = '0.7';
+        iframe.style.transition = 'opacity 0.3s ease';
       });
 
-      // Highlight center/active iframe
+      // Set initial active item iframe to full opacity
       setTimeout(() => {
-        const centerItem = document.querySelector(
-          ".watch-and-buy-section .owl-item.active.center .carousel-iframe"
-        );
-        if (centerItem) {
-          centerItem.style.opacity = "1";
+        const activeItem = document.querySelector('.watch-and-buy-section .owl-item.active.center .carousel-iframe');
+        if (activeItem) {
+          activeItem.style.opacity = '1';
         }
-      }, 100);
-    });
+      }, 500);
 
-    // Resume carousel content after popup closes
-    function resumeCarouselContent() {
-      setTimeout(() => {
-        try {
-          // Resume videos
-          document
-            .querySelectorAll(".watch-and-buy-section .watch-buy-item video")
-            .forEach((vid) => {
+      // Handle Owl Carousel events for iframe visibility
+      watchBuySlider.on('changed.owl.carousel', function (event) {
+        // Reset all iframe opacity
+        document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
+          iframe.style.opacity = '0.7';
+        });
+
+        // Highlight center/active iframe
+        setTimeout(() => {
+          const centerItem = document.querySelector('.watch-and-buy-section .owl-item.active.center .carousel-iframe');
+          if (centerItem) {
+            centerItem.style.opacity = '1';
+          }
+        }, 100);
+      });
+
+      // Resume carousel content after popup closes
+      function resumeCarouselContent() {
+        setTimeout(() => {
+          try {
+            // Resume videos
+            document.querySelectorAll('.watch-and-buy-section .watch-buy-item video').forEach((vid) => {
               if (vid.paused) {
                 vid.play().catch((e) => {
-                  console.log("Autoplay prevented for carousel video");
+                  console.log('Autoplay prevented for carousel video');
                 });
               }
             });
 
-          // Reset iframe opacity
-          document.querySelectorAll(".carousel-iframe").forEach((iframe) => {
-            iframe.style.opacity = "0.7";
-          });
+            // Reset iframe opacity
+            document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
+              iframe.style.opacity = '0.7';
+            });
 
-          // Highlight center iframe if any
-          const centerIframe = document.querySelector(
-            ".watch-and-buy-section .owl-item.active.center .carousel-iframe"
-          );
-          if (centerIframe) {
-            centerIframe.style.opacity = "1";
+            // Highlight center iframe if any
+            const centerIframe = document.querySelector(
+              '.watch-and-buy-section .owl-item.active.center .carousel-iframe'
+            );
+            if (centerIframe) {
+              centerIframe.style.opacity = '1';
+            }
+          } catch (error) {
+            console.error('Error resuming carousel content:', error);
           }
-        } catch (error) {
-          console.error("Error resuming carousel content:", error);
-        }
-      }, 200);
-    }
+        }, 200);
+      }
 
-    // Re-initialize handlers when Owl Carousel changes (for cloned items)
-    watchBuySlider.on(
-      "refreshed.owl.carousel initialized.owl.carousel",
-      function () {
+      // Re-initialize handlers when Owl Carousel changes (for cloned items)
+      watchBuySlider.on('refreshed.owl.carousel initialized.owl.carousel', function () {
         setTimeout(() => {
           collectVideoItems();
           setupItemClickHandlers();
         }, 300);
-      }
-    );
-  }
-});
+      });
+    }
+  });
 </script>
 
 <style>
