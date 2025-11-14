@@ -1,12 +1,9 @@
-{% assign variant = product.selected_or_first_available_variant %}
-
+{% assign variant = product.selected_or_first_available_variant %}  
 <div class="pdp-details-main">
   <div class="pdp-details-accordion">
-
     <div class="pdp-details-accordion-item">
       <label for="pdp-details-accordion-item-1" class="pdp-details-accordion-item-title" onclick="pushPromo('Product Information')">
         Product Information
-
       </label>
       <div class="pdp-details-accordion-item-content">
         <p id="Sku-{{ section.id }}" class="product__sku">{{ variant.sku }}</p>
@@ -32,8 +29,11 @@
           </thead>
           <tbody>
             <tr id="metal-info-row">
-              <td id="metal-type"></td>
-              <td id="metal-weight"></td>
+              <td id="metal-label"></td>
+              <td>
+                <span id="metal-net-weight"></span><br>
+                <span id="metal-gross-weight"></span>
+              </td>
               <td id="metal-dimensions"></td>
             </tr>
           </tbody>
@@ -42,7 +42,7 @@
     </div>
 
     <!-- Diamond Information -->
-    <div class="pdp-details-accordion-item">
+    <div class="pdp-details-accordion-item" id="diamond-accordion">
       <label for="pdp-details-accordion-item-3" class="pdp-details-accordion-item-title" onclick="pushPromo('Diamond Information')">
         Diamond Information
       </label>
@@ -55,12 +55,18 @@
               <th>SETTING / WT</th>
             </tr>
           </thead>
-          <tbody id="diamond-table-body"></tbody>
+          <tbody>
+            <tr>
+              <td id="diamond-type"></td>
+              <td id="diamond-pcs-shape"></td>
+              <td id="diamond-setting-wt"></td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Gemstone Information - Added ID for easier targeting -->
+    <!-- Gemstone Information -->
     <div class="pdp-details-accordion-item" id="gemstone-accordion">
       <label for="pdp-details-accordion-item-4" class="pdp-details-accordion-item-title" onclick="pushPromo('Gemstone Information')">
         Gemstone Information
@@ -74,15 +80,32 @@
               <th>SETTING / WT</th>
             </tr>
           </thead>
-          <tbody id="gemstone-table-body"></tbody>
+          <tbody>
+            <tr>
+              <td id="gem-type"></td>
+              <td id="gem-shape-pcs"></td>
+              <td id="gem-setting-wt"></td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
-
   </div>
 </div>
 
+
+
+
 <script>
+// Build variants data with escaped metafields JSON (components approach)
+var variantsData = {
+  {% for variant in product.variants %}
+  {% assign variant_components = variant.metafields.variant_components.components | default: '{}' | strip %}
+  "{{ variant.id }}": '{{ variant_components | replace: "'", "\\'" | replace: "\n", " " }}'{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+};
+
+// Build metafields fallback data
 window.variantMetafields = {};
 
 {% for v in product.variants %}
@@ -162,133 +185,378 @@ window.variantMetafields = {};
   };
 
 {% endfor %}
-</script>
 
-
-<script>
-(function(){
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
+// Helper: robust property finder (case/format tolerant)
+function getProp(obj, keys) {
+  if (!obj) return undefined;
+  for (var i = 0; i < keys.length; i++) {
+    var k = keys[i];
+    if (k in obj && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') return obj[k];
   }
-
-  function clearAccordion() {
-    document.getElementById('Sku-{{ section.id }}').textContent = '';
-    document.getElementById('metal-type').textContent = '';
-    document.getElementById('metal-weight').innerHTML = '';
-    document.getElementById('metal-dimensions').innerHTML = '';
-    document.getElementById('diamond-table-body').innerHTML = '';
-    document.getElementById('gemstone-table-body').innerHTML = '';
-    
-    // Hide gemstone accordion when clearing
-    var gemstoneAccordion = document.getElementById('gemstone-accordion');
-    if (gemstoneAccordion) {
-      gemstoneAccordion.style.display = 'none';
+  // fallback: case-insensitive match
+  for (var prop in obj) {
+    for (var j = 0; j < keys.length; j++) {
+      if (prop.toLowerCase() === String(keys[j]).toLowerCase() && obj[prop] !== null && obj[prop] !== undefined && obj[prop] !== '') {
+        return obj[prop];
+      }
     }
   }
+  return undefined;
+}
 
-  function updateAccordionForVariant(variantId) {
-    var data = window.variantMetafields[variantId];
-    if(!data) return clearAccordion();
+function safeNum(v, decimals) {
+  var n = parseFloat(v);
+  if (isNaN(n)) return null;
+  return (typeof decimals === 'number') ? parseFloat(n.toFixed(decimals)) : n;
+}
 
-    // SKU
-    document.getElementById('Sku-{{ section.id }}').textContent = data.sku || '';
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
 
-    // Metal
-    document.getElementById('metal-type').textContent = [data.metal_purity, data.metal_color].filter(Boolean).join(' - ');
-    document.getElementById('metal-weight').innerHTML = 
-      (data.metal_weight ? 'Net Wt: '+data.metal_weight+'g<br>' : '') +
-      (data.gross_weight ? 'Gross Wt: '+data.gross_weight+'g' : '');
-    document.getElementById('metal-dimensions').innerHTML =
-      (data.top_width ? 'Width: '+data.top_width+'mm<br>' : '') +
-      (data.top_height ? 'Height: '+data.top_height+'mm' : '');
+// Check if component data exists and is valid
+function hasValidComponents(variantId) {
+  var raw = variantsData[variantId] || '{}';
+  if (!raw || raw === '{}' || raw === '') return false;
+  try {
+    var parsed = JSON.parse(raw);
+    return parsed.components && Array.isArray(parsed.components) && parsed.components.length > 0;
+  } catch(e) {
+    console.log('Component parse error:', e);
+    return false;
+  }
+}
 
-    // Diamonds
-    var diamondBody = document.getElementById('diamond-table-body');
-    if(diamondBody) {
-      diamondBody.innerHTML = (data.diamonds || []).filter(d => d.type).map(d => `
-        <tr>
-          <td>${escapeHtml(d.type)}${(d.clarity||d.color)?'/ '+escapeHtml(d.clarity)+'-'+escapeHtml(d.color):''}</td>
-          <td>${escapeHtml(d.numbers)} - ${escapeHtml(d.shape)}</td>
-          <td>${escapeHtml(d.setting)}: ${escapeHtml(d.weight)}ct</td>
-        </tr>
-      `).join('');
-    }
+// Get metal weights from metafields
+function getMetalWeightsFromMetafields(variantId) {
+  var data = window.variantMetafields && window.variantMetafields[variantId];
+  if (!data) return { net: null, gross: null };
+  
+  return {
+    net: data.metal_weight,
+    gross: data.gross_weight
+  };
+}
 
-    // Gemstones - Show/hide accordion based on content
-    var gemBody = document.getElementById('gemstone-table-body');
-    var gemstoneAccordion = document.getElementById('gemstone-accordion');
+// Render using metafields (fallback approach)
+function renderFromMetafields(variantId) {
+  console.log('Rendering from metafields for variant:', variantId);
+  var data = window.variantMetafields && window.variantMetafields[variantId];
+  
+  if (!data) {
+    console.warn('No metafield data found for variant', variantId);
+    // Set all to blank
+    document.getElementById('metal-label').textContent = '';
+    document.getElementById('metal-net-weight').textContent = '';
+    document.getElementById('metal-gross-weight').textContent = '';
+    document.getElementById('metal-dimensions').textContent = '';
+    document.getElementById('diamond-type').textContent = '';
+    document.getElementById('diamond-pcs-shape').textContent = '';
+    document.getElementById('diamond-setting-wt').textContent = '';
+    document.getElementById('gem-type').textContent = '';
+    document.getElementById('gem-shape-pcs').textContent = '';
+    document.getElementById('gem-setting-wt').textContent = '';
+    document.getElementById('diamond-accordion').style.display = 'none';
+    document.getElementById('gemstone-accordion').style.display = 'none';
+    return;
+  }
+
+  // Update SKU
+  document.getElementById('Sku-{{ section.id }}').textContent = data.sku || '';
+
+  // METAL Information
+  var metalLabel = [data.metal_purity, data.metal_color].filter(Boolean).join(' - ');
+  document.getElementById('metal-label').textContent = metalLabel || '';
+  
+  var netWt = data.metal_weight ? 'Net Wt: ' + data.metal_weight + 'g' : '';
+  var grossWt = data.gross_weight ? 'Gross Wt: ' + data.gross_weight + 'g' : '';
+  document.getElementById('metal-net-weight').textContent = netWt;
+  document.getElementById('metal-gross-weight').textContent = grossWt;
+
+  var dimParts = [];
+  if (data.top_width) dimParts.push('Width: ' + data.top_width + 'mm');
+  if (data.top_height) dimParts.push('Height: ' + data.top_height + 'mm');
+  document.getElementById('metal-dimensions').innerHTML = dimParts.length ? dimParts.join('<br>') : '';
+
+  // DIAMOND Information
+  var diamondAccordion = document.getElementById('diamond-accordion');
+  var diamonds = (data.diamonds || []).filter(function(d) { return d.type; });
+  
+  if (diamonds.length > 0) {
+    diamondAccordion.style.display = 'block';
+    var d = diamonds[0]; // Use first diamond
     
-    if(gemBody && gemstoneAccordion) {
-      var gemstones = (data.gemstones || []).filter(g => g.type);
-      
-      if (gemstones.length > 0) {
-        // Show accordion and populate content
-        gemstoneAccordion.style.display = 'block';
-        gemBody.innerHTML = gemstones.map(g => `
-          <tr>
-            <td>${escapeHtml(g.color)} - ${escapeHtml(g.type)}</td>
-            <td>${escapeHtml(g.numbers)} - ${escapeHtml(g.shape)}</td>
-            <td>${escapeHtml(g.setting)}: ${escapeHtml(g.weight)}ct</td>
-          </tr>
-        `).join('');
-      } else {
-        // Hide accordion when no gemstones
-        gemstoneAccordion.style.display = 'none';
-        gemBody.innerHTML = '';
+    var dType = d.type || '';
+    var dClarity = d.clarity || '';
+    var dColor = d.color || '';
+    var typeParts = [dType];
+    if (dClarity || dColor) {
+      typeParts.push([dClarity, dColor].filter(Boolean).join('-'));
+    }
+    document.getElementById('diamond-type').textContent = typeParts.filter(Boolean).join(' / ') || '';
+    
+    var pcsShape = [d.numbers, d.shape].filter(Boolean).join(' - ');
+    document.getElementById('diamond-pcs-shape').textContent = pcsShape || '';
+    
+    var settingWt = d.setting && d.weight ? d.setting + ': ' + d.weight + 'ct' : '';
+    document.getElementById('diamond-setting-wt').textContent = settingWt;
+  } else {
+    diamondAccordion.style.display = 'none';
+    document.getElementById('diamond-type').textContent = '';
+    document.getElementById('diamond-pcs-shape').textContent = '';
+    document.getElementById('diamond-setting-wt').textContent = '';
+  }
+
+  // GEMSTONE Information
+  var gemstoneAccordion = document.getElementById('gemstone-accordion');
+  var gemstones = (data.gemstones || []).filter(function(g) { return g.type; });
+  
+  if (gemstones.length > 0) {
+    gemstoneAccordion.style.display = 'block';
+    var g = gemstones[0]; // Use first gemstone
+    
+    var gType = [g.color, g.type].filter(Boolean).join(' - ');
+    document.getElementById('gem-type').textContent = gType || '';
+    
+    var gShape = [g.numbers, g.shape].filter(Boolean).join(' - ');
+    document.getElementById('gem-shape-pcs').textContent = gShape || '';
+    
+    var gSettingWt = g.setting && g.weight ? g.setting + ': ' + g.weight + 'ct' : '';
+    document.getElementById('gem-setting-wt').textContent = gSettingWt;
+  } else {
+    gemstoneAccordion.style.display = 'none';
+    document.getElementById('gem-type').textContent = '';
+    document.getElementById('gem-shape-pcs').textContent = '';
+    document.getElementById('gem-setting-wt').textContent = '';
+  }
+}
+
+// Extract & render logic for the accordion sections (components approach)
+function renderFromComponents(variantId) {
+  console.log('Rendering from components for variant:', variantId);
+  var raw = variantsData[variantId] || '{}';
+  var parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch(e) {
+    console.error('components JSON parse error for variant', variantId, e, raw);
+    parsed = {};
+  }
+  var comps = parsed.components || [];
+
+  // Initialize defaults to blank
+  document.getElementById('metal-label').textContent = '';
+  document.getElementById('metal-net-weight').textContent = '';
+  document.getElementById('metal-gross-weight').textContent = '';
+  document.getElementById('metal-dimensions').textContent = '';
+
+  document.getElementById('diamond-type').textContent = '';
+  document.getElementById('diamond-pcs-shape').textContent = '';
+  document.getElementById('diamond-setting-wt').textContent = '';
+
+  document.getElementById('gem-type').textContent = '';
+  document.getElementById('gem-shape-pcs').textContent = '';
+  document.getElementById('gem-setting-wt').textContent = '';
+
+  // Hide/show accordions
+  var diamondAccordion = document.getElementById('diamond-accordion');
+  var gemstoneAccordion = document.getElementById('gemstone-accordion');
+
+  // METAL: find Gold/Metal component
+  var metal = comps.find(function(c){
+    var ig = c.item_group_name && String(c.item_group_name).toLowerCase();
+    if (ig && (ig.indexOf('gold') !== -1 || ig.indexOf('metal') !== -1)) return true;
+    if (getProp(c, ['Metal'])) return true;
+    return false;
+  });
+
+  if (metal) {
+    // label e.g. "14KT - Rose Gold"
+    var karat = getProp(metal, ['karat_code','karat','Karat']);
+    var metalName = getProp(metal, ['Metal','item_group_name','metal_label']) || '';
+    var labelParts = [];
+    if (karat && karat !== 'NA') labelParts.push((String(karat).trim()) + 'KT');
+    if (metalName) labelParts.push(String(metalName).trim());
+    document.getElementById('metal-label').textContent = labelParts.length ? labelParts.join(' - ') : (metal.item_group_name || '');
+
+    // ALWAYS get Net & Gross weight from metafields
+    var weights = getMetalWeightsFromMetafields(variantId);
+    document.getElementById('metal-net-weight').textContent = weights.net ? ('Net Wt: ' + safeNum(weights.net,3) + 'g') : '';
+    document.getElementById('metal-gross-weight').textContent = weights.gross ? ('Gross Wt: ' + safeNum(weights.gross,3) + 'g') : '';
+
+    // dimensions
+    var dims = getProp(metal, ['dimensions','Dimensions','size','Size']);
+    if (dims) {
+      document.getElementById('metal-dimensions').textContent = dims;
+    } else {
+      // Try to build from width/height
+      var width = getProp(metal, ['width','Width','top_width']);
+      var height = getProp(metal, ['height','Height','top_height']);
+      if (width || height) {
+        var dimParts = [];
+        if (width) dimParts.push('Width: ' + width + 'mm');
+        if (height) dimParts.push('Height: ' + height + 'mm');
+        document.getElementById('metal-dimensions').innerHTML = dimParts.join('<br>');
       }
     }
   }
 
-  document.addEventListener('DOMContentLoaded', function(){
-    var sel = document.querySelector('select[name="id"], input[name="id"]');
-    var initialVariantId = sel?.value || '{{ variant.id }}';
-    updateAccordionForVariant(initialVariantId);
+  // DIAMOND: find component with item_group_name 'Diamond'
+  var diamond = comps.find(function(c){
+    return c.item_group_name && String(c.item_group_name).toLowerCase().indexOf('diamond') !== -1;
+  });
 
-    // Variant change listener
-    document.addEventListener('variant:change', e => {
-      var vid = e?.detail?.variant?.id;
-      if(vid) updateAccordionForVariant(vid);
-    });
+  if (diamond) {
+    diamondAccordion.style.display = 'block';
 
-    // Select / Swatch fallback
-    sel?.addEventListener('change', function(){ updateAccordionForVariant(this.value); });
-    document.body.addEventListener('click', function(e){
-      var vid = e.target?.dataset?.variantId || e.target?.getAttribute('data-variant-id');
-      if(vid) updateAccordionForVariant(vid);
+    // TYPE: combine Type + quality + stone_color_code
+    var dType = getProp(diamond, ['Type','type']) || '';
+    var quality = getProp(diamond, ['quality_code','quality','clarity']) || '';
+    var colorCode = getProp(diamond, ['stone_color_code','stone_color','color']) || '';
+    var typeParts = [];
+    if (dType) typeParts.push(String(dType));
+    var qualColor = [quality, colorCode].filter(Boolean).join('-');
+    if (qualColor) typeParts.push(qualColor);
+    document.getElementById('diamond-type').textContent = typeParts.length ? typeParts.join(' / ') : '';
+
+    // PCS / SHAPE
+    var pcsShape = getProp(diamond, ['PCs-shape','PCs_shape','pcs-shape','shape-pcs','shape_pcs']);
+    if (!pcsShape) {
+      var pieces = getProp(diamond, ['pieces','Pieces','numbers']);
+      var shape = getProp(diamond, ['shape_code','shape','shapeCode']);
+      if (pieces && shape) pcsShape = pieces + ' - ' + shape;
+      else if (pieces) pcsShape = String(pieces);
+      else if (shape) pcsShape = String(shape);
+    }
+    document.getElementById('diamond-pcs-shape').textContent = pcsShape || '';
+
+    // SETTING / WT
+    var dSetting = getProp(diamond, ['setting-weight','setting_weight','settingWeight','setting']);
+    var dWeight = getProp(diamond, ['pointer_weight','pointer-weight','pointerWeight','weight']);
+    if (dSetting && dWeight) {
+      document.getElementById('diamond-setting-wt').textContent = dSetting + ': ' + dWeight + 'ct';
+    } else if (dSetting) {
+      document.getElementById('diamond-setting-wt').textContent = dSetting;
+    } else if (dWeight) {
+      document.getElementById('diamond-setting-wt').textContent = 'Prong: ' + dWeight + 'ct';
+    } else {
+      document.getElementById('diamond-setting-wt').textContent = '';
+    }
+  } else {
+    diamondAccordion.style.display = 'none';
+  }
+
+  // GEMSTONE: find component with item_group_name containing 'gem' or 'stone'
+  var gem = comps.find(function(c){
+    var ig = c.item_group_name && String(c.item_group_name).toLowerCase();
+    return ig && (ig.indexOf('gem') !== -1 || ig.indexOf('stone') !== -1) && ig.indexOf('diamond') === -1;
+  });
+
+  if (gem) {
+    gemstoneAccordion.style.display = 'block';
+
+    // TYPE: combine color + type
+    var gColor = getProp(gem, ['color','Color','stone_color','stone_color_code']) || '';
+    var gType = getProp(gem, ['type','Type','item_group_name']) || ''; 
+    var typeText = [ 'Others' , gType].filter(Boolean).join(' - ');
+    document.getElementById('gem-type').textContent = typeText || '';
+
+    // SHAPE / PCS
+    var gShape = getProp(gem, ['shape-pcs','shape_pcs','PCs-shape','pcs-shape']);
+    if (!gShape) {
+      var gPieces = getProp(gem, ['pieces','Pieces','numbers']);
+      var gShapeCode = getProp(gem, ['shape_code','shapeCode','shape']);
+      if (gPieces && gShapeCode) gShape = gPieces + ' - ' + gShapeCode;
+      else if (gPieces) gShape = String(gPieces);
+      else if (gShapeCode) gShape = String(gShapeCode);
+    }
+    document.getElementById('gem-shape-pcs').textContent = gShape || '';
+
+    // SETTING / WT
+    var gSetting = getProp(gem, ['setting-weight','setting_weight','settingWeight','setting']);
+    var gWeight = getProp(gem, ['pointer_weight','pointer-weight','pointerWeight','weight']);
+    if (gSetting && gWeight) {
+      document.getElementById('gem-setting-wt').textContent = gSetting + ': ' + gWeight + 'ct';
+    } else if (gSetting) {
+      document.getElementById('gem-setting-wt').textContent = gSetting;
+    } else if (gWeight) {
+      document.getElementById('gem-setting-wt').textContent = 'Prong: ' + gWeight + 'ct';
+    } else {
+      document.getElementById('gem-setting-wt').textContent = '';
+    }
+  } else {
+    gemstoneAccordion.style.display = 'none';
+  }
+
+  // Update SKU
+  document.getElementById('Sku-{{ section.id }}').textContent = parsed.sku || '{{ variant.sku }}';
+}
+
+// Main render function with fallback logic
+function renderForVariant(variantId) {
+  console.log('renderForVariant called with:', variantId);
+  console.log('variantsData:', variantsData);
+  console.log('variantMetafields:', window.variantMetafields);
+  
+  // Check if components data exists and is valid
+  if (hasValidComponents(variantId)) {
+    console.log('Using components data for variant', variantId);
+    renderFromComponents(variantId);
+  } else {
+    console.log('Using metafields data for variant', variantId);
+    renderFromMetafields(variantId);
+  }
+}
+
+// Initial render and event wiring
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('DOM Content Loaded');
+  var initialVariant = {{ product.selected_or_first_available_variant.id }};
+  console.log('Initial variant:', initialVariant);
+  renderForVariant(initialVariant);
+
+  // Listen to theme variant change event
+  document.addEventListener('variant:change', function(e) {
+    console.log('variant:change event:', e);
+    if (e && e.detail && e.detail.variant && e.detail.variant.id) {
+      renderForVariant(e.detail.variant.id);
+    }
+  });
+
+  // Fallback for select / radio changes
+  var selectors = document.querySelectorAll('select[name="id"], input[name="id"], .product-form__input input[type="radio"]');
+  console.log('Found selectors:', selectors.length);
+  selectors.forEach(function(el) {
+    el.addEventListener('change', function(ev) {
+      var val = ev.target.value;
+      console.log('Selector changed to:', val);
+      if (!isNaN(parseInt(val))) renderForVariant(parseInt(val));
     });
   });
-})();
-
+});
 </script>
 
 <script>
 window.pushPromo = function(promoName){
-    if (!window.variantMetafields) {
-        console.error('variantMetafields is not defined');
-        return;
+  var currentVariantId = document.querySelector('select[name="id"], input[name="id"]')?.value || '{{ variant.id }}';
+  var sku = document.getElementById('Sku-{{ section.id }}').textContent || '';
+
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'promoClick',
+    promoClick: {
+      promo_id: sku,
+      promo_name: '{{ product.title }}',
+      creative_name: promoName
     }
-    
-    var currentVariantId = document.querySelector('select[name="id"], input[name="id"]')?.value || '{{ variant.id }}';
-    var sku = window.variantMetafields[currentVariantId]?.sku || '';
-    
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-        event: 'promoClick',
-        promoClick: { 
-            promo_id: sku, 
-            promo_name: '{{ product.title }}', 
-            creative_name: promoName 
-        }
-    });
-    
-    console.log('GA4 event pushed:', { promo_id: sku, promo_name: '{{ product.title }}', creative_name: promoName });
+  });
+
+  console.log('GA4 event pushed:', { promo_id: sku, promo_name: '{{ product.title }}', creative_name: promoName });
 };
-
-
 </script>
