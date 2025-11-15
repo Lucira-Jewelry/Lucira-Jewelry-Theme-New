@@ -1,223 +1,191 @@
+{% comment %}
+  Match & Shine: Random products from different categories
+  Categories: Rings, Necklace, Bracelet, Pendant, Earring
+  Shows one random product per category within price range
+{% endcomment %}
+
+{% assign current_variant_price = product.selected_or_first_available_variant.price | divided_by: 100.0 %}
+{% assign price_factor = section.settings.price_range | default: 20 %}
+
+{% assign range_value = current_variant_price | times: price_factor | divided_by: 100 %}
+{% assign lower_limit = current_variant_price | minus: range_value %}
+{% assign upper_limit = current_variant_price | plus: range_value %}
+
+{% assign max_products = section.settings.product_limit | default: 8 %}
+
+{% if product.tags contains 'Rings' %}
+  {% assign categories = 'all-necklaces,all-earrings,all-bracelets' | split: ',' %}
+{% elsif product.tags contains 'Necklaces' %}
+  {% assign categories = 'all-rings,all-earrings,all-bracelets' | split: ',' %}
+{% elsif product.tags contains 'Bracelets' %}
+  {% assign categories = 'all-rings,all-earrings,all-necklaces' | split: ',' %}
+{% elsif product.tags contains 'Earrings' %}
+  {% assign categories = 'all-rings,all-necklaces,all-bracelets' | split: ',' %}
+{% else %}
+  {% assign categories = 'all-rings,all-necklaces,all-bracelets,all-earrings' | split: ',' %}
+{% endif %}
+{% assign displayed_products = '' | split: ',' %}
+
+<div class="match-and-shine">
+  <div class="page-width">
+    <h2 class="mas-title">Match & Shine</h2>
+    <p class="mas-subheading">Designed to Complement, Meant to Shine</p>
+
+<div class="mas-image-features-product-wrapper">
+    <div class="mas-image-features-product desktop-show">
+      <img
+        src="{{ product.featured_media | img_url: '470x470' }}"
+        height="472"
+        width="472"
+        alt="{{ product.title }}"
+        title="{{ product.title }}"
+      >
+    </div>
+
+    <div class="mas-grid">
+      {% assign counter = 0 %}
+
+      {% for category in categories %}
+        {% assign collection_handle = category %}
+        {% assign collection = collections[collection_handle] %}
+        {% if collection != null %}
+          {% assign random_products = collection.products %}
+          <!-- pick 10 random items to sample -->
+
+          {% for item in random_products %}
+            {% assign item_price = item.selected_or_first_available_variant.price | divided_by: 100.0 %}
+
+            {% if item.handle != product.handle and item_price >= lower_limit and item_price <= upper_limit %}
+                            <div
+                class="related-product-card"
+                data-handle="{{ item.handle }}"
+                data-name="{{ item.title | escape }}"
+                data-id="{{ item.id }}"
+                data-price="{{ item.price | divided_by: 100.0 }}"
+                data-category="{{ item.type | escape }}"
+                onclick="
+                  window.dataLayer = window.dataLayer || []; window.dataLayer.push({
+                    'event': 'promoClick',
+
+                      'promoClick': {
+                          'promo_id': '{{ item.selected_or_first_available_variant.sku }}',
+                          'promo_name': '{{ item.title | escape }}',
+                          'creative_name': 'Match and shine',
+                    },
+                    'event_callback': function() {
+                      window.location.href = '{{ related_product.url }}';
+                    }
+                  });
+                "
+              >
+
+              {% render 'card-product', card_product: item %}
+              </div>
+              {% assign displayed_products = displayed_products | push: item.handle %}
+              {% assign counter = counter | plus: 1 %}
+              {% break %}
+              <!-- only one product per category -->
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {% if counter >= max_products %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  </div>
+</div>
+
+<style>
+  .match-and-shine {
+    padding: 40px 0px;
+    background-color: transparent;
+    text-align: center;
+  }
+  .mas-title {
+    font-size: 24px;
+    text-align: center;
+    margin-top:0px;
+    margin-bottom:0px;
+    padding-top:10px;
+  }
+
+  .mas-subheading{
+      color: #535361;
+      font-weight: 400;
+      font-size: 18px;
+      line-height: 2;
+      text-align: center;
+      margin: 0 auto 40px ;
+      display: block;
+  }
+  .mas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    justify-content: center;
+    gap: 10px;
+    height: fit-content;
+  }
+
+  .mas-image-features-product-wrapper {display: grid ; grid-template-columns: calc(36% - 10px) calc(64% - 10px); align-items: center; gap: 20px; background: #f2f2f2; padding: 45px; border-radius: 12px;}
+  .mas-image-features-product img { border-radius: 12px; width: 100%;height: auto; }
+  .match-and-shine .price--on-sale .price-item--regular {font-size: 12px; font-weight: 400 !important;}
+  .match-and-shine .card__content span.price-item.price-item--sale, .price-item {font-weight: 600; font-size: 18px;}
+  .match-and-shine a.product-card-link {font-weight: 400; font-size: 12px;}
+  
+  @media (max-width: 768px) {
+    .mas-image-features-product-wrapper{display:flex; flex-direction:row;padding:10px;}
+    .match-and-shine {padding:0px;padding-bottom: 20px;}
+    .mas-title { font-size: 20px; }
+    .mas-subheading{ font-size: 14px;}
+    .mas-image-features-product-wrapper .card-wrapper {flex: 0 0 calc(250px - 0px);}
+    .mas-grid {
+    display: flex ; justify-content: flex-start; gap: 10px; overflow-x: scroll;
+  }
+
+  }
+  @media (max-width: 480px) {
+    .mas-title { font-size: 20px; }
+  }
+</style>
+
 {% schema %}
 {
-  "name": "Match Shine",
+  "name": "Match and Shine New",
   "settings": [
     {
-      "type": "collection",
-      "id": "collection",
-      "label": "t:sections.featured-collection.settings.collection.label"
-    },
-    {
-      "type": "header",
-      "content": "t:sections.featured-collection.settings.header.content"
-    },
-    {
-      "type": "select",
-      "id": "image_ratio",
-      "options": [
-        {
-          "value": "adapt",
-          "label": "t:sections.featured-collection.settings.image_ratio.options__1.label"
-        },
-        {
-          "value": "portrait",
-          "label": "t:sections.featured-collection.settings.image_ratio.options__2.label"
-        },
-        {
-          "value": "square",
-          "label": "t:sections.featured-collection.settings.image_ratio.options__3.label"
-        }
-      ],
-      "default": "adapt",
-      "label": "t:sections.featured-collection.settings.image_ratio.label"
-    },
-    {
-      "type": "select",
-      "id": "image_shape",
-      "options": [
-        {
-          "value": "default",
-          "label": "t:sections.all.image_shape.options__1.label"
-        },
-        {
-          "value": "arch",
-          "label": "t:sections.all.image_shape.options__2.label"
-        },
-        {
-          "value": "blob",
-          "label": "t:sections.all.image_shape.options__3.label"
-        },
-        {
-          "value": "chevronleft",
-          "label": "t:sections.all.image_shape.options__4.label"
-        },
-        {
-          "value": "chevronright",
-          "label": "t:sections.all.image_shape.options__5.label"
-        },
-        {
-          "value": "diamond",
-          "label": "t:sections.all.image_shape.options__6.label"
-        },
-        {
-          "value": "parallelogram",
-          "label": "t:sections.all.image_shape.options__7.label"
-        },
-        {
-          "value": "round",
-          "label": "t:sections.all.image_shape.options__8.label"
-        }
-      ],
-      "default": "default",
-      "label": "t:sections.all.image_shape.label",
-      "info": "t:sections.all.image_shape.info"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_secondary_image",
-      "default": false,
-      "label": "t:sections.featured-collection.settings.show_secondary_image.label"
-    },
-    {
-      "type": "checkbox",
-      "id": "show_rating",
-      "default": false,
-      "label": "t:sections.featured-collection.settings.show_rating.label",
-      "info": "t:sections.featured-collection.settings.show_rating.info"
-    },
-    {
-      "type": "select",
-      "id": "quick_add",
-      "default": "none",
-      "label": "t:sections.main-collection-product-grid.settings.quick_add.label",
-      "info": "t:sections.main-collection-product-grid.settings.quick_add.info",
-      "options": [
-        {
-          "value": "none",
-          "label": "t:sections.main-collection-product-grid.settings.quick_add.options.option_1"
-        },
-        {
-          "value": "standard",
-          "label": "t:sections.main-collection-product-grid.settings.quick_add.options.option_2"
-        },
-        {
-          "value": "bulk",
-          "label": "t:sections.main-collection-product-grid.settings.quick_add.options.option_3"
-        }
-      ]
-    },
-    {
-      "type": "header",
-      "content": "t:sections.all.padding.section_padding_heading"
+      "type": "text",
+      "id": "collection_handle",
+      "label": "Base collection handle",
+      "default": "jewelry"
     },
     {
       "type": "range",
-      "id": "padding_top",
-      "min": 0,
-      "max": 100,
-      "step": 4,
-      "unit": "px",
-      "label": "t:sections.all.padding.padding_top",
-      "default": 36
+      "id": "price_range",
+      "label": "Price Range (%)",
+      "default": 20,
+      "min": 5,
+      "max": 50,
+      "step": 5,
+      "unit": "%"
     },
     {
       "type": "range",
-      "id": "padding_bottom",
-      "min": 0,
-      "max": 100,
-      "step": 4,
-      "unit": "px",
-      "label": "t:sections.all.padding.padding_bottom",
-      "default": 36
+      "id": "product_limit",
+      "label": "Number of products to show",
+      "default": 8,
+      "min": 3,
+      "max": 20,
+      "step": 1
     }
   ],
   "presets": [
     {
-      "name": "Match Shine Section"
+      "name": "Match and Shine",
+      "category": "Cross-sell"
     }
   ]
-
 }
 {% endschema %}
-{% assign shineprod = product.metafields.custom.matching_product.value %}
-{% if shineprod != blank %}
-<div class="pdp-match-shine" data-lazy-section>
-  <div class="pdp-match-shine-headers">
-    <h2>Match & Shine With</h2>
-    <p>Designed to Complement, Meant to Shine</p>
-  </div>
-  <div class="pdp-match-shine-content">
-    <div class="pdp-match-shine-main-product">
-      <img src="{{ product.featured_media | img_url: '472x472' }}" height="472" width="472" alt="{{ product.title }}" title="{{ product.title }}">
-    </div>
-    <div class="pdp-match-shine-slider">
-      {%- for product in shineprod -%}
-        <div class="pdp-match-shine-slider-item">
-          {% render 'card-product',
-            card_product: product,
-            media_aspect_ratio: section.settings.image_ratio,
-            image_shape: section.settings.image_shape,
-            show_secondary_image: section.settings.show_secondary_image,
-            show_rating: section.settings.show_rating,
-            skip_styles: skip_card_product_styles,
-            section_id: section.id,
-            quick_add: section.settings.quick_add
-          %}
-        </div>
-      {%- endfor -%}
-    </div>
-  </div>
-</div>
-{% endif %}
-<style>
-.pdp-match-shine { padding-block: {{ section.settings.padding_top }}px {{ section.settings.padding_bottom }}px; height: max-content; display: flex; flex-direction: column; align-items: center; justify-content: center; content-visibility: auto; contain-intrinsic-size: 800px; opacity: 0; transform: translateY(40px); transition: opacity 0.6s ease, transform 0.6s ease; } 
-.pdp-match-shine.visible { opacity: 1; transform: translateY(0); }
-</style>
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const section = document.querySelector("[data-lazy-section]");
-  if (!section) return;
-
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        section.classList.add("visible");
-
-        const matchShineWrapper = section.querySelector(".pdp-match-shine-slider");
-        if (matchShineWrapper) {
-          matchShineWrapper.addEventListener("click", function (e) {
-            const card = e.target.closest(".pdp-match-shine-slider-item");
-            if (card) {
-              const productTitle = card.querySelector(".card__heading")?.innerText || "Unknown Product";
-              const productLink = card.querySelector("a")?.href || window.location.href;
-              const productId = card.querySelector("a")?.getAttribute("data-product-id") || "";
-              
-              // Get position index of the card
-              const allCards = matchShineWrapper.querySelectorAll(".pdp-match-shine-slider-item");
-              const cardIndex = Array.from(allCards).indexOf(card);
-
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                event: "promoClick",
-                promoClick: {
-                  promo_id: `match-and-shine-${productId || 'section'}`,
-                  creative_name: "match_and_shine_feature",
-                  promo_position: `product_page_match_and_shine_${cardIndex + 1}`,
-                  promo_name:(productTitle || '').replace(/\s+/g, ' ').trim()
-                }
-              });
-            }
-          });
-        }
-
-        observer.disconnect();
-      }
-    });
-  }, { threshold: 0.2 });
-
-  observer.observe(section);
-});
-</script>
-
-
-{% render 'product-collection-card' %}
