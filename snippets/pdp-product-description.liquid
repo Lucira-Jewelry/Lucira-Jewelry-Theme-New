@@ -47,7 +47,7 @@
         Diamond Information
       </label>
       <div class="pdp-details-accordion-item-content">
-        <table>
+        <table id="diamond-info-table">
           <thead>
             <tr>
               <th>TYPE</th>
@@ -55,12 +55,8 @@
               <th>SETTING / WT</th>
             </tr>
           </thead>
-          <tbody>
-            <tr>
-              <td id="diamond-type"></td>
-              <td id="diamond-pcs-shape"></td>
-              <td id="diamond-setting-wt"></td>
-            </tr>
+          <tbody id="diamond-tbody">
+            <!-- Rows will be dynamically generated -->
           </tbody>
         </table>
       </div>
@@ -256,9 +252,7 @@ function renderFromMetafields(variantId) {
     document.getElementById('metal-net-weight').textContent = '';
     document.getElementById('metal-gross-weight').textContent = '';
     document.getElementById('metal-dimensions').textContent = '';
-    document.getElementById('diamond-type').textContent = '';
-    document.getElementById('diamond-pcs-shape').textContent = '';
-    document.getElementById('diamond-setting-wt').textContent = '';
+    document.getElementById('diamond-tbody').innerHTML = '';
     document.getElementById('gem-type').textContent = '';
     document.getElementById('gem-shape-pcs').textContent = '';
     document.getElementById('gem-setting-wt').textContent = '';
@@ -284,33 +278,47 @@ function renderFromMetafields(variantId) {
   if (data.top_height) dimParts.push('Height: ' + data.top_height + 'mm');
   document.getElementById('metal-dimensions').innerHTML = dimParts.length ? dimParts.join('<br>') : '';
 
-  // DIAMOND Information
+  // DIAMOND Information - Show all diamonds
   var diamondAccordion = document.getElementById('diamond-accordion');
   var diamonds = (data.diamonds || []).filter(function(d) { return d.type; });
   
   if (diamonds.length > 0) {
     diamondAccordion.style.display = 'block';
-    var d = diamonds[0]; // Use first diamond
+    var diamondTbody = document.getElementById('diamond-tbody');
+    diamondTbody.innerHTML = '';
     
-    var dType = d.type || '';
-    var dClarity = d.clarity || '';
-    var dColor = d.color || '';
-    var typeParts = [dType];
-    if (dClarity || dColor) {
-      typeParts.push([dClarity, dColor].filter(Boolean).join('-'));
-    }
-    document.getElementById('diamond-type').textContent = typeParts.filter(Boolean).join(' / ') || '';
-    
-    var pcsShape = [d.numbers, d.shape].filter(Boolean).join(' - ');
-    document.getElementById('diamond-pcs-shape').textContent = pcsShape || '';
-    
-    var settingWt = d.setting && d.weight ? d.setting + ': ' + d.weight + 'ct' : '';
-    document.getElementById('diamond-setting-wt').textContent = settingWt;
+    diamonds.forEach(function(d) {
+      var row = document.createElement('tr');
+      
+      // TYPE cell
+      var typeCell = document.createElement('td');
+      var dType = d.type || '';
+      var dClarity = d.clarity || '';
+      var dColor = d.color || '';
+      var typeParts = [dType];
+      if (dClarity || dColor) {
+        typeParts.push([dClarity, dColor].filter(Boolean).join('-'));
+      }
+      typeCell.textContent = typeParts.filter(Boolean).join(' / ') || '';
+      row.appendChild(typeCell);
+      
+      // PCS / SHAPE cell
+      var pcsShapeCell = document.createElement('td');
+      var pcsShape = [d.numbers, d.shape].filter(Boolean).join(' - ');
+      pcsShapeCell.textContent = pcsShape || '';
+      row.appendChild(pcsShapeCell);
+      
+      // SETTING / WT cell
+      var settingWtCell = document.createElement('td');
+      var settingWt = d.setting && d.weight ? d.setting + ': ' + d.weight + 'ct' : '';
+      settingWtCell.textContent = settingWt;
+      row.appendChild(settingWtCell);
+      
+      diamondTbody.appendChild(row);
+    });
   } else {
     diamondAccordion.style.display = 'none';
-    document.getElementById('diamond-type').textContent = '';
-    document.getElementById('diamond-pcs-shape').textContent = '';
-    document.getElementById('diamond-setting-wt').textContent = '';
+    document.getElementById('diamond-tbody').innerHTML = '';
   }
 
   // GEMSTONE Information
@@ -356,9 +364,7 @@ function renderFromComponents(variantId) {
   document.getElementById('metal-gross-weight').textContent = '';
   document.getElementById('metal-dimensions').textContent = '';
 
-  document.getElementById('diamond-type').textContent = '';
-  document.getElementById('diamond-pcs-shape').textContent = '';
-  document.getElementById('diamond-setting-wt').textContent = '';
+  document.getElementById('diamond-tbody').innerHTML = '';
 
   document.getElementById('gem-type').textContent = '';
   document.getElementById('gem-shape-pcs').textContent = '';
@@ -407,47 +413,61 @@ function renderFromComponents(variantId) {
     }
   }
 
-  // DIAMOND: find component with item_group_name 'Diamond'
-  var diamond = comps.find(function(c){
+  // DIAMOND: find ALL components with item_group_name 'Diamond'
+  var diamonds = comps.filter(function(c){
     return c.item_group_name && String(c.item_group_name).toLowerCase().indexOf('diamond') !== -1;
   });
 
-  if (diamond) {
+  if (diamonds.length > 0) {
     diamondAccordion.style.display = 'block';
+    var diamondTbody = document.getElementById('diamond-tbody');
+    diamondTbody.innerHTML = '';
 
-    // TYPE: combine Type + quality + stone_color_code
-    var dType = getProp(diamond, ['Type','type']) || '';
-    var quality = getProp(diamond, ['quality_code','quality','clarity']) || '';
-    var colorCode = getProp(diamond, ['stone_color_code','stone_color','color']) || '';
-    var typeParts = [];
-    if (dType) typeParts.push(String(dType));
-    var qualColor = [quality, colorCode].filter(Boolean).join('-');
-    if (qualColor) typeParts.push(qualColor);
-    document.getElementById('diamond-type').textContent = typeParts.length ? typeParts.join(' / ') : '';
+    diamonds.forEach(function(diamond) {
+      var row = document.createElement('tr');
+      
+      // TYPE cell
+      var typeCell = document.createElement('td');
+      var dType = getProp(diamond, ['Type','type']) || '';
+      var quality = getProp(diamond, ['quality_code','quality','clarity']) || '';
+      var colorCode = getProp(diamond, ['stone_color_code','stone_color','color']) || '';
+      var typeParts = [];
+      if (dType) typeParts.push(String(dType));
+      var qualColor = [quality, colorCode].filter(Boolean).join('-');
+      if (qualColor) typeParts.push(qualColor);
+      typeCell.textContent = typeParts.length ? typeParts.join(' / ') : '';
+      row.appendChild(typeCell);
 
-    // PCS / SHAPE
-    var pcsShape = getProp(diamond, ['PCs-shape','PCs_shape','pcs-shape','shape-pcs','shape_pcs']);
-    if (!pcsShape) {
-      var pieces = getProp(diamond, ['pieces','Pieces','numbers']);
-      var shape = getProp(diamond, ['shape_code','shape','shapeCode']);
-      if (pieces && shape) pcsShape = pieces + ' - ' + shape;
-      else if (pieces) pcsShape = String(pieces);
-      else if (shape) pcsShape = String(shape);
-    }
-    document.getElementById('diamond-pcs-shape').textContent = pcsShape || '';
+      // PCS / SHAPE cell
+      var pcsShapeCell = document.createElement('td');
+      var pcsShape = getProp(diamond, ['PCs-shape','PCs_shape','pcs-shape','shape-pcs','shape_pcs']);
+      if (!pcsShape) {
+        var pieces = getProp(diamond, ['pieces','Pieces','numbers']);
+        var shape = getProp(diamond, ['shape_code','shape','shapeCode']);
+        if (pieces && shape) pcsShape = pieces + ' - ' + shape;
+        else if (pieces) pcsShape = String(pieces);
+        else if (shape) pcsShape = String(shape);
+      }
+      pcsShapeCell.textContent = pcsShape || '';
+      row.appendChild(pcsShapeCell);
 
-    // SETTING / WT
-    var dSetting = getProp(diamond, ['setting-weight','setting_weight','settingWeight','setting']);
-    var dWeight = getProp(diamond, ['pointer_weight','pointer-weight','pointerWeight','weight']);
-    if (dSetting && dWeight) {
-      document.getElementById('diamond-setting-wt').textContent = dSetting + ': ' + dWeight + 'ct';
-    } else if (dSetting) {
-      document.getElementById('diamond-setting-wt').textContent = dSetting;
-    } else if (dWeight) {
-      document.getElementById('diamond-setting-wt').textContent = 'Prong: ' + dWeight + 'ct';
-    } else {
-      document.getElementById('diamond-setting-wt').textContent = '';
-    }
+      // SETTING / WT cell
+      var settingWtCell = document.createElement('td');
+      var dSetting = getProp(diamond, ['setting-weight','setting_weight','settingWeight','setting']);
+      var dWeight = getProp(diamond, ['pointer_weight','pointer-weight','pointerWeight','weight']);
+      if (dSetting && dWeight) {
+        settingWtCell.textContent = dSetting + ': ' + dWeight + 'ct';
+      } else if (dSetting) {
+        settingWtCell.textContent = dSetting;
+      } else if (dWeight) {
+        settingWtCell.textContent = 'Prong: ' + dWeight + 'ct';
+      } else {
+        settingWtCell.textContent = '';
+      }
+      row.appendChild(settingWtCell);
+      
+      diamondTbody.appendChild(row);
+    });
   } else {
     diamondAccordion.style.display = 'none';
   }
@@ -464,7 +484,7 @@ function renderFromComponents(variantId) {
     // TYPE: combine color + type
     var gColor = getProp(gem, ['color','Color','stone_color','stone_color_code']) || '';
     var gType = getProp(gem, ['type','Type','item_group_name']) || ''; 
-    var typeText = [ 'Others' , gType].filter(Boolean).join(' - ');
+    var typeText = ['Others', gType].filter(Boolean).join(' - ');
     document.getElementById('gem-type').textContent = typeText || '';
 
     // SHAPE / PCS
