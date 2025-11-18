@@ -2,56 +2,55 @@
   Franchise Form Section
 {% endcomment %}
 <section class="franchise-form-section">
-    <div class="page-width">
-  <div class="franchise-form-wrapper">
+  <div class="page-width">
+    <div class="franchise-form-wrapper">
 
-    <h2 class="ff-title">{{ section.settings.title }}</h2>
-    <p class="ff-subtitle">{{ section.settings.subtitle }}</p>
+      <h2 class="ff-title">{{ section.settings.title }}</h2>
+      <p class="ff-subtitle">{{ section.settings.subtitle }}</p>
 
-    <!-- FINAL WORKING FORM -->
-    <form method="post" action="/contact#franchise-success" accept-charset="UTF-8" class="franchise-form">
-      {% form 'contact' %}
+      <!-- FINAL WORKING FORM (use Shopify form tag only - DO NOT wrap in another <form>) -->
+      <div class="franchise-form">
+        {% form 'contact' %}
+          <!-- Force Shopify email routing -->
+          <input type="hidden" name="contact[form_type]" value="Franchise Form Submission">
+          <input type="hidden" name="contact[subject]" value="New Franchise Lead - Lucira Jewelry">
 
-        <!-- Force Shopify email routing -->
-        <input type="hidden" name="contact[form_type]" value="Franchise Form Submission">
-        <input type="hidden" name="contact[subject]" value="New Franchise Lead - Lucira Jewelry">
+          <div class="ff-row">
+            <div class="ff-field">
+              <label>Enter your Full Name</label>
+              <input type="text" name="contact[name]" placeholder="Sumit Chavda" required>
+            </div>
 
-        <div class="ff-row">
-          <div class="ff-field">
-            <label>Enter your Full Name</label>
-            <input type="text" name="contact[name]" placeholder="Sumit Chavda" required>
+            <div class="ff-field">
+              <label>Enter your Phone Number</label>
+              <input type="text" name="contact[phone]" placeholder="+91 9876543210" required>
+            </div>
+
+            <div class="ff-field">
+              <label>Enter your Mail ID</label>
+              <input type="email" name="contact[email]" placeholder="sumit@business.com" required>
+            </div>
+
+            <div class="ff-field">
+              <label>Enter your City or Pincode</label>
+              <input type="text" name="contact[city]" placeholder="400001" required>
+            </div>
           </div>
 
-          <div class="ff-field">
-            <label>Enter your Phone Number</label>
-            <input type="text" name="contact[phone]" placeholder="+91 9876543210" required>
-          </div>
+          <button type="submit" class="ff-submit">SUBMIT</button>
 
-          <div class="ff-field">
-            <label>Enter your Mail ID</label>
-            <input type="email" name="contact[email]" placeholder="sumit@business.com" required>
-          </div>
+          <!-- SUCCESS MESSAGE (Liquid) - MUST be inside the form block so `form` object is available -->
+          {% if form.posted_successfully? %}
+            <div class="ff-success" id="franchise-success">
+              Thank you! Our personnel will contact you shortly.
+            </div>
+          {% endif %}
 
-          <div class="ff-field">
-            <label>Enter your City or Pincode</label>
-            <input type="text" name="contact[city]" placeholder="400001" required>
-          </div>
-        </div>
-
-        <button type="submit" class="ff-submit">SUBMIT</button>
-
-      {% endform %}
-    </form>
-
-    <!-- SUCCESS MESSAGE -->
-    {% if form.posted_successfully? %}
-      <div class="ff-success" id="franchise-success">
-        Thank you! Your request has been submitted.
+        {% endform %}
       </div>
-    {% endif %}
-</div>
-  </div>
 
+    </div>
+  </div>
   <style>
     .franchise-form-section {
       width: 100%;
@@ -142,6 +141,124 @@
   </style>
 </section>
 
+{% raw %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  // IDs/classes in the form
+  const form = document.querySelector('.franchise-form form') || document.querySelector('.franchise-form');
+  // If your HTML structure differs, this will still try to pick the form element
+
+  // Replace with your webhook endpoint (Zapier/Make/your server). Leave blank to disable.
+  const WEBHOOK_URL = ""; // e.g. "https://hooks.zapier.com/hooks/catch/123456/abcdef"
+
+  // Create (or reuse) the success element (for JS-posted success)
+  let successEl = document.querySelector('.ff-success');
+  if (!successEl) {
+      successEl = document.createElement('div');
+      successEl.className = 'ff-success';
+      successEl.id = 'franchise-success';
+      successEl.style.display = 'none';
+      successEl.textContent = 'Thank you! Our team will contact you shortly.';
+      // Append after the form wrapper
+      const wrapper = document.querySelector('.franchise-form-wrapper') || document.body;
+      wrapper.appendChild(successEl);
+  }
+
+  // Create (or reuse) an inline error element
+  let errorEl = document.querySelector('.ff-error');
+  if (!errorEl) {
+      errorEl = document.createElement('div');
+      errorEl.className = 'ff-error';
+      errorEl.style.display = 'none';
+      errorEl.style.color = '#b00020';
+      errorEl.style.marginTop = '12px';
+      const wrapper = document.querySelector('.franchise-form-wrapper') || document.body;
+      wrapper.appendChild(errorEl);
+  }
+
+  // If form not found, stop
+  if (!form) return;
+
+  form.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      // Hide messages
+      successEl.style.display = 'none';
+      errorEl.style.display = 'none';
+      errorEl.textContent = '';
+
+      // Gather form data (works for inputs, selects, textareas)
+      const fd = new FormData(form);
+
+      // Ensure Shopify's form tag fields are present
+      // If you use {% form 'contact' %} these should already be present.
+      if (!fd.get('contact[subject]')) {
+        fd.set('contact[subject]', 'New Franchise Lead - Lucira Jewelry');
+      }
+      if (!fd.get('contact[form_type]')) {
+        fd.set('contact[form_type]', 'Franchise Form Submission');
+      }
+
+      // Disable submit button to prevent double-submits
+      const submitButton = form.querySelector('[type="submit"]');
+      if (submitButton) submitButton.disabled = true;
+
+      // 1) Submit to Shopify contact endpoint
+      fetch('/contact', {
+        method: 'POST',
+        body: fd,
+        credentials: 'same-origin'
+      })
+      .then(response => {
+        // Shopify often responds with 200 and redirects — treat 200/redirect as success
+        if (!response.ok && response.status !== 200 && response.status !== 302) {
+          throw new Error('Network response was not OK');
+        }
+        // show on-page success message
+        successEl.style.display = 'block';
+
+        // optional: clear form
+        form.reset();
+
+        // 2) Send data to your webhook (for sending an email / saving to CRM)
+        if (WEBHOOK_URL) {
+          // convert to JSON
+          const json = {};
+          fd.forEach((value, key) => {
+            // convert 'contact[name]' to 'name' for webhook convenience
+            const simpleKey = key.replace(/^contact\[(.*)\]$/, '$1');
+            json[simpleKey] = value;
+          });
+          // Add metadata
+          json._submitted_at = new Date().toISOString();
+          json._subject = fd.get('contact[subject]') || '';
+
+          // send webhook (fire-and-forget)
+          fetch(WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(json)
+          }).catch(err => {
+            // non-blocking: log to console; you may show a small warning if needed
+            console.warn('Webhook post failed:', err);
+          });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        errorEl.textContent = 'Something went wrong while submitting the form. Please try again or contact us directly.';
+        errorEl.style.display = 'block';
+      })
+      .finally(() => {
+        if (submitButton) submitButton.disabled = false;
+      });
+  });
+});
+</script>
+{% endraw %}
+
 {% schema %}
 {
   "name": "Franchise Form",
@@ -166,12 +283,3 @@
   ]
 }
 {% endschema %}
-
-<script>
-document.addEventListener("DOMContentLoaded", function() {
-  const params = new URLSearchParams(window.location.search);
-  if (window.location.hash === "#franchise-form" && params.has("contact_posted")) {
-      document.querySelector(".ff-success").style.display = "block";
-  }
-});
-</script>
