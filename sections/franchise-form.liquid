@@ -15,6 +15,12 @@
           <input type="hidden" name="contact[form_type]" value="Franchise Form Submission">
           <input type="hidden" name="contact[subject]" value="New Franchise Lead - Lucira Jewelry">
 
+          <!-- HONEYPOT (invisible to real users; helps reduce bot submissions) -->
+          <div style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
+            <label for="contact_extra">Leave this field blank</label>
+            <input id="contact_extra" name="contact[extra]" type="text" autocomplete="off" tabindex="-1" />
+          </div>
+
           <div class="ff-row">
             <div class="ff-field">
               <label>Enter your Full Name</label>
@@ -39,7 +45,7 @@
 
           <button type="submit" class="ff-submit">SUBMIT</button>
 
-          <!-- SUCCESS MESSAGE (Liquid) - MUST be inside the form block so `form` object is available -->
+          <!-- SUCCESS MESSAGE (Liquid) - rendered by Shopify after successful submit -->
           {% if form.posted_successfully? %}
             <div class="ff-success" id="franchise-success">
               Thank you! Our personnel will contact you shortly.
@@ -51,6 +57,7 @@
 
     </div>
   </div>
+
   <style>
     .franchise-form-section {
       width: 100%;
@@ -140,6 +147,43 @@
     }
   </style>
 </section>
+
+{% raw %}
+<script>
+/*
+  Non-invasive helper script:
+  - Does NOT POST or intercept the form.
+  - Looks for Shopify redirect patterns (#franchise-success, ?contact_posted or ?contact_posted=true)
+    and ensures the success message (if present in DOM) is visible for the user.
+  - This helps UX when Shopify redirects back to the page after a server submit.
+*/
+document.addEventListener('DOMContentLoaded', function () {
+  try {
+    var showSuccess = false;
+    // If URL contains anchor #franchise-success
+    if (window.location.hash && window.location.hash.indexOf('franchise-success') !== -1) {
+      showSuccess = true;
+    }
+    // If URL contains contact_posted param (Shopify sometimes uses ?contact_posted or query)
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('contact_posted') === 'true' || params.has('contact_posted')) {
+      showSuccess = true;
+    }
+    if (showSuccess) {
+      var el = document.getElementById('franchise-success');
+      if (el) {
+        el.style.display = 'block';
+        // scroll into view for better UX
+        try { el.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+      }
+    }
+  } catch (e) {
+    // non-fatal: do nothing
+    console.warn('franchise-form helper script error', e);
+  }
+});
+</script>
+{% endraw %}
 
 {% schema %}
 {
