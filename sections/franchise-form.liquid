@@ -304,10 +304,10 @@
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    const form = document.getElementById('franchise_contact_form'); // Change this ID to match your new form
-    const submitBtn = form.querySelector('.ff-submit'); // Update selector to match your button class
-    const successMsg = document.getElementById('ff-success-msg'); // Change ID to match your success message element
-    const errorMsg = document.getElementById('ff-error-msg'); // Change ID to match your error message element
+    const form = document.getElementById('franchise_contact_form');
+    const submitBtn = form.querySelector('.ff-submit');
+    const successMsg = document.getElementById('ff-success-msg');
+    const errorMsg = document.getElementById('ff-error-msg');
 
     form.addEventListener('submit', function(e) {
       e.preventDefault();
@@ -320,13 +320,13 @@
       submitBtn.disabled = true;
       submitBtn.textContent = 'SUBMITTING...';
       
-      // Get form data - Update IDs to match your new form
-      const name = document.getElementById('franchise_name').value;
-      const phone = document.getElementById('franchise_phone').value;
-      const email = document.getElementById('franchise_email').value;
-      const city = document.getElementById('franchise_city').value;
+      // Get form data
+      const name = document.getElementById('franchise_name').value.trim();
+      const phone = document.getElementById('franchise_phone').value.trim();
+      const email = document.getElementById('franchise_email').value.trim();
+      const city = document.getElementById('franchise_city').value.trim();
       
-      // Prepare payload for GCP API
+      // Prepare payload for GCP API (exactly as expected by your API)
       const payload = {
         name: name,
         phone: phone,
@@ -334,24 +334,35 @@
         city: city,
         formType: 'franchise_registration',
         pageUrl: window.location.href,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        submittedAt: new Date().toLocaleString('en-IN', { 
+          timeZone: 'Asia/Kolkata',
+          dateStyle: 'full',
+          timeStyle: 'short'
+        })
       };
+      
+      console.log('Sending payload:', payload); // Debug log
       
       // Submit to GCP API
       fetch('https://franchise-api-385594025448.asia-south1.run.app/', {
         method: 'POST',
         headers: { 
-          'Content-Type': 'application/json' 
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify(payload)
       })
       .then(function(response) {
+        console.log('Response status:', response.status); // Debug log
+        
         if (!response.ok) {
-          throw new Error('Submission failed');
+          throw new Error('Submission failed with status: ' + response.status);
         }
         return response.json();
       })
       .then(function(data) {
+        console.log('Success response:', data); // Debug log
+        
         // Track event in dataLayer
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
@@ -372,11 +383,12 @@
         });
       })
       .catch(function(error) {
+        console.error('Form submission error:', error); // Debug log
+        
         // Error - show error message
         errorMsg.style.display = 'flex';
         submitBtn.disabled = false;
         submitBtn.textContent = 'SUBMIT';
-        console.error('Form submission error:', error);
       });
     });
   });
