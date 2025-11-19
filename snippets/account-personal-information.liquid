@@ -466,6 +466,13 @@
   document.getElementById('editAddressForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
+    // 🔹 6-digit validation for Edit modal
+    const editPin = document.getElementById('EditAddressZip').value.trim();
+    if (!/^\d{6}$/.test(editPin)) {
+      alert('Please enter a valid 6-digit pincode.');
+      return;
+    }
+
     const customerId = document.getElementById('customer_id').value;
     const addressId = document.getElementById('EditAddressId').value;
 
@@ -480,31 +487,12 @@
       city: document.getElementById('EditAddressCity').value,
       province: document.getElementById('EditAddressProvince').value,
       country: document.getElementById('EditAddressCountry').value,
-      zip: document.getElementById('EditAddressZip').value
+      zip: editPin
     };
 
-    try {
-      const response = await fetch("https://user-address-edit-385594025448.asia-south1.run.app", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data)
-      });
-
-      const result = await response.json();
-
-      if (response.ok) {
-        alert("✅ Address updated successfully.");
-        closeEditModal();
-        location.reload(); // Reload to show updated address
-      } else {
-        alert("❌ Failed to update address: " + (result.message || "Unknown error"));
-        console.error(result);
-      }
-    } catch (err) {
-      alert("⚠️ Network error. Please try again.");
-      console.error(err);
-    }
+    // ... rest of your existing code here (fetch PUT etc.)
   });
+
 
   window.addEventListener('load', () => {
     typeof CustomerAddresses !== 'undefined' && new CustomerAddresses();
@@ -614,5 +602,108 @@
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return re.test(email);
     }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const addAddressForm = document.querySelector('#addAddressModal form');
+    const addPinInput = document.getElementById('AddressZipNew');
+
+    if (addAddressForm && addPinInput) {
+      // Only numbers and max 6 chars while typing
+      addPinInput.addEventListener('input', function (e) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 6) v = v.slice(0, 6);
+        e.target.value = v;
+      });
+
+      addAddressForm.addEventListener('submit', function (e) {
+        const pin = addPinInput.value.trim();
+        if (!/^\d{6}$/.test(pin)) {
+          e.preventDefault();
+          alert('Please enter a valid 6-digit pincode.');
+        }
+      });
+    }
+
+    // Same input mask for Edit
+    const editPinInput = document.getElementById('EditAddressZip');
+    if (editPinInput) {
+      editPinInput.addEventListener('input', function (e) {
+        let v = e.target.value.replace(/\D/g, '');
+        if (v.length > 6) v = v.slice(0, 6);
+        e.target.value = v;
+      });
+    }
+  });
+</script>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const addPinInput = document.getElementById('AddressZipNew');
+    const addCityInput = document.getElementById('AddressCityNew');
+    const addStateSelect = document.getElementById('AddressProvinceNew');
+
+    const editPinInput = document.getElementById('EditAddressZip');
+    const editCityDisplayInput = document.getElementById('EditAddressAddress2'); // City/ District/ Town
+    const editStateSelect = document.getElementById('EditAddressProvince');
+
+    async function fetchLocationFromPincode(pin) {
+      if (!/^\d{6}$/.test(pin)) return null;
+      try {
+        const res = await fetch('https://api.postalpincode.in/pincode/' + pin);
+        const data = await res.json();
+
+        if (Array.isArray(data) &&
+            data[0].Status === 'Success' &&
+            data[0].PostOffice &&
+            data[0].PostOffice.length) {
+
+          const po = data[0].PostOffice[0];
+          return {
+            city: po.District || '',
+            state: po.State || ''
+          };
+        }
+      } catch (err) {
+        console.error('Pincode lookup failed:', err);
+      }
+      return null;
+    }
+
+    function setupPincodeAutoFill(pinInput, cityInput, stateSelect) {
+      if (!pinInput) return;
+
+      // already added input mask in previous script, but safe to keep here if you prefer it here instead
+      pinInput.addEventListener('blur', async function (e) {
+        const pin = e.target.value.trim();
+        if (!/^\d{6}$/.test(pin)) return;
+
+        const loc = await fetchLocationFromPincode(pin);
+        if (!loc) return;
+
+        // Fill city
+        if (cityInput && !cityInput.value) {
+          cityInput.value = loc.city;
+        }
+
+        // Auto-select state option if it matches
+        if (stateSelect && loc.state) {
+          const stateOption = Array.from(stateSelect.options).find(function (opt) {
+            return opt.value.toLowerCase() === loc.state.toLowerCase();
+          });
+          if (stateOption) {
+            stateSelect.value = stateOption.value;
+          }
+        }
+      });
+    }
+
+    // Add address modal: auto-fill City + State
+    setupPincodeAutoFill(addPinInput, addCityInput, addStateSelect);
+
+    // Edit address modal: auto-fill City/ District/ Town + State
+    setupPincodeAutoFill(editPinInput, editCityDisplayInput, editStateSelect);
   });
 </script>
