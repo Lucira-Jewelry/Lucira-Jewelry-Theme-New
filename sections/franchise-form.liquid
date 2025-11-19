@@ -1,5 +1,5 @@
 {% comment %}
-  Franchise Form Section
+  Franchise Form Section with Email Notifications
 {% endcomment %}
 <section class="franchise-form-section">
   <div class="page-width">
@@ -8,12 +8,15 @@
       <h2 class="ff-title">{{ section.settings.title }}</h2>
       <p class="ff-subtitle">{{ section.settings.subtitle }}</p>
 
-      <!-- FINAL WORKING FORM (use Shopify form tag only - DO NOT wrap in another <form>) -->
+      <!-- FINAL WORKING FORM -->
       <div class="franchise-form">
         {% form 'contact' %}
-          <!-- Force Shopify email routing -->
+          <!-- Force Shopify email routing to your email -->
           <input type="hidden" name="contact[form_type]" value="Franchise Form Submission">
           <input type="hidden" name="contact[subject]" value="New Franchise Lead - Lucira Jewelry">
+          
+          <!-- This ensures email goes to your specified address -->
+          <input type="hidden" name="contact[recipient]" value="tech@lucirajewelry.com">
 
           <!-- HONEYPOT (invisible to real users; helps reduce bot submissions) -->
           <div style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
@@ -24,24 +27,27 @@
           <div class="ff-row">
             <div class="ff-field">
               <label>Enter your Full Name</label>
-              <input type="text" name="contact[name]" placeholder="Sumit Chavda" required>
+              <input type="text" name="contact[name]" id="franchise_name" placeholder="Sumit Chavda" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your Phone Number</label>
-              <input type="text" name="contact[phone]" placeholder="+91 9876543210" required>
+              <input type="tel" name="contact[phone]" id="franchise_phone" placeholder="+91 9876543210" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your Mail ID</label>
-              <input type="email" name="contact[email]" placeholder="sumit@business.com" required>
+              <input type="email" name="contact[email]" id="franchise_email" placeholder="sumit@business.com" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your City or Pincode</label>
-              <input type="text" name="contact[city]" placeholder="400001" required>
+              <input type="text" name="contact[city]" id="franchise_city" placeholder="400001" required>
             </div>
           </div>
+
+          <!-- Hidden field to include all details in email body -->
+          <input type="hidden" name="contact[body]" id="franchise_body" value="">
 
           <button type="submit" class="ff-submit">SUBMIT</button>
 
@@ -61,7 +67,6 @@
   <style>
     .franchise-form-section {
       width: 100%;
-      {% comment %} padding: 40px 0; {% endcomment %}
       display: flex;
       justify-content: center;
     }
@@ -134,6 +139,16 @@
       opacity: 0.85;
     }
 
+    .ff-success {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
     @media (max-width: 900px) {
       .franchise-form-section .ff-row {
         grid-template-columns: repeat(2, 1fr);
@@ -150,21 +165,37 @@
 
 {% raw %}
 <script>
-/*
-  Non-invasive helper script:
-  - Does NOT POST or intercept the form.
-  - Looks for Shopify redirect patterns (#franchise-success, ?contact_posted or ?contact_posted=true)
-    and ensures the success message (if present in DOM) is visible for the user.
-  - This helps UX when Shopify redirects back to the page after a server submit.
-*/
 document.addEventListener('DOMContentLoaded', function () {
+  // Get the form element
+  var form = document.querySelector('.franchise-form form');
+  
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      // Collect form data and populate hidden body field
+      var name = document.getElementById('franchise_name').value;
+      var phone = document.getElementById('franchise_phone').value;
+      var email = document.getElementById('franchise_email').value;
+      var city = document.getElementById('franchise_city').value;
+      
+      // Create formatted message body
+      var bodyContent = 
+        "NEW FRANCHISE LEAD\n\n" +
+        "Full Name: " + name + "\n" +
+        "Phone Number: " + phone + "\n" +
+        "Email: " + email + "\n" +
+        "City/Pincode: " + city + "\n\n" +
+        "Submitted on: " + new Date().toLocaleString();
+      
+      document.getElementById('franchise_body').value = bodyContent;
+    });
+  }
+
+  // Show success message if form was posted
   try {
     var showSuccess = false;
-    // If URL contains anchor #franchise-success
     if (window.location.hash && window.location.hash.indexOf('franchise-success') !== -1) {
       showSuccess = true;
     }
-    // If URL contains contact_posted param (Shopify sometimes uses ?contact_posted or query)
     var params = new URLSearchParams(window.location.search);
     if (params.get('contact_posted') === 'true' || params.has('contact_posted')) {
       showSuccess = true;
@@ -173,12 +204,10 @@ document.addEventListener('DOMContentLoaded', function () {
       var el = document.getElementById('franchise-success');
       if (el) {
         el.style.display = 'block';
-        // scroll into view for better UX
         try { el.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
       }
     }
   } catch (e) {
-    // non-fatal: do nothing
     console.warn('franchise-form helper script error', e);
   }
 });
