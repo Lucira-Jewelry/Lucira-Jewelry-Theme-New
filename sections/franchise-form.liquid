@@ -1,6 +1,6 @@
 {% comment %}
-  Franchise Form Section - Uses Shopify Native Contact Form
-  Stays on same page after submission with success message
+  Franchise Form Section - Uses AJAX submission to prevent redirect
+  Stays on same page and shows success message
   Sends email to tech@lucirajewelry.com
 {% endcomment %}
 
@@ -11,36 +11,7 @@
       <h2 class="ff-title">{{ section.settings.title }}</h2>
       <p class="ff-subtitle">{{ section.settings.subtitle }}</p>
 
-      <!-- SUCCESS MESSAGE (appears on reload after submission) -->
-      {% if form.posted_successfully? %}
-        <div class="ff-success-message">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM8 15L3 10L4.41 8.59L8 12.17L15.59 4.58L17 6L8 15Z" fill="#155724"/>
-          </svg>
-          <p>Thank you! Our personnel will contact you shortly.</p>
-        </div>
-        <script>
-          // Scroll to success message smoothly
-          document.addEventListener('DOMContentLoaded', function() {
-            var successMsg = document.querySelector('.ff-success-message');
-            if (successMsg) {
-              successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-          });
-        </script>
-      {% endif %}
-
-      <!-- ERROR MESSAGE -->
-      {% if form.errors %}
-        <div class="ff-error-message">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="#721c24"/>
-          </svg>
-          <p>{{ form.errors | default_errors }}</p>
-        </div>
-      {% endif %}
-
-      <!-- SHOPIFY NATIVE CONTACT FORM -->
+      <!-- SHOPIFY CONTACT FORM with AJAX -->
       {% form 'contact', class: 'franchise-form', id: 'franchise_contact_form' %}
         
         {% comment %} Hidden field to identify form type {% endcomment %}
@@ -57,7 +28,6 @@
               oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '');"
               pattern="[A-Za-z\s]+"
               maxlength="50"
-              value="{% if form.name %}{{ form.name }}{% endif %}"
               required>
           </div>
 
@@ -72,7 +42,6 @@
               inputmode="numeric"
               pattern="[0-9+\s-]+"
               oninput="this.value = this.value.replace(/[^0-9+\s-]/g, '');"
-              value="{% if form.phone %}{{ form.phone }}{% endif %}"
               required>
           </div>
 
@@ -83,7 +52,6 @@
               name="contact[email]" 
               id="franchise_email" 
               placeholder="sumit@business.com"
-              value="{% if form.email %}{{ form.email }}{% endif %}"
               required>
           </div>
 
@@ -94,7 +62,6 @@
               name="contact[city]" 
               id="franchise_city" 
               placeholder="Mumbai / 400001"
-              value="{% if form.city %}{{ form.city }}{% endif %}"
               required>
           </div>
         </div>
@@ -104,6 +71,22 @@
 
         <div class="ff-submit-wrapper">
           <button type="submit" class="ff-submit">SUBMIT</button>
+        </div>
+
+        <!-- SUCCESS MESSAGE (hidden by default) -->
+        <div class="ff-success-message" id="ff-success-msg" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM8 15L3 10L4.41 8.59L8 12.17L15.59 4.58L17 6L8 15Z" fill="#155724"/>
+          </svg>
+          <p>Thank you! Our personnel will contact you shortly.</p>
+        </div>
+
+        <!-- ERROR MESSAGE (hidden by default) -->
+        <div class="ff-error-message" id="ff-error-msg" style="display: none;">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+            <path d="M10 0C4.48 0 0 4.48 0 10C0 15.52 4.48 20 10 20C15.52 20 20 15.52 20 10C20 4.48 15.52 0 10 0ZM11 15H9V13H11V15ZM11 11H9V5H11V11Z" fill="#721c24"/>
+          </svg>
+          <p>Something went wrong. Please try again or email us at <strong>tech@lucirajewelry.com</strong></p>
         </div>
 
       {% endform %}
@@ -152,7 +135,7 @@
     align-items: center;
     justify-content: center;
     gap: 12px;
-    margin-bottom: 30px;
+    margin-top: 30px;
     padding: 18px 24px;
     border-radius: 8px;
     font-size: 14px;
@@ -321,10 +304,22 @@
 <script>
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('franchise_contact_form');
-    if (!form) return;
+    const submitBtn = form.querySelector('.ff-submit');
+    const successMsg = document.getElementById('ff-success-msg');
+    const errorMsg = document.getElementById('ff-error-msg');
 
-    // Build formatted message body before submission
     form.addEventListener('submit', function(e) {
+      e.preventDefault(); // Prevent default form submission and redirect
+      
+      // Hide previous messages
+      successMsg.style.display = 'none';
+      errorMsg.style.display = 'none';
+      
+      // Disable submit button and show loading
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'SUBMITTING...';
+      
+      // Get form data
       const name = document.getElementById('franchise_name').value;
       const phone = document.getElementById('franchise_phone').value;
       const email = document.getElementById('franchise_email').value;
@@ -351,20 +346,52 @@ Submitted: ${new Date().toLocaleString('en-IN', {
 ⚠️ Please contact this lead within 24 hours.
       `.trim();
       
-      document.getElementById('franchise_body').value = messageBody;
-
-      // Add loading state to submit button
-      const submitBtn = form.querySelector('.ff-submit');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'SUBMITTING...';
+      // Prepare form data for AJAX submission
+      const formData = new FormData();
+      formData.append('form_type', 'contact');
+      formData.append('utf8', '✓');
+      formData.append('contact[name]', name);
+      formData.append('contact[email]', email);
+      formData.append('contact[phone]', phone);
+      formData.append('contact[city]', city);
+      formData.append('contact[form_type]', 'franchise_inquiry');
+      formData.append('contact[body]', messageBody);
+      
+      // Submit via AJAX
+      fetch('/contact', {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'Accept': 'application/javascript'
+        }
+      })
+      .then(function(response) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'SUBMIT';
+        
+        if (response.ok || response.redirected) {
+          // Success - show success message
+          successMsg.style.display = 'flex';
+          form.reset(); // Clear form
+          
+          // Scroll to success message
+          successMsg.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          });
+        } else {
+          // Error - show error message
+          errorMsg.style.display = 'flex';
+        }
+      })
+      .catch(function(error) {
+        // Network error
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'SUBMIT';
+        errorMsg.style.display = 'flex';
+        console.error('Form submission error:', error);
+      });
     });
-
-    // If there are errors, re-enable the submit button
-    if (document.querySelector('.ff-error-message')) {
-      const submitBtn = form.querySelector('.ff-submit');
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'SUBMIT';
-    }
   });
 </script>
 
