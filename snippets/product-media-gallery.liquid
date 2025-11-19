@@ -275,7 +275,7 @@
 {{ 'photoswipe.min.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'photoswipe.umd.min.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'photoswipe-lightbox.umd.min.js' | asset_url }}" defer="defer"></script>
-<script>
+{% comment %} <script>
   document.addEventListener('DOMContentLoaded', function () {
     const playButton = document.getElementById('audioPlayButton-{{ section.id }}');
 
@@ -294,7 +294,89 @@
       });
     }
   });
+</script> {% endcomment %}
+
+<script>
+(function () {
+
+  function initAudioPlayers() {
+    const audioPlayers = document.querySelectorAll('.product-audio-player');
+
+    audioPlayers.forEach((wrapper) => {
+
+      const button = wrapper.querySelector('.audio-play-button');
+      const audio = wrapper.querySelector('audio');
+
+      if (!button || !audio) return;
+
+      // Replace existing listeners
+      const newBtn = button.cloneNode(true);
+      button.replaceWith(newBtn);
+
+      const playIcon = newBtn.querySelector('.icon-play');
+      const pauseIcon = newBtn.querySelector('.icon-pause');
+
+      // Ensure initial state
+      playIcon.style.display = "block";
+      pauseIcon.style.display = "none";
+
+      newBtn.addEventListener("click", () => {
+
+        if (audio.paused) {
+          // ➜ AUDIO STARTED
+          audio.play();
+          playIcon.style.display = "none";
+          pauseIcon.style.display = "block";
+
+          // FIRE DATALAYER EVENT - START
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: "promoClick",
+            promoClick: {
+              promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+              creative_name: "Audio Click Start",
+              promo_name: "{{ product.title }}"
+            }
+          });
+
+        } else {
+          // ➜ AUDIO PAUSED
+          audio.pause();
+          playIcon.style.display = "block";
+          pauseIcon.style.display = "none";
+
+          // FIRE DATALAYER EVENT - END
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: "promoClick",
+            promoClick: {
+              promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+              creative_name: "Audio Click End",
+              promo_name: "{{ product.title }}"
+            }
+          });
+        }
+      });
+
+      audio.addEventListener("ended", () => {
+        playIcon.style.display = "block";
+        pauseIcon.style.display = "none";
+      });
+    });
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAudioPlayers);
+  } else {
+    initAudioPlayers();
+  }
+
+  document.addEventListener('variant:change', initAudioPlayers);
+
+})();
+
 </script>
+
 <script>
   // Initialize gallery loaded state immediately
   (function () {
