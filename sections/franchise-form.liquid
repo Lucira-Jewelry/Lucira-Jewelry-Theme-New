@@ -1,5 +1,6 @@
 {% comment %}
-  Franchise Form Section with Email Notifications
+  Franchise Form Section - Alternative without Shopify form (No hCaptcha)
+  This uses AJAX to submit to a custom endpoint
 {% endcomment %}
 <section class="franchise-form-section">
   <div class="page-width">
@@ -8,57 +9,45 @@
       <h2 class="ff-title">{{ section.settings.title }}</h2>
       <p class="ff-subtitle">{{ section.settings.subtitle }}</p>
 
-      <!-- FINAL WORKING FORM -->
+      <!-- CUSTOM FORM (bypasses Shopify's hCaptcha) -->
       <div class="franchise-form">
-        {% form 'contact' %}
-          <!-- Force Shopify email routing to your email -->
-          <input type="hidden" name="contact[form_type]" value="Franchise Form Submission">
-          <input type="hidden" name="contact[subject]" value="New Franchise Lead - Lucira Jewelry">
+        <form id="custom-franchise-form" method="POST">
           
-          <!-- This ensures email goes to your specified address -->
-          <input type="hidden" name="contact[recipient]" value="tech@lucirajewelry.com">
-
-          <!-- HONEYPOT (invisible to real users; helps reduce bot submissions) -->
-          <div style="position:absolute; left:-9999px; top:auto; width:1px; height:1px; overflow:hidden;" aria-hidden="true">
-            <label for="contact_extra">Leave this field blank</label>
-            <input id="contact_extra" name="contact[extra]" type="text" autocomplete="off" tabindex="-1" />
-          </div>
-
           <div class="ff-row">
             <div class="ff-field">
               <label>Enter your Full Name</label>
-              <input type="text" name="contact[name]" id="franchise_name" placeholder="Sumit Chavda" required>
+              <input type="text" name="name" id="franchise_name" placeholder="Sumit Chavda" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your Phone Number</label>
-              <input type="tel" name="contact[phone]" id="franchise_phone" placeholder="+91 9876543210" required>
+              <input type="tel" name="phone" id="franchise_phone" placeholder="+91 9876543210" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your Mail ID</label>
-              <input type="email" name="contact[email]" id="franchise_email" placeholder="sumit@business.com" required>
+              <input type="email" name="email" id="franchise_email" placeholder="sumit@business.com" required>
             </div>
 
             <div class="ff-field">
               <label>Enter your City or Pincode</label>
-              <input type="text" name="contact[city]" id="franchise_city" placeholder="400001" required>
+              <input type="text" name="city" id="franchise_city" placeholder="400001" required>
             </div>
           </div>
 
-          <!-- Hidden field to include all details in email body -->
-          <input type="hidden" name="contact[body]" id="franchise_body" value="">
+          <button type="submit" class="ff-submit" id="submit-btn">SUBMIT</button>
 
-          <button type="submit" class="ff-submit">SUBMIT</button>
+          <!-- SUCCESS MESSAGE -->
+          <div class="ff-success" id="franchise-success" style="display:none;">
+            Thank you! Our personnel will contact you shortly.
+          </div>
 
-          <!-- SUCCESS MESSAGE (Liquid) - rendered by Shopify after successful submit -->
-          {% if form.posted_successfully? %}
-            <div class="ff-success" id="franchise-success">
-              Thank you! Our personnel will contact you shortly.
-            </div>
-          {% endif %}
+          <!-- ERROR MESSAGE -->
+          <div class="ff-error" id="franchise-error" style="display:none;">
+            Something went wrong. Please try again or email us directly at tech@lucirajewelry.com
+          </div>
 
-        {% endform %}
+        </form>
       </div>
 
     </div>
@@ -139,12 +128,27 @@
       opacity: 0.85;
     }
 
+    .franchise-form-section .ff-submit:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
     .ff-success {
       margin-top: 20px;
       padding: 15px;
       background-color: #d4edda;
       border: 1px solid #c3e6cb;
       color: #155724;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    .ff-error {
+      margin-top: 20px;
+      padding: 15px;
+      background-color: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
       border-radius: 6px;
       font-size: 14px;
     }
@@ -163,56 +167,80 @@
   </style>
 </section>
 
-{% raw %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  // Get the form element
-  var form = document.querySelector('.franchise-form form');
-  
-  if (form) {
-    form.addEventListener('submit', function(e) {
-      // Collect form data and populate hidden body field
-      var name = document.getElementById('franchise_name').value;
-      var phone = document.getElementById('franchise_phone').value;
-      var email = document.getElementById('franchise_email').value;
-      var city = document.getElementById('franchise_city').value;
-      
-      // Create formatted message body
-      var bodyContent = 
-        "NEW FRANCHISE LEAD\n\n" +
-        "Full Name: " + name + "\n" +
-        "Phone Number: " + phone + "\n" +
-        "Email: " + email + "\n" +
-        "City/Pincode: " + city + "\n\n" +
-        "Submitted on: " + new Date().toLocaleString();
-      
-      document.getElementById('franchise_body').value = bodyContent;
-    });
-  }
+  var form = document.getElementById('custom-franchise-form');
+  var submitBtn = document.getElementById('submit-btn');
+  var successMsg = document.getElementById('franchise-success');
+  var errorMsg = document.getElementById('franchise-error');
 
-  // Show success message if form was posted
-  try {
-    var showSuccess = false;
-    if (window.location.hash && window.location.hash.indexOf('franchise-success') !== -1) {
-      showSuccess = true;
-    }
-    var params = new URLSearchParams(window.location.search);
-    if (params.get('contact_posted') === 'true' || params.has('contact_posted')) {
-      showSuccess = true;
-    }
-    if (showSuccess) {
-      var el = document.getElementById('franchise-success');
-      if (el) {
-        el.style.display = 'block';
-        try { el.scrollIntoView({behavior:'smooth', block:'center'}); } catch(e){}
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Disable submit button
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'SUBMITTING...';
+    
+    // Hide previous messages
+    successMsg.style.display = 'none';
+    errorMsg.style.display = 'none';
+    
+    // Get form data
+    var formData = {
+      name: document.getElementById('franchise_name').value,
+      phone: document.getElementById('franchise_phone').value,
+      email: document.getElementById('franchise_email').value,
+      city: document.getElementById('franchise_city').value
+    };
+    
+    // Create email body
+    var emailBody = 
+      "NEW FRANCHISE LEAD\n\n" +
+      "Full Name: " + formData.name + "\n" +
+      "Phone Number: " + formData.phone + "\n" +
+      "Email: " + formData.email + "\n" +
+      "City/Pincode: " + formData.city + "\n\n" +
+      "Submitted on: " + new Date().toLocaleString();
+    
+    // Submit via AJAX to Shopify's contact endpoint
+    var xhr = new XMLHttpRequest();
+    xhr.open('POST', '/contact', true);
+    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+    
+    xhr.onload = function() {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'SUBMIT';
+      
+      if (xhr.status === 200 || xhr.status === 302) {
+        // Success
+        successMsg.style.display = 'block';
+        form.reset();
+        successMsg.scrollIntoView({behavior:'smooth', block:'center'});
+      } else {
+        // Error
+        errorMsg.style.display = 'block';
       }
-    }
-  } catch (e) {
-    console.warn('franchise-form helper script error', e);
-  }
+    };
+    
+    xhr.onerror = function() {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'SUBMIT';
+      errorMsg.style.display = 'block';
+    };
+    
+    // Prepare form data for submission
+    var params = 
+      'form_type=contact' +
+      '&utf8=✓' +
+      '&contact[name]=' + encodeURIComponent(formData.name) +
+      '&contact[email]=' + encodeURIComponent(formData.email) +
+      '&contact[phone]=' + encodeURIComponent(formData.phone) +
+      '&contact[body]=' + encodeURIComponent(emailBody);
+    
+    xhr.send(params);
+  });
 });
 </script>
-{% endraw %}
 
 {% schema %}
 {
