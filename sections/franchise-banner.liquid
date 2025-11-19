@@ -950,6 +950,140 @@
   </div>
 </div>
 
+<script>
+  function openFranchiseOverlay() {
+    const overlay = document.getElementById('franchiseOverlay');
+    overlay.style.display = 'flex';
+    document.body.classList.add('no-scroll');
+
+    document.getElementById('franchiseFormSection').style.display = 'block';
+    document.getElementById('franchiseSuccessMessage').style.display = 'none';
+    document.getElementById('franchiseContactForm').reset();
+    document.getElementById('franchiseSubmitBtn').disabled = true;
+  }
+
+  function closeFranchiseOverlay() {
+    const overlay = document.getElementById('franchiseOverlay');
+    overlay.style.display = 'none';
+    document.body.classList.remove('no-scroll');
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const overlay = document.getElementById('franchiseOverlay');
+    const contactForm = document.getElementById('franchiseContactForm');
+    const phoneInput = document.getElementById('franchise_phone');
+    const nameInput = document.getElementById('franchise_name');
+    const emailInput = document.getElementById('franchise_email');
+    const cityInput = document.getElementById('franchise_city');
+    const successMessage = document.getElementById('franchiseSuccessMessage');
+    const phoneError = document.getElementById('franchise_phoneError');
+    const submitBtn = document.getElementById('franchiseSubmitBtn');
+
+    function validateInputs() {
+      const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
+      const nameValid = nameInput.value.trim().length > 0;
+      const emailValid = emailInput.value.trim().length > 0 && emailInput.validity.valid;
+      const cityValid = cityInput.value.trim().length > 0;
+      
+      submitBtn.disabled = !(phoneValid && nameValid && emailValid && cityValid);
+    }
+
+    phoneInput.addEventListener('input', validateInputs);
+    nameInput.addEventListener('input', validateInputs);
+    emailInput.addEventListener('input', validateInputs);
+    cityInput.addEventListener('input', validateInputs);
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeFranchiseOverlay();
+    });
+
+    contactForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const phone = phoneInput.value.trim();
+      const name = nameInput.value.trim();
+      const email = emailInput.value.trim();
+      const city = cityInput.value.trim();
+      
+      const phoneValid = /^\d{10}$/.test(phone);
+      phoneError.style.display = phoneValid ? 'none' : 'block';
+      if (!phoneValid) return;
+
+      const payload = {
+        name: name,
+        phone: phone,
+        email: email,
+        city: city,
+        formType: 'franchise_registration',
+        pageUrl: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      submitBtn.textContent = 'Submitting...';
+      submitBtn.disabled = true;
+      submitBtn.style.opacity = '0.6';
+
+      fetch('https://schemes-api-385594025448.europe-west1.run.app/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+        .then(response => {
+          if (!response.ok) throw new Error('Submission failed');
+          return response.json();
+        })
+        .then(() => {
+          // Track event in dataLayer
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: 'franchiseRegistrationSubmit',
+            franchiseData: payload,
+          });
+
+          // Show success message
+          document.getElementById('franchiseFormSection').style.display = 'none';
+          successMessage.style.display = 'flex';
+
+          // Download brochure
+          {% comment %} const brochureUrl = '{{ section.settings.brochure_url }}';
+          if (brochureUrl && brochureUrl !== '') {
+            const link = document.createElement('a');
+            link.href = brochureUrl;
+            link.download = 'Lucira-Franchise-Brochure.pdf';
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+          } {% endcomment %}
+
+          // Reset form
+          contactForm.reset();
+          submitBtn.textContent = 'Submit';
+          submitBtn.disabled = true;
+          submitBtn.style.opacity = '1';
+
+          // Animate progress bar
+          const progressBar = document.querySelector('.franchise-progress-bar');
+          progressBar.style.animation = 'none';
+          progressBar.offsetHeight;
+          progressBar.style.animation = 'franchiseShrinkBar 3s linear forwards';
+
+          // Close overlay after 3 seconds
+          setTimeout(() => {
+            closeFranchiseOverlay();
+          }, 3000);
+        })
+        .catch(err => {
+          console.error('Error:', err);
+          alert('Something went wrong. Please try again.');
+          submitBtn.textContent = 'Submit';
+          submitBtn.disabled = false;
+          submitBtn.style.opacity = '1';
+        });
+    });
+  });
+</script>
+
 {% schema %}
 {
   "name": "Franchise Hero Enhanced",
