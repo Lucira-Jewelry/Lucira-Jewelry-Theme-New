@@ -230,7 +230,6 @@
 })();
 </script> {% endcomment %}
 
-
 {% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
 
 <div 
@@ -239,7 +238,12 @@
   data-delivery-days="{{ delivery_days }}"
   data-product-sku="{{ product.selected_or_first_available_variant.sku }}"
   data-product-title="{{ product.title | escape }}"
+  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+  data-inventory-quantity="{{ product.selected_or_first_available_variant.inventory_quantity }}"
+  data-available="{{ product.selected_or_first_available_variant.available }}"
+  data-variant-count="{{ product.variants.size }}"
 >
+
 
   <div class="lucira-delivery-input-container">
     <div class="input-wrapper">
@@ -371,7 +375,6 @@
     `;
     submitBtn.disabled = false;
     if (pincodeInput) {
-      pincodeInput.value = "";
       pincodeInput.disabled = false;
     }
   }
@@ -392,32 +395,31 @@
     `;
     submitBtn.disabled = false;
   }
+    function processDelivery(pin) {
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+            promo_name: '{{ product.title }}',
+            creative_name: 'Pincode_Entered',
+            pincode: pin
+          }
+        });
+      } catch (_) {}
 
-  function processDelivery(pin) {
-    try {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          {% comment %} promo_id: container.dataset.productSku,
-          promo_name: container.dataset.productTitle, {% endcomment %}
-          creative_name: "pincodeEntered",
-          {% comment %} location_id: container.dataset.variantId, {% endcomment %}
-          promo_position: pin,
-          pincode: pin
-        }
-      });
-    } catch (_) {}
+      const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
+      const formatted = fmtDatePlus(days);
 
-    const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
-    const formatted = fmtDatePlus(days);
+      if (dateSpan) dateSpan.textContent = formatted;
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
+      setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
+      
+      setChangeView();
+    }
 
-    if (dateSpan) dateSpan.textContent = formatted;
-    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 60);
-    setTimeout(() => { if (dateSpan) dateSpan.textContent = formatted; }, 250);
-    
-    setChangeView();
-  }
+
 
   // Input event listener
   if (pincodeInput) {
@@ -436,6 +438,9 @@
         }, 150);
       } else if (val.length < 6 && currentMode === "submit") {
         setLocateView();
+      } else if (val.length === 6 && currentMode === "change") {
+        // User has edited to a new valid pincode while in change mode
+        setSubmitView();
       }
     });
 
@@ -444,9 +449,11 @@
       const currentMode = submitBtn.getAttribute("data-mode");
       if (currentMode === "change") {
         e.preventDefault();
-        setLocateView();
+        // Don't change the button state, just allow editing
         setTimeout(() => {
           pincodeInput.focus();
+          // Move cursor to end of input
+          pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
         }, 50);
       }
     });
@@ -454,7 +461,10 @@
     pincodeInput.addEventListener("focus", (e) => {
       const currentMode = submitBtn.getAttribute("data-mode");
       if (currentMode === "change") {
-        setLocateView();
+        // Move cursor to end when focused in change mode
+        setTimeout(() => {
+          pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
+        }, 10);
       }
     });
   }
@@ -468,12 +478,15 @@
       const mode = submitBtn.getAttribute("data-mode");
       const pin = (pincodeInput?.value || "").trim();
 
-      // Handle Change button - reset to initial state
+      // Handle Change button - focus input without clearing
       if (mode === "change") {
-        setLocateView();
-        setTimeout(() => {
-          if (pincodeInput) pincodeInput.focus();
-        }, 50);
+        if (pincodeInput) {
+          pincodeInput.focus();
+          // Move cursor to end of input
+          setTimeout(() => {
+            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
+          }, 10);
+        }
         return;
       }
 
