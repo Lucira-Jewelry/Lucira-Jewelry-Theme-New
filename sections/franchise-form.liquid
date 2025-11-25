@@ -541,7 +541,6 @@ Submitted: ${new Date().toLocaleString('en-IN', {
               id="franchise-name" 
               placeholder="Sumit Chavda"
               oninput="this.value = this.value.replace(/[^a-zA-Z\s]/g, '');"
-              pattern="[A-Za-z\s]+"
               maxlength="50"
               required>
           </div>
@@ -555,7 +554,6 @@ Submitted: ${new Date().toLocaleString('en-IN', {
               placeholder="+91 9876543210"
               maxlength="13"
               inputmode="numeric"
-              pattern="[0-9+\s-]+"
               oninput="this.value = this.value.replace(/[^0-9+\s-]/g, '');"
               required>
             <div class="ff-error-message" id="franchise_phoneError" style="display: none;">
@@ -831,7 +829,8 @@ Submitted: ${new Date().toLocaleString('en-IN', {
 
     // Real-time validation function
     function validateInputs() {
-      const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
+      const phoneValue = phoneInput.value.trim();
+      const phoneValid = /^\d{10}$/.test(phoneValue.replace(/[+\s-]/g, ''));
       const nameValid = nameInput.value.trim().length > 0;
       const emailValid = emailInput.value.trim().length > 0 && emailInput.validity.valid;
       const cityValid = cityInput.value.trim().length > 0;
@@ -839,7 +838,7 @@ Submitted: ${new Date().toLocaleString('en-IN', {
       submitBtn.disabled = !(phoneValid && nameValid && emailValid && cityValid);
       
       // Show/hide phone error
-      phoneError.style.display = (phoneInput.value.trim() && !phoneValid) ? 'block' : 'none';
+      phoneError.style.display = (phoneValue && !phoneValid) ? 'block' : 'none';
     }
 
     // Add event listeners for real-time validation
@@ -857,14 +856,18 @@ Submitted: ${new Date().toLocaleString('en-IN', {
       
       // Get form data
       const name = nameInput.value.trim();
-      const phone = phoneInput.value.trim();
+      let phone = phoneInput.value.trim();
       const email = emailInput.value.trim();
       const city = cityInput.value.trim();
+      
+      // Clean phone number (remove +, spaces, dashes)
+      phone = phone.replace(/[+\s-]/g, '');
       
       // Validate phone number (10 digits)
       const phoneValid = /^\d{10}$/.test(phone);
       if (!phoneValid) {
         phoneError.style.display = 'block';
+        phoneError.textContent = 'Please enter a valid 10-digit phone number';
         return;
       }
       
@@ -873,7 +876,7 @@ Submitted: ${new Date().toLocaleString('en-IN', {
       submitBtn.textContent = 'SUBMITTING...';
       submitBtn.style.opacity = '0.6';
       
-      // Prepare payload for GCP API (same structure as your overlay form)
+      // Prepare payload for GCP API
       const payload = {
         name: name,
         phone: phone,
@@ -905,7 +908,7 @@ Submitted: ${new Date().toLocaleString('en-IN', {
       .then(function(data) {
         console.log('Success response:', data);
         
-        // Track event in dataLayer (same as your GCP script)
+        // Track event in dataLayer
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
           event: 'promoClick',
@@ -938,6 +941,11 @@ Submitted: ${new Date().toLocaleString('en-IN', {
         submitBtn.disabled = false;
         submitBtn.textContent = 'SUBMIT';
         submitBtn.style.opacity = '1';
+        
+        // Check if it's a CORS issue
+        if (error.message.includes('Failed to fetch') || error.message.includes('CORS')) {
+          errorMsg.querySelector('p').innerHTML = 'Network error. Please check your connection and try again, or email us at <strong>tech@lucirajewelry.com</strong>';
+        }
       });
     });
 
