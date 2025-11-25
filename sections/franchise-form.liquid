@@ -302,7 +302,7 @@
   }
 </style>
 
-<script>
+{% comment %} <script>
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('franchise_contact_form');
     const submitBtn = form.querySelector('.ff-submit');
@@ -392,8 +392,107 @@
       });
     });
   });
-</script>
+</script> {% endcomment %}
 
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('franchise_contact_form');
+  const submitBtn = form.querySelector('.ff-submit');
+  const successMsg = document.getElementById('ff-success-msg');
+  const errorMsg = document.getElementById('ff-error-msg');
+
+  const nameInput = document.getElementById('franchise-name');
+  const phoneInput = document.getElementById('franchise-phone');
+  const emailInput = document.getElementById('franchise-email');
+  const cityInput = document.getElementById('franchise-city');
+
+  function validateInputs() {
+    const phoneValid = /^\d{10}$/.test(phoneInput.value.trim());
+    const nameValid = nameInput.value.trim().length > 0;
+    const emailValid = emailInput.value.trim().length > 0 && emailInput.validity.valid;
+    const cityValid = cityInput.value.trim().length > 0;
+
+    submitBtn.disabled = !(phoneValid && nameValid && emailValid && cityValid);
+    submitBtn.style.opacity = submitBtn.disabled ? '0.6' : '1';
+  }
+
+  // Validate on input
+  [nameInput, phoneInput, emailInput, cityInput].forEach(input => {
+    input.addEventListener('input', validateInputs);
+  });
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const phone = phoneInput.value.trim();
+    const name = nameInput.value.trim();
+    const email = emailInput.value.trim();
+    const city = cityInput.value.trim();
+
+    if (!/^\d{10}$/.test(phone)) {
+      alert('Please enter a valid 10-digit phone number');
+      return;
+    }
+
+    const payload = {
+      name: name,
+      phone: phone,
+      email: email,
+      city: city,
+      formType: 'franchise_registration',
+      pageUrl: window.location.href,
+      timestamp: new Date().toISOString(),
+      submittedAt: new Date().toLocaleString('en-IN', { 
+        timeZone: 'Asia/Kolkata',
+        dateStyle: 'full',
+        timeStyle: 'short'
+      })
+    };
+
+    // Disable button
+    submitBtn.textContent = 'Submitting...';
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.6';
+
+    fetch('https://franchise-api-385594025448.asia-south1.run.app/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    })
+      .then(response => {
+        if (!response.ok) throw new Error('Submission failed');
+        return response.json();
+      })
+      .then(() => {
+        // Push to dataLayer
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'franchiseRegistrationSubmit',
+          franchiseData: payload
+        });
+
+        // Show success message
+        successMsg.style.display = 'flex';
+        errorMsg.style.display = 'none';
+        form.reset();
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.6';
+        submitBtn.textContent = 'SUBMIT';
+
+        // Scroll to success
+        successMsg.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      })
+      .catch(err => {
+        console.error('Form submission error:', err);
+        errorMsg.style.display = 'flex';
+        successMsg.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        submitBtn.textContent = 'SUBMIT';
+      });
+  });
+});
+</script>
 
 {% comment %} 
 <script>
