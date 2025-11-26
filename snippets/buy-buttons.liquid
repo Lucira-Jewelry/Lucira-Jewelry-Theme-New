@@ -437,22 +437,47 @@
         </div>
       </div>
       <script>
-        document.addEventListener("DOMContentLoaded", function() {
-          // Treat product as in-stock only if total inventory > 0
-          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-          const inStock = totalInventory > 0;
+        document.addEventListener("DOMContentLoaded", function () {
 
-          const today = new Date();
-          const shippingDate = new Date();
+          function updateShippingDate(variant) {
+            if (!variant) return;
 
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+            const inStock = variant.inventory_quantity > 0;
 
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            const today = new Date();
+            const shippingDate = new Date();
 
-          const shippingField = document.getElementById('prop-shipping-date');
-          if (shippingField) shippingField.value = formattedDate;
+            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+
+            const formattedDate = shippingDate.toLocaleDateString('en-GB');
+
+            const shippingField = document.getElementById('prop-shipping-date');
+            if (shippingField) shippingField.value = formattedDate;
+          }
+
+          // --- 1. When variant changes using Shopify's event ---
+          document.addEventListener("variant:change", function (event) {
+            const variant = event.detail.variant;
+            updateShippingDate(variant);
+          });
+
+          // --- 2. Fallback: Detect change in <select name="id"> ---
+          const variantSelect = document.querySelector('[name="id"]');
+          if (variantSelect) {
+            variantSelect.addEventListener("change", function () {
+              const selectedId = parseInt(this.value);
+              const variant = window?.meta?.product?.variants?.find(v => v.id === selectedId);
+              updateShippingDate(variant);
+            });
+          }
+
+          // --- 3. Run on initial load ---
+          const initialVariant = window?.meta?.product?.variants?.find(v => v.id === {{ product.selected_or_first_available_variant.id }});
+          updateShippingDate(initialVariant);
+
         });
       </script>
+
     </product-form>
 
   {%- else -%}
