@@ -437,84 +437,100 @@
         </div>
       </div>
       <script>
-        document.addEventListener('DOMContentLoaded', function () {
-          // Liquid: product JSON must exist on the page (Dawn includes it on product pages)
-          const productData = {{ product | json }};
-
-          // Utility: format date in dd/mm/yyyy (en-GB)
+        document.addEventListener("DOMContentLoaded", function () {
+          // --- Helper: format date dd/mm/yyyy (en-GB) ---
           function formatDate(d) {
             return d.toLocaleDateString('en-GB');
           }
 
-          // Update the hidden field and optional visible element
-          function setShippingDate(date) {
+          // --- Helper: write to hidden field ---
+          function writeShippingDate(date) {
             const formatted = formatDate(date);
             const shippingField = document.getElementById('prop-shipping-date');
             if (shippingField) shippingField.value = formatted;
-
-            // Optional: update visible element if you want to show date on page
-            const display = document.getElementById('shipping-date-display');
-            if (display) display.textContent = formatted;
+            // console.log for debugging (remove in production)
+            console.log('Shipping date set to', formatted);
           }
 
-          // Compute shipping date from variant availability
-          function updateShippingForVariant(variant) {
-            if (!variant) return;
-
-            // Dawn uses variant.available as boolean — treat available as "in stock"
-            const inStock = !!variant.available;
+          // --- Compute shipping date given an "inStock" boolean ---
+          function setShippingByStock(inStock) {
             const today = new Date();
             const shippingDate = new Date();
             shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-            setShippingDate(shippingDate);
+            writeShippingDate(shippingDate);
           }
 
-          // 1) On initial load: try to find selected_or_first_available_variant, otherwise first variant
+          // --- Try to get total inventory from Liquid-rendered sum (safe) ---
+          var totalInventoryFromLiquid = null;
           try {
-            let initialVariant = null;
-            if (productData && productData.selected_or_first_available_variant) {
-              initialVariant = productData.selected_or_first_available_variant;
-            } else if (productData && productData.variants && productData.variants.length) {
-              // prefer the one that is currently selected in Dawn if available
-              initialVariant = productData.variants.find(v => v.id == productData.selected_variant) || productData.variants[0];
-            }
-            updateShippingForVariant(initialVariant);
+            // This will be replaced server-side by a number (or 0)
+            totalInventoryFromLiquid = Number({{ product.variants | map: 'inventory_quantity' | sum | default: 0 }});
+            if (Number.isNaN(totalInventoryFromLiquid)) totalInventoryFromLiquid = null;
           } catch (e) {
-            // fallback: set out-of-stock date (safer default)
-            const fallback = new Date();
-            fallback.setDate(new Date().getDate() + 15);
-            setShippingDate(fallback);
-            console.error('Shipping date initialization error:', e);
+            totalInventoryFromLiquid = null;
           }
 
-          // 2) Listen for Dawn's variant change event (product form dispatches this)
+          // --- Page load: prefer product JSON if available (Dawn provides it) ---
+          var productJson = null;
+          try {
+            productJson = {{ product | json }};
+          } catch (e) {
+            productJson = null;
+          }
+
+          // Determine initial inStock value
+          var initialInStock = false;
+          if (productJson && productJson.selected_or_first_available_variant) {
+            // Dawn exposes selected_or_first_available_variant; use its 'available' boolean if present.
+            initialInStock = !!productJson.selected_or_first_available_variant.available;
+          } else if (totalInventoryFromLiquid !== null) {
+            initialInStock = totalInventoryFromLiquid > 0;
+          } else {
+            // Safe default: assume out of stock (so +15 days) if we can't determine
+            initialInStock = false;
+          }
+
+          setShippingByStock(initialInStock);
+
+          // --- When Dawn fires variant:change (preferred) ---
           document.addEventListener('variant:change', function (evt) {
-            // event.detail.variant contains the new variant object
-            const newVariant = evt && evt.detail && evt.detail.variant ? evt.detail.variant : null;
-            updateShippingForVariant(newVariant);
+            try {
+              var v = evt && evt.detail && evt.detail.variant ? evt.detail.variant : null;
+              if (!v) return;
+              // Prefer boolean available (Dawn), else fall back to inventory_quantity
+              var inStock = typeof v.available !== 'undefined' ? !!v.available :
+                            (typeof v.inventory_quantity !== 'undefined' ? Number(v.inventory_quantity) > 0 : false);
+              setShippingByStock(inStock);
+            } catch (e) {
+              console.error('variant:change handler error', e);
+            }
           });
 
-          // 3) Extra safety: if your theme uses product form updates without variant:change,
-          //    also listen for change on select inputs inside the product form
+          // --- Extra safety: listen for changes to the product form's selected variant ID ---
           document.addEventListener('change', function (evt) {
-            const target = evt.target;
-            if (!target) return;
+            try {
+              var target = evt.target;
+              if (!target) return;
+              var form = target.closest && target.closest('form[data-product-form]');
+              if (!form) return;
 
-            // if the change came from a variant option dropdown inside the product form, attempt to recalc
-            if (target.closest && target.closest('form[data-product-form]')) {
-              // attempt to read currently selected variant ID from the form's input[name="id"]
-              const form = target.closest('form[data-product-form]');
-              const idInput = form ? form.querySelector('input[name="id"]') : null;
-              const variantId = idInput ? Number(idInput.value) : null;
-              if (variantId) {
-                const variant = productData.variants.find(v => Number(v.id) === variantId);
-                if (variant) updateShippingForVariant(variant);
-              }
+              var idInput = form.querySelector('input[name="id"]');
+              if (!idInput) return;
+              var variantId = Number(idInput.value);
+              if (!variantId || !productJson || !productJson.variants) return;
+
+              var variant = productJson.variants.find(function (x) { return Number(x.id) === variantId; });
+              if (!variant) return;
+
+              var inStock = typeof variant.available !== 'undefined' ? !!variant.available :
+                            (typeof variant.inventory_quantity !== 'undefined' ? Number(variant.inventory_quantity) > 0 : false);
+              setShippingByStock(inStock);
+            } catch (e) {
+              console.error('product-form change handler error', e);
             }
           });
         });
       </script>
-
 
     </product-form>
 
