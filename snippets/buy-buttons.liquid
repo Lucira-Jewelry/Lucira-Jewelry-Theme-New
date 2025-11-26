@@ -437,101 +437,22 @@
         </div>
       </div>
       <script>
-        document.addEventListener("DOMContentLoaded", function () {
-          // --- Helper: format date dd/mm/yyyy (en-GB) ---
-          function formatDate(d) {
-            return d.toLocaleDateString('en-GB');
-          }
+        document.addEventListener("DOMContentLoaded", function() {
+          // Treat product as in-stock only if total inventory > 0
+          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
+          const inStock = totalInventory > 0;
 
-          // --- Helper: write to hidden field ---
-          function writeShippingDate(date) {
-            const formatted = formatDate(date);
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (shippingField) shippingField.value = formatted;
-            // console.log for debugging (remove in production)
-            console.log('Shipping date set to', formatted);
-          }
+          const today = new Date();
+          const shippingDate = new Date();
 
-          // --- Compute shipping date given an "inStock" boolean ---
-          function setShippingByStock(inStock) {
-            const today = new Date();
-            const shippingDate = new Date();
-            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-            writeShippingDate(shippingDate);
-          }
+          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          // --- Try to get total inventory from Liquid-rendered sum (safe) ---
-          var totalInventoryFromLiquid = null;
-          try {
-            // This will be replaced server-side by a number (or 0)
-            totalInventoryFromLiquid = Number({{ product.variants | map: 'inventory_quantity' | sum | default: 0 }});
-            if (Number.isNaN(totalInventoryFromLiquid)) totalInventoryFromLiquid = null;
-          } catch (e) {
-            totalInventoryFromLiquid = null;
-          }
+          const formattedDate = shippingDate.toLocaleDateString('en-GB');
 
-          // --- Page load: prefer product JSON if available (Dawn provides it) ---
-          var productJson = null;
-          try {
-            productJson = {{ product | json }};
-          } catch (e) {
-            productJson = null;
-          }
-
-          // Determine initial inStock value
-          var initialInStock = false;
-          if (productJson && productJson.selected_or_first_available_variant) {
-            // Dawn exposes selected_or_first_available_variant; use its 'available' boolean if present.
-            initialInStock = !!productJson.selected_or_first_available_variant.available;
-          } else if (totalInventoryFromLiquid !== null) {
-            initialInStock = totalInventoryFromLiquid > 0;
-          } else {
-            // Safe default: assume out of stock (so +15 days) if we can't determine
-            initialInStock = false;
-          }
-
-          setShippingByStock(initialInStock);
-
-          // --- When Dawn fires variant:change (preferred) ---
-          document.addEventListener('variant:change', function (evt) {
-            try {
-              var v = evt && evt.detail && evt.detail.variant ? evt.detail.variant : null;
-              if (!v) return;
-              // Prefer boolean available (Dawn), else fall back to inventory_quantity
-              var inStock = typeof v.available !== 'undefined' ? !!v.available :
-                            (typeof v.inventory_quantity !== 'undefined' ? Number(v.inventory_quantity) > 0 : false);
-              setShippingByStock(inStock);
-            } catch (e) {
-              console.error('variant:change handler error', e);
-            }
-          });
-
-          // --- Extra safety: listen for changes to the product form's selected variant ID ---
-          document.addEventListener('change', function (evt) {
-            try {
-              var target = evt.target;
-              if (!target) return;
-              var form = target.closest && target.closest('form[data-product-form]');
-              if (!form) return;
-
-              var idInput = form.querySelector('input[name="id"]');
-              if (!idInput) return;
-              var variantId = Number(idInput.value);
-              if (!variantId || !productJson || !productJson.variants) return;
-
-              var variant = productJson.variants.find(function (x) { return Number(x.id) === variantId; });
-              if (!variant) return;
-
-              var inStock = typeof variant.available !== 'undefined' ? !!variant.available :
-                            (typeof variant.inventory_quantity !== 'undefined' ? Number(variant.inventory_quantity) > 0 : false);
-              setShippingByStock(inStock);
-            } catch (e) {
-              console.error('product-form change handler error', e);
-            }
-          });
+          const shippingField = document.getElementById('prop-shipping-date');
+          if (shippingField) shippingField.value = formattedDate;
         });
       </script>
-
     </product-form>
 
   {%- else -%}
