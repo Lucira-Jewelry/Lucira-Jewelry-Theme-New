@@ -438,21 +438,37 @@
       </div>
       <script>
         document.addEventListener("DOMContentLoaded", function() {
-          // Treat product as in-stock only if total inventory > 0
-          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-          const inStock = totalInventory > 0;
 
-          const today = new Date();
-          const shippingDate = new Date();
+          function updateShippingDate(variant) {
+            const inStock = variant && variant.inventory_quantity > 0;
 
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+            const today = new Date();
+            const shippingDate = new Date();
 
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          const shippingField = document.getElementById('prop-shipping-date');
-          if (shippingField) shippingField.value = formattedDate;
+            const formattedDate = shippingDate.toLocaleDateString('en-GB');
+
+            const shippingField = document.getElementById('prop-shipping-date');
+            if (shippingField) shippingField.value = formattedDate;
+          }
+
+          /* ------- 1. On page load ------- */
+          const productData = {{ product | json }};
+          if (productData.variants && productData.variants.length > 0) {
+            const selectedVariant = productData.variants.find(v => v.id == productData.selected_or_first_available_variant.id);
+            updateShippingDate(selectedVariant);
+          }
+
+          /* ------- 2. On variant change ------ */
+          document.addEventListener("variant:change", function(event) {
+            const newVariant = event.detail.variant;
+            updateShippingDate(newVariant);
+          });
+
         });
       </script>
+
     </product-form>
 
   {%- else -%}
