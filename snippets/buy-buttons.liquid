@@ -437,80 +437,175 @@
         </div>
       </div>
       <script>
-        document.addEventListener('DOMContentLoaded', function () {
-          // Render variant data from Liquid into JS
-          // NOTE: this line requires this snippet be inside a product template where `product` exists
-          const variants = {{ product.variants | json }};
+        (function () {
+          document.addEventListener('DOMContentLoaded', function () {
+            try {
+              // --- Configuration ---
+              const SHIPPING_FIELD_ID = 'prop-shipping-date'; // id of hidden shipping date input
+              const VARIANT_INPUT_SELECTOR = 'input[name="id"].product-variant-id, input[name="id"]'; // hidden variant input(s)
+              const POLL_INTERVAL_MS = 250; // polling fallback interval
+              const IN_STOCK_LEAD = 2;
+              const OUT_STOCK_LEAD = 15;
 
-          // Helper: find variant object by id (id is integer in Liquid)
-          function getVariantById(id) {
-            // incoming id might be string; convert to number for comparison
-            const idNum = Number(id);
-            return variants.find(v => Number(v.id) === idNum) || null;
-          }
+              // --- Variants JSON from Liquid (must be inside product template) ---
+              const variants = {{ product.variants | json }};
 
-          // Helper: compute shipping date and set hidden field
-          function updateShippingDateForVariantId(variantId) {
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (!shippingField) return;
+              console.info('[shipping-date] variants count:', Array.isArray(variants) ? variants.length : 'missing');
 
-            const selectedVariant = getVariantById(variantId);
-
-            // Fallback: if no selectedVariant found, you can decide default behavior.
-            // We'll treat missing variant as out-of-stock.
-            let inStock = false;
-            if (selectedVariant) {
-              // Use availability to decide. You can also use inventory_quantity > 0 check.
-              inStock = selectedVariant.available === true || Number(selectedVariant.inventory_quantity) > 0;
-              // If you want to base on total inventory across all variants instead, uncomment:
-              // const totalInventory = variants.reduce((s, v) => s + (Number(v.inventory_quantity) || 0), 0);
-              // inStock = totalInventory > 0;
-            }
-
-            const leadDays = inStock ? 2 : 15;
-            const today = new Date();
-            const shippingDate = new Date(today);
-            shippingDate.setDate(today.getDate() + leadDays);
-            const formattedDate = shippingDate.toLocaleDateString('en-GB');
-            shippingField.value = formattedDate;
-          }
-
-          // Initialize using current hidden variant input (Shopify renders <input name="id" ...>)
-          const variantInput = document.querySelector('input[name="id"].product-variant-id') || document.querySelector('input[name="id"]');
-          if (variantInput) {
-            updateShippingDateForVariantId(variantInput.value);
-          } else {
-            // fallback: set based on first variant
-            if (variants && variants.length) updateShippingDateForVariantId(variants[0].id);
-          }
-
-          // Listen for common theme events that indicate variant change (many themes trigger this)
-          document.addEventListener('variant:change', function (e) {
-            // event might include e.detail.variant or similar; fallback to reading the input value
-            const eventVariantId = (e && e.detail && e.detail.variant && e.detail.variant.id) ? e.detail.variant.id : (variantInput && variantInput.value);
-            updateShippingDateForVariantId(eventVariantId);
-          });
-
-          // Fallback: listen for change on variant select or radio inputs
-          document.addEventListener('change', function (e) {
-            // if a variant select or radio changed, update shipping date
-            if (!variantInput) return;
-            // many themes update the hidden input[name="id"] when variant changes, so just read it
-            updateShippingDateForVariantId(variantInput.value);
-          });
-
-          // Robust fallback: observe changes to the hidden input's value attribute (MutationObserver)
-          if (variantInput) {
-            const observer = new MutationObserver(function (mutations) {
-              for (const m of mutations) {
-                if (m.type === 'attributes' && m.attributeName === 'value') {
-                  updateShippingDateForVariantId(variantInput.value);
-                }
+              function toNumber(v) {
+                if (typeof v === 'number') return v;
+                if (!v) return NaN;
+                // Shopify variant.id sometimes comes as integer or string; remove quotes then parse
+                return Number(String(v).replace(/[^0-9]/g, '')) || NaN;
               }
-            });
-            observer.observe(variantInput, { attributes: true });
-          }
-        });
+
+              function findVariantById(id) {
+                const idNum = toNumber(id);
+                if (isNaN(idNum)) return null;
+                return (Array.isArray(variants) && variants.find(v => toNumber(v.id) === idNum)) || null;
+              }
+
+              function computeFormattedDate(daysAhead) {
+                const now = new Date();
+                const d = new Date(now);
+                d.setDate(now.getDate() + Number(daysAhead));
+                return d.toLocaleDateString('en-GB');
+              }
+
+              function setShippingValue(val) {
+                const el = document.getElementById(SHIPPING_FIELD_ID);
+                if (!el) {
+                  console.warn('[shipping-date] shipping hidden field not found (id=' + SHIPPING_FIELD_ID + ')');
+                  return;
+                }
+                if (el.value === val) {
+                  // no change
+                  return;
+                }
+                el.value = val;
+                // If you need to trigger any Shopify form listeners that read property values on change,
+                // you can dispatch an "input" event:
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                console.info('[shipping-date] set value ->', val);
+              }
+
+              // Primary update logic given variantId (string/number)
+              function updateForVariantId(variantId) {
+                const variant = findVariantById(variantId);
+                let inStock = false;
+
+                if (variant) {
+                  // Prefer the variant.available flag, fallback to its inventory_quantity
+                  inStock = (variant.available === true) || (Number(variant.inventory_quantity) > 0);
+                  console.info('[shipping-date] selected variant found:', toNumber(variant.id), 'available:', variant.available, 'inventory:', variant.inventory_quantity);
+                } else {
+                  // If no variant match, optionally base on total inventory across variants
+                  const totalInventory = Array.isArray(variants) ? variants.reduce((s, v) => s + (Number(v.inventory_quantity) || 0), 0) : 0;
+                  inStock = totalInventory > 0;
+                  console.warn('[shipping-date] variant not found for id:', variantId, 'falling back to totalInventory:', totalInventory);
+                }
+
+                const days = inStock ? IN_STOCK_LEAD : OUT_STOCK_LEAD;
+                setShippingValue(computeFormattedDate(days));
+              }
+
+              // --- Helpers to read current variant id from page ---
+              function readVariantIdFromHiddenInput() {
+                const el = document.querySelector(VARIANT_INPUT_SELECTOR);
+                return el ? el.value : null;
+              }
+
+              // Track last value to avoid redundant work
+              let lastSeenVariantId = null;
+
+              function handlePotentialVariantChange(forcedId) {
+                const candidate = forcedId !== undefined && forcedId !== null ? forcedId : readVariantIdFromHiddenInput();
+                if (!candidate) {
+                  console.warn('[shipping-date] no variant id read yet');
+                  return;
+                }
+                if (String(candidate) === String(lastSeenVariantId)) {
+                  // no change
+                  return;
+                }
+                lastSeenVariantId = candidate;
+                console.info('[shipping-date] variant changed ->', candidate);
+                updateForVariantId(candidate);
+              }
+
+              // --- Initialize once on load ---
+              handlePotentialVariantChange();
+
+              // --- Listen for common theme events (many Shopify themes emit these) ---
+              document.addEventListener('variant:change', function (e) {
+                console.info('[shipping-date] caught variant:change event', e && e.detail ? e.detail : '');
+                const idFromDetail = e && e.detail && e.detail.variant && e.detail.variant.id ? e.detail.variant.id : null;
+                // prefer event detail id, fallback to hidden input
+                handlePotentialVariantChange(idFromDetail || undefined);
+              });
+
+              // Some themes emit custom events like 'product:variant:change' or 'shopify:variant:changed'
+              ['product:variant:change', 'shopify:variant:changed', 'variant:changed'].forEach(evt => {
+                document.addEventListener(evt, function (e) {
+                  console.info('[shipping-date] caught', evt);
+                  handlePotentialVariantChange();
+                });
+              });
+
+              // --- Listen to change on selects and inputs as fallback ---
+              document.addEventListener('change', function (e) {
+                // We don't need to inspect the target deeply; the hidden input will be updated by the theme
+                handlePotentialVariantChange();
+              }, true);
+
+              // Also react to clicks (swatches sometimes change via clicks)
+              document.addEventListener('click', function (e) {
+                // small debounce: wait 0ms so theme handlers update hidden input first
+                setTimeout(() => handlePotentialVariantChange(), 0);
+              }, true);
+
+              // --- MutationObserver on the hidden input's value property (handles direct attribute change) ---
+              const variantHidden = document.querySelector(VARIANT_INPUT_SELECTOR);
+              if (variantHidden) {
+                // Observe attribute changes (value sometimes set as attribute)
+                const obs = new MutationObserver(function (mutations) {
+                  for (const m of mutations) {
+                    if (m.type === 'attributes' && (m.attributeName === 'value' || m.attributeName === 'checked')) {
+                      handlePotentialVariantChange();
+                    }
+                  }
+                });
+                obs.observe(variantHidden, { attributes: true });
+                // Also observe subtree of form in case theme replaces the input entirely
+                const formEl = variantHidden.closest('form') || document;
+                const obs2 = new MutationObserver(function (mutations) {
+                  // small delay to allow theme to re-render
+                  setTimeout(() => handlePotentialVariantChange(), 20);
+                });
+                obs2.observe(formEl, { childList: true, subtree: true });
+              } else {
+                console.warn('[shipping-date] hidden variant input not found for selector:', VARIANT_INPUT_SELECTOR);
+              }
+
+              // --- Polling fallback: check hidden input value every POLL_INTERVAL_MS ms ---
+              let pollLast = readVariantIdFromHiddenInput();
+              setInterval(function () {
+                const current = readVariantIdFromHiddenInput();
+                if (current && String(current) !== String(pollLast)) {
+                  pollLast = current;
+                  console.info('[shipping-date] poll detected variant change ->', current);
+                  handlePotentialVariantChange(current);
+                }
+              }, POLL_INTERVAL_MS);
+
+              // --- Final note for themes that update via AJAX: you may need to run handlePotentialVariantChange() after AJAX finishes ---
+              console.info('[shipping-date] shipped robust shipping-date script (polling, observers, event listeners active)');
+
+            } catch (err) {
+              console.error('[shipping-date] unexpected error', err);
+            }
+          });
+        })();
       </script>
 
     </product-form>
