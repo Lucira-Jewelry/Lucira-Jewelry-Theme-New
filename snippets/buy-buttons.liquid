@@ -437,37 +437,84 @@
         </div>
       </div>
       <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener('DOMContentLoaded', function () {
+          // Liquid: product JSON must exist on the page (Dawn includes it on product pages)
+          const productData = {{ product | json }};
 
-          function updateShippingDate(variant) {
-            const inStock = variant && variant.inventory_quantity > 0;
+          // Utility: format date in dd/mm/yyyy (en-GB)
+          function formatDate(d) {
+            return d.toLocaleDateString('en-GB');
+          }
 
+          // Update the hidden field and optional visible element
+          function setShippingDate(date) {
+            const formatted = formatDate(date);
+            const shippingField = document.getElementById('prop-shipping-date');
+            if (shippingField) shippingField.value = formatted;
+
+            // Optional: update visible element if you want to show date on page
+            const display = document.getElementById('shipping-date-display');
+            if (display) display.textContent = formatted;
+          }
+
+          // Compute shipping date from variant availability
+          function updateShippingForVariant(variant) {
+            if (!variant) return;
+
+            // Dawn uses variant.available as boolean — treat available as "in stock"
+            const inStock = !!variant.available;
             const today = new Date();
             const shippingDate = new Date();
-
             shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-
-            const formattedDate = shippingDate.toLocaleDateString('en-GB');
-
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (shippingField) shippingField.value = formattedDate;
+            setShippingDate(shippingDate);
           }
 
-          /* ------- 1. On page load ------- */
-          const productData = {{ product | json }};
-          if (productData.variants && productData.variants.length > 0) {
-            const selectedVariant = productData.variants.find(v => v.id == productData.selected_or_first_available_variant.id);
-            updateShippingDate(selectedVariant);
+          // 1) On initial load: try to find selected_or_first_available_variant, otherwise first variant
+          try {
+            let initialVariant = null;
+            if (productData && productData.selected_or_first_available_variant) {
+              initialVariant = productData.selected_or_first_available_variant;
+            } else if (productData && productData.variants && productData.variants.length) {
+              // prefer the one that is currently selected in Dawn if available
+              initialVariant = productData.variants.find(v => v.id == productData.selected_variant) || productData.variants[0];
+            }
+            updateShippingForVariant(initialVariant);
+          } catch (e) {
+            // fallback: set out-of-stock date (safer default)
+            const fallback = new Date();
+            fallback.setDate(new Date().getDate() + 15);
+            setShippingDate(fallback);
+            console.error('Shipping date initialization error:', e);
           }
 
-          /* ------- 2. On variant change ------ */
-          document.addEventListener("variant:change", function(event) {
-            const newVariant = event.detail.variant;
-            updateShippingDate(newVariant);
+          // 2) Listen for Dawn's variant change event (product form dispatches this)
+          document.addEventListener('variant:change', function (evt) {
+            // event.detail.variant contains the new variant object
+            const newVariant = evt && evt.detail && evt.detail.variant ? evt.detail.variant : null;
+            updateShippingForVariant(newVariant);
           });
 
+          // 3) Extra safety: if your theme uses product form updates without variant:change,
+          //    also listen for change on select inputs inside the product form
+          document.addEventListener('change', function (evt) {
+            const target = evt.target;
+            if (!target) return;
+
+            // if the change came from a variant option dropdown inside the product form, attempt to recalc
+            if (target.closest && target.closest('form[data-product-form]')) {
+              // attempt to read currently selected variant ID from the form's input[name="id"]
+              const form = target.closest('form[data-product-form]');
+              const idInput = form ? form.querySelector('input[name="id"]') : null;
+              const variantId = idInput ? Number(idInput.value) : null;
+              if (variantId) {
+                const variant = productData.variants.find(v => Number(v.id) === variantId);
+                if (variant) updateShippingForVariant(variant);
+              }
+            }
+          });
         });
       </script>
+
 
     </product-form>
 
