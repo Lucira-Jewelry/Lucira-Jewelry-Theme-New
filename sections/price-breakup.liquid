@@ -222,6 +222,53 @@
         }
     }
 
+    // --- NEW: shipping date updater ---
+    updateShippingDate(variantId) {
+      try {
+        const SHIPPING_FIELD_ID = 'prop-shipping-date';
+        const inStockLead = 2;
+        const outStockLead = 15;
+
+        // Try to find selected variant in config.variantsData first
+        const variantsData = this.config.variantsData || {};
+        let inStock = false;
+        let matchedVariant = variantsData[variantId];
+
+        if (matchedVariant) {
+          // some themes provide `available` or `inventory_quantity` in the variant data
+          inStock = (matchedVariant.available === true) || (Number(matchedVariant.inventory_quantity) > 0);
+          console.info('[Live Gold Price Editor] shipping: variant found, available=', matchedVariant.available, 'inventory=', matchedVariant.inventory_quantity);
+        } else {
+          // Fallback to summing inventory from variantsData if variant not present
+          let totalInventory = 0;
+          for (const k in variantsData) {
+            const v = variantsData[k];
+            totalInventory += Number(v.inventory_quantity) || 0;
+          }
+          inStock = totalInventory > 0;
+          console.warn('[Live Gold Price Editor] shipping: variant not found in variantsData, falling back to totalInventory=', totalInventory);
+        }
+
+        const leadDays = inStock ? inStockLead : outStockLead;
+        const today = new Date();
+        const shippingDate = new Date(today);
+        shippingDate.setDate(today.getDate() + leadDays);
+        const formatted = shippingDate.toLocaleDateString('en-GB');
+
+        const el = document.getElementById(SHIPPING_FIELD_ID);
+        if (el) {
+          el.value = formatted;
+          // dispatch input event in case some listener expects it
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          console.info('[Live Gold Price Editor] shipping date set to', formatted);
+        } else {
+          console.warn('[Live Gold Price Editor] shipping field not found (id=' + SHIPPING_FIELD_ID + ')');
+        }
+      } catch (err) {
+        console.error('[Live Gold Price Editor] updateShippingDate error:', err);
+      }
+    }
+
     // ✅ CORRECTED: Single init method
     init() {
         console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
@@ -230,6 +277,9 @@
         // ✅ Always initialize hidden inputs with current variant data
         const initialVariantId = this.config.currentVariantId;
         this.updatePriceBreakdown(initialVariantId);
+        
+        // initialize shipping date on load as well
+        this.updateShippingDate(initialVariantId);
         
         // Only calculate if drawer is initially open
         const drawer = document.getElementById('price-drawer');
@@ -297,6 +347,8 @@
       // Only now calculate the price breakdown
       const variantId = this.getCurrentVariantId();
       this.updatePriceBreakdown(variantId);
+      // ensure shipping date also updates on open
+      this.updateShippingDate(variantId);
     }
 
     onDrawerClose() {
@@ -342,6 +394,8 @@
         if (variantId && this.config.variantConfigs[variantId]) {
             console.log('[Live Gold Price Editor] Variant changed to:', variantId);
             this.updatePriceBreakdown(variantId);
+            // ensure shipping date updates whenever variant changes
+            this.updateShippingDate(variantId);
         }
     }
 
@@ -354,6 +408,8 @@
             this.renderPriceBreakdown(cachedData);
             // ✅ Ensure hidden inputs are updated even with cached data
             this.updateHiddenInputs(cachedData);
+            // also update shipping date from cached data / variantId
+            this.updateShippingDate(variantId);
             this.currentVariantId = variantId;
             return;
         }
@@ -377,6 +433,8 @@
             this.renderPriceBreakdown(calculationData);
             // ✅ Ensure hidden inputs are updated with new data
             this.updateHiddenInputs(calculationData);
+            // update shipping date whenever breakdown updates
+            this.updateShippingDate(variantId);
             this.currentVariantId = variantId;
 
         } catch (error) {
@@ -820,7 +878,8 @@
         'prop-making-charges',
         'prop-diamond-charges',
         'prop-gst',
-        'prop-final-price'
+        'prop-final-price',
+        'prop-shipping-date' // added to debug list
     ];
     
     inputs.forEach(id => {
@@ -829,6 +888,7 @@
     });
   }
 </script>
+
 
 <script>
 (function () {
