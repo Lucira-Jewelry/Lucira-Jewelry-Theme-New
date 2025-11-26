@@ -436,68 +436,89 @@
           </div>
         </div>
       </div>
-      <script>
-        document.addEventListener("DOMContentLoaded", function() {
-          // Function to update shipping date based on inventory
-          function updateShippingDate() {
-            const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-            const inStock = totalInventory > 0;
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        // Store variant inventory data
+        const variantInventoryMap = {};
+        {% for variant in product.variants %}
+          variantInventoryMap[{{ variant.id }}] = {
+            available: {{ variant.available | json }},
+            inventory_quantity: {{ variant.inventory_quantity | default: 0 }}
+          };
+        {% endfor %}
 
-            const today = new Date();
-            const shippingDate = new Date();
-            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-
-            const formattedDate = shippingDate.toLocaleDateString('en-GB');
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (shippingField) shippingField.value = formattedDate;
+        // Function to calculate shipping date for a specific variant
+        function updateShippingDateForVariant(variantId) {
+          const variantData = variantInventoryMap[variantId];
+          
+          if (!variantData) {
+            console.log('No variant data found for ID:', variantId);
+            return;
           }
+          
+          // Check if variant is in stock (available AND inventory > 0)
+          const inStock = variantData.available && variantData.inventory_quantity > 0;
+          
+          console.log('Variant ID:', variantId);
+          console.log('Available:', variantData.available);
+          console.log('Inventory:', variantData.inventory_quantity);
+          console.log('In Stock:', inStock);
+          
+          const today = new Date();
+          const shippingDate = new Date();
+          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          // Function to calculate shipping date for a specific variant
-          function updateShippingDateForVariant(variantId) {
-            // Get all variant data from the product object
-            const variants = {{ product.variants | json }};
-            const selectedVariant = variants.find(v => v.id == variantId);
-            
-            if (!selectedVariant) return;
-            
-            const inStock = selectedVariant.available && selectedVariant.inventory_quantity > 0;
-            const today = new Date();
-            const shippingDate = new Date();
-            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-
-            const formattedDate = shippingDate.toLocaleDateString('en-GB');
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (shippingField) shippingField.value = formattedDate;
+          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+          const shippingField = document.getElementById('prop-shipping-date');
+          
+          if (shippingField) {
+            shippingField.value = formattedDate;
+            console.log('Updated shipping date to:', formattedDate, '(', (inStock ? '2 days' : '15 days'), ')');
           }
+        }
 
-          // Initial calculation
-          updateShippingDate();
+        // Get initial variant ID
+        const initialVariantId = {{ product.selected_or_first_available_variant.id | default: 'null' }};
+        if (initialVariantId) {
+          updateShippingDateForVariant(initialVariantId);
+        }
 
-          // Listen for variant changes (Dawn theme event)
-          document.addEventListener('variant:change', function(evt) {
-            if (evt.detail && evt.detail.variant && evt.detail.variant.id) {
-              updateShippingDateForVariant(evt.detail.variant.id);
+        // Listen for variant changes (Dawn theme event)
+        document.addEventListener('variant:change', function(evt) {
+          console.log('variant:change event detected');
+          if (evt.detail && evt.detail.variant && evt.detail.variant.id) {
+            updateShippingDateForVariant(evt.detail.variant.id);
+          }
+        });
+
+        // Also listen for changes on the hidden variant ID input
+        const variantIdInput = document.querySelector('.product-variant-id');
+        if (variantIdInput) {
+          // Monitor value changes via input event
+          variantIdInput.addEventListener('change', function() {
+            const variantId = parseInt(this.value);
+            if (variantId) {
+              console.log('Variant input changed to:', variantId);
+              updateShippingDateForVariant(variantId);
             }
           });
 
-          // Also listen for changes on the hidden variant ID input
-          const variantIdInput = document.querySelector('.product-variant-id');
-          if (variantIdInput) {
-            const observer = new MutationObserver(function(mutations) {
-              mutations.forEach(function(mutation) {
-                if (mutation.attributeName === 'value') {
-                  const variantId = variantIdInput.value;
-                  if (variantId) {
-                    updateShippingDateForVariant(variantId);
-                  }
-                }
-              });
-            });
-            
-            observer.observe(variantIdInput, { attributes: true });
-          }
-        });
-      </script>
+          // Use MutationObserver as backup
+          const observer = new MutationObserver(function(mutations) {
+            const variantId = parseInt(variantIdInput.value);
+            if (variantId) {
+              console.log('Variant changed via mutation:', variantId);
+              updateShippingDateForVariant(variantId);
+            }
+          });
+          
+          observer.observe(variantIdInput, { 
+            attributes: true, 
+            attributeFilter: ['value'] 
+          });
+        }
+      });
+    </script>
     </product-form>
 
   {%- else -%}
