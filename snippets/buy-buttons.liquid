@@ -438,19 +438,64 @@
       </div>
       <script>
         document.addEventListener("DOMContentLoaded", function() {
-          // Treat product as in-stock only if total inventory > 0
-          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-          const inStock = totalInventory > 0;
+          // Function to update shipping date based on inventory
+          function updateShippingDate() {
+            const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
+            const inStock = totalInventory > 0;
 
-          const today = new Date();
-          const shippingDate = new Date();
+            const today = new Date();
+            const shippingDate = new Date();
+            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+            const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            const shippingField = document.getElementById('prop-shipping-date');
+            if (shippingField) shippingField.value = formattedDate;
+          }
 
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+          // Function to calculate shipping date for a specific variant
+          function updateShippingDateForVariant(variantId) {
+            // Get all variant data from the product object
+            const variants = {{ product.variants | json }};
+            const selectedVariant = variants.find(v => v.id == variantId);
+            
+            if (!selectedVariant) return;
+            
+            const inStock = selectedVariant.available && selectedVariant.inventory_quantity > 0;
+            const today = new Date();
+            const shippingDate = new Date();
+            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          const shippingField = document.getElementById('prop-shipping-date');
-          if (shippingField) shippingField.value = formattedDate;
+            const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            const shippingField = document.getElementById('prop-shipping-date');
+            if (shippingField) shippingField.value = formattedDate;
+          }
+
+          // Initial calculation
+          updateShippingDate();
+
+          // Listen for variant changes (Dawn theme event)
+          document.addEventListener('variant:change', function(evt) {
+            if (evt.detail && evt.detail.variant && evt.detail.variant.id) {
+              updateShippingDateForVariant(evt.detail.variant.id);
+            }
+          });
+
+          // Also listen for changes on the hidden variant ID input
+          const variantIdInput = document.querySelector('.product-variant-id');
+          if (variantIdInput) {
+            const observer = new MutationObserver(function(mutations) {
+              mutations.forEach(function(mutation) {
+                if (mutation.attributeName === 'value') {
+                  const variantId = variantIdInput.value;
+                  if (variantId) {
+                    updateShippingDateForVariant(variantId);
+                  }
+                }
+              });
+            });
+            
+            observer.observe(variantIdInput, { attributes: true });
+          }
         });
       </script>
     </product-form>
