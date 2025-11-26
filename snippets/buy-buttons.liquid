@@ -437,173 +437,21 @@
         </div>
       </div>
       <script>
-        document.addEventListener('DOMContentLoaded', function () {
-          // --- 0) Find an already-parsed product object on the page ---
-          const possibleVars = [
-            // common names used by themes / custom code
-            window.product,
-            window.productData,
-            window.product_json,
-            window.productJson,
-            window.meta && window.meta.product,
-            window.__PRODUCT__,
-            window.__product,
-            window.shopifyProduct,
-          ];
+        document.addEventListener("DOMContentLoaded", function() {
+          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
+          const inStock = totalInventory > 0;
 
-          // pick first non-null object that looks like a product (has variants array)
-          const productData = possibleVars.find(p => p && Array.isArray(p.variants)) || null;
+          const today = new Date();
+          const shippingDate = new Date();
 
-          if (!productData) {
-            console.warn('No parsed product JSON found on window (tried common variable names).');
-            // still attempt to continue: we may rely on <select name="id"> to resolve current variant
-          } else {
-            console.log('Using parsed product JSON from page.');
-          }
+          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
 
-          // Helper: find variant by id
-          function findVariantById(id) {
-            if (!id) return null;
-            const numericId = (typeof id === 'string') ? Number(id) : id;
-            if (!productData || !Array.isArray(productData.variants)) return null;
-            return productData.variants.find(v => Number(v.id) === numericId) || null;
-          }
+          const formattedDate = shippingDate.toLocaleDateString('en-GB');
 
-          // Compute shipping date from variant object or fallback to available boolean
-          function computeShippingDateFromVariant(variant) {
-            const today = new Date();
-            const shippingDate = new Date();
-            let inStock = false;
-
-            if (variant) {
-              if (typeof variant.inventory_quantity === 'number') {
-                inStock = variant.inventory_quantity > 0;
-              } else if (typeof variant.available === 'boolean') {
-                inStock = variant.available;
-              } else if (typeof variant.inventory_policy === 'string') {
-                // best-effort guess: if inventory_policy === 'continue' treat as in stock
-                inStock = variant.inventory_policy === 'continue';
-              } else {
-                inStock = false;
-              }
-            } else {
-              // If we have no variant object, try to detect stock from the page (common selectors)
-              const soldOutBadge = document.querySelector('[data-sold-out], .sold-out, .badge--sold-out, .product-form__sold-out');
-              inStock = !soldOutBadge;
-            }
-
-            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-            return shippingDate.toLocaleDateString('en-GB');
-          }
-
-          // Update hidden input and dispatch change
-          function setShippingDateValue(formattedDate) {
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (!shippingField) {
-              console.warn('Shipping field #prop-shipping-date not found.');
-              return;
-            }
-            shippingField.value = formattedDate;
-            shippingField.setAttribute('value', formattedDate);
-            shippingField.dispatchEvent(new Event('change', { bubbles: true }));
-            console.log('Shipping date set to', formattedDate);
-          }
-
-          // Main update function accepts variant object or variant id or null
-          function updateShippingForVariantInput(variantOrId) {
-            let variant = null;
-            if (!variantOrId) {
-              // try select
-              const sel = document.querySelector('[name="id"]');
-              if (sel && sel.value) variant = findVariantById(sel.value);
-            } else if (typeof variantOrId === 'object') {
-              variant = variantOrId;
-            } else {
-              variant = findVariantById(variantOrId);
-            }
-
-            const formatted = computeShippingDateFromVariant(variant);
-            setShippingDateValue(formatted);
-          }
-
-          // Listen for Shopify modern events
-          document.addEventListener('variant:change', function (e) {
-            console.log('variant:change event', e);
-            const variant = e?.detail?.variant || null;
-            updateShippingForVariantInput(variant);
-          });
-          document.addEventListener('variant:changed', function (e) {
-            console.log('variant:changed event', e);
-            const variant = e?.detail?.variant || null;
-            updateShippingForVariantInput(variant);
-          });
-
-          // Fallback: listen for changes on the variant <select>
-          const variantSelect = document.querySelector('[name="id"]');
-          if (variantSelect) {
-            variantSelect.addEventListener('change', function () {
-              console.log('Variant <select> changed to', this.value);
-              updateShippingForVariantInput(this.value);
-            });
-          } else {
-            console.warn('No [name="id"] select found on page.');
-          }
-
-          // Swatch/click fallback - common pattern: clickable swatches have data-variant-id
-          document.addEventListener('click', function (e) {
-            const target = e.target.closest('[data-variant-id]');
-            if (target) {
-              const vid = target.getAttribute('data-variant-id');
-              if (vid) {
-                console.log('Clicked element with data-variant-id', vid);
-                // small timeout in case theme updates select asynchronously
-                setTimeout(() => updateShippingForVariantInput(vid), 50);
-              }
-            }
-          });
-
-          // If some themes update the selected variant via custom events, also support a generic 'product:variant:updated'
-          document.addEventListener('product:variant:updated', function (e) {
-            console.log('product:variant:updated', e);
-            const variant = e?.detail?.variant || null;
-            updateShippingForVariantInput(variant);
-          });
-
-          // Initial run: try to resolve a variant from select or parsed product
-          (function initial() {
-            // First try the select value
-            const sel = document.querySelector('[name="id"]');
-            if (sel && sel.value) {
-              updateShippingForVariantInput(sel.value);
-              return;
-            }
-
-            // Try common global selected id variables (some themes expose them)
-            const commonSelected = window.selectedVariantId || window.currentVariantId || window.__selectedVariantId;
-            if (commonSelected) {
-              updateShippingForVariantInput(commonSelected);
-              return;
-            }
-
-            // Try to use productData.selected_or_first_available_variant or the first variant
-            if (productData) {
-              if (productData.selected_or_first_available_variant && productData.selected_or_first_available_variant.id) {
-                updateShippingForVariantInput(productData.selected_or_first_available_variant);
-                return;
-              }
-              if (Array.isArray(productData.variants) && productData.variants.length) {
-                updateShippingForVariantInput(productData.variants[0]);
-                return;
-              }
-            }
-
-            // Last resort: compute based on page DOM (sold out badge)
-            updateShippingForVariantInput(null);
-          })();
-
-        }); 
+          const shippingField = document.getElementById('prop-shipping-date');
+          if (shippingField) shippingField.value = formattedDate;
+        });
       </script>
-
     </product-form>
 
   {%- else -%}
