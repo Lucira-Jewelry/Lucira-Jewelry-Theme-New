@@ -275,6 +275,8 @@
   </div>
 </div>
 
+// Replace the entire <script> section in your delivery widget with this updated version:
+
 <script>
 (() => {
   const container = document.getElementById("pdp-delivery-check");
@@ -286,6 +288,7 @@
 
   const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
   let isProcessingLocate = false;
+  let lastEnteredPincode = null; // Track the last submitted pincode
 
   const fmtDatePlus = (plusDays) => {
     const d = new Date();
@@ -362,11 +365,21 @@
 
   function repaint() {
     if (!dateSpan) return;
-    dateSpan.textContent = fmtDatePlus(computeDays());
+    const days = computeDays();
+    dateSpan.textContent = fmtDatePlus(days);
+    
+    console.log('Repaint called:', {
+      inStock: isVariantInStock(),
+      days: days,
+      date: dateSpan.textContent,
+      mode: submitBtn?.getAttribute("data-mode"),
+      hasPincode: !!lastEnteredPincode
+    });
   }
 
   function setLocateView() {
     isProcessingLocate = false;
+    lastEnteredPincode = null; // Clear pincode when going back to locate
     submitBtn.setAttribute("data-mode", "locate");
     submitBtn.innerHTML = `
       <svg width="16" height="16" class="icon icon-locate">
@@ -415,18 +428,15 @@
       await window.luciraLocateMe();
       console.log('Location fetch completed');
 
-      // Wait a bit for the pincode to be populated
       setTimeout(() => {
         const newPin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
         console.log('Pincode after location fetch:', newPin);
         
-        // CRITICAL FIX: Always reset the processing flag
         isProcessingLocate = false;
 
         if (newPin.length === 6) {
           processDelivery(newPin);
         } else {
-          // If no pincode was populated, reset to locate mode
           setLocateView();
           console.log('No valid pincode found after location fetch');
         }
@@ -434,7 +444,6 @@
 
     } catch (error) {
       console.error('Location fetch failed:', error);
-      // CRITICAL FIX: Always reset the processing flag on error
       isProcessingLocate = false;
       setLocateView();
       return false;
@@ -444,32 +453,31 @@
   function processDelivery(pin) {
     console.log('Processing delivery for pincode:', pin);
     
+    // Store the pincode for variant change recalculations
+    lastEnteredPincode = pin;
+    
     try {
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({
         event: "promoClick",
         promoClick: {
-          promo_id: '{{ product.selected_or_first_available_variant.sku }}',
-          promo_name: '{{ product.title }}',
+          promo_id: container.dataset.productSku,
+          promo_name: container.dataset.productTitle,
           creative_name: 'Pincode_Entered',
           pincode: pin
         }
       });
     } catch (_) {}
 
-    const days = isVariantInStock() ? 2 : Number(container.dataset.deliveryDays || META_DAYS);
+    const days = computeDays();
     const formatted = fmtDatePlus(days);
 
     if (dateSpan) dateSpan.textContent = formatted;
     
     setChangeView();
     
-    console.log('Delivery date updated to:', formatted);
+    console.log('Delivery processed:', { pin, days, formatted, inStock: isVariantInStock() });
   }
-
-  /* ---------------------------
-     PINCODE INPUT LOGIC - COMPLETELY REWRITTEN
-  ---------------------------- */
 
   if (pincodeInput) {
     pincodeInput.addEventListener("input", (e) => {
@@ -483,33 +491,30 @@
       const isEmpty = val.length === 0;
       const isComplete = val.length === 6;
 
-      // Always allow locate mode when field is empty
       if (isEmpty) {
         console.log('Field is empty, forcing locate mode');
         setLocateView();
+        repaint(); // Reset to default date
         return;
       }
 
-      // Handle transitions from locate mode
       if (currentMode === "locate") {
         if (isComplete) {
           console.log('Complete pincode in locate mode, switching to submit');
           setSubmitView();
         }
-        // If not complete but has content, stay in locate mode
         return;
       }
 
-      // Handle transitions from submit mode
       if (currentMode === "submit") {
         if (!isComplete) {
           console.log('Incomplete pincode in submit mode, switching to locate');
           setLocateView();
+          repaint(); // Reset to default date
         }
         return;
       }
 
-      // Handle transitions from change mode
       if (currentMode === "change") {
         if (isComplete) {
           console.log('Complete pincode in change mode, switching to submit');
@@ -517,6 +522,7 @@
         } else {
           console.log('Incomplete pincode in change mode, switching to locate');
           setLocateView();
+          repaint(); // Reset to default date
         }
         return;
       }
@@ -529,6 +535,7 @@
       if (currentMode === "change") {
         e.preventDefault();
         setLocateView();
+        repaint(); // Reset to default date
         setTimeout(() => {
           pincodeInput.focus();
           pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
@@ -542,21 +549,17 @@
       
       if (currentMode === "change") {
         setLocateView();
+        repaint(); // Reset to default date
         setTimeout(() => {
           pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
         }, 10);
       }
     });
 
-    // Reset processing flag when user manually types
     pincodeInput.addEventListener("keydown", (e) => {
       isProcessingLocate = false;
     });
   }
-
-  /* ---------------------------
-     BUTTON CLICK - SIMPLIFIED AND DEBUGGED
-  ---------------------------- */
 
   if (submitBtn) {
     submitBtn.addEventListener("click", async (e) => {
@@ -574,7 +577,6 @@
         inputValue: pincodeInput?.value
       });
 
-      // Safety check: if somehow stuck in processing, reset
       if (isProcessingLocate) {
         console.warn('Force resetting stuck location processing');
         isProcessingLocate = false;
@@ -605,6 +607,8 @@
   }
 
   function onVariantChange(e) {
+    console.log('=== VARIANT CHANGE DETECTED ===');
+    
     const v = e?.detail?.variant;
     if (v) {
       container.dataset.variantId = String(v.id || "");
@@ -614,8 +618,21 @@
       if (typeof v.available !== "undefined") {
         container.dataset.available = String(!!v.available);
       }
+      
+      console.log('Variant data updated:', {
+        id: v.id,
+        inventory: v.inventory_quantity,
+        available: v.available
+      });
     }
+    
+    // CRITICAL FIX: Always recalculate and update the date
+    // This happens whether or not a pincode was entered
     repaint();
+    
+    // If user had entered a pincode before, the date updates automatically
+    // because repaint() calls computeDays() which checks current stock status
+    console.log('Delivery date recalculated after variant change');
   }
 
   document.addEventListener("variant:change", onVariantChange);
@@ -623,7 +640,10 @@
 
   document.addEventListener("change", (evt) => {
     const n = evt.target?.name || "";
-    if (n.includes("Color") || n.includes("Size")) repaint();
+    if (n.includes("Color") || n.includes("Size")) {
+      console.log('Option changed:', n);
+      repaint();
+    }
   });
 
   // Initialize
@@ -638,6 +658,9 @@
       inputValue: pincodeInput?.value,
       inputLength: pincodeInput?.value?.length,
       isProcessingLocate,
+      lastEnteredPincode,
+      inStock: isVariantInStock(),
+      computedDays: computeDays(),
       luciraLocateMe: typeof window.luciraLocateMe
     };
   };
