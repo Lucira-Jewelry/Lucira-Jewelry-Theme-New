@@ -437,21 +437,43 @@
         </div>
       </div>
       <script>
-        document.addEventListener("DOMContentLoaded", function() {
+        document.addEventListener("DOMContentLoaded", function () {
+
+          function updateShippingDate(inStock) {
+            const today = new Date();
+            const shippingDate = new Date();
+
+            shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+            const formattedDate = shippingDate.toLocaleDateString("en-GB");
+
+            const shippingField = document.getElementById("prop-shipping-date");
+            if (shippingField) shippingField.value = formattedDate;
+          }
+
+          // --- On Page Load ---
           const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-          const inStock = totalInventory > 0;
+          updateShippingDate(totalInventory > 0);
 
-          const today = new Date();
-          const shippingDate = new Date();
+          // --- On Variant Change ---
+          const variantSelect = document.querySelector(".product-variant-id");
+          if (variantSelect) {
+            variantSelect.addEventListener("change", function () {
+              const selectedVariantId = this.value;
 
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+              // Shopify variant JSON
+              const variants = {{ product.variants | json }};
 
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+              const selected = variants.find(v => v.id == selectedVariantId);
 
-          const shippingField = document.getElementById('prop-shipping-date');
-          if (shippingField) shippingField.value = formattedDate;
+              if (selected) {
+                updateShippingDate(selected.inventory_quantity > 0);
+              }
+            });
+          }
+
         });
       </script>
+
     </product-form>
 
   {%- else -%}
