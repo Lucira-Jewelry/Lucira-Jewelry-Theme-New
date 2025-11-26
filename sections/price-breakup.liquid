@@ -222,53 +222,6 @@
         }
     }
 
-    // --- NEW: shipping date updater ---
-    updateShippingDate(variantId) {
-      try {
-        const SHIPPING_FIELD_ID = 'prop-shipping-date';
-        const inStockLead = 2;
-        const outStockLead = 15;
-
-        // Try to find selected variant in config.variantsData first
-        const variantsData = this.config.variantsData || {};
-        let inStock = false;
-        let matchedVariant = variantsData[variantId];
-
-        if (matchedVariant) {
-          // some themes provide `available` or `inventory_quantity` in the variant data
-          inStock = (matchedVariant.available === true) || (Number(matchedVariant.inventory_quantity) > 0);
-          console.info('[Live Gold Price Editor] shipping: variant found, available=', matchedVariant.available, 'inventory=', matchedVariant.inventory_quantity);
-        } else {
-          // Fallback to summing inventory from variantsData if variant not present
-          let totalInventory = 0;
-          for (const k in variantsData) {
-            const v = variantsData[k];
-            totalInventory += Number(v.inventory_quantity) || 0;
-          }
-          inStock = totalInventory > 0;
-          console.warn('[Live Gold Price Editor] shipping: variant not found in variantsData, falling back to totalInventory=', totalInventory);
-        }
-
-        const leadDays = inStock ? inStockLead : outStockLead;
-        const today = new Date();
-        const shippingDate = new Date(today);
-        shippingDate.setDate(today.getDate() + leadDays);
-        const formatted = shippingDate.toLocaleDateString('en-GB');
-
-        const el = document.getElementById(SHIPPING_FIELD_ID);
-        if (el) {
-          el.value = formatted;
-          // dispatch input event in case some listener expects it
-          el.dispatchEvent(new Event('input', { bubbles: true }));
-          console.info('[Live Gold Price Editor] shipping date set to', formatted);
-        } else {
-          console.warn('[Live Gold Price Editor] shipping field not found (id=' + SHIPPING_FIELD_ID + ')');
-        }
-      } catch (err) {
-        console.error('[Live Gold Price Editor] updateShippingDate error:', err);
-      }
-    }
-
     // ✅ CORRECTED: Single init method
     init() {
         console.log('[Live Gold Price Editor] Initializing Price Breakdown.');
@@ -277,9 +230,6 @@
         // ✅ Always initialize hidden inputs with current variant data
         const initialVariantId = this.config.currentVariantId;
         this.updatePriceBreakdown(initialVariantId);
-        
-        // initialize shipping date on load as well
-        this.updateShippingDate(initialVariantId);
         
         // Only calculate if drawer is initially open
         const drawer = document.getElementById('price-drawer');
@@ -347,8 +297,6 @@
       // Only now calculate the price breakdown
       const variantId = this.getCurrentVariantId();
       this.updatePriceBreakdown(variantId);
-      // ensure shipping date also updates on open
-      this.updateShippingDate(variantId);
     }
 
     onDrawerClose() {
@@ -394,8 +342,6 @@
         if (variantId && this.config.variantConfigs[variantId]) {
             console.log('[Live Gold Price Editor] Variant changed to:', variantId);
             this.updatePriceBreakdown(variantId);
-            // ensure shipping date updates whenever variant changes
-            this.updateShippingDate(variantId);
         }
     }
 
@@ -408,8 +354,6 @@
             this.renderPriceBreakdown(cachedData);
             // ✅ Ensure hidden inputs are updated even with cached data
             this.updateHiddenInputs(cachedData);
-            // also update shipping date from cached data / variantId
-            this.updateShippingDate(variantId);
             this.currentVariantId = variantId;
             return;
         }
@@ -433,8 +377,6 @@
             this.renderPriceBreakdown(calculationData);
             // ✅ Ensure hidden inputs are updated with new data
             this.updateHiddenInputs(calculationData);
-            // update shipping date whenever breakdown updates
-            this.updateShippingDate(variantId);
             this.currentVariantId = variantId;
 
         } catch (error) {
@@ -878,8 +820,7 @@
         'prop-making-charges',
         'prop-diamond-charges',
         'prop-gst',
-        'prop-final-price',
-        'prop-shipping-date' // added to debug list
+        'prop-final-price'
     ];
     
     inputs.forEach(id => {
@@ -888,7 +829,6 @@
     });
   }
 </script>
-
 
 <script>
 (function () {
@@ -970,238 +910,6 @@
 
   // expose tiny debug helper
   window.debugPcsFromTable = updatePcsNow;
-})();
-</script>
-
-<script>
-(function () {
-  // Small helper to log with a consistent prefix
-  const log = (...args) => console.info('[shipping-sync]', ...args);
-  const warn = (...args) => console.warn('[shipping-sync]', ...args);
-  const err = (...args) => console.error('[shipping-sync]', ...args);
-
-  // Config: ID of the hidden shipping input
-  const SHIPPING_FIELD_ID = 'prop-shipping-date';
-
-  // Get variants data from your existing config if present
-  const variantsData = (window.PriceGuideConfig && window.PriceGuideConfig.variantsData) ? window.PriceGuideConfig.variantsData : null;
-  if (!variantsData) {
-    warn('No variantsData found on PriceGuideConfig — script will still try to use DOM-based variant id');
-  } else {
-    log('variantsData present, keys:', Object.keys(variantsData).length);
-  }
-
-  function toNumber(v) {
-    if (typeof v === 'number') return v;
-    if (!v) return NaN;
-    return Number(String(v).replace(/[^0-9]/g, '')) || NaN;
-  }
-
-  function computeShippingDateString(inStock) {
-    const days = inStock ? 2 : 15;
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-    return d.toLocaleDateString('en-GB');
-  }
-
-  function setHiddenShippingDate(str) {
-    const el = document.getElementById(SHIPPING_FIELD_ID);
-    if (!el) {
-      warn('Shipping hidden input not found with id:', SHIPPING_FIELD_ID);
-      return false;
-    }
-    if (el.value === str) return true; // nothing to do
-    el.value = str;
-    el.dispatchEvent(new Event('input', { bubbles: true }));
-    log('Set', SHIPPING_FIELD_ID, '->', str);
-    return true;
-  }
-
-  // Determine inStock for a variantId using variantsData or DOM fallback
-  function isVariantInStock(variantId) {
-    // prefer variantsData
-    if (variantsData && variantsData[variantId]) {
-      const v = variantsData[variantId];
-      // support either available boolean or inventory_quantity
-      return (v.available === true) || (Number(v.inventory_quantity) > 0);
-    }
-
-    // fallback: try to read hidden input value presence or product total inventory
-    const variantInput = document.querySelector('input[name="id"]');
-    if (variantInput) {
-      // If the page exposes 'data-available' attribute on option, check it.
-      const selectedOption = variantInput.value;
-      if (selectedOption && variantsData && variantsData[selectedOption]) {
-        const v = variantsData[selectedOption];
-        return (v.available === true) || (Number(v.inventory_quantity) > 0);
-      }
-    }
-
-    // last resort: treat as out-of-stock
-    return false;
-  }
-
-  // main updater that accepts variantId (string/number)
-  function updateShippingForVariant(variantId) {
-    if (!variantId) {
-      // try URL param
-      const url = new URL(window.location.href);
-      variantId = url.searchParams.get('variant') || variantId;
-    }
-    if (!variantId) {
-      warn('No variantId available to update shipping date');
-      return;
-    }
-
-    // If the PriceGuide manager exists, prefer its method (keeps single source of truth)
-    try {
-      if (window.priceGuideManager && typeof window.priceGuideManager.updateShippingDate === 'function') {
-        log('Calling priceGuideManager.updateShippingDate for variant', variantId);
-        window.priceGuideManager.updateShippingDate(String(variantId));
-        return;
-      }
-    } catch (e) {
-      warn('priceGuideManager call failed, fallback to local update', e);
-    }
-
-    // Fallback: compute inStock from variantsData and set the shipping field
-    const inStock = isVariantInStock(String(variantId));
-    const formatted = computeShippingDateString(inStock);
-    setHiddenShippingDate(formatted);
-  }
-
-  // Read variant id from hidden input or URL
-  function readVariantIdFromPage() {
-    const hidden = document.querySelector('input[name="id"]');
-    if (hidden && hidden.value) return hidden.value;
-    const url = new URL(window.location.href);
-    const v = url.searchParams.get('variant');
-    if (v) return v;
-    return null;
-  }
-
-  // Debounced wrapper to avoid thrash
-  let debouncer = null;
-  function debounceUpdate(variantId, delay = 80) {
-    clearTimeout(debouncer);
-    debouncer = setTimeout(() => updateShippingForVariant(variantId), delay);
-  }
-
-  // Observe mutations of the hidden variant input (themes often replace it)
-  function observeVariantInput() {
-    const selector = 'input[name="id"]';
-    let el = document.querySelector(selector);
-    if (!el) {
-      warn('Variant hidden input not found for selector', selector);
-      return;
-    }
-    log('Observing hidden variant input for attribute changes.');
-    const mo = new MutationObserver(() => {
-      const vid = readVariantIdFromPage();
-      if (vid) debounceUpdate(vid);
-    });
-    mo.observe(el, { attributes: true, attributeFilter: ['value'], subtree: false, childList: false });
-    // also watch parent in case theme re-renders input entirely
-    const parent = el.closest('form') || document.body;
-    const mo2 = new MutationObserver(() => {
-      // small timeout to let theme re-render
-      setTimeout(() => {
-        const vid = readVariantIdFromPage();
-        if (vid) debounceUpdate(vid);
-      }, 10);
-    });
-    mo2.observe(parent, { childList: true, subtree: true });
-  }
-
-  // Polling fallback (every 200ms) — safe and low-cost
-  function startPolling() {
-    let last = readVariantIdFromPage();
-    setInterval(() => {
-      const cur = readVariantIdFromPage();
-      if (cur && String(cur) !== String(last)) {
-        last = cur;
-        log('poll detected variant change ->', cur);
-        debounceUpdate(cur);
-      }
-    }, 200);
-  }
-
-  // Listen to common variant events (themes)
-  function addEventListeners() {
-    // theme events
-    ['variant:change', 'variant:changed', 'product:variant:change', 'shopify:variant:changed'].forEach(evt => {
-      document.addEventListener(evt, function (e) {
-        log('caught event', evt, e && e.detail ? e.detail : '');
-        const vid = e && e.detail && e.detail.variant && (e.detail.variant.id || e.detail.variant.id) ? e.detail.variant.id : readVariantIdFromPage();
-        debounceUpdate(vid);
-      }, true);
-    });
-
-    // changes on selects / radios / click (swatches)
-    document.addEventListener('change', function (e) {
-      // common pattern: theme updates hidden input upon change
-      if (e.target && (e.target.name === 'id' || e.target.matches('select') || e.target.matches('input[type="radio"], input[type="checkbox"]'))) {
-        const vid = readVariantIdFromPage();
-        debounceUpdate(vid);
-      } else {
-        // still attempt a generic update
-        const vid = readVariantIdFromPage();
-        if (vid) debounceUpdate(vid);
-      }
-    }, true);
-
-    document.addEventListener('click', function () {
-      // wait a tick for theme handlers to update hidden input
-      setTimeout(() => {
-        const vid = readVariantIdFromPage();
-        if (vid) debounceUpdate(vid);
-      }, 0);
-    }, true);
-
-    // history / URL changes
-    window.addEventListener('popstate', function () {
-      const vid = readVariantIdFromPage();
-      debounceUpdate(vid);
-    }, true);
-  }
-
-  // Run initialization after DOM ready
-  function init() {
-    const initial = readVariantIdFromPage() || (window.PriceGuideConfig && window.PriceGuideConfig.currentVariantId) || null;
-    if (initial) {
-      log('initial variant id:', initial);
-      // try immediate update
-      updateShippingForVariant(initial);
-    } else {
-      warn('No initial variant id found on page load.');
-    }
-
-    // Setup observers/listeners
-    observeVariantInput();
-    addEventListeners();
-    startPolling();
-
-    // If a priceGuideManager exists, also hook into it for variant changes to keep single source
-    if (window.priceGuideManager && typeof window.priceGuideManager.updateShippingDate === 'function') {
-      log('Found priceGuideManager — will call its updateShippingDate when available.');
-      // no further action — our updateShippingForVariant prefers calling it already
-    }
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-  // Expose small debug helper
-  window._shippingSyncDebug = {
-    updateShippingForVariant,
-    readVariantIdFromPage,
-    computeShippingDateString,
-    setHiddenShippingDate
-  };
-
 })();
 </script>
 
