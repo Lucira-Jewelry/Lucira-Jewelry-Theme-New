@@ -438,21 +438,117 @@
       </div>
       <script>
         document.addEventListener("DOMContentLoaded", function() {
+          // Replace with your shipping field id
+          const SHIPPING_FIELD_ID = 'prop-shipping-date';
+          const productHandle = "{{ product.handle }}"; // Liquid: server inserts product handle
 
-          const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
-          const inStock = totalInventory > 0;
+          // Utility: set shipping date string (en-GB)
+          function setShippingDate(daysFromNow) {
+            const today = new Date();
+            const shippingDate = new Date();
+            shippingDate.setDate(today.getDate() + daysFromNow);
+            const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            const shippingField = document.getElementById(SHIPPING_FIELD_ID);
+            if (shippingField) shippingField.value = formattedDate;
+          }
 
-          const today = new Date();
-          const shippingDate = new Date();
+          // Given inventory number, compute days to ship and set field
+          function applyShippingByInventory(inventory) {
+            // Change these thresholds if you want different logic
+            const days = inventory > 0 ? 2 : 15;
+            setShippingDate(days);
+          }
 
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
+          // Get currently selected variant id from common inputs
+          function getSelectedVariantId() {
+            // Common patterns: select[name="id"] or input[name="id"]:checked
+            const select = document.querySelector('select[name="id"]');
+            if (select && select.value) return select.value;
 
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
+            const radio = document.querySelector('input[name="id"]:checked');
+            if (radio && radio.value) return radio.value;
 
-          const shippingField = document.getElementById('prop-shipping-date');
-          if (shippingField) shippingField.value = formattedDate;
+            // Some themes store variant id in a hidden input with id "product-select" or data attributes — try a few fallbacks
+            const hidden = document.querySelector('input[type="hidden"][name="id"]');
+            if (hidden && hidden.value) return hidden.value;
+
+            return null;
+          }
+
+          // Fetch product JSON and find variant by id (returns inventory_quantity or null)
+          async function fetchVariantInventory(variantId) {
+            if (!variantId) return null;
+            try {
+              const res = await fetch(`/products/${encodeURIComponent(productHandle)}.js`, {cache: 'no-store'});
+              if (!res.ok) return null;
+              const product = await res.json();
+              const variant = product.variants.find(v => String(v.id) === String(variantId));
+              return variant ? variant.inventory_quantity : null;
+            } catch (e) {
+              console.error('Error fetching product JSON for inventory:', e);
+              return null;
+            }
+          }
+
+          // Main updater: determine current inventory and update shipping field
+          async function updateShippingDate() {
+            const variantId = getSelectedVariantId();
+            // If we couldn't find a specific variant id, fallback to using server-rendered total inventory
+            if (!variantId) {
+              // fallback - try reading a pre-rendered totalInventory if you left it (optional)
+              // const totalInventory = {{ product.variants | map: 'inventory_quantity' | sum | default: 0 }};
+              // applyShippingByInventory(totalInventory);
+              // But since fallback may be static, just set to default 2 days:
+              applyShippingByInventory(1);
+              return;
+            }
+
+            const inventory = await fetchVariantInventory(variantId);
+            if (inventory === null) {
+              // on failure, choose safe default (in-stock assumption or fallback to longer)
+              applyShippingByInventory(0); // treat as out of stock
+              return;
+            }
+            applyShippingByInventory(inventory);
+          }
+
+          // Hook updateShippingDate to events commonly fired on variant changes
+          function attachVariantListeners() {
+            // Listen to native changes on selects and radios
+            document.addEventListener('change', function(e) {
+              const t = e.target;
+              if (!t) return;
+              if (t.name === 'id' || t.matches('select[name="id"], input[name="id"]')) {
+                updateShippingDate();
+              }
+            }, {capture: true});
+
+            // Some themes fire custom events — listen to a few common ones
+            const customEvents = ['variant:change', 'product:variant:change', 'variantChange', 'variantChangeData'];
+            customEvents.forEach(evt => {
+              document.addEventListener(evt, function() {
+                updateShippingDate();
+              });
+            });
+
+            // MutationObserver as a last-resort: watches for changes to an element that contains current variant id
+            const variantContainer = document.querySelector('form[action*="/cart/add"], .product-form, .product-form__variants, #product-form');
+            if (variantContainer) {
+              const mo = new MutationObserver((mutations) => {
+                // small debounce to avoid spamming
+                if (window._updateShippingTimeout) clearTimeout(window._updateShippingTimeout);
+                window._updateShippingTimeout = setTimeout(() => updateShippingDate(), 150);
+              });
+              mo.observe(variantContainer, { childList: true, subtree: true, attributes: true, attributeFilter: ['value', 'data-variant-id'] });
+            }
+          }
+
+          // Initial run + attach listeners
+          attachVariantListeners();
+          updateShippingDate();
         });
       </script>
+
     </product-form>
 
   {%- else -%}
