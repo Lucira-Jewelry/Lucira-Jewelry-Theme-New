@@ -1,76 +1,190 @@
 {% comment %}
-  1. Define the type of the current product and initialization variables.
+  1. Define initialization variables.
 {% endcomment %}
 {% assign current_product_type = product.type %}
 {% assign max_products = 16 %}
-{% assign suggested_products_handles = '' %}
 {% assign current_product_handle = product.handle %}
+{% assign current_price = product.price %}
 
 {% comment %}
-  2. DETERMINE TARGET COLLECTION: Construct the collection handle based on the product type.
-  Handle specific exceptions for complex product type names, then use general 'all-' prefix logic.
+  2. DEFINE 5 PRICE TIERS (The Waterfall)
 {% endcomment %}
 
+{% comment %} Tier 1: +/- 10% {% endcomment %}
+{% assign min_t1 = current_price | times: 0.9 %}
+{% assign max_t1 = current_price | times: 1.1 %}
+
+{% comment %} Tier 2: +/- 20% {% endcomment %}
+{% assign min_t2 = current_price | times: 0.8 %}
+{% assign max_t2 = current_price | times: 1.2 %}
+
+{% comment %} Tier 3: +/- 30% {% endcomment %}
+{% assign min_t3 = current_price | times: 0.7 %}
+{% assign max_t3 = current_price | times: 1.3 %}
+
+{% comment %} Tier 4: +/- 40% {% endcomment %}
+{% assign min_t4 = current_price | times: 0.6 %}
+{% assign max_t4 = current_price | times: 1.4 %}
+
+{% comment %} Tier 5: Safety Net (0.3x to 3.0x) - Fills remaining spots {% endcomment %}
+{% assign min_t5 = current_price | times: 0.3 %}
+{% assign max_t5 = current_price | times: 3.0 %}
+
+{% assign handles_tier1 = '' %}
+{% assign handles_tier2 = '' %}
+{% assign handles_tier3 = '' %}
+{% assign handles_tier4 = '' %}
+{% assign handles_tier5 = '' %}
+
+{% comment %}
+  3. DETERMINE TARGET COLLECTION
+{% endcomment %}
 {% assign current_product_type_handle = current_product_type | handleize %}
 
-{% comment %} Handle 'Charms & Pendants' -> 'all-charmspendants' (Removes '-and-') {% endcomment %}
 {% if current_product_type_handle == 'charms-and-pendants' %}
   {% assign target_collection_handle = 'all-charmspendants' %}
-  {% comment %} Handle 'Nose-pin' -> 'all-nosepins' (Removed '-pin's dash for consistency with 'all-') {% endcomment %}
 {% elsif current_product_type_handle == 'nose-pin' %}
   {% assign target_collection_handle = 'all-nosepins' %}
 {% else %}
-  {% comment %} General case: 'all-' plus the standard handleized type {% endcomment %}
   {% assign target_collection_handle = 'all-' | append: current_product_type_handle %}
 {% endif %}
 
 {% assign target_collection = collections[target_collection_handle] %}
 
 {% if target_collection != blank %}
+  
   {% comment %}
-    3. COLLECT ALL HANDLES from the collection, excluding the current product.
+    4. SORT PRODUCTS INTO EXCLUSIVE BUCKETS
   {% endcomment %}
   {% for p in target_collection.products %}
     {% unless p.handle == current_product_handle %}
-      {% assign suggested_products_handles = suggested_products_handles | append: p.handle | append: ',' %}
+      
+      {% if p.price >= min_t1 and p.price <= max_t1 %}
+        {% assign handles_tier1 = handles_tier1 | append: p.handle | append: ',' %}
+      
+      {% elsif p.price >= min_t2 and p.price <= max_t2 %}
+        {% assign handles_tier2 = handles_tier2 | append: p.handle | append: ',' %}
+      
+      {% elsif p.price >= min_t3 and p.price <= max_t3 %}
+        {% assign handles_tier3 = handles_tier3 | append: p.handle | append: ',' %}
+
+      {% elsif p.price >= min_t4 and p.price <= max_t4 %}
+        {% assign handles_tier4 = handles_tier4 | append: p.handle | append: ',' %}
+
+      {% elsif p.price >= min_t5 and p.price <= max_t5 %}
+        {% assign handles_tier5 = handles_tier5 | append: p.handle | append: ',' %}
+      
+      {% endif %}
+
     {% endunless %}
   {% endfor %}
 
-  {% assign product_handles_array = suggested_products_handles | split: ',' | compact %}
-  {% assign total_related = product_handles_array.size %}
+  {% assign array_tier1 = handles_tier1 | split: ',' | compact %}
+  {% assign array_tier2 = handles_tier2 | split: ',' | compact %}
+  {% assign array_tier3 = handles_tier3 | split: ',' | compact %}
+  {% assign array_tier4 = handles_tier4 | split: ',' | compact %}
+  {% assign array_tier5 = handles_tier5 | split: ',' | compact %}
+  
+  {% comment %}
+    5. ROTATE EACH TIER INDIVIDUALLY
+  {% endcomment %}
+  {% assign id_as_string = product.id | append: '' %}
+  {% assign seed = id_as_string | slice: -3, 3 | plus: 0 %}
+
+  {% comment %} --- Rotate Tier 1 --- {% endcomment %}
+  {% assign s1 = array_tier1.size %}
+  {% if s1 > 0 %}
+    {% assign off1 = seed | modulo: s1 %}
+    {% assign t1_a = array_tier1 | slice: off1, s1 %}
+    {% assign t1_b = array_tier1 | slice: 0, off1 %}
+    {% assign final_tier1 = t1_a | concat: t1_b %}
+  {% else %}
+    {% assign final_tier1 = array_tier1 %}
+  {% endif %}
+
+  {% comment %} --- Rotate Tier 2 --- {% endcomment %}
+  {% assign s2 = array_tier2.size %}
+  {% if s2 > 0 %}
+    {% assign off2 = seed | modulo: s2 %}
+    {% assign t2_a = array_tier2 | slice: off2, s2 %}
+    {% assign t2_b = array_tier2 | slice: 0, off2 %}
+    {% assign final_tier2 = t2_a | concat: t2_b %}
+  {% else %}
+    {% assign final_tier2 = array_tier2 %}
+  {% endif %}
+
+  {% comment %} --- Rotate Tier 3 --- {% endcomment %}
+  {% assign s3 = array_tier3.size %}
+  {% if s3 > 0 %}
+    {% assign off3 = seed | modulo: s3 %}
+    {% assign t3_a = array_tier3 | slice: off3, s3 %}
+    {% assign t3_b = array_tier3 | slice: 0, off3 %}
+    {% assign final_tier3 = t3_a | concat: t3_b %}
+  {% else %}
+    {% assign final_tier3 = array_tier3 %}
+  {% endif %}
+
+  {% comment %} --- Rotate Tier 4 --- {% endcomment %}
+  {% assign s4 = array_tier4.size %}
+  {% if s4 > 0 %}
+    {% assign off4 = seed | modulo: s4 %}
+    {% assign t4_a = array_tier4 | slice: off4, s4 %}
+    {% assign t4_b = array_tier4 | slice: 0, off4 %}
+    {% assign final_tier4 = t4_a | concat: t4_b %}
+  {% else %}
+    {% assign final_tier4 = array_tier4 %}
+  {% endif %}
+
+  {% comment %} --- Rotate Tier 5 --- {% endcomment %}
+  {% assign s5 = array_tier5.size %}
+  {% if s5 > 0 %}
+    {% assign off5 = seed | modulo: s5 %}
+    {% assign t5_a = array_tier5 | slice: off5, s5 %}
+    {% assign t5_b = array_tier5 | slice: 0, off5 %}
+    {% assign final_tier5 = t5_a | concat: t5_b %}
+  {% else %}
+    {% assign final_tier5 = array_tier5 %}
+  {% endif %}
 
   {% comment %}
-    4. APPLY ROTATION: Use the product ID to calculate an offset for a different product order.
+    6. STACK THE LAYERS
   {% endcomment %}
-  {% if total_related > 0 %}
-    {% comment %} Use last 3 digits of product ID as a simple seed number for variation {% endcomment %}
-    {% assign id_as_string = product.id | append: '' %}
-    {% assign seed = id_as_string | slice: -3, 3 | plus: 0 %}
+  {% assign all_candidates = final_tier1 | concat: final_tier2 | concat: final_tier3 | concat: final_tier4 | concat: final_tier5 %}
+  {% assign products_to_render = all_candidates | slice: 0, max_products %}
 
-    {% comment %} Calculate the offset using modulo to ensure it's within the total count {% endcomment %}
-    {% assign start_offset = seed | modulo: total_related %}
+  {% comment %}
+    7. FORCE-FILL TO max_products USING ANY OTHER PRODUCTS FROM COLLECTION
+  {% endcomment %}
+  {% assign current_size = products_to_render.size %}
 
-    {% comment %}
-      Perform the circular slice (rotation) on the array of handles:
-      1. Get the slice from the offset to the end.
-      2. Get the slice from the beginning to the offset.
-      3. Concatenate and slice the first 16.
-    {% endcomment %}
+  {% if current_size < max_products %}
+    {% assign extra_needed = max_products | minus: current_size %}
+    {% assign filler_handles = '' %}
 
-    {% assign rotated_part_1 = product_handles_array | slice: start_offset, total_related %}
-    {% assign rotated_part_2 = product_handles_array | slice: 0, start_offset %}
+    {%- for p in target_collection.products -%}
+      {% unless p.handle == current_product_handle or products_to_render contains p.handle %}
+        {% assign filler_handles = filler_handles | append: p.handle | append: ',' %}
+      {% endunless %}
+    {%- endfor -%}
 
-    {% assign rotated_handles = rotated_part_1 | concat: rotated_part_2 %}
-    {% assign products_to_render = rotated_handles | slice: 0, max_products %}
+    {% assign filler_array = filler_handles | split: ',' | compact %}
+    {% assign filler_array = filler_array | slice: 0, extra_needed %}
 
-  {% else %}
-    {% assign products_to_render = product_handles_array %}
+    {% assign products_to_render = products_to_render | concat: filler_array %}
   {% endif %}
+
+  {%- comment -%}
+    DEBUG (optional): shows you counts in HTML comments
+    <!-- YMAL debug: collection={{ target_collection_handle }}, 
+         total_products={{ target_collection.products_count }}, 
+         price_candidates={{ all_candidates.size }}, 
+         final_render={{ products_to_render.size }} -->
+  {%- endcomment -%}
+
 {% endif %}
 
 {% comment %}
-  *** CONDITIONAL RENDERING START ***
-  The entire section only renders if we have products to show.
+  *** RENDERING ***
 {% endcomment %}
 {% if products_to_render.size > 0 %}
   <div class="you-may-also-like-section">
@@ -80,26 +194,24 @@
       .card__inner.color-scheme-2.gradient.ratio{border: 1px solid #ffffff !important;}
       .you-may-also-like-section{padding:0 1rem; padding-top: 3rem; padding-bottom:5rem; margin-bottom:20px; margin:0 auto;background-color:#f9f9f9}
       .you-may-also-like-section h2{text-align:center;font-size:20px;margin-bottom:0px}
-      /* Mobile Default: 2 columns */
+      
       .product-grid{display:grid;gap:1.5rem;grid-template-columns:repeat(2,1fr) !important}
+      
       @media (max-width:768px){
-        .product-grid{
-        gap:12px !important;
-        }
+        .product-grid{ gap:12px !important; }
         .you-may-also-like-section{padding:3rem 0rem}
         .you-may-also-like-section h2{ margin-top:0px}
       }
+      
       @media (min-width:768px){
           .you-may-also-like-section{padding-left:1.5rem;padding-right:1.5rem}
-      .you-may-also-like-section h2{text-align:center;font-size:24px;margin-bottom:0px}
-                  p.section-sub-heading{color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
-
-          /* Tablet: 3 columns */
+          .you-may-also-like-section h2{text-align:center;font-size:24px;margin-bottom:0px}
+          p.section-sub-heading{color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
           .product-grid{grid-template-columns:repeat(3,1fr) !important;gap:2rem}
       }
+      
       @media (min-width:1024px){
           .you-may-also-like-section{padding-left:2rem;padding-right:2rem; margin-bottom:30px;}
-          /* Desktop: 4 columns */
           .product-grid{grid-template-columns:repeat(4,1fr) !important}
       }
     </style>
@@ -110,14 +222,17 @@
         <p class="section-sub-heading">Other picks based on your interest</p>
 
         <div class="product-grid">
-          {% comment %}
-            Loop through the pre-calculated and rotated handles.
-          {% endcomment %}
           {% for product_handle in products_to_render %}
-            {% assign related_product = all_products[product_handle] %}
+            {% assign related_product = nil %}
+            
+            {%- for p in target_collection.products -%}
+              {% if p.handle == product_handle %}
+                {% assign related_product = p %}
+                {% break %}
+              {% endif %}
+            {%- endfor -%}
 
-            {% comment %}Ensure the product exists before rendering{% endcomment %}
-            {% if related_product != blank %}
+            {% if related_product %}
               <div
                 class="related-product-card"
                 data-handle="{{ related_product.handle }}"
@@ -128,7 +243,6 @@
                 onclick="
                   window.dataLayer = window.dataLayer || []; window.dataLayer.push({
                     'event': 'promoClick',
-
                       'promoClick': {
                           'promo_id': '{{ related_product.selected_or_first_available_variant.sku }}',
                           'creative_name': 'You May Also Like',
