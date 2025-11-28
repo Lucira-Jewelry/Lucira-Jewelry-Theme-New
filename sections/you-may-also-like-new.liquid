@@ -7,34 +7,23 @@
 {% assign current_price = product.price %}
 
 {% comment %}
-  2. DEFINE 5 PRICE TIERS (The Waterfall)
+  2. DEFINE PRICE TIERS (Waterfall)
 {% endcomment %}
 
-{% comment %} Tier 1: +/- 10% {% endcomment %}
 {% assign min_t1 = current_price | times: 0.9 %}
 {% assign max_t1 = current_price | times: 1.1 %}
 
-{% comment %} Tier 2: +/- 20% {% endcomment %}
 {% assign min_t2 = current_price | times: 0.8 %}
 {% assign max_t2 = current_price | times: 1.2 %}
 
-{% comment %} Tier 3: +/- 30% {% endcomment %}
 {% assign min_t3 = current_price | times: 0.7 %}
 {% assign max_t3 = current_price | times: 1.3 %}
 
-{% comment %} Tier 4: +/- 40% {% endcomment %}
 {% assign min_t4 = current_price | times: 0.6 %}
 {% assign max_t4 = current_price | times: 1.4 %}
 
-{% comment %} Tier 5: Safety Net (0.3x to 3.0x) - Fills remaining spots {% endcomment %}
 {% assign min_t5 = current_price | times: 0.3 %}
 {% assign max_t5 = current_price | times: 3.0 %}
-
-{% assign handles_tier1 = '' %}
-{% assign handles_tier2 = '' %}
-{% assign handles_tier3 = '' %}
-{% assign handles_tier4 = '' %}
-{% assign handles_tier5 = '' %}
 
 {% comment %}
   3. DETERMINE TARGET COLLECTION
@@ -51,20 +40,26 @@
 
 {% assign target_collection = collections[target_collection_handle] %}
 
+{% assign handles_tier1 = '' %}
+{% assign handles_tier2 = '' %}
+{% assign handles_tier3 = '' %}
+{% assign handles_tier4 = '' %}
+{% assign handles_tier5 = '' %}
+{% assign products_to_render = '' %}
+
 {% if target_collection != blank %}
-  
+
   {% comment %}
-    4. SORT PRODUCTS INTO EXCLUSIVE BUCKETS
+    4. SINGLE PASS → PUT PRODUCTS INTO TIERS (NO EARLY BREAK)
   {% endcomment %}
   {% for p in target_collection.products %}
     {% unless p.handle == current_product_handle %}
-      
       {% if p.price >= min_t1 and p.price <= max_t1 %}
         {% assign handles_tier1 = handles_tier1 | append: p.handle | append: ',' %}
-      
+
       {% elsif p.price >= min_t2 and p.price <= max_t2 %}
         {% assign handles_tier2 = handles_tier2 | append: p.handle | append: ',' %}
-      
+
       {% elsif p.price >= min_t3 and p.price <= max_t3 %}
         {% assign handles_tier3 = handles_tier3 | append: p.handle | append: ',' %}
 
@@ -73,115 +68,43 @@
 
       {% elsif p.price >= min_t5 and p.price <= max_t5 %}
         {% assign handles_tier5 = handles_tier5 | append: p.handle | append: ',' %}
-      
       {% endif %}
-
     {% endunless %}
   {% endfor %}
 
-  {% assign array_tier1 = handles_tier1 | split: ',' | compact %}
-  {% assign array_tier2 = handles_tier2 | split: ',' | compact %}
-  {% assign array_tier3 = handles_tier3 | split: ',' | compact %}
-  {% assign array_tier4 = handles_tier4 | split: ',' | compact %}
-  {% assign array_tier5 = handles_tier5 | split: ',' | compact %}
-  
   {% comment %}
-    5. ROTATE EACH TIER INDIVIDUALLY
+    5. STACK TIERS: T1 (closest price) → T2 → T3 → T4 → T5
   {% endcomment %}
-  {% assign id_as_string = product.id | append: '' %}
-  {% assign seed = id_as_string | slice: -3, 3 | plus: 0 %}
-
-  {% comment %} --- Rotate Tier 1 --- {% endcomment %}
-  {% assign s1 = array_tier1.size %}
-  {% if s1 > 0 %}
-    {% assign off1 = seed | modulo: s1 %}
-    {% assign t1_a = array_tier1 | slice: off1, s1 %}
-    {% assign t1_b = array_tier1 | slice: 0, off1 %}
-    {% assign final_tier1 = t1_a | concat: t1_b %}
-  {% else %}
-    {% assign final_tier1 = array_tier1 %}
-  {% endif %}
-
-  {% comment %} --- Rotate Tier 2 --- {% endcomment %}
-  {% assign s2 = array_tier2.size %}
-  {% if s2 > 0 %}
-    {% assign off2 = seed | modulo: s2 %}
-    {% assign t2_a = array_tier2 | slice: off2, s2 %}
-    {% assign t2_b = array_tier2 | slice: 0, off2 %}
-    {% assign final_tier2 = t2_a | concat: t2_b %}
-  {% else %}
-    {% assign final_tier2 = array_tier2 %}
-  {% endif %}
-
-  {% comment %} --- Rotate Tier 3 --- {% endcomment %}
-  {% assign s3 = array_tier3.size %}
-  {% if s3 > 0 %}
-    {% assign off3 = seed | modulo: s3 %}
-    {% assign t3_a = array_tier3 | slice: off3, s3 %}
-    {% assign t3_b = array_tier3 | slice: 0, off3 %}
-    {% assign final_tier3 = t3_a | concat: t3_b %}
-  {% else %}
-    {% assign final_tier3 = array_tier3 %}
-  {% endif %}
-
-  {% comment %} --- Rotate Tier 4 --- {% endcomment %}
-  {% assign s4 = array_tier4.size %}
-  {% if s4 > 0 %}
-    {% assign off4 = seed | modulo: s4 %}
-    {% assign t4_a = array_tier4 | slice: off4, s4 %}
-    {% assign t4_b = array_tier4 | slice: 0, off4 %}
-    {% assign final_tier4 = t4_a | concat: t4_b %}
-  {% else %}
-    {% assign final_tier4 = array_tier4 %}
-  {% endif %}
-
-  {% comment %} --- Rotate Tier 5 --- {% endcomment %}
-  {% assign s5 = array_tier5.size %}
-  {% if s5 > 0 %}
-    {% assign off5 = seed | modulo: s5 %}
-    {% assign t5_a = array_tier5 | slice: off5, s5 %}
-    {% assign t5_b = array_tier5 | slice: 0, off5 %}
-    {% assign final_tier5 = t5_a | concat: t5_b %}
-  {% else %}
-    {% assign final_tier5 = array_tier5 %}
-  {% endif %}
+  {% assign handles_all = handles_tier1 | append: handles_tier2 | append: handles_tier3 | append: handles_tier4 | append: handles_tier5 %}
+  {% assign products_to_render = handles_all | split: ',' | compact | slice: 0, max_products %}
 
   {% comment %}
-    6. STACK THE LAYERS
-  {% endcomment %}
-  {% assign all_candidates = final_tier1 | concat: final_tier2 | concat: final_tier3 | concat: final_tier4 | concat: final_tier5 %}
-  {% assign products_to_render = all_candidates | slice: 0, max_products %}
-
-  {% comment %}
-    7. FORCE-FILL TO max_products USING ANY OTHER PRODUCTS FROM COLLECTION
+    6. FALLBACK: FILL REMAINING SLOTS WITH ANY OTHER PRODUCTS FROM COLLECTION
   {% endcomment %}
   {% assign current_size = products_to_render.size %}
 
   {% if current_size < max_products %}
     {% assign extra_needed = max_products | minus: current_size %}
-    {% assign filler_handles = '' %}
+    {% assign added_extra = 0 %}
+    {% assign extra_handles = '' %}
 
-    {%- for p in target_collection.products -%}
+    {% for p in target_collection.products %}
+      {% if added_extra >= extra_needed %}
+        {% break %}
+      {% endif %}
+
       {% unless p.handle == current_product_handle or products_to_render contains p.handle %}
-        {% assign filler_handles = filler_handles | append: p.handle | append: ',' %}
+        {% assign extra_handles = extra_handles | append: p.handle | append: ',' %}
+        {% assign added_extra = added_extra | plus: 1 %}
       {% endunless %}
-    {%- endfor -%}
+    {% endfor %}
 
-    {% assign filler_array = filler_handles | split: ',' | compact %}
-    {% assign filler_array = filler_array | slice: 0, extra_needed %}
-
-    {% assign products_to_render = products_to_render | concat: filler_array %}
+    {% assign extra_array = extra_handles | split: ',' | compact %}
+    {% assign products_to_render = products_to_render | concat: extra_array %}
   {% endif %}
 
-  {%- comment -%}
-    DEBUG (optional): shows you counts in HTML comments
-    <!-- YMAL debug: collection={{ target_collection_handle }}, 
-         total_products={{ target_collection.products_count }}, 
-         price_candidates={{ all_candidates.size }}, 
-         final_render={{ products_to_render.size }} -->
-  {%- endcomment -%}
-
 {% endif %}
+
 
 {% comment %}
   *** RENDERING ***
@@ -225,12 +148,12 @@
           {% for product_handle in products_to_render %}
             {% assign related_product = nil %}
             
-            {%- for p in target_collection.products -%}
+            {% for p in target_collection.products %}
               {% if p.handle == product_handle %}
                 {% assign related_product = p %}
                 {% break %}
               {% endif %}
-            {%- endfor -%}
+            {% endfor %}
 
             {% if related_product %}
               <div
