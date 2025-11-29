@@ -1,9 +1,3 @@
-{% comment %}
-  Custom Collection Section with per-block facts
-  Desktop facts beside collection, scrollable, height matches product cards
-  Mobile facts under collection, with Read More
-  FIXED: Variant selection and image changing
-{% endcomment %}
 
 {%- assign skip_card_product_styles = false -%}
 
@@ -61,7 +55,7 @@
 </style>
 
 <div class="page-width">
-  <div class="chips_main">
+  {% comment %} <div class="chips_main">
     {% for block in section.blocks %}
       {% if block.type == 'collection_block' %}
         <div
@@ -72,7 +66,7 @@
         </div>
       {% endif %}
     {% endfor %}
-  </div>
+  </div> {% endcomment %}
 
   {% assign index = 0 %}
 
@@ -102,34 +96,133 @@
         </div>
 
         <div class="collection-left collection-left-inner">
+          {% comment %} Determine source type {% endcomment %}
+          {% assign source_type = block.settings.product_source | default: 'individual' %}
+          
+          {% comment %} Determine collection URL for View All button {% endcomment %}
           {% if block.settings.collection %}
-            {% assign custom_collection = block.settings.collection.products %}
+            {% assign collection_url = block.settings.collection.url %}
+          {% else %}
+            {% assign collection_url = '#' %}
+          {% endif %}
 
-            <div class="collection-products-grid">
-              {% for product in custom_collection limit: 4 %}
-                {% comment %} Generate unique card ID for each product {% endcomment %}
-                {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-' | append: forloop.index %}
-                
-                {% render 'card-product',
-                  card_product: product,
-                  media_aspect_ratio: section.settings.image_ratio,
-                  image_shape: section.settings.image_shape,
-                  show_secondary_image: section.settings.show_secondary_image,
-                  show_vendor: section.settings.show_vendor,
-                  show_rating: section.settings.show_rating,
-                  skip_styles: skip_card_product_styles,
-                  section_id: card_id,
-                  quick_add: section.settings.quick_add,
-                  forloop: forloop
-                %}
-              {% endfor %}
-            </div>
+          {% if source_type == 'individual' %}
+            {% comment %} Individual Products Mode - Direct rendering {% endcomment %}
+            {% assign product_count = 0 %}
+            {% if block.settings.product_1 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+            {% if block.settings.product_2 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+            {% if block.settings.product_3 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
 
-            <div class="view-all-wrapper">
-              <a href="{{ block.settings.collection.url }}" class="view-all-btn">
-                {{ block.settings.button_text }}
-              </a>
-            </div>
+            {% if product_count > 0 %}
+              <div class="collection-products-grid">
+                {% if block.settings.product_1 %}
+                  {% assign selected_product_1 = all_products[block.settings.product_1] %}
+                  {% if selected_product_1 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-1' %}
+                    {% render 'card-product',
+                      card_product: selected_product_1,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+
+                {% if block.settings.product_2 %}
+                  {% assign selected_product_2 = all_products[block.settings.product_2] %}
+                  {% if selected_product_2 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-2' %}
+                    {% render 'card-product',
+                      card_product: selected_product_2,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+
+                {% if block.settings.product_3 %}
+                  {% assign selected_product_3 = all_products[block.settings.product_3] %}
+                  {% if selected_product_3 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-3' %}
+                    {% render 'card-product',
+                      card_product: selected_product_3,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+              </div>
+
+              {% if collection_url != '#' %}
+                <div class="view-all-wrapper">
+                  <a href="{{ collection_url }}" class="view-all-btn">
+                    {{ block.settings.button_text }}
+                  </a>
+                </div>
+              {% endif %}
+            {% else %}
+              <p style="text-align: center; padding: 40px 0;">No products selected. Please select at least one product.</p>
+            {% endif %}
+
+          {% else %}
+            {% comment %} Collection Mode with Sorting {% endcomment %}
+            {% if block.settings.collection %}
+              {% assign sort_order = block.settings.price_sort | default: 'default' %}
+              
+              {% if sort_order == 'low_to_high' %}
+                {% assign sorted_products = block.settings.collection.products | sort: 'price' %}
+              {% elsif sort_order == 'high_to_low' %}
+                {% assign sorted_products = block.settings.collection.products | sort: 'price' | reverse %}
+              {% else %}
+                {% assign sorted_products = block.settings.collection.products %}
+              {% endif %}
+
+              <div class="collection-products-grid">
+                {% for product in sorted_products limit: 4 %}
+                  {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-' | append: forloop.index %}
+                  
+                  {% render 'card-product',
+                    card_product: product,
+                    media_aspect_ratio: section.settings.image_ratio,
+                    image_shape: section.settings.image_shape,
+                    show_secondary_image: section.settings.show_secondary_image,
+                    show_vendor: section.settings.show_vendor,
+                    show_rating: section.settings.show_rating,
+                    skip_styles: skip_card_product_styles,
+                    section_id: card_id,
+                    quick_add: section.settings.quick_add,
+                    forloop: forloop
+                  %}
+                {% endfor %}
+              </div>
+
+              {% if collection_url != '#' %}
+                <div class="view-all-wrapper">
+                  <a href="{{ collection_url }}" class="view-all-btn">
+                    {{ block.settings.button_text }}
+                  </a>
+                </div>
+              {% endif %}
+            {% else %}
+              <p style="text-align: center; padding: 40px 0;">No collection selected. Please select a collection.</p>
+            {% endif %}
           {% endif %}
         </div>
 
@@ -254,11 +347,93 @@
       "type": "collection_block",
       "name": "Collection Block",
       "settings": [
-        { "type": "collection", "id": "collection", "label": "Select Collection" },
-        { "type": "text", "id": "chips_text", "label": "Chips Name" },
-        { "type": "text", "id": "button_text", "label": "Button Text" },
-        { "type": "text", "id": "fact_heading", "label": "Fact Heading" },
-        { "type": "text", "id": "fact_text", "label": "Fact Text" }
+        {
+          "type": "header",
+          "content": "Product Source"
+        },
+        {
+          "type": "select",
+          "id": "product_source",
+          "label": "Choose Product Source",
+          "default": "individual",
+          "options": [
+            { "label": "Individual Products", "value": "individual" },
+            { "label": "Collection", "value": "collection" }
+          ]
+        },
+        {
+          "type": "header",
+          "content": "Individual Products"
+        },
+        {
+          "type": "paragraph",
+          "content": "Select up to 3 individual products (only used when 'Individual Products' is selected above)."
+        },
+        {
+          "type": "product",
+          "id": "product_1",
+          "label": "Product 1"
+        },
+        {
+          "type": "product",
+          "id": "product_2",
+          "label": "Product 2"
+        },
+        {
+          "type": "product",
+          "id": "product_3",
+          "label": "Product 3"
+        },
+        {
+          "type": "header",
+          "content": "Collection Settings"
+        },
+        {
+          "type": "paragraph",
+          "content": "Select a collection (only used when 'Collection' is selected above)."
+        },
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select Collection"
+        },
+        {
+          "type": "select",
+          "id": "price_sort",
+          "label": "Collection Price Sorting",
+          "info": "Only applies when using collection source",
+          "default": "default",
+          "options": [
+            { "label": "Default (Collection Order)", "value": "default" },
+            { "label": "Price: Low to High", "value": "low_to_high" },
+            { "label": "Price: High to Low", "value": "high_to_low" }
+          ]
+        },
+        {
+          "type": "header",
+          "content": "Display Settings"
+        },
+        {
+          "type": "text",
+          "id": "chips_text",
+          "label": "Chips Name"
+        },
+        {
+          "type": "text",
+          "id": "button_text",
+          "label": "Button Text",
+          "default": "View All"
+        },
+        {
+          "type": "text",
+          "id": "fact_heading",
+          "label": "Fact Heading"
+        },
+        {
+          "type": "textarea",
+          "id": "fact_text",
+          "label": "Fact Text"
+        }
       ]
     }
   ],
