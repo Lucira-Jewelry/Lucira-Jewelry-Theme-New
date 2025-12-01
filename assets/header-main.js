@@ -154,7 +154,7 @@ function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition 
   if (useTopRight && popup) {
     popup.style.position = 'fixed';
     popup.style.top = '115px';
-    popup.style.right = '80px';
+    popup.style.right = '50px';
     popup.style.left = 'auto';
     popup.style.transform = 'none';
     popup.style.margin = '0';
