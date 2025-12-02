@@ -1,0 +1,231 @@
+{% comment %} <button id="try-on-btn" class="try-on-btn">TRY ON</button>
+
+<!-- Camera Popup -->
+<div id="tryon-popup" style="display:none;">
+  <div style="
+    position: absolute;
+    width: 60vw;
+    height: 80vh;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    top: 0%;
+    right:50%;
+    z-index: 9999999;
+  ">
+    <video id="tryon-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+
+    <!-- Static Necklace Image -->
+    <img id="static-necklace" src="{{ product.featured_image | img_url: '500x' }}" 
+         style="
+           position: absolute;
+           width: 150px; /* adjust size */
+           top: 50%;
+           left: 50%;
+           transform: translate(-50%, 50%); /* roughly below chin */
+           pointer-events: none;
+           z-index: 10;
+         " />
+
+    <canvas id="tryon-canvas" style="position:absolute; top:0; left:0; width:100%; height:100%;"></canvas>
+    
+    <button onclick="closeTryOn()" style="position:absolute; top:10px; right:10px; background:red; color:white; border:none; padding:6px 10px; border-radius:6px; cursor:pointer;">✕</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+
+<script>
+let model, video, canvas, ctx;
+
+document.getElementById("try-on-btn").addEventListener("click", async () => {
+  document.getElementById("tryon-popup").style.display = "flex";
+
+  video = document.getElementById("tryon-video");
+  canvas = document.getElementById("tryon-canvas");
+  ctx = canvas.getContext("2d");
+
+  // Start camera
+  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  video.srcObject = stream;
+
+  video.onloadedmetadata = async () => {
+    video.play();
+
+    // Load FaceMesh model
+    model = await faceLandmarksDetection.load(
+      faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+    );
+
+    renderLoop();
+  };
+});
+
+async function renderLoop() {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height); // show video frame
+
+  if (!model) return requestAnimationFrame(renderLoop);
+
+  const predictions = await model.estimateFaces({ input: video });
+
+  if (predictions.length > 0) {
+    const keypoints = predictions[0].scaledMesh;
+    const jawLeft  = keypoints[234];
+    const jawRight = keypoints[454];
+    const chin     = keypoints[152];
+
+    const neckWidth = Math.abs(jawRight[0] - jawLeft[0]) * 1.1;
+    const neckX = ((jawLeft[0] + jawRight[0]) / 2) - neckWidth / 2;
+    const neckY = chin[1] + 10;
+
+    const necklaceImg = document.getElementById("static-necklace");
+    const aspect = necklaceImg.naturalHeight / necklaceImg.naturalWidth;
+    necklaceImg.style.width = neckWidth + "px";
+    necklaceImg.style.height = neckWidth * aspect + "px";
+    necklaceImg.style.left = neckX + "px";
+    necklaceImg.style.top = neckY + "px";
+  }
+
+  requestAnimationFrame(renderLoop);
+}
+
+function closeTryOn() {
+  document.getElementById("tryon-popup").style.display = "none";
+  let stream = video.srcObject;
+  if (stream) stream.getTracks().forEach(track => track.stop());
+}
+</script> {% endcomment %}
+<style>
+  button#try-on-btn {
+    background: #0064008a;
+    color: white;
+    border: 1px solid white;
+    padding: 10px 35px;
+    border-radius: 10px;
+  }  
+</style>
+
+<button id="try-on-btn" class="try-on-btn">TRY ON</button>
+
+<!-- Camera Popup -->
+<div id="tryon-popup" style="
+  display:none !important;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  z-index: 999999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+">  
+  <div style="  
+    position: relative;
+    width:55vw;
+    height: 70vh;
+    background: #000;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    top:10%;
+  ">
+    <!-- Video feed -->
+    <video id="tryon-video" autoplay playsinline style="width:100%; height:100%; object-fit:cover;"></video>
+
+    <!-- Necklace overlay -->
+    <img id="necklace-img" src="{{ product.featured_image | img_url: '500x' }}" 
+         style="
+           position: absolute;
+           width: 150px;
+           top: 50%;
+           left: 50%;
+           transform: translate(-50%, 50%);
+           pointer-events: none;
+           z-index: 10;
+         " />
+
+    <!-- Close button -->
+    <button onclick="closeTryOn()" style="
+      position:absolute; top:10px; right:10px;
+      background:red; color:white; border:none;
+      padding:6px 10px; border-radius:6px; cursor:pointer;
+    ">✕</button>
+  </div>
+</div>
+
+<!-- TensorFlow Face Landmarks -->
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.18.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/face-landmarks-detection"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  let video, necklaceImg, model;
+
+  const tryOnBtn = document.getElementById("try-on-btn");
+  const popup = document.getElementById("tryon-popup");
+
+  tryOnBtn.addEventListener("click", async () => {
+    popup.style.display = "flex";
+
+    video = document.getElementById("tryon-video");
+    necklaceImg = document.getElementById("necklace-img");
+
+    // Start camera
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      video.srcObject = stream;
+    } catch(err) {
+      alert("Camera access denied or not available. Make sure you allow camera permissions and use HTTPS.");
+      return;
+    }
+
+    // Load face landmarks model
+    model = await faceLandmarksDetection.load(
+      faceLandmarksDetection.SupportedPackages.mediapipeFacemesh
+    );
+
+    video.onloadedmetadata = () => video.play();
+    renderLoop();
+  });
+
+  async function renderLoop() {
+    if (!video.videoWidth) return requestAnimationFrame(renderLoop);
+
+    // Try face tracking
+    if (model) {
+      const predictions = await model.estimateFaces({ input: video });
+      if (predictions.length > 0) {
+        const keypoints = predictions[0].scaledMesh;
+
+        const jawLeft = keypoints[234];
+        const jawRight = keypoints[454];
+        const chin = keypoints[152];
+
+        const neckWidth = Math.abs(jawRight[0] - jawLeft[0]) * 1.1;
+        const neckHeight = neckWidth * (necklaceImg.naturalHeight / necklaceImg.naturalWidth);
+        const neckX = ((jawLeft[0] + jawRight[0]) / 2) - neckWidth / 2;
+        const neckY = chin[1] + 10;
+
+        necklaceImg.style.width = neckWidth + "px";
+        necklaceImg.style.height = neckHeight + "px";
+        necklaceImg.style.left = neckX + "px";
+        necklaceImg.style.top = neckY + "px";
+      }
+    }
+
+    requestAnimationFrame(renderLoop);
+  }
+
+  window.closeTryOn = () => {
+    popup.style.display = "none";
+    if (video && video.srcObject) {
+      video.srcObject.getTracks().forEach(track => track.stop());
+    }
+  };
+});
+</script>

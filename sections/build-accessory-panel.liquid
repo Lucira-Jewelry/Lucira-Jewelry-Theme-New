@@ -1,0 +1,330 @@
+{{ 'build-accessory-panel.css' | asset_url | stylesheet_tag }}
+<script src="{{ 'build-accessory-panel.js' | asset_url }}" defer="defer"></script>
+<script src="{{ 'konva.min.js' | asset_url }}" defer="defer"></script>
+
+<div
+  id="lucira-accessory-fullscreen"
+  class="lucira-accessory-fullscreen"
+  aria-hidden="true"
+  style="display:none;"
+  data-base-collections="{{ product.collections | map: 'handle' | join: ',' }}"
+  data-product-handle="{{ product.handle }}"
+>
+  <div class="lucira-full-inner">
+    <main class="lucira-full-main">
+      <section class="lucira-left">
+        <div class="variant-card">
+          <div class="variant-img-wrap">
+            <div
+              id="vis-Visualiser_Canvas"
+              style="width:100%; height:100%; position:relative;"
+            ></div>
+          </div>
+        </div>
+
+        <div class="variant-zoom-controls">
+          <button type="button" id="zoom-out" aria-label="Zoom out">
+            {% render 'zoomout_svg' %}
+          </button>
+
+          <input
+            id="zoom-range"
+            type="range"
+            min="0.5"
+            max="2"
+            step="0.01"
+            value="1"
+          >
+
+          <button type="button" id="zoom-in" aria-label="Zoom in">
+            {% render 'zoomin_svg' %}
+          </button>
+        </div>
+      </section>
+
+      <section class="lucira-right-split">
+        <div class="right-split-inner">
+          <div class="grids-column scrollable">
+
+            <div id="lf-color-filter">
+              <span id="lf-active-dot" aria-hidden="true"></span>
+              <span id="lf-color-name">All Metals</span>
+              <div class="lf-dots" id="lf-dots"></div>
+            </div>
+
+            <div class="charms-grids-wrapper" id="lf-charms-grids-wrapper">
+              {% for block in section.blocks %}
+                {% assign coll = collections[block.settings.collection] %}
+
+                <div
+                  class="charms-grid-container {% if forloop.first %}active{% endif %}"
+                  id="collection-grid-{{ block.id }}"
+                  data-collection-handle="{{ coll.handle }}"
+                  {% unless forloop.first %}
+                    style="display:none"
+                  {% endunless %}
+                >
+                  {% if coll and coll.products_count > 0 %}
+                    <div class="charms-grid" data-original-value="" role="list">
+                      {% for p in coll.products %}
+                        {% assign kt_list = '' %}
+
+                        {% for v in p.variants %}
+                          {% assign variant_kt = '' %}
+
+                          {% if v.option1 and v.option1 contains 'KT' %}
+                            {% assign variant_kt = v.option1 | upcase | replace: ' ', '' %}
+                          {% elsif v.option2 and v.option2 contains 'KT' %}
+                            {% assign variant_kt = v.option2 | upcase | replace: ' ', '' %}
+                          {% elsif v.option3 and v.option3 contains 'KT' %}
+                            {% assign variant_kt = v.option3 | upcase | replace: ' ', '' %}
+                          {% elsif v.title and v.title contains 'KT' %}
+                            {% assign parts = v.title | upcase | split: ' ' %}
+                            {% for part in parts %}
+                              {% if part contains 'KT' %}
+                                {% assign variant_kt = part | replace: ' ', '' %}
+                              {% endif %}
+                            {% endfor %}
+                          {% endif %}
+
+                          {% if variant_kt != '' %}
+                            {% unless kt_list contains variant_kt %}
+                              {% assign kt_list = kt_list | append: variant_kt | append: ',' %}
+                            {% endunless %}
+                          {% endif %}
+
+                          {% assign kt_list = kt_list | strip %}
+
+                          <article
+                            class="charm-card custom-charm-grid"
+                            data-meta-diamond-weight="{{ v.metafields.custom.diamond_1_weight }}"
+                            data-meta-metal-weight="{{ v.metafields.custom.metal_weight }}"
+                            data-product-handle="{{ v.handle }}"
+                            data-product-id="{{ v.id }}"
+                            data-price="{{ v.price }}"
+                            data-compare-price="{{ v.compare_at_price }}"
+                            data-carat="{{ kt_list }}"
+                            data-title="{{ v.title }}"
+                          >
+                            <div class="charm-thumb-wrap">
+                              <img
+                                src="{{ v.featured_image | img_url: '400x' }}"
+                                width="auto"
+                                height="auto"
+                                loading="lazy"
+                                alt="{{ v.title }}"
+                              >
+                            </div>
+
+                            <div class="charm-info">
+                              <div class="charm-qty" aria-label="Quantity selector">
+                                <button
+                                  type="button"
+                                  class="qty-btn qty-decr"
+                                  aria-label="Decrease"
+                                >−</button>
+
+                                <input
+                                  type="text"
+                                  class="qty-input"
+                                  value="0"
+                                  readonly
+                                  aria-live="polite"
+                                >
+
+                                <button
+                                  type="button"
+                                  class="qty-btn qty-incr"
+                                  aria-label="Increase"
+                                >+</button>
+                              </div>
+
+                              <div class="charm-title">
+                                {{ v.title | truncate: 30 }}
+                              </div>
+
+                              <div class="price-title-row">
+                                <div class="price-wrap">
+                                  {% if v.compare_at_price and v.compare_at_price > v.price %}
+                                    <div class="charm-price">
+                                      <span class="new-price">
+                                        {{ v.price | money }}
+                                      </span>
+                                      <span class="old-price">
+                                        <s>{{ v.compare_at_price | money }}</s>
+                                      </span>
+                                    </div>
+                                  {% else %}
+                                    <div class="charm-price">
+                                      <span class="new-price">
+                                        {{ v.price | money }}
+                                      </span>
+                                    </div>
+                                  {% endif %}
+                                </div>
+
+                                <a
+                                  href="#"
+                                  class="view-details"
+                                  data-variant-id="{{ v.id }}"
+                                >
+                                  {% render 'view-details_icon' %}
+                                </a>
+                              </div>
+
+                              {%- assign _heading = v.metafields.custom.heading.value | default: v.title -%}
+                              {%- assign _desc = v.metafields.custom.description.value | default: '' -%}
+                              {%- assign _img_url = '' -%}
+
+                              {%- if v.metafields.custom.detail_image != blank -%}
+                                {%- assign _img_url = v.metafields.custom.detail_image | image_url: width: 1200 -%}
+                              {%- elsif v.featured_image -%}
+                                {%- assign _img_url = v.featured_image | img_url: '1200x' -%}
+                              {%- endif -%}
+
+                              <script
+                                type="application/json"
+                                id="variant-meta-{{ v.id }}"
+                              >
+                                {
+                                  "id": {{ v.id | json }},
+                                  "heading": {{ _heading | json }},
+                                  "description": {{ _desc | json }},
+                                  "image": {{ _img_url | json }}
+                                }
+                              </script>
+                            </div>
+                          </article>
+
+                          <script
+                            type="application/json"
+                            id="product-json-{{ v.id }}"
+                          >
+                            {{ v | json }}
+                          </script>
+                        {% endfor %}
+                      {% endfor %}
+                    </div>
+                  {% else %}
+                    <div class="no-collection">No products in this collection.</div>
+                  {% endif %}
+                </div>
+              {% endfor %}
+            </div>
+
+            <div class="cta-footer">
+              <button id="lf-total-cta">PROCEED : —</button>
+            </div>
+          </div>
+
+          <aside class="tiles-column scrollable" id="lf-collection-tiles">
+            <div class="title_coll_container">
+              {% for block in section.blocks %}
+                {% assign coll = collections[block.settings.collection] %}
+
+                <div class="main-collection-tile-div">
+                  <button
+                    class="collection-tile {% if forloop.first %}active{% endif %}"
+                    role="tab"
+                    aria-selected="{% if forloop.first %}true{% else %}false{% endif %}"
+                    tabindex="0"
+                    onclick="setActiveCollectionById(this.dataset.target)"
+                    data-target="collection-grid-{{ block.id }}"
+                    data-collection-handle="{{ coll.handle }}"
+                  >
+                    <div class="ct-title">{{ coll.title }}</div>
+                    <div class="ct-qty" aria-hidden="true">()</div>
+
+                    {% if section.settings.show_collection_count %}
+                      <p class="plp-collection-banner__count">
+                        <small>
+                          <span class="ct-visible-count">0</span> options
+                          <span class="ct-icon ct-mobile-only">
+                            <svg
+                              width="14"
+                              height="14"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                            >
+                              <polyline points="6 9 12 15 18 9"></polyline>
+                            </svg>
+                          </span>
+                        </small>
+                      </p>
+                    {% endif %}
+                  </button>
+                </div>
+              {% endfor %}
+            </div>
+          </aside>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  {% render 'pricebraekup-drawer' %}
+</div>
+
+{% if page.handle == 'bracelet-custom-functionality' %}
+  <style>
+    footer,
+    .shopify-section-footer,
+    .popular-searches-wrapper,
+    #popular-searches,
+    .popular-searches,
+    .popular-searches-section {
+      display: none !important;
+    }
+    .utility-bar {
+      display: none;
+    }
+  </style>
+
+  <script>
+    if (document.querySelector('.shopify-section-group-header-group #popupOverlay')) {
+      document.querySelector('.shopify-section-group-header-group #popupOverlay').parentNode.style.display = 'none';
+    }
+  </script>
+{% endif %}
+
+{% comment %}
+  <script src="https://unpkg.com/konva@9.3.0/konva.min.js"></script>
+{% endcomment %}
+
+{% render 'View_button' %}
+
+{% schema %}
+{
+  "name": "Build Accessory panel",
+  "settings": [
+    {
+      "type": "checkbox",
+      "id": "show_collection_count",
+      "label": "Show Product Count",
+      "default": true
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection_block",
+      "name": "Collection",
+      "settings": [
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Choose collection"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "panel"
+    }
+  ]
+}
+{% endschema %}

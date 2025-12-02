@@ -5,14 +5,6 @@ class CartRemoveButton extends HTMLElement {
     this.addEventListener('click', (event) => {
       event.preventDefault();
       const cartItems = this.closest('cart-items') || this.closest('cart-drawer-items');
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'removeFromCart',
-        'products':{
-        ...this.dataset,
-        }
-      })
-
       cartItems.updateQuantity(this.dataset.index, 0, event);
     });
   }
@@ -68,17 +60,7 @@ class CartItems extends HTMLElement {
     const index = event.target.dataset.index;
     let message = '';
 
-    if (inputValue === 0) {
-      // 0 quantity means remove the item
-      this.updateQuantity(
-        index,
-        0,
-        event,
-        document.activeElement.getAttribute('name'),
-        event.target.dataset.quantityVariantId
-      );
-      return;
-    } else if (inputValue < event.target.dataset.min) {
+    if (inputValue < event.target.dataset.min) {
       message = window.quickOrderListStrings.min_error.replace('[min]', event.target.dataset.min);
     } else if (inputValue > parseInt(event.target.max)) {
       message = window.quickOrderListStrings.max_error.replace('[max]', event.target.max);
@@ -310,3 +292,65 @@ if (!customElements.get('cart-note')) {
     }
   );
 }
+
+// view breakup button
+
+ function getChildRowsForParent(parentRow) {
+    const children = [];
+    if (!parentRow) return children;
+
+    let next = parentRow.nextElementSibling;
+    while (next && next.classList.contains('cart-item__nested-line')) {
+      children.push(next);
+      next = next.nextElementSibling;
+    }
+    return children;
+  }
+
+  function setBreakupState(btn, open) {
+    const parentRowId = btn.getAttribute('data-parent-row');
+    const parentRow = document.getElementById(parentRowId);
+    if (!parentRow) return;
+
+    const children = getChildRowsForParent(parentRow);
+    children.forEach(row => {
+      if (open) {
+        row.classList.remove('hidden-child');
+      } else {
+        row.classList.add('hidden-child');
+      }
+    });
+    btn.dataset.breakupOpen = open ? 'true' : 'false';
+
+    const label = btn.querySelector('.cart-breakup-toggle__label');
+    if (label) {
+      label.textContent = open ? 'Hide breakup' : 'View breakup';
+    }
+
+    btn.classList.toggle('is-open', open);
+  }
+
+  function initCartBreakupToggle() {
+    const buttons = document.querySelectorAll('.cart-breakup-toggle');
+    if (!buttons.length) return;
+
+    buttons.forEach((btn) => {
+      if (btn.dataset.breakupInit === 'true') return;
+      btn.dataset.breakupInit = 'true';
+
+      setBreakupState(btn, false);
+
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const isOpen = btn.dataset.breakupOpen === 'true';
+        setBreakupState(btn, !isOpen);
+      });
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', initCartBreakupToggle);
+  document.addEventListener('shopify:section:load', initCartBreakupToggle);
+  document.addEventListener('cart:refresh', initCartBreakupToggle);
+  document.addEventListener('cart:updated', initCartBreakupToggle); 
