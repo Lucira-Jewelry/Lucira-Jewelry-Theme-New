@@ -99,31 +99,10 @@ function switchMenu(newMenu) {
 
 let popupTimer;
 let progressTimer;
-let lottieEl;
-let scrollPlayTriggered = false;
 
 let hasShownPopup = sessionStorage.getItem('popupShown') === 'true';
 let hasBeenManuallyOpened = sessionStorage.getItem('popupManuallyOpened') === 'true';
 let hasShownAutoPopupInSession = sessionStorage.getItem('autoPopupShownInSession') === 'true';
-
-function pauseLottieAnimation() {
-  if (lottieEl && typeof lottieEl.pause === 'function') {
-    lottieEl.pause();
-  }
-}
-
-function playLottieAnimation() {
-  if (lottieEl && typeof lottieEl.play === 'function') {
-    lottieEl.play();
-  }
-}
-
-function playLottieThenPauseAfter(seconds = 5) {
-  playLottieAnimation();
-  setTimeout(() => {
-    pauseLottieAnimation();
-  }, seconds * 1000);
-}
 
 function isHomePage() {
   const path = window.location.pathname;
@@ -140,17 +119,16 @@ function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition 
   const isMobile = window.innerWidth < 768;
   const useTopRight = forceHeaderPosition && !isMobile;
 
-    if (forceHeaderPosition) {
-      window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'promoClick',
-          promoClick: {
-            creative_name: 'Annocement Clicked'
-          }
-      });
+  if (forceHeaderPosition) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name: 'Annocement Clicked'
+      }
+    });
   }
 
-  
   if (useTopRight && popup) {
     popup.style.position = 'fixed';
     popup.style.top = '115px';
@@ -170,11 +148,11 @@ function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition 
   }
 
   overlay.classList.add('active');
-  document.body.classList.add('no-scroll'); // ✅ Disable background scroll
+  document.body.classList.add('no-scroll'); // Disable background scroll
 
   if (iconButton) {
     iconButton.classList.add('active');
-    iconButton.classList.add('opened'); // ✅ Add opened class
+    iconButton.classList.add('opened'); // Add opened class
   }
 
   if (withTimer) {
@@ -198,28 +176,24 @@ function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition 
     if (progressContainer) progressContainer.style.display = 'none';
     progressBar.style.width = '0%';
   }
-
-  pauseLottieAnimation(); // Stop animation when popup opens
 }
 
 function closePopup() {
   const overlay = document.getElementById('popupOverlay');
   const iconButton = document.getElementById('popupIconButton');
   overlay.classList.remove('active');
-  document.body.classList.remove('no-scroll'); // ✅ Re-enable scroll
+  document.body.classList.remove('no-scroll'); // Re-enable scroll
 
   if (iconButton) {
     iconButton.classList.remove('active');
-    iconButton.classList.remove('opened'); // ✅ Remove opened class
+    iconButton.classList.remove('opened'); // Remove opened class
   }
 
-  pauseLottieAnimation();
   clearTimeout(popupTimer);
   clearInterval(progressTimer);
 }
 
 function togglePopup() {
-
   window.dataLayer = window.dataLayer || [];
   window.dataLayer.push({
     event: "promoClick",
@@ -241,13 +215,11 @@ function togglePopup() {
     sessionStorage.setItem('popupShown', 'true');
 
     showPopup(false);
-    pauseLottieAnimation(); // Stop Lottie when manually triggered
   }
 }
 
 document.addEventListener('DOMContentLoaded', function () {
   const iconButton = document.getElementById('popupIconButton');
-  lottieEl = document.getElementById('announcementLottie'); // ✅ Assign lottie player
 
   if (iconButton) {
     iconButton.style.display = 'none';
@@ -277,39 +249,19 @@ document.addEventListener('DOMContentLoaded', function () {
         iconButton.style.opacity = '1';
       }
 
-      if (!scrollPlayTriggered && !isPopupActive) {
-        playLottieThenPauseAfter(5);
-        scrollPlayTriggered = true;
-      }
-
-      if (isHomePage() && !hasShownAutoPopupInSession && !hasBeenManuallyOpened) {
-        showPopup(true);
-        hasShownAutoPopupInSession = true;
-        sessionStorage.setItem('autoPopupShownInSession', 'true');
-        hasShownPopup = true;
-        sessionStorage.setItem('popupShown', 'true');
-      }
+      // autopopup on scroll removed per request:
+      // no automatic showPopup here anymore
     } else {
       if (iconButton) {
         iconButton.style.display = 'none';
         iconButton.style.visibility = 'hidden';
         iconButton.style.opacity = '0';
       }
-      pauseLottieAnimation();
-      scrollPlayTriggered = false; // ✅ Allow re-trigger after scroll up
+
+      // nothing related to lottie or auto-popup
     }
   });
 });
-
-function resetPopupTrigger() {
-  hasShownPopup = false;
-  hasBeenManuallyOpened = false;
-  hasShownAutoPopupInSession = false;
-  sessionStorage.removeItem('popupShown');
-  sessionStorage.removeItem('popupManuallyOpened');
-  sessionStorage.removeItem('autoPopupShownInSession');
-}
-
 
 document.addEventListener("DOMContentLoaded", function () {
   const stickyHeader = document.querySelector("sticky-header");
