@@ -1,19 +1,3 @@
-document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
-  anchor.addEventListener("click", function (e) {
-    e.preventDefault();
-    const targetId = this.getAttribute("href").substring(1);
-    if (targetId === "") {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    const targetElement = document.getElementById(targetId);
-    if (targetElement) {
-      const y =
-        targetElement.getBoundingClientRect().top + window.pageYOffset + -100;
-      window.scrollTo({ top: y, behavior: "smooth" });
-    }
-  });
-});
 
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
@@ -43,57 +27,20 @@ document.addEventListener("DOMContentLoaded", function() {
 });
 
 jQuery(document).ready(function () {
-  // Append Font Awesome icon to each accordion title
-  jQuery(".accordion .accordion-title").append('<i class="accordion-icon fa fa-plus"></i>');
-
-  jQuery(".accordion .accordion-title").click(function () {
-    const icon = jQuery(this).find(".accordion-icon");
-
-    // Toggle active class
-    jQuery(this).toggleClass("active");
-
-    // Toggle content
-    jQuery(this).next(".accordion-content").slideToggle();
-
-    // Toggle icon class
-    if (jQuery(this).hasClass("active")) {
-      icon.removeClass("fa-plus").addClass("fa-times");
-    } else {
-      icon.removeClass("fa-times").addClass("fa-plus");
-    }
-  });
-});
-
-document.addEventListener('DOMContentLoaded', () => {
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const img = entry.target;
-        img.src = img.dataset.src;
-        observer.unobserve(img);
-      }
-    });
-  });
-  document.querySelectorAll('img[data-src]').forEach(img => observer.observe(img));
-});
-
-jQuery(document).ready(function () {
-  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").append(
-    "<i class='fa fa-angle-down accordion-icon' aria-hidden='true'></i>"
+  jQuery(".accordion .accordion-title").append(
+    "<i class='fa fa-plus accordion-icon' aria-hidden='true'></i>"
   );
   
-  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").click(function () {
+  jQuery(".accordion .accordion-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
     
     if (jQuery(this).hasClass("active")) {
       jQuery(this).removeClass("active");
-      icon.removeClass("fa-angle-up").addClass("fa-angle-down");
     } else {
       jQuery(this).addClass("active");
-      icon.removeClass("fa-angle-down").addClass("fa-angle-up");
     }
     
-    jQuery(this).next(".pdp-details-accordion-item-content").slideToggle();
+    jQuery(this).next(".accordion .accordion-content").slideToggle();
   });
 });
 
@@ -109,7 +56,7 @@ $(document).ready(function () {
         $(".lucira-accordion-toggle").removeClass("active")
           .off("click")
           .find(".lucira-accordion-icon")
-          .html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+          .html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
         initialized = false;
       }
       return;
@@ -141,7 +88,7 @@ $(document).ready(function () {
           paddingTop: "0",
           paddingBottom: "0"
         });
-        $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+        $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
       }
 
       $toggle.on("click", function () {
@@ -158,7 +105,7 @@ $(document).ready(function () {
             }, 300, function () {
               $otherContent.css("overflow", "hidden");
             });
-            $el.find(".lucira-accordion-icon").html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+            $el.find(".lucira-accordion-icon").html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
           }
         });
 
@@ -174,7 +121,7 @@ $(document).ready(function () {
           }, 300, function () {
             $content.css("overflow", "hidden");
           });
-          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/add_circle.svg?v=1753965140" width="auto" height="auto">');
         } else {
           const naturalHeight = $content.css({ height: "auto", paddingTop: "12px", paddingBottom: "12px" }).outerHeight();
 
@@ -197,7 +144,7 @@ $(document).ready(function () {
           });
 
           $toggle.addClass("active");
-          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-minus"></use></svg>');
+          $icon.html('<img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/minus.svg?v=1753965750" width="auto" height="auto">');
         }
       });
     });
@@ -230,5 +177,3 @@ $(document).ready(function(){
       ]
     });
   });
-
-

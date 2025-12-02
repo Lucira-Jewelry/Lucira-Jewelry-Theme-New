@@ -20,13 +20,7 @@
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
-{%- if option.name == 'Size' -%}
-  {%- assign sorted_values = option.values | sort -%}
-{%- else -%}
-  {%- assign sorted_values = option.values -%}
-{%- endif -%}
-
-{%- for value in sorted_values -%}
+{%- for value in option.values -%}
   {%- liquid
     assign swatch_focal_point = null
     if value.swatch.image
@@ -64,11 +58,6 @@
     </span>
   {%- endcapture -%}
 
-  {%- assign is_default_selected = false -%}
-  {%- if value == '12' and option.selected_value == blank -%}
-    {%- assign is_default_selected = true -%}
-  {%- endif -%}
-
   {%- if picker_type == 'swatch' -%}
     {%- capture help_text -%}
       <span class="visually-hidden">{{ value | escape }}</span>
@@ -81,7 +70,7 @@
       value: value | escape,
       swatch: value.swatch,
       product_form_id: product_form_id,
-      checked: value.selected or is_default_selected,
+      checked: value.selected,
       visually_disabled: option_disabled,
       shape: block.settings.swatch_shape,
       help_text: help_text,
@@ -94,16 +83,9 @@
       name="{{ input_name | escape }}"
       value="{{ value | escape }}"
       form="{{ product_form_id }}"
-      {% if value.selected or is_default_selected %}
-        checked
-      {% endif %}
-      {% if option_disabled %}
-        class="disabled"
-      {% endif %}
+      {% if value.selected %}checked{% endif %}
+      {% if option_disabled %}class="disabled"{% endif %}
       {{ input_dataset }}
-      {% if option.name == 'Color' %}
-        onchange="updateSizeStockStatus(this.value)"
-      {% endif %}
     >
 
     <label for="{{ input_id }}" class="variant-label">
@@ -120,75 +102,24 @@
           {%- endif -%}
         </span>
       {%- endif -%}
-
-      {%- if option.name == 'Color' -%}
-        {% assign color_in_stock = false %}
-        {% for variant in product.variants %}
-          {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
-            {% assign color_in_stock = true %}
-            {% break %}
-          {% endif %}
-        {% endfor %}
-
-        <span class="variant-text">
-          {%- assign parts = value | split: ' ' -%}
-          <span class="variant-karat">{{ parts[0] }}</span>
-          {{ parts[1] }}
-          {{ parts[2] }}
-          <span class="Variant_Stock_Status">
-            {% if color_in_stock %}
-              <span class="stock-active">In Stock</span>
-            {% else %}
-              Made to Order
-            {% endif %}
-          </span>
-          {{ label_unavailable }}
-        </span>
-
-      {%- elsif option.name == 'Size' -%}
-        {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-        {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
-
-        <span class="variant-text" style="display: inline-block !important;">
-          {{ value }}
-          <span class="Variant_Stock_Status" data-size="{{ value }}">
-            {% if current_variant and current_variant.available %}
-              {% if current_variant.inventory_quantity > 0 %}
-                <span class="stock-active">In Stock</span>
-              {% endif %}
-            {% endif %}
-          </span>
-          {{ label_unavailable }}
-        </span>
-        
-        {%- comment -%}Store variant data for each color-size combination{%- endcomment -%}
-        {% for variant in product.variants %}
-          {% if variant.option2 == value %}
-            <script>
-              if (!window.variantStockData) window.variantStockData = {};
-              if (!window.variantStockData['{{ variant.option1 }}']) window.variantStockData['{{ variant.option1 }}'] = {};
-              window.variantStockData['{{ variant.option1 }}']['{{ variant.option2 }}'] = {
-                available: {{ variant.available }},
-                inventory: {{ variant.inventory_quantity | default: 0 }}
-              };
-            </script>
-          {% endif %}
-        {% endfor %}
-
-
+      {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+      <span class="variant-text">
+        {%- assign parts = value | split: ' ' -%}
+        <span class="variant-karat">{{ parts[0] }}</span>
+        {{ parts[1] }} {{ parts[2] }}
+        {{ label_unavailable }}
+      </span>
       {%- else -%}
-        <span class="variant-text">
-          {{ value }}
-          {{ label_unavailable }}
-        </span>
+        <span class="variant-text"> {{ value }}{{ label_unavailable }} </span>
       {%- endif -%}
     </label>
 
+          
   {%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
     <option
       id="{{ input_id }}"
       value="{{ value | escape }}"
-      {% if value.selected or is_default_selected %}
+      {% if value.selected %}
         selected="selected"
       {% endif %}
       {% if swatch_value and picker_type == 'swatch_dropdown' %}
@@ -207,52 +138,3 @@
     </option>
   {%- endif -%}
 {%- endfor -%}
-
-<script>
-  window.variantStockData = window.variantStockData || {};
-  {% for v in product.variants %}
-    window.variantStockData['{{ v.option1 | escape }}'] = window.variantStockData['{{ v.option1 | escape }}'] || {};
-    window.variantStockData['{{ v.option1 | escape }}']['{{ v.option2 | escape }}'] = {
-      available: {{ v.available | json }},
-      inventory: {{ v.inventory_quantity | default: 0 | json }}
-    };
-  {% endfor %}
-
-  function updateSizeStockStatus(colorValue) {
-    document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(function(el) {
-      var size = el.getAttribute('data-size');
-      var stock = (window.variantStockData[colorValue] || {})[size];
-      
-      // Clear any old text
-      el.innerHTML = '';
-
-      // Show "In Stock" only when available and inventory > 0
-      if (stock && stock.available && Number(stock.inventory) > 0) {
-        el.innerHTML = '<span class="stock-active">In Stock</span>';
-      }
-
-      // Optional: visually disable unavailable sizes (uncomment if needed)
-      /*
-      var sizeInput = document.querySelector('input[name^="Size"][value="'+ size +'"]');
-      if (sizeInput) sizeInput.disabled = !(stock && stock.available);
-      */
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-    // Initial render based on current selected color
-    updateSizeStockStatus('{{ product.selected_or_first_available_variant.option1 | escape }}');
-
-    // Trigger update when color changes (radio buttons)
-    document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
-      radio.addEventListener('change', function(){ updateSizeStockStatus(this.value); });
-    });
-
-    // Also react to Shopify variant:change event (Dawn theme support)
-    document.addEventListener('variant:change', function (evt) {
-      if (evt.detail && evt.detail.variant) {
-        updateSizeStockStatus(evt.detail.variant.option1);
-      }
-    });
-  });
-</script>

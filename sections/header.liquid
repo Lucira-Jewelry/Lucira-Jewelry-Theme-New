@@ -1,6 +1,6 @@
-{{ 'component-list-menu.css' | asset_url | stylesheet_tag: preload: true }}
-{{ 'component-search.css' | asset_url | stylesheet_tag: preload: true }}
-{{ 'component-menu-drawer.css' | asset_url | stylesheet_tag: preload: true }}
+{{ 'component-list-menu.css' | asset_url | stylesheet_tag }}
+{{ 'component-search.css' | asset_url | stylesheet_tag }}
+{{ 'component-menu-drawer.css' | asset_url | stylesheet_tag }}
 
 <link
   rel="stylesheet"
@@ -8,6 +8,10 @@
   media="print"
   onload="this.media='all'"
 >
+
+{%- if settings.predictive_search_enabled -%}
+  <link rel="stylesheet" href="{{ 'component-price.css' | asset_url }}" media="print" onload="this.media='all'">
+{%- endif -%}
 
 {%- if section.settings.menu_type_desktop == 'mega' -%}
   <link rel="stylesheet" href="{{ 'component-mega-menu.css' | asset_url }}" media="print" onload="this.media='all'">
@@ -48,7 +52,9 @@
     flex-wrap: wrap;
   }
 
-  
+  summary.list-menu__item {
+    padding-right: 0; padding-left: 0; margin-left: 12px; margin-right: 20px;
+  }
 
   .list-menu__item {
     display: flex;
@@ -108,33 +114,28 @@
 {% liquid
   assign header_tag = 'div'
 
-  if section.settings.sticky_header_type != 'none' and page.template_suffix != 'purpose-and-value'
+  if section.settings.sticky_header_type != 'none'
     assign header_tag = 'sticky-header'
   endif
 %}
 
-  {% if section.settings.sticky_header_type != 'none' and request.page_type != 'product' or page.template_suffix != 'purpose-and-value' %}
-    <style>
-      .header__inline-menu.desktop-menu .small-logo {
-        display: none;
-      }
-    </style>
-  {% endif %}
-
-
   {%- assign transparent_enabled = false -%}
 
-  {%- if request.page_type == 'index' and section.settings.transparent_homepage -%}
-  {%- assign transparent_enabled = true -%}
-  {%- elsif section.settings.transparent_header -%}
-    {%- if page.template_suffix == 'purpose-and-value' -%}
-      {%- assign transparent_enabled = true -%}
-    {% comment %} {%- elsif collection.template_suffix == 'hexa' -%}
-      {%- assign transparent_enabled = true -%} {% endcomment %}
-    {%- elsif request.page_type == 'product' and section.settings.transparent_products contains product.id -%}
-      {%- assign transparent_enabled = true -%}
-    {%- endif -%}
+  {%- assign page_handles = section.settings.transparent_pages | split: ',' | map: 'strip' -%}
+  {%- assign collection_handles = section.settings.transparent_collections | split: ',' | map: 'strip' -%}
+  {%- assign product_handles = section.settings.transparent_products | split: ',' | map: 'strip' -%}
+
+  {%- if request.page_type == 'index' -%}
+    {%- assign transparent_enabled = true -%}
+  {%- elsif request.page_type == 'page' and page_handles contains page.handle -%}
+    {%- assign transparent_enabled = true -%}
+  {%- elsif request.page_type == 'collection' and collection_handles contains collection.handle -%}
+    {%- assign transparent_enabled = true -%}
+  {%- elsif request.page_type == 'product' and product_handles contains product.handle -%}
+    {%- assign transparent_enabled = true -%}
   {%- endif -%}
+
+
 
 
   <{{ header_tag }}
@@ -280,7 +281,7 @@
         {%- if shop.customer_accounts_enabled -%}
           <a
             href="{%- if customer -%}{{ routes.account_url }}{%- else -%}{{ routes.account_login_url }}{%- endif -%}"
-            class="header__icon header__icon--account link focus-inset{% if section.settings.menu != blank %} {% endif %}"
+            class="header__icon header__icon--account link focus-inset{% if section.settings.menu != blank %} small-hide{% endif %}"
             rel="nofollow"
           >
             {%- if section.settings.enable_customer_avatar -%}
@@ -288,7 +289,7 @@
                 {%- if customer and customer.has_avatar? -%}
                   {{ customer | avatar }}
                 {%- else -%}
-                  <span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span>
+                  {% comment %} <span class="svg-wrapper">{{ 'icon-account.svg' | inline_asset_content }}</span> {% endcomment %}
                 {%- endif -%}
               </account-icon>
             {%- else -%}
@@ -306,11 +307,7 @@
           </a>
         {%- endif -%}
 
-        <a class="iwishDrawer header__icon iw_desk_link" href="#" title="Wishlist"><span class="svg-wrapper">
-          <svg class="icon icon-wishlist">
-            <use xlink:href="#wishlist 1"></use>
-          </svg></span> <span class="iwish-counter iw-count-show" style="display:none;">0</span>
-        </a>
+        <a class="iwishDrawer header__icon iw_desk_link" href="#" title="Wishlist"><span class="svg-wrapper"><svg viewBox="0 0 256 256" width="20" class="iwishOutline" xmlns="http://www.w3.org/2000/svg"><rect fill="none" height="256" width="256"></rect><path d="M128,216S28,160,28,92A52,52,0,0,1,128,72h0A52,52,0,0,1,228,92C228,160,128,216,128,216Z" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="15"></path></svg></span> <span class="iwish-counter iw-count-show" style="display:none;">0</span></a>
 
         {%- for block in section.blocks -%}
           {%- case block.type -%}
@@ -321,15 +318,9 @@
 
         <a href="{{ routes.cart_url }}" class="header__icon header__icon--cart link focus-inset" id="cart-icon-bubble">
           {% if cart == empty %}
-            <svg class="icon icon-cart-empty">
-              <use xlink:href="#cart icon 1"></use>
-            </svg>
+            <span class="svg-wrapper">{{ 'icon-cart-empty.svg' | inline_asset_content }}</span>
           {% else %}
-            <span class="svg-wrapper">
-              <svg class="icon icon-cart">
-                <use xlink:href="#cart icon 1"></use>
-              </svg>
-            </span>
+            <span class="svg-wrapper">{{ 'icon-cart.svg' | inline_asset_content }}</span>
           {% endif %}
           <span class="visually-hidden">{{ 'templates.cart.cart' | t }}</span>
           {%- if cart != empty -%}
@@ -349,22 +340,17 @@
         
           <span class="icon-desktop">
             {% if template contains "index" %}
-              <svg class="icon icon-announcement">
-                <use xlink:href="#Announcement icon above whatsapp 1"></use>
-              </svg>
+              {{'announcement-icon.svg' | inline_asset_content }}
+              {{'announcement-icon-white.svg' | inline_asset_content }}
             {% else %}
-              <svg class="icon icon-announcement">
-                <use xlink:href="#Announcement icon above whatsapp 1"></use>
-              </svg>
+              {{'announcement-icon.svg' | inline_asset_content }}
+              {{'announcement-icon-white.svg' | inline_asset_content }}
             {% endif %}
           </span>
         </a>
       </div>
     </div>
   </header>
-  <div class="search_wrapper mobile-show">
-    {% render 'header-search-bar' %}
-  </div>
 </{{ header_tag }}>
 
 {%- if settings.cart_type == 'notification' -%}
@@ -527,52 +513,6 @@
     }
   </script>
 {%- endif -%}
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const cartIcon = document.getElementById('cart-icon-bubble');
-
-    if (cartIcon) {
-      cartIcon.addEventListener('click', function () {
-        fetch('/cart.js')
-          .then(response => response.json())
-          .then(cart => {
-            const cartData = {
-              event: 'viewCart',
-              cart: {
-                currency: 'INR', // or cart.currency if present
-                cart_total: cart.original_total_price / 100,
-                grand_total: cart.total_price / 100,
-                discount_amount: (cart.original_total_price - cart.total_price) / 100,
-                total_quantity: cart.item_count,
-                total_product: cart.items.length,
-                coupon_code: (cart.cart_level_discount_applications?.[0]?.code) || '',
-                items: cart.items.map((item, index) => ({
-                  id: item.product_id.toString(),
-                  sku: item.sku || '',
-                  variant_id: item.variant_id.toString(),
-                  product_name: item.product_title,
-                  product_type: item.product_type,
-                  category: item.vendor,
-                  sub_category: item.product_type, // adjust if needed
-                  price: item.original_price / 100,
-                  offer_price: item.discounted_price / 100,
-                  quantity: item.quantity,
-                  thumbnail_image: item.image,
-                  index_position: index + 1
-                }))
-              }
-            };
-
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push(cartData);
-          })
-          .catch(error => {
-            console.error('Cart fetch error:', error);
-          });
-      });
-    }
-  });
-</script>
 
 {% schema %}
 {
@@ -660,6 +600,24 @@
       "label": "Enable Transparent Header",
       "default": false,
       "info": "Header will appear transparent over selected page content."
+    },
+    {
+      "type": "text",
+      "id": "transparent_pages",
+      "label": "Specific pages (comma-separated handles)",
+      "default": "about-us,contact"
+    },
+    {
+      "type": "text",
+      "id": "transparent_collections",
+      "label": "Specific collections (comma-separated handles)",
+      "default": "rings,necklaces"
+    },
+    {
+      "type": "text",
+      "id": "transparent_products",
+      "label": "Specific products (comma-separated handles)",
+      "default": "diamond-ring,hexa-necklace"
     },
     {
       "type": "select",
@@ -851,3 +809,4 @@
   ]
 }
 {% endschema %}
+

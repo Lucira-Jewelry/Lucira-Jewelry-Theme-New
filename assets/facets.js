@@ -363,22 +363,3 @@ class FacetRemove extends HTMLElement {
 }
 
 customElements.define('facet-remove', FacetRemove);
-
-document.getElementById('SortBy-mobile').addEventListener('change', function () {
-  const mobileForm = document.getElementById('FacetFiltersFormMobile');
-  // Update hidden input in mobile form
-  let hiddenInput = mobileForm.querySelector('input[name="sort_by"]');
-  if (!hiddenInput) {
-    hiddenInput = document.createElement('input');
-    hiddenInput.type = 'hidden';
-    hiddenInput.name = 'sort_by';
-    mobileForm.appendChild(hiddenInput);
-  }
-  hiddenInput.value = this.value;
-
-  // Trigger the FacetFiltersForm submit handler
-  const facetFormElement = mobileForm.closest('facet-filters-form');
-  if (facetFormElement && facetFormElement.onSubmitHandler) {
-    facetFormElement.onSubmitHandler({ target: hiddenInput, srcElement: hiddenInput, preventDefault: () => {} });
-  }
-});

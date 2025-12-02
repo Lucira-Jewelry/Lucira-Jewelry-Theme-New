@@ -10,266 +10,6 @@
   Usage:
   {% render 'buy-buttons', block: block, product: product, product_form_id: product_form_id, section_id: section.id, show_pickup_availability: true %}
 {% endcomment %}
-
-{% comment %}
-  <div {{ block.shopify_attributes }} class="buy-buttons-wrapper">
-    {%- if product != blank -%}
-      {%- liquid
-        assign gift_card_recipient_feature_active = false
-        if block.settings.show_gift_card_recipient and product.gift_card?
-          assign gift_card_recipient_feature_active = true
-        endif
-
-        assign show_dynamic_checkout = false
-        if block.settings.show_dynamic_checkout and gift_card_recipient_feature_active == false
-          assign show_dynamic_checkout = true
-        endif
-      -%}
-
-      <product-form
-        class="product-form"
-        data-hide-errors="{{ gift_card_recipient_feature_active }}"
-        data-section-id="{{ section.id }}"
-      >
-        <div class="product-form__error-message-wrapper" role="alert" hidden>
-          <span class="svg-wrapper">
-            {{- 'icon-error.svg' | inline_asset_content -}}
-          </span>
-          <span class="product-form__error-message"></span>
-        </div>
-
-        {%- form 'product',
-          product,
-          id: product_form_id,
-          class: 'form',
-          novalidate: 'novalidate',
-          data-type: 'add-to-cart-form',
-          onsubmit: 'handleGTMAddToCartSubmit(event)'
-        -%}
-          <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date">
-          <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
-          <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
-          <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
-          <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram">
-          <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight">
-          <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price">
-          <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges">
-          <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges">
-          <input type="hidden" name="properties[_GST]" id="prop-gst">
-          <input type="hidden" name="properties[_Final Price]" id="prop-final-price">
-          <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs">
-
-          <input
-            type="hidden"
-            name="id"
-            value="{{ product.selected_or_first_available_variant.id }}"
-            {% if product.selected_or_first_available_variant.available == false
-              or quantity_rule_soldout
-              or product.selected_or_first_available_variant == null
-            %}
-              disabled
-            {% endif %}
-            class="product-variant-id"
-          >
-
-          {%- if gift_card_recipient_feature_active -%}
-            {%- render 'gift-card-recipient-form', product: product, form: form, section: section -%}
-          {%- endif -%}
-
-
-
-          <div class="product-form__buttons">
-            {%- liquid
-              assign check_against_inventory = true
-              if product.selected_or_first_available_variant.inventory_management != 'shopify' or product.selected_or_first_available_variant.inventory_policy == 'continue'
-                assign check_against_inventory = false
-              endif
-              if product.selected_or_first_available_variant.quantity_rule.min > product.selected_or_first_available_variant.inventory_quantity and check_against_inventory
-                assign quantity_rule_soldout = true
-              endif
-            -%}
-            <button
-              id="ProductSubmitButton-{{ section_id }}"
-              type="submit"
-              name="add"
-              class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %}"
-              {% if product.selected_or_first_available_variant.available == false
-                or quantity_rule_soldout
-                or product.selected_or_first_available_variant == null
-              %}
-                disabled
-              {% endif %}
-            >
-              <span>
-                {%- if product.selected_or_first_available_variant == null -%}
-                  {{ 'products.product.unavailable' | t }}
-                {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
-                  {{ 'products.product.sold_out' | t }}
-                {%- else -%}
-                  {{ 'products.product.add_to_cart' | t }}
-                {%- endif -%}
-              </span>
-              {%- render 'loading-spinner' -%}
-            </button>
-            {%- if show_dynamic_checkout -%}
-              {{ form | payment_button }}
-            {%- endif -%}
-          </div>
-        {%- endform -%}
-        <div class="desktop-show inline-flex">
-          <div class="iwish-app-block-product"><a class="iWishAdd st-1" href="#" data-variant="{{ product.variants.first.id }}" data-product="{{ product.id }}" data-pTitle="{{ product.title | escape }}"></a></div>
-        </div>
-        {% comment %} {% assign allowed_tags = 'Chembur Store Available,Pune store available' | split: ',' %}
-        {% assign show_try_at_home = false %}
-
-        {% comment %} Check product tags {% endcomment %}
-        {% for tag in product.tags %}
-          {% if allowed_tags contains tag %}
-            {% assign show_try_at_home = true %}
-            {% break %}
-          {% endif %}
-        {% endfor %}
-
-        {% comment %} If not found in tags, check variant metafields {% endcomment %}
-        {% unless show_try_at_home %}
-          {% for variant in product.variants %}
-            {% if variant.metafields.custom.in_store_available != blank %}
-              {% assign show_try_at_home = true %}
-              {% break %}
-            {% endif %}
-          {% endfor %}
-        {% endunless %}
-
-        {% if show_try_at_home %}
-          <button class="try-at-home-atc-button" onclick="openTryAtHomeOverlay()">Try at Home</button>
-          <style>
-            @media (max-width: 768px) {
-              .product-form__submit { border-radius: 8px !important; width: 140px; }
-            }
-          </style>
-        {% endif %} {% endcomment %}
-        <div class="mobile-show">
-          <div class="custom-wp_btn-link">
-            <a
-              href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
-              style="padding: 0 !important; border: 0 !important;"
-              target="_blank"
-            >
-              <img
-                class="chat-with-experts"
-                src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022"
-                height="46"
-                width="46" alt="whatsapp icon" title = "whatsapp"
-              >
-            </a>
-          </div>
-
-        </div>
-
-        <div class="custom-share-icon desktop-show">
-          <div>
-            <div class="product-share product_share" onclick="share()" id="product_share">
-              {{ 'icon-share-product.svg' | inline_asset_content }}
-            </div>
-          </div>
-        </div>
-        <script>
-          document.addEventListener("DOMContentLoaded", function() {
-            const today = new Date();
-            const shippingDate = new Date();
-            shippingDate.setDate(today.getDate() + 9);
-            const formattedDate = shippingDate.toLocaleDateString('en-GB');
-            const shippingField = document.getElementById('prop-shipping-date');
-            if (shippingField) shippingField.value = formattedDate;
-          });
-        </script>
-
-      </product-form>
-
-      {%- else -%}
-        <div class="product-form">
-          <div class="product-form__buttons form">
-            <button
-              type="submit"
-              name="add"
-              class="product-form__submit button button--full-width button--primary"
-              disabled
-            >
-              {{ 'products.product.sold_out' | t }}
-            </button>
-          </div>
-        </div>
-      {%- endif -%}
-
-      {%- if show_pickup_availability -%}
-        {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag: preload: true }}
-
-        {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
-          | where: 'pick_up_enabled', true
-        -%}
-
-        <pickup-availability
-          class="product__pickup-availabilities quick-add-hidden"
-          {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
-            available
-          {% endif %}
-          data-root-url="{{ routes.root_url }}"
-          data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-          data-has-only-default-variant="{{ product.has_only_default_variant }}"
-          data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-        >
-          <template>
-            <pickup-availability-preview class="pickup-availability-preview">
-              <span class="svg-wrapper">
-                {{- 'icon-unavailable.svg' | inline_asset_content -}}
-              </span>
-              <div class="pickup-availability-info">
-                <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
-                <button class="pickup-availability-button link link--text underlined-link">
-                  {{ 'products.product.pickup_availability.refresh' | t }}
-                </button>
-              </div>
-            </pickup-availability-preview>
-          </template>
-        </pickup-availability>
-
-        <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
-      {%- endif -%}
-  </div>
-
-  <div class="price-notification">
-  <span
-   id="open-notify-btn"
-   class="notify-wrapper open-notify-btn"
-   onclick="
-     window.dataLayer = window.dataLayer || [];
-     window.dataLayer.push({
-       event: 'promoClick',
-       promoClick: {
-         promo_id: '{{ product.selected_or_first_available_variant.sku }}',
-         promo_name: '{{ product.title }}',
-         creative_name: 'Notify Me Clicked'
-       }
-     });
-   "
-   >
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g clip-path="url(#clip0_4803_1407)">
-          <path d="M8.55664 17.5C8.70293 17.7533 8.91332 17.9637 9.16668 18.11C9.42003 18.2563 9.70743 18.3333 9.99997 18.3333C10.2925 18.3333 10.5799 18.2563 10.8333 18.11C11.0866 17.9637 11.297 17.7533 11.4433 17.5" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18.3334 6.66663C18.3334 4.74996 17.6667 3.08329 16.6667 1.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M2.71833 12.7716C2.60947 12.8909 2.53763 13.0393 2.51155 13.1987C2.48547 13.3581 2.50627 13.5217 2.57142 13.6695C2.63658 13.8173 2.74328 13.9429 2.87855 14.0312C3.01381 14.1195 3.17182 14.1665 3.33333 14.1666H16.6667C16.8282 14.1667 16.9862 14.1198 17.1216 14.0317C17.2569 13.9436 17.3637 13.8181 17.4291 13.6704C17.4944 13.5227 17.5154 13.3592 17.4895 13.1998C17.4637 13.0404 17.392 12.8919 17.2833 12.7725C16.175 11.63 15 10.4158 15 6.66663C15 5.34054 14.4732 4.06877 13.5355 3.13109C12.5979 2.19341 11.3261 1.66663 10 1.66663C8.67392 1.66663 7.40215 2.19341 6.46447 3.13109C5.52679 4.06877 5 5.34054 5 6.66663C5 10.4158 3.82417 11.63 2.71833 12.7716Z" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M3.33335 1.66663C2.33335 3.08329 1.66669 4.74996 1.66669 6.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </g>
-          <defs>
-          <clipPath id="clip0_4803_1407">
-          <rect width="20" height="20" fill="white"/>
-          </clipPath>
-          </defs>
-      </svg>
-      Notify me</span>When Price Drops
-  </div>
-{% endcomment %}
-
 <div {{ block.shopify_attributes }} class="buy-buttons-wrapper">
   {%- if product != blank -%}
     {%- liquid
@@ -301,22 +41,8 @@
         id: product_form_id,
         class: 'form',
         novalidate: 'novalidate',
-        data-type: 'add-to-cart-form',
-        onsubmit: 'handleGTMAddToCartSubmit(event)'
+        data-type: 'add-to-cart-form'
       -%}
-        <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date">
-        <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
-        <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
-        <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
-        <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram">
-        <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight">
-        <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price">
-        <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges">
-        <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges">
-        <input type="hidden" name="properties[_GST]" id="prop-gst">
-        <input type="hidden" name="properties[_Final Price]" id="prop-final-price">
-        <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs">
-
         <input
           type="hidden"
           name="id"
@@ -344,12 +70,11 @@
               assign quantity_rule_soldout = true
             endif
           -%}
-
           <button
             id="ProductSubmitButton-{{ section_id }}"
             type="submit"
             name="add"
-            class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %} animated-cart-btn"
+            class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %}"
             {% if product.selected_or_first_available_variant.available == false
               or quantity_rule_soldout
               or product.selected_or_first_available_variant == null
@@ -357,59 +82,25 @@
               disabled
             {% endif %}
           >
-            <span class="btn-text-wrapper">
-              <span class="add-to-cart-text">
-                {%- if product.selected_or_first_available_variant == null -%}
-                  {{ 'products.product.unavailable' | t }}
-                {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
-                  {{ 'products.product.sold_out' | t }}
-                {%- else -%}
-                  {{ 'products.product.add_to_cart' | t }}
-                {%- endif -%}
-              </span>
+            <span>
+              {%- if product.selected_or_first_available_variant == null -%}
+                {{ 'products.product.unavailable' | t }}
+              {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
+                {{ 'products.product.sold_out' | t }}
+              {%- else -%}
+                {{ 'products.product.add_to_cart' | t }}
+              {%- endif -%}
             </span>
-
-            <svg class="cart-icon" width="24" height="24">
-              <use href="#icon-cart"></use>
-            </svg>
-
-            <!-- Filled/added-to-cart icon -->
-            <svg class="custom-cart-icon" width="24" height="24">
-              <use href="#icon-cart-check"></use>
-            </svg>
-
-            {% comment %} <i class="fas fa-box box-icon"></i> {% endcomment %}
-
-            <svg width="100" height="100" class="fas fa-box box-icon" class="filled-cart">
-              <use href="#icon-custom-large"></use>
-            </svg>
-
-            {%- comment -%} Loading spinner kept for functionality but hidden visually {%- endcomment -%}
-            <span
-              class="loading__spinner hidden"
-              style="display: none !important; visibility: hidden !important; position: absolute; width: 0; height: 0; overflow: hidden;"
-            >
-              {%- render 'loading-spinner' -%}
-            </span>
+            {%- render 'loading-spinner' -%}
           </button>
-
           {%- if show_dynamic_checkout -%}
             {{ form | payment_button }}
           {%- endif -%}
         </div>
       {%- endform -%}
       <div class="desktop-show inline-flex">
-        <div class="iwish-app-block-product">
-          <a
-            class="iWishAdd st-1"
-            href="#"
-            data-variant="{{ product.variants.first.id }}"
-            data-product="{{ product.id }}"
-            data-pTitle="{{ product.title | escape }}"
-          ></a>
-        </div>
+        <div class="iwish-app-block-product"><a class="iWishAdd st-1" href="#" data-variant="{{ product.variants.first.id }}" data-product="{{ product.id }}" data-pTitle="{{ product.title | escape }}"></a></div>
       </div>
-
       <div class="mobile-show">
         <div class="custom-wp_btn-link">
           <a
@@ -422,13 +113,10 @@
               src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022"
               height="46"
               width="46"
-              alt="whatsapp icon"
-              title="whatsapp"
             >
           </a>
         </div>
       </div>
-
       <div class="custom-share-icon desktop-show">
         <div>
           <div class="product-share product_share" onclick="share()" id="product_share">
@@ -436,268 +124,87 @@
           </div>
         </div>
       </div>
-    <script>
-      document.addEventListener("DOMContentLoaded", function() {
-        // Store variant inventory data
-        const variantInventoryMap = {};
-        {% for variant in product.variants %}
-          variantInventoryMap[{{ variant.id }}] = {
-            available: {{ variant.available | json }},
-            inventory_quantity: {{ variant.inventory_quantity | default: 0 }}
-          };
-        {% endfor %}
-
-        // Function to calculate shipping date for a specific variant
-        function updateShippingDateForVariant(variantId) {
-          const variantData = variantInventoryMap[variantId];
-          
-          if (!variantData) {
-            console.log('No variant data found for ID:', variantId);
-            return;
-          }
-          
-          // Check if variant is in stock (available AND inventory > 0)
-          const inStock = variantData.available && variantData.inventory_quantity > 0;
-          
-          console.log('Variant ID:', variantId);
-          console.log('Available:', variantData.available);
-          console.log('Inventory:', variantData.inventory_quantity);
-          console.log('In Stock:', inStock);
-          
-          const today = new Date();
-          const shippingDate = new Date();
-          shippingDate.setDate(today.getDate() + (inStock ? 2 : 15));
-
-          const formattedDate = shippingDate.toLocaleDateString('en-GB');
-          const shippingField = document.getElementById('prop-shipping-date');
-          
-          if (shippingField) {
-            shippingField.value = formattedDate;
-            console.log('Updated shipping date to:', formattedDate, '(', (inStock ? '2 days' : '15 days'), ')');
-          }
-        }
-
-        // Get initial variant ID
-        const initialVariantId = {{ product.selected_or_first_available_variant.id | default: 'null' }};
-        if (initialVariantId) {
-          updateShippingDateForVariant(initialVariantId);
-        }
-
-        // Listen for variant changes (Dawn theme event)
-        document.addEventListener('variant:change', function(evt) {
-          console.log('variant:change event detected');
-          if (evt.detail && evt.detail.variant && evt.detail.variant.id) {
-            updateShippingDateForVariant(evt.detail.variant.id);
-          }
-        });
-
-        // Also listen for changes on the hidden variant ID input
-        const variantIdInput = document.querySelector('.product-variant-id');
-        if (variantIdInput) {
-          // Monitor value changes via input event
-          variantIdInput.addEventListener('change', function() {
-            const variantId = parseInt(this.value);
-            if (variantId) {
-              console.log('Variant input changed to:', variantId);
-              updateShippingDateForVariant(variantId);
-            }
-          });
-
-          // Use MutationObserver as backup
-          const observer = new MutationObserver(function(mutations) {
-            const variantId = parseInt(variantIdInput.value);
-            if (variantId) {
-              console.log('Variant changed via mutation:', variantId);
-              updateShippingDateForVariant(variantId);
-            }
-          });
-          
-          observer.observe(variantIdInput, { 
-            attributes: true, 
-            attributeFilter: ['value'] 
-          });
-        }
-      });
-    </script>
     </product-form>
 
-  {%- else -%}
-    <div class="product-form">
-      <div class="product-form__buttons form">
-        <button
-          type="submit"
-          name="add"
-          class="product-form__submit button button--full-width button--primary"
-          disabled
-        >
-          {{ 'products.product.sold_out' | t }}
-        </button>
+    {%- else -%}
+      <div class="product-form">
+        <div class="product-form__buttons form">
+          <button
+            type="submit"
+            name="add"
+            class="product-form__submit button button--full-width button--primary"
+            disabled
+          >
+            {{ 'products.product.sold_out' | t }}
+          </button>
+        </div>
       </div>
-    </div>
-  {%- endif -%}
+    {%- endif -%}
 
-  {%- if show_pickup_availability -%}
-    {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag: preload: true }}
+    {%- if show_pickup_availability -%}
+      {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag }}
 
-    {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
-      | where: 'pick_up_enabled', true
-    -%}
+      {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
+        | where: 'pick_up_enabled', true
+      -%}
 
-    <pickup-availability
-      class="product__pickup-availabilities quick-add-hidden"
-      {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
-        available
-      {% endif %}
-      data-root-url="{{ routes.root_url }}"
-      data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-      data-has-only-default-variant="{{ product.has_only_default_variant }}"
-      data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-    >
-      <template>
-        <pickup-availability-preview class="pickup-availability-preview">
-          <span class="svg-wrapper">
-            {{- 'icon-unavailable.svg' | inline_asset_content -}}
-          </span>
-          <div class="pickup-availability-info">
-            <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
-            <button class="pickup-availability-button link link--text underlined-link">
-              {{ 'products.product.pickup_availability.refresh' | t }}
-            </button>
-          </div>
-        </pickup-availability-preview>
-      </template>
-    </pickup-availability>
+      <pickup-availability
+        class="product__pickup-availabilities quick-add-hidden"
+        {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
+          available
+        {% endif %}
+        data-root-url="{{ routes.root_url }}"
+        data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+        data-has-only-default-variant="{{ product.has_only_default_variant }}"
+        data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
+      >
+        <template>
+          <pickup-availability-preview class="pickup-availability-preview">
+            <span class="svg-wrapper">
+              {{- 'icon-unavailable.svg' | inline_asset_content -}}
+            </span>
+            <div class="pickup-availability-info">
+              <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
+              <button class="pickup-availability-button link link--text underlined-link">
+                {{ 'products.product.pickup_availability.refresh' | t }}
+              </button>
+            </div>
+          </pickup-availability-preview>
+        </template>
+      </pickup-availability>
 
-    <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
-  {%- endif -%}
+      <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
+    {%- endif -%}
 </div>
 
-{% comment %}
-  <div class="price-notification">
-  <span
-   id="open-notify-btn"
-   class="notify-wrapper open-notify-btn"
-   onclick="
-     window.dataLayer = window.dataLayer || [];
-     window.dataLayer.push({
-       event: 'promoClick',
-       promoClick: {
-         promo_id: '{{ product.selected_or_first_available_variant.sku }}',
-         promo_name: '{{ product.title }}',
-         creative_name: 'Notify Me Clicked'
-       }
-     });
-   "
-   >
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <g clip-path="url(#clip0_4803_1407)">
-          <path d="M8.55664 17.5C8.70293 17.7533 8.91332 17.9637 9.16668 18.11C9.42003 18.2563 9.70743 18.3333 9.99997 18.3333C10.2925 18.3333 10.5799 18.2563 10.8333 18.11C11.0866 17.9637 11.297 17.7533 11.4433 17.5" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M18.3334 6.66663C18.3334 4.74996 17.6667 3.08329 16.6667 1.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M2.71833 12.7716C2.60947 12.8909 2.53763 13.0393 2.51155 13.1987C2.48547 13.3581 2.50627 13.5217 2.57142 13.6695C2.63658 13.8173 2.74328 13.9429 2.87855 14.0312C3.01381 14.1195 3.17182 14.1665 3.33333 14.1666H16.6667C16.8282 14.1667 16.9862 14.1198 17.1216 14.0317C17.2569 13.9436 17.3637 13.8181 17.4291 13.6704C17.4944 13.5227 17.5154 13.3592 17.4895 13.1998C17.4637 13.0404 17.392 12.8919 17.2833 12.7725C16.175 11.63 15 10.4158 15 6.66663C15 5.34054 14.4732 4.06877 13.5355 3.13109C12.5979 2.19341 11.3261 1.66663 10 1.66663C8.67392 1.66663 7.40215 2.19341 6.46447 3.13109C5.52679 4.06877 5 5.34054 5 6.66663C5 10.4158 3.82417 11.63 2.71833 12.7716Z" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M3.33335 1.66663C2.33335 3.08329 1.66669 4.74996 1.66669 6.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </g>
-          <defs>
-          <clipPath id="clip0_4803_1407">
-          <rect width="20" height="20" fill="white"/>
-          </clipPath>
-          </defs>
-      </svg>
-      Notify me</span>When Price Drops
-  </div>
-{% endcomment %}
-
-<style>
-  .animated-cart-btn,.animated-cart-btn.loading,.animated-cart-btn[aria-busy=true],.animated-cart-btn[disabled],.button--primary.loading,.button--secondary.loading,.product-form__submit,.product-form__submit.loading,.product-form__submit[aria-busy=true],button[name=add],button[name=add].loading,button[name=add][aria-busy=true]{opacity:1!important}
-  .animated-cart-btn{position:relative;overflow:hidden!important}
-  .animated-cart-btn .btn-text-wrapper{position:relative;z-index:3;display:block}
-  .animated-cart-btn .add-to-cart-text,.animated-cart-btn .added-to-cart-text{font-family:'Futura Std',Futura,'Century Gothic',Arial,sans-serif;font-weight:500;display:block}
-  .animated-cart-btn .add-to-cart-text{opacity:1;transition:opacity .3s ease-in-out}
-  .animated-cart-btn .added-to-cart-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);opacity:0;white-space:nowrap}
-  .animated-cart-btn .box-icon,.animated-cart-btn .cart-icon,.animated-cart-btn .custom-cart-icon{position:absolute;z-index:0;color:#fff}
-  .animated-cart-btn .cart-icon{top:50%;left:-10%;font-size:2em;transform:translate(-50%,-50%);opacity:1;transition:opacity .2s ease-in-out}
-  .animated-cart-btn .custom-cart-icon{top:50%;left:-10%;width:2em;height:2em;transform:translate(-50%,-50%);opacity:1;transition:opacity .2s ease-in-out;overflow:hidden}
-  .animated-cart-btn .box-icon{top:-20%;left:52%;font-size:1.2em;transform:translate(-50%,-50%)}
-  .animated-cart-btn.cart-animating .cart-icon{animation:cart-slide 1.5s ease-in-out forwards,cart-fade-out 1.5s ease-in-out forwards}
-  .animated-cart-btn.cart-animating .custom-cart-icon{animation:cart-slide 1.5s ease-in-out forwards,cart-fade-in 1.5s ease-in-out forwards}
-  .animated-cart-btn.cart-animating .box-icon{animation:box-slide 1.5s ease-in-out forwards}
-  .animated-cart-btn.cart-animating .add-to-cart-text{animation:text-fade-out 1.5s ease-in-out forwards}
-  .animated-cart-btn.cart-animating .added-to-cart-text{animation:text-fade-in 1.5s ease-in-out forwards}
-  .animated-cart-btn .cart-icon,.animated-cart-btn .custom-cart-icon{position:absolute;top:50%;left:10%;transform:translate(-50%,-50%);z-index:4;transition:all .3s ease-in-out}
-  .animated-cart-btn .custom-cart-icon{opacity:1}
-  .animated-cart-btn.cart-animating .cart-icon{animation:cart-slide 1.5s ease-in-out forwards,cart-fade-out 1.5s ease-in-out forwards}
-  .animated-cart-btn.cart-animating .custom-cart-icon{animation:cart-slide 1.5s ease-in-out forwards,cart-fade-in 1.5s ease-in-out forwards}
-  .animated-cart-btn .box-icon{position:absolute;top:-20%;left:52%;width:15px;height:15px;transform:translate(-50%,-50%);opacity:1;z-index:4;transition:all .3s ease-in-out;fill:#fff}
-  .product-form__buttons .filled-cart{z-index:-2}
-  @keyframes cart-slide{
-  0%{left:-10%}
-  40%,60%{left:50%}
-  100%{left:110%}
-  }
-  @keyframes box-slide{
-  0%,40%{top:-20%}
-  60%{top:40%;left:52%}
-  100%{top:40%;left:112%}
-  }
-  @keyframes text-fade-out{
-  0%{opacity:1}
-  100%,20%{opacity:0}
-  }
-  @keyframes text-fade-in{
-  0%,80%{opacity:0}
-  100%{opacity:1}
-  }
-  @keyframes cart-fade-out{
-  0%,55%{opacity:1}
-  65%{opacity:0}
-  100%{opacity:0}
-  }
-  @keyframes cart-fade-in{
-  0%,55%{opacity:0}
-  65%{opacity:1}
-  100%{opacity:1}
-  }
-  .animated-cart-btn .box-icon,.animated-cart-btn .cart-icon,.animated-cart-btn .custom-cart-icon{opacity:0;visibility:hidden}
-  .animated-cart-btn.cart-animating .box-icon,.animated-cart-btn.cart-animating .cart-icon,.animated-cart-btn.cart-animating .custom-cart-icon{visibility:visible;opacity:1}
-</style>
-
-<script>
-  (function () {
-    document.addEventListener('DOMContentLoaded', function () {
-      const animatedButton = document.querySelector('.animated-cart-btn');
-
-      if (!animatedButton) return;
-
-      const form = animatedButton.closest('form');
-      const cartIcon = animatedButton.querySelector('.cart-icon');
-      const customCartIcon = animatedButton.querySelector('.custom-cart-icon');
-      const boxIcon = animatedButton.querySelector('.box-icon');
-
-      // Ensure icons are hidden initially
-      [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-        if (icon) icon.style.opacity = '0';
-      });
-
-      if (form) {
-        form.addEventListener('submit', function (e) {
-          if (animatedButton.disabled || animatedButton.classList.contains('cart-animating')) return;
-
-          // Show icons only when clicked
-          [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-            if (icon) icon.style.opacity = '1';
-          });
-
-          animatedButton.classList.add('cart-animating');
-
-          // Reset animation after complete
-          setTimeout(function () {
-            animatedButton.classList.remove('cart-animating');
-            // Hide icons again
-            [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-              if (icon) icon.style.opacity = '0';
-            });
-          }, 2000);
-        });
-      }
-    });
-  })();
-</script>
+<div class="price-notification">
+<span
+ id="open-notify-btn" 
+ class="notify-wrapper open-notify-btn"
+ onclick="
+   window.dataLayer = window.dataLayer || [];
+   window.dataLayer.push({
+     event: 'promoClick',
+     promoClick: {
+       promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+       promo_name: '{{ product.title }}',
+       creative_name: 'Notify Me Clicked'
+     }
+   });
+ "
+ >
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <g clip-path="url(#clip0_4803_1407)">
+        <path d="M8.55664 17.5C8.70293 17.7533 8.91332 17.9637 9.16668 18.11C9.42003 18.2563 9.70743 18.3333 9.99997 18.3333C10.2925 18.3333 10.5799 18.2563 10.8333 18.11C11.0866 17.9637 11.297 17.7533 11.4433 17.5" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M18.3334 6.66663C18.3334 4.74996 17.6667 3.08329 16.6667 1.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2.71833 12.7716C2.60947 12.8909 2.53763 13.0393 2.51155 13.1987C2.48547 13.3581 2.50627 13.5217 2.57142 13.6695C2.63658 13.8173 2.74328 13.9429 2.87855 14.0312C3.01381 14.1195 3.17182 14.1665 3.33333 14.1666H16.6667C16.8282 14.1667 16.9862 14.1198 17.1216 14.0317C17.2569 13.9436 17.3637 13.8181 17.4291 13.6704C17.4944 13.5227 17.5154 13.3592 17.4895 13.1998C17.4637 13.0404 17.392 12.8919 17.2833 12.7725C16.175 11.63 15 10.4158 15 6.66663C15 5.34054 14.4732 4.06877 13.5355 3.13109C12.5979 2.19341 11.3261 1.66663 10 1.66663C8.67392 1.66663 7.40215 2.19341 6.46447 3.13109C5.52679 4.06877 5 5.34054 5 6.66663C5 10.4158 3.82417 11.63 2.71833 12.7716Z" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M3.33335 1.66663C2.33335 3.08329 1.66669 4.74996 1.66669 6.66663" stroke="#793C26" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <defs>
+        <clipPath id="clip0_4803_1407">
+        <rect width="20" height="20" fill="white"/>
+        </clipPath>
+        </defs>
+    </svg> 
+    Notify me</span>When Price Drops
+</div>

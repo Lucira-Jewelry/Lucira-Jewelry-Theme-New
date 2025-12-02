@@ -1,0 +1,211 @@
+
+<style>
+
+    .view-details {
+    display: inline-flex;
+    } 
+
+  .charm-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 4;
+    pointer-events: none;
+  }
+
+  .charm-drawer.is-open {
+    pointer-events: auto;
+  }
+
+  .charm-drawer__overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .55);
+    backdrop-filter: blur(3px);
+    opacity: 0;
+    transition: opacity .35s ease;
+  }
+
+  .charm-drawer.is-open .charm-drawer__overlay {
+    opacity: 1;
+  }
+
+ .charm-drawer__panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(480px, 92vw);
+  background: #fff;
+  transform: translateX(100%);
+  transition: transform .35s cubic-bezier(.28, .68, .4, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -32px 0 60px rgba(0, 0, 0, .22);
+}
+
+.charm-drawer.is-open .charm-drawer__panel {
+  transform: translateX(0);
+}
+
+
+  .charm-drawer__close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 36px;
+    height: 36px;
+   background: #fff;
+   border:none;
+    cursor: pointer;
+    font-size: 28px;
+  }
+
+  #charm-details-drawer {
+    background: transparent;
+    transition: background .28s ease;
+  }
+
+  #charm-details-drawer.is-open {
+    background: #1a1a1a66;
+  }
+.charm-drawer__body {
+    padding: 18px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+  }
+
+  .charm-drawer__image-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  .charm-drawer__image-wrap img {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .charm-drawer__content h3 {
+    font-size: 32px;
+    font-weight:650;
+    margin: 40px 0 24px;
+  }
+
+  .charm-drawer__content p {
+    color: #444;
+    font-size: 16px;
+    line-height: 1.55;
+    margin: 24px 0 14px;
+  }
+  @media (max-width: 768px){
+
+    .charms-grid {
+      max-width: 200vw;
+      display: flex !important;
+      gap: 12px;
+      padding: 12px;
+      overflow-x: auto;
+    }
+
+    {% comment %} .charm-card.custom-charm-grid {
+      max-width: 150px;
+      flex: 0 0 auto;
+    } {% endcomment %}
+
+    .charm-thumb-wrap {
+      height: unset;
+    }
+  }
+</style>
+
+
+<div id="charm-details-drawer" class="charm-drawer" aria-hidden="true">
+  <div class="charm-drawer__overlay" data-close-drawer></div>
+
+  <div class="charm-drawer__panel">
+    <button class="charm-drawer__close" type="button" data-close-drawer>✕</button>
+
+    <div class="charm-drawer__body">
+      <div class="charm-drawer__image-wrap">
+        <img id="drawer-charm-image" src="" alt="" width="auto" height="auto" loading="lazy">
+      </div>
+
+      <div class="charm-drawer__content">
+        <h3 id="drawer-charm-title"></h3>
+        <p id="drawer-charm-desc"></p>
+
+        <button class="drawer-cta" data-close-drawer>CONTINUE SHOPPING</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const d = document.getElementById('charm-details-drawer');
+    if (!d) return;
+
+    const overlay = d.querySelector('.charm-drawer__overlay');
+    const panel = d.querySelector('.charm-drawer__panel');
+    const img = d.querySelector('#drawer-charm-image');
+    const title = d.querySelector('#drawer-charm-title');
+    const desc = d.querySelector('#drawer-charm-desc');
+    let lastFocus;
+
+    const getMeta = (id) => {
+      const el = document.getElementById('variant-meta-' + id);
+      if (!el) return null;
+      try {
+        return JSON.parse(el.textContent);
+      } catch {
+        return null;
+      }
+    };
+
+    const open = (m) => {
+      if (!m) return;
+      if (img) {
+        img.src = m.image || '';
+        img.alt = m.heading || '';
+      }
+      if (title) title.textContent = m.heading || '';
+      if (desc) desc.textContent = m.description || '';
+
+      lastFocus = document.activeElement;
+      document.body.style.overflow = 'hidden';
+      d.classList.add('is-open');
+      d.setAttribute('aria-hidden', 'false');
+      setTimeout(() => panel?.focus(), 0);
+    };
+
+    const close = () => {
+      d.classList.remove('is-open');
+      d.setAttribute('aria-hidden', 'true');
+      document.body.style.overflow = '';
+      lastFocus?.focus?.();
+    };
+
+    document.addEventListener(
+      'click',
+      (e) => {
+        const btn = e.target.closest('.view-details');
+        if (!btn) return;
+        e.preventDefault();
+        open(getMeta(btn.dataset.variantId) || {});
+      },
+      { passive: false }
+    );
+
+    d.addEventListener('click', (e) => {
+      if (e.target.closest('[data-close-drawer]')) close();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close();
+    });
+  })();
+</script>

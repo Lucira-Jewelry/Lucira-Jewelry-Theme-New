@@ -469,7 +469,7 @@ class ComparisonTableManager {
     this.config = priceGuideConfig;
     this.labGrownRates = {
       'sc': 40000,
-      'vvs': 34000,
+      'vvs': 32000,
       'default': 40000
     };
     
@@ -724,6 +724,39 @@ document.addEventListener('DOMContentLoaded', function() {
   }, 100);
 });
 
+function luciraLocateMe() {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`;
+
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.address && data.address.postcode) {
+              document.getElementById("lucira-delivery-zipcode").value =
+                data.address.postcode;
+
+              document
+                .getElementById("lucira-delivery-zipcode")
+                .dispatchEvent(new Event("input", { bubbles: true }));
+            } else {
+              alert("Pincode not found for your location.");
+            }
+          })
+          .catch((error) => console.error("Error fetching pincode:", error));
+      },
+      (error) => {
+        alert("Unable to retrieve location. Please allow location access.");
+      }
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+  }
+}
 
 document.addEventListener("DOMContentLoaded", function () {
   const container = document.querySelector("#pdp-delivery-check");
@@ -752,8 +785,7 @@ document.addEventListener("DOMContentLoaded", function () {
         promo_id: productSku,
         promo_name: productTitle,
         creative_name: "pincodeEntered",
-        promo_position: pincode,
-        pincode: pincode
+        promo_position: pincode
       };
 
       window.dataLayer = window.dataLayer || [];
@@ -818,368 +850,3 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 })();
 
-document.addEventListener("DOMContentLoaded", function () {
-  initEngraving();
-});
-
-function initEngraving() {
-  const engravingInput = document.getElementById("lucira_engraving_text");
-  const previewText = document.getElementById("engraving-preview-text");
-  const fontOptions = document.querySelectorAll(".lucira_engraving_font_option");
-  const saveButton = document.getElementById("product_engraving_confirm_submit");
-  const savedWrapper = document.getElementById("engraving-saved-wrapper");
-  const closeButton = document.getElementById("close-engraving-button");
-  const overlay = document.getElementById("engraving-drawer-overlay");
-
-  if (!engravingInput || !previewText || !fontOptions.length) {
-    console.warn('Engraving elements not found');
-    return;
-  }
-
-  // Get main product form
-  const mainForm = document.querySelector('form[data-type="add-to-cart-form"]') || 
-                   document.querySelector('form[action*="/cart/add"]') ||
-                   engravingInput.closest('form');
-
-  // Create or get hidden inputs
-  let fontInput = mainForm?.querySelector('input[name="properties[EngravingFont]"]');
-  let textInput = mainForm?.querySelector('input[name="properties[EngravingText]"]');
-
-  if (mainForm && !fontInput) {
-    fontInput = document.createElement("input");
-    fontInput.type = "hidden";
-    fontInput.name = "properties[EngravingFont]";
-    fontInput.id = "hidden-engraving-font";
-    mainForm.appendChild(fontInput);
-  }
-
-  if (mainForm && !textInput) {
-    textInput = document.createElement("input");
-    textInput.type = "hidden";
-    textInput.name = "properties[EngravingText]";
-    textInput.id = "hidden-engraving-text";
-    mainForm.appendChild(textInput);
-  }
-
-  const allowedChars = /^[A-Za-z0-9❤∞]*$/;
-
-  // Set default font from active option
-  const activeOption = document.querySelector(".lucira_engraving_font_option.active");
-  if (activeOption) {
-    const defaultFont = activeOption.dataset.font;
-    previewText.style.fontFamily = defaultFont;
-    if (fontInput) fontInput.value = defaultFont;
-  }
-
-  // Update save button state
-  function toggleSaveButton() {
-    const engravingValue = engravingInput?.value.trim();
-    const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
-    if (engravingValue && selectedFont) {
-      saveButton.disabled = false;
-    } else {
-      saveButton.disabled = true;
-    }
-  }
-
-  // Update preview & hidden inputs on input
-  engravingInput.addEventListener("input", function () {
-    if (!allowedChars.test(this.value)) {
-      this.value = this.value.split('').filter(c => allowedChars.test(c)).join('');
-    }
-    if (this.value.length > 8) this.value = this.value.slice(0, 8);
-    previewText.textContent = this.value;
-    if (textInput) textInput.value = this.value;
-    toggleSaveButton();
-  });
-
-  // Symbol insertion
-  function insertAtCursor(input, text) {
-    const start = input.selectionStart;
-    const end = input.selectionEnd;
-    input.value = input.value.slice(0, start) + text + input.value.slice(end);
-    input.setSelectionRange(start + text.length, start + text.length);
-    input.focus();
-    input.dispatchEvent(new Event("input"));
-  }
-
-  window.EngravingAddSymbol = function(symbol) {
-    if (engravingInput.value.length + symbol.length <= 8) {
-      insertAtCursor(engravingInput, symbol);
-    } else {
-      alert('Maximum 8 characters reached');
-    }
-  };
-  window.ProductEngravAddSymbol = window.EngravingAddSymbol;
-
-  // Font selection
-  fontOptions.forEach(option => {
-    option.addEventListener("click", () => {
-      fontOptions.forEach(opt => opt.classList.remove("active"));
-      option.classList.add("active");
-      const font = option.dataset.font;
-      previewText.style.fontFamily = font;
-      if (fontInput) fontInput.value = font;
-      toggleSaveButton();
-    });
-  });
-
-  // Save button functionality
-  if (saveButton) {
-    saveButton.addEventListener("click", e => {
-      e.preventDefault();
-      const engravingValue = engravingInput.value.trim();
-      const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
-
-      if (!engravingValue || !selectedFont) {
-        alert("Please enter engraving text and choose a font before saving.");
-        return;
-      }
-
-      if (textInput) textInput.value = engravingValue;
-      if (fontInput) fontInput.value = selectedFont;
-
-      if (savedWrapper) {
-        savedWrapper.style.display = "flex";
-        savedWrapper.innerHTML = `
-          <p><strong>Saved Engraving:</strong></p>
-          <div style="font-family: ${selectedFont}; font-size:14px; margin-top:0px;">
-            ${engravingValue}
-          </div>
-        `;
-      }
-
-      saveButton.textContent = "Saved ✓";
-      setTimeout(() => {
-        saveButton.textContent = "SAVE";
-        closeEngravingDrawer();
-      }, 2000);
-    });
-  }
-
-  // Drawer open/close
-  window.openEngravingDrawer = function() {
-    const drawer = document.getElementById("engraving-drawer");
-    if (drawer && overlay) {
-      drawer.classList.add("active");
-      overlay.classList.add("active");
-    }
-  };
-
-  function closeEngravingDrawer() {
-    const drawer = document.getElementById("engraving-drawer");
-    if (drawer && overlay) {
-      drawer.classList.remove("active");
-      overlay.classList.remove("active");
-    }
-  }
-
-  if (closeButton) closeButton.addEventListener("click", closeEngravingDrawer);
-  if (overlay) overlay.addEventListener("click", closeEngravingDrawer);
-
-  // Load existing engraving if present
-  function loadExistingEngraving() {
-    if (textInput && textInput.value) {
-      engravingInput.value = textInput.value;
-      previewText.textContent = textInput.value;
-    }
-    if (fontInput && fontInput.value) {
-      const fontToSelect = Array.from(fontOptions).find(opt => opt.dataset.font === fontInput.value);
-      if (fontToSelect) {
-        fontOptions.forEach(opt => opt.classList.remove("active"));
-        fontToSelect.classList.add("active");
-        previewText.style.fontFamily = fontInput.value;
-      }
-    }
-    toggleSaveButton();
-  }
-
-  loadExistingEngraving();
-
-  // DEBUG helper
-  window.debugEngravingInputs = function() {
-    console.log('=== ENGRAVING DEBUG ===');
-    console.log('Visible Text:', engravingInput.value);
-    console.log('Preview Text:', previewText.textContent);
-    console.log('Selected Font:', document.querySelector('.lucira_engraving_font_option.active')?.dataset.font);
-    console.log('Hidden Text Input:', textInput?.value);
-    console.log('Hidden Font Input:', fontInput?.value);
-    console.log('=====================');
-  };
-}
-//customise button clicked datalayer
-document.addEventListener("DOMContentLoaded", function () {
-  var customizeBtn = document.getElementById("product_variant_drawer");
-
-  if (customizeBtn) {
-    customizeBtn.addEventListener("click", function () {
-      window.dataLayer = window.dataLayer || [];
-
-      window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          creative_name: "Customize Button Clicked"
-        }
-      });
-    });
-  }
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-  const stickyBar = document.getElementById("sticky-add-to-cart");
-  const targetEl = document.querySelector(".small-devicePosition");
-
-  if (!stickyBar || !targetEl) return;
-
-  // Check if target is above the viewport
-  function isElementAboveViewport(el) {
-    const rect = el.getBoundingClientRect();
-    return rect.bottom < 0;
-  }
-
-  // Toggle sticky bar
-  function toggleStickyBar() {
-    const elementAbove = isElementAboveViewport(targetEl);
-    if (elementAbove) {
-      stickyBar.classList.add("show");
-    } else {
-      stickyBar.classList.remove("show");
-    }
-  }
-
-  window.addEventListener("scroll", toggleStickyBar);
-});
-
-
-// pdp-delivery-details
-function luciraLocateMe() {
-  const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
-  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-
-  // Show loading state
-  submitBtn.innerHTML = "Locating...";
-  submitBtn.disabled = true;
-
-  if (navigator.geolocation) {
-    // Force fresh and accurate location
-    const geoOptions = {
-      enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 0
-    };
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-
-        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&timestamp=${Date.now()}`;
-
-        fetch(url)
-          .then((response) => response.json())
-          .then((data) => {
-            if (data.address && data.address.postcode) {
-              pincodeInput.value = data.address.postcode;
-
-              // Trigger input event to update button to Submit
-              pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-              // Push GA4 event
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                event: "promoClick",
-                promoClick: {
-                  promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-                  promo_name: "{{ product.title }}",
-                  creative_name: "Locate Me Clicked"
-                }
-              });
-            } else {
-              alert("Pincode not found for your location.");
-              resetToLocateMe();
-            }
-          })
-          .catch((error) => {
-            console.error("Error fetching pincode:", error);
-            alert("Error fetching pincode. Please try again.");
-            resetToLocateMe();
-          });
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        alert("Unable to retrieve location. Please allow location access.");
-        resetToLocateMe();
-      },
-      geoOptions
-    );
-  } else {
-    alert("Geolocation is not supported by this browser.");
-    resetToLocateMe();
-  }
-
-  // helper function to reset button back to "Locate Me"
-  function resetToLocateMe() {
-    submitBtn.innerHTML = `
-      <svg width="16" height="16" class="icon icon-locate">
-        <use xlink:href="#icon-locate"></use>
-      </svg> Locate Me
-    `;
-    submitBtn.disabled = false;
-  }
-}
-
-
-
-// (function () {
-
-//   function initAudioPlayers() {
-//     const audioPlayers = document.querySelectorAll('.product-audio-player');
-
-//     audioPlayers.forEach((wrapper) => {
-
-//       const button = wrapper.querySelector('.audio-play-button');
-//       const audio = wrapper.querySelector('audio');
-
-//       if (!button || !audio) return;
-
-//       // Replace existing listeners
-//       const newBtn = button.cloneNode(true);
-//       button.replaceWith(newBtn);
-
-//       const playIcon = newBtn.querySelector('.icon-play');
-//       const pauseIcon = newBtn.querySelector('.icon-pause');
-
-//       // Ensure initial state
-//       playIcon.style.display = "block";
-//       pauseIcon.style.display = "none";
-
-//       newBtn.addEventListener("click", () => {
-//         if (audio.paused) {
-//           audio.play();
-//           playIcon.style.display = "none";
-//           pauseIcon.style.display = "block";
-//         } else {
-//           audio.pause();
-//           playIcon.style.display = "block";
-//           pauseIcon.style.display = "none";
-//         }
-//       });
-
-//       audio.addEventListener("ended", () => {
-//         playIcon.style.display = "block";
-//         pauseIcon.style.display = "none";
-//       });
-//     });
-//   }
-
-//   // Load event
-//   if (document.readyState === 'loading') {
-//     document.addEventListener('DOMContentLoaded', initAudioPlayers);
-//   } else {
-//     initAudioPlayers();
-//   }
-
-//   // Re-initialize on variant change
-//   document.addEventListener('variant:change', initAudioPlayers);
-
-// })();

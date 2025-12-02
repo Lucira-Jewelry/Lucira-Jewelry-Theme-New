@@ -12,15 +12,16 @@
 
 {% if show_banner %}
 {{ 'plp-banner.css' | asset_url | stylesheet_tag: preload: true }}
+<script src="{{ 'gsap.min.js' | asset_url }}" defer></script>
+<script src="{{ 'Draggable.min.js' | asset_url }}" defer></script>
 
+<!-- Drawer Content (if metafields exist) -->
 {% assign drawer_content = collection.metafields.custom.plp_banner_content %}
 {% assign drawer_image = collection.metafields.custom.plp_drawer_image %}
 
 <section class="curved-slider-section">
-  <div class="curve-bg page-width">
+  <div class="curve-bg">
     <div class="plp-collection-banner__content">
-      
-
       {% if section.settings.show_breadcrumbs %}
         <nav class="plp-collection-banner__breadcrumbs"
              itemscope itemtype="https://schema.org/BreadcrumbList">
@@ -56,13 +57,15 @@
         
         </nav>
       {% endif %}
+
+
       <div class="plp-collection-banner__header">
         <h1 class="plp-collection-banner__title">
           {{ collection.title | default: 'All Products' }} 
           {% if drawer_content != blank and drawer_image != blank %}
-            <span class="plp-banner__cta_btn">
+            <span class="mobile-show">
               <a href="javascript:void(0)" class="plp-banner__cta-button open-drawer-btn">
-                <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Info.svg?v=1751958261" width="14" height="14" loading="lazy" alt="info" title="info">
+                <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Info.svg?v=1751958261" width="auto" height="auto" loading="lazy">
               </a>
             </span>
           {% endif %}
@@ -70,16 +73,237 @@
 
         {% if section.settings.show_product_count %}
           <p class="plp-collection-banner__count">
-            <small>{{ collection.all_products_count | default: 0 }} designs</small>
+            <small>({{ collection.all_products_count | default: 0 }} products)</small>
           </p>
         {% endif %}
       </div>
+
+      {% if section.settings.show_description and collection.description != blank %}
+        <div class="plp-collection-banner__description">
+          {{ collection.description }}
+        </div>
+      {% endif %}
+
       
 
-     
+      {% if drawer_content != blank %}
+        <div class="plp-collection-banner__drawer-trigger">
+          <p class="plp-collection-banner__drawer-preview">
+            {{ drawer_content | strip_html | truncatewords: 25 }}
+          </p>
+          <a href="javascript:void(0)" class="plp-banner__cta-button open-drawer-btn" id="open-drawer">
+            <span class="plp-banner__cta-text--desktop">Read More</span>
+            <span class="plp-banner__cta-icon--mobile">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none">
+                <path d="M9 17C13.1421 17 16.5 13.6421 16.5 9.5C16.5 5.35786 13.1421 2 9 2C4.85786 2 1.5 5.35786 1.5 9.5C1.5 13.6421 4.85786 17 9 17Z" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M9 12.5V9.5" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M9 6.5H9.0075" stroke="#333333" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>
+              </svg>
+            </span>
+          </a>
+        </div>
+      {% endif %}
+      <p class="swipe-text" style="text-align: center; color: #333333;">Swipe to select Other Category</p>
+      
     </div>
   </div>
+  {% if collection.metafields.custom.banner_filter_activated == true %}
+  <div class="wheel-wrapper">
+    <div class="wheel">
+      {% comment %} First loop through all metafield items {% endcomment %}
+      {% for block in collection.metafields.custom.collection_banner_filter.value %}
+        {% if block.collection and block.banner_image %}
+            <div class="wheel__card" onclick="dataLayer.push({ event: 'promoClick', promoClick: { promo_id: '{{ block.collection.value.id }}', promo_name: '{{ block.banner_label | escape | strip_newlines }}', creative_name: 'PLP Banner', destination_url: '{{ block.collection.value.url }}' } })" >            
+              <a href="{{ block.collection.value.url }}">
+              {% if block.banner_label %}
+                <span class="wheel-label">{{ block.banner_label }}</span>
+              {% endif %}
+              <picture>
+                <source
+                  type="image/webp"
+                  srcset="
+                    {{ block.banner_image | image_url: width: 240, format: 'webp' }} 240w,
+                    {{ block.banner_image | image_url: width: 480, format: 'webp' }} 480w
+                  "
+                  sizes="100vw"
+                >
+                <source
+                  type="image/jpeg"
+                  srcset="
+                    {{ block.banner_image | image_url: width: 240 }} 240w,
+                    {{ block.banner_image | image_url: width: 480 }} 480w
+                  "
+                  sizes="100vw"
+                >
+                <img   
+                  src="{{ block.banner_image | image_url: width: 240 }}"
+                  alt="{{ block.banner_label | default: block.collection.value.title }}"
+                  loading="lazy"
+                  decoding="async"
+                  width="auto"
+                  height="auto"
+                >
+              </picture>
+            </a>
+          </div>
+        {% endif %}
+      {% endfor %}
+      
+      {% comment %} Calculate how many more items we need to reach 15 {% endcomment %}
+      {% assign metafield_count = 0 %}
+      {% for block in collection.metafields.custom.collection_banner_filter.value %}
+        {% if block.collection and block.banner_image %}
+          {% assign metafield_count = metafield_count | plus: 1 %}
+        {% endif %}
+      {% endfor %}
+      
+      {% comment %} If we have fewer than 15, repeat from the beginning {% endcomment %}
+      {% if metafield_count > 0 and metafield_count < 18 %}
+        {% assign remaining_needed = 18 | minus: metafield_count %}
+        {% for i in (1..remaining_needed) %}
+          {% assign index = i | minus: 1 | modulo: metafield_count %}
+          {% assign current_index = 0 %}
+          {% for block in collection.metafields.custom.collection_banner_filter.value %}
+            {% if block.collection and block.banner_image %}
+              {% if current_index == index %}
+                    <div class="wheel__card" onclick="dataLayer.push({ event: 'promoClick', promoClick: { promo_id: '{{ block.collection.value.id }}', promo_name: '{{ block.banner_label | escape | strip_newlines }}', creative_name: 'PLP Banner', destination_url: '{{ block.collection.value.url }}' } })" >                  <a href="{{ block.collection.value.url }}">
+                    {% if block.banner_label %}
+                      <span class="wheel-label">{{ block.banner_label }}</span>
+                    {% endif %}
+                    <picture>
+                      <source
+                        type="image/webp"
+                        srcset="
+                          {{ block.banner_image | image_url: width: 240, format: 'webp' }} 240w,
+                          {{ block.banner_image | image_url: width: 480, format: 'webp' }} 480w
+                        "
+                        sizes="100vw"
+                      >
+                      <source
+                        type="image/jpeg"
+                        srcset="
+                          {{ block.banner_image | image_url: width: 240 }} 240w,
+                          {{ block.banner_image | image_url: width: 480 }} 480w
+                        "
+                        sizes="100vw"
+                      >
+                      <img
+                        src="{{ block.banner_image | image_url: width: 240 }}"
+                        alt="{{ block.banner_label | default: block.collection.value.title }}"
+                        loading="lazy"
+                        decoding="async"
+                        width="auto"
+                        height="auto"
+                      >
+                    </picture>
+                  </a>
+                </div>
+                {% break %}
+              {% endif %}
+              {% assign current_index = current_index | plus: 1 %}
+            {% endif %}
+          {% endfor %}
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  <div class="wheel-wrapper">
+  <div class="wheel">
+    {% comment %} Hardcoded collections data - URL|Title|ImageURL {% endcomment %}
+    {% assign hardcoded_collections = "
+      /collections/all-rings|Rings|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rings.jpg?v=1752557714,
+      /collections/all-earrings|Earrings|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Earrings_5c4ead6a-3784-443d-b42d-5a6cbd37d804.jpg?v=1752557714,
+      /collections/all-bracelets|Bracelets|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Bracelets_6f0b4d8f-8a99-4bf3-ae88-7f709b261ac1.jpg?v=1752557715,
+      /collections/all-necklaces|Necklaces|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Necklaces.jpg?v=1752557715,
+      /collections/mangalsutra-necklaces|Mangalsutra Necklaces|https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Mangalsutra-necklaces.jpg?v=1752557918
+    " | split: "," %}
+    
+    {% comment %} Create 18 items by looping through the 5 collections {% endcomment %}
+    {% for i in (1..18) %}
+      {% assign index = forloop.index0 | modulo: hardcoded_collections.size %}
+      {% assign collection_data = hardcoded_collections[index] | split: "|" %}
+      
+          <div class="wheel__card" onclick="dataLayer.push({ event: 'promoClick', promoClick: { promo_id: '{{ block.collection.value.id }}', promo_name: '{{ block.banner_label | escape | strip_newlines }}', creative_name: 'PLP Banner Click', destination_url: '{{ block.collection.value.url }}' } })" >        
+          <a href="{{ collection_data[0] }}">
+          <span class="wheel-label">{{ collection_data[1] }}</span>
+          <picture>
+            {% comment %} Single source since we only have JPGs {% endcomment %}
+            <source
+              type="image/jpeg"
+              srcset="
+                {{ collection_data[2] }}?width=240 240w,
+                {{ collection_data[2] }}?width=480 480w,
+                {{ collection_data[2] }}?width=720 720w
+              "
+              sizes="(max-width: 480px) 240px, (max-width: 768px) 480px, 720px"
+            >
+            <img
+              src="{{ collection_data[2] }}?width=240"
+              alt="{{ collection_data[1] }}"
+              loading="lazy"
+              decoding="async"
+              width="240"
+              height="240"
+            >
+          </picture>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
 </section>
+
+<style>
+  .curved-slider-section{position:relative;height:550px;overflow:hidden}
+  .curved-slider-section .wheel-wrapper{position:absolute;bottom:-15px;left:50%;transform:translateX(-50%);width:100%;height:670px;overflow:hidden;pointer-events:none;z-index:0}
+  .curved-slider-section .curve-bg{position:absolute;top:0;width:100%;height:710px;background:url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Circle_Frame_2.png?v=1752560510) no-repeat center bottom;background-size:cover;z-index:0}
+  .collection-template-page .header-wrapper {background-attachment: fixed; border: 0;}
+
+  .curved-slider-section .wheel{position:absolute;bottom:140px;left:50%;transform:translateX(-50%);width:1900px;height:1900px;pointer-events:none;z-index:2}
+  .curved-slider-section .wheel__card{position:absolute;width:200px;height:200px;border-radius:50%;overflow:hidden;background:#fff;pointer-events:auto;cursor:pointer}
+  .curved-slider-section .wheel__card img{width:100%;height:100%;object-fit:cover;object-position:bottom}
+
+  .plp-collection-banner__content { margin-bottom: 120px; }
+
+  @media (max-width: 768px) {
+    .curved-slider-section .wheel{cursor:grabbing}
+    .curved-slider-section .wheel__card a{display:block;width:100%;height:100%;position:relative;z-index:10;pointer-events:auto;text-decoration:none;touch-action:manipulation!important;-webkit-tap-highlight-color:transparent}
+    .curved-slider-section .wheel__card{width:120px;height:120px;pointer-events:auto;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-moz-user-select:none;-ms-user-select:none}
+    .curved-slider-section .wheel__card a{display:block;width:100%;height:100%;position:relative;z-index:9999999;pointer-events:auto}
+    .curved-slider-section .wheel__card{width:120px;height:120px;pointer-events:auto;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+    .curved-slider-section .wheel__card a{display:block;width:100%;height:100%;position:relative;z-index:9999999;pointer-events:auto;touch-action:manipulation!important}
+    .curve-bg {height: 280px;}
+    .curved-slider-section  .wheel-wrapper {overflow: visible;  bottom: 165px;}
+    .curved-slider-section {height: 330px; overflow: hidden;}
+    .curved-slider-section .wheel__card { width: 105px; height: 105px; }
+    .curved-slider-section .wheel {width: 600px; height: 600px; bottom: 0;}
+    .curved-slider-section .curve-bg {height: 390px;}
+    .curved-slider-section .wheel-wrapper {bottom: 60px;}
+    
+  }
+  @media only screen and (min-width:1600px) and (max-width:1920px){
+    .curved-slider-section .curve-bg {height: 815px;}
+    .curved-slider-section {height: 620px;}
+    .curved-slider-section .wheel {width: 2000px; height: 2000px; }
+    .curved-slider-section .wheel-wrapper {height: 755px;}
+    .curved-slider-section .wheel__card {width: 240px; height: 240px;}
+    .curved-slider-section .wheel-wrapper { bottom: 0; }
+  }
+  @media only screen and (min-width:1921px) and (max-width:2200px){
+    .curved-slider-section .curve-bg { height: 915px; }
+    .collection-template-page .product-collection-grid {top: 0;}
+    .curved-slider-section .wheel {width: 2600px; height: 2600px; }
+    .curved-slider-section {height: 590px;}
+    .curved-slider-section .wheel-wrapper {bottom: -10px;}
+    .curved-slider-section .wheel__card {width: 240px; height: 240px;}
+  }
+
+  @media only screen and (min-width:2201px) and (max-width:3000px){
+    .curved-slider-section .curve-bg {height: 935px;}
+  }
+</style>
 
 {% endif %}
 
@@ -245,7 +469,6 @@
           height="auto"
           loading="lazy"
           alt="Banner Image"
-          title="Banner Image"
           class="drawer-image"
         >
         <button class="drawer-close">
@@ -264,7 +487,7 @@
       </div>
 
       <div class="drawer-body">
-        <p class="drawer-title">{{ collection.title }}</p>
+        <h2 class="drawer-title">{{ collection.title }}</h2>
         <div class="drawer-description">
           {{ collection.metafields.custom.plp_banner_content }}
         </div>
@@ -273,10 +496,133 @@
         <a href="javascript:void(0);" class="Shopbutton continue-button">Continue Shopping</a>
       </div>
     </div>
-  </div> 
+  </div>
 
   <script>
-
+    document.addEventListener("DOMContentLoaded", () => {
+      gsap.registerPlugin(Draggable);
+  
+      function setupCarousel() {
+        const wheel = document.querySelector(".wheel");
+        if (!wheel) return;
+  
+        const cards = gsap.utils.toArray(".wheel__card");
+        const count = 8;
+        const radius = wheel.offsetWidth / 2;
+        const center = radius;
+        const DEG2RAD = Math.PI / 180;
+  
+        const arc = window.innerWidth < 767 ? 180 : 140;
+        const startAngle = -arc / 2;
+        const slice = arc / (count - 1);
+  
+        cards.forEach((card, i) => {
+          const angle = startAngle + i * slice;
+          const rad = angle * DEG2RAD;
+          const x = center + radius * Math.cos(rad);
+          const y = center + radius * Math.sin(rad);
+          const distanceFromCenter = Math.abs(i - Math.floor(count / 2));
+          const maxDist = Math.floor(count / 2);
+          const opacity = Math.max(0.4, 1 - (distanceFromCenter / maxDist) * 0.6);
+          const scale = Math.max(0.75, 1 - (distanceFromCenter / maxDist) * 0.25);
+  
+          gsap.set(card, {
+            x: x,
+            y: y,
+            xPercent: -50,
+            yPercent: -50,
+            rotation: angle + 270,
+          });
+        });
+  
+        gsap.set(wheel, { rotation: 0 });
+  
+        if (window.wheelDraggable && window.wheelDraggable.kill) {
+          window.wheelDraggable.kill();
+        }
+  
+        const isMobile = window.innerWidth <= 767;
+        let isDragging = false;
+        let touchStartTime = 0;
+        let startX = 0;
+        let startY = 0;
+  
+        window.wheelDraggable = Draggable.create(wheel, {
+          type: "rotation",
+          inertia: true,
+          onDragStart: () => {
+            isDragging = true;
+          },
+          onDragEnd: () => {
+            setTimeout(() => { isDragging = false; }, 50);
+          },
+          onThrowUpdate: updateVisuals,
+          snap: (endValue) => {
+            const snapAngle = 360 / count;
+            return Math.round(endValue / snapAngle) * snapAngle;
+          },
+          allowEvent: (e) => {
+            return !(e.target.closest('a') && isDragging);
+          },
+          onClick: (e) => {
+            if (e.target.closest('a') && isDragging) {
+              return false;
+            }
+          }
+        })[0];
+  
+        // Accurate click on mobile with scale animation
+        if (isMobile) {
+          wheel.addEventListener("touchstart", (e) => {
+            touchStartTime = Date.now();
+            isDragging = false;
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+          });
+  
+          wheel.addEventListener("touchend", (e) => {
+            const timeDiff = Date.now() - touchStartTime;
+            const touch = e.changedTouches[0];
+            const deltaX = Math.abs(touch.clientX - startX);
+            const deltaY = Math.abs(touch.clientY - startY);
+            const moved = deltaX > 10 || deltaY > 10;
+  
+            if (!moved && timeDiff < 250) {
+              const card = e.target.closest(".wheel__card");
+              const link = e.target.closest("a");
+  
+              if (card) {
+                // Feedback animation on mobile tap
+                gsap.fromTo(
+                  card,
+                  { scale: 0.95 },
+                  {
+                    scale: 1,
+                    duration: 0.3,
+                    ease: "power2.out",
+                  }
+                );
+              }
+  
+              if (link) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Delay to show animation before navigating
+                setTimeout(() => link.click(), 150);
+              }
+            }
+          });
+        }
+      }
+  
+      function updateVisuals() {
+        // Optional: animation sync on throw or rotate
+      }
+  
+      setupCarousel();
+      window.addEventListener("resize", setupCarousel);
+    });
   
     document.addEventListener("DOMContentLoaded", function () {
       const openBtns = document.querySelectorAll(".open-drawer-btn");

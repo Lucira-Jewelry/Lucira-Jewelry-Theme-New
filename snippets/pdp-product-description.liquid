@@ -1,30 +1,35 @@
 {% assign variant = product.selected_or_first_available_variant %}
 <div class="pdp-details-main">
   <div class="pdp-details-accordion">
+
+    <!-- Product Information -->
     <div class="pdp-details-accordion-item">
-      <label
-        for="pdp-details-accordion-item-1"
-        class="pdp-details-accordion-item-title"
-        onclick="pushPromo('Product Information')"
-      >
+      <input type="checkbox" id="pdp-details-accordion-item-1" />
+      <label for="pdp-details-accordion-item-1" class="pdp-details-accordion-item-title" onclick="pushPromo('Product Information')">
         Product Information
+        <i class="fa-solid fa-angle-down"></i>
       </label>
       <div class="pdp-details-accordion-item-content">
-        <p id="Sku-{{ section.id }}" class="product__sku">{{ variant.sku }}</p>
-        <div class="product__description rte quick-add-hidden">
-          {{ product.description }}
+        <div>
+          <p class="product__sku{% if block.settings.text_style == 'uppercase' %} caption-with-letter-spacing{% elsif block.settings.text_style == 'subtitle' %} subtitle{% endif %}{% if variant.sku.size == 0 %} visibility-hidden{% endif %}" id="Sku-{{ section.id }}" role="status" {{ block.shopify_attributes }}>
+            {% if variant.sku %}
+              <span class="visually-hidden-">{{ 'products.product.sku' | t }}:</span>
+              {{- variant.sku -}}
+            {% endif %}
+          </p>
+          <div class="product__description rte quick-add-hidden" {{ block.shopify_attributes }}>
+            {{ product.description }}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Metal Information -->
     <div class="pdp-details-accordion-item">
-      <label
-        for="pdp-details-accordion-item-2"
-        class="pdp-details-accordion-item-title"
-        onclick="pushPromo('Metal Information')"
-      >
+      <input type="checkbox" id="pdp-details-accordion-item-2" />
+      <label for="pdp-details-accordion-item-2" class="pdp-details-accordion-item-title" onclick="pushPromo('Metal Information')">
         Metal Information
+        <i class="fa-solid fa-angle-down"></i>
       </label>
       <div class="pdp-details-accordion-item-content">
         <table id="metal-info-table">
@@ -37,593 +42,285 @@
           </thead>
           <tbody>
             <tr id="metal-info-row">
-              <td id="metal-label"></td>
-              <td>
-                <span id="metal-net-weight"></span><br>
-                <span id="metal-gross-weight"></span>
+              <td id="metal-type">
+                {% if variant.metafields.custom.metal_purity %}{{ variant.metafields.custom.metal_purity }} - {% endif %}
+                {% if variant.metafields.custom.metal_color %}{{ variant.metafields.custom.metal_color }}{% endif %}
               </td>
-              <td id="metal-dimensions"></td>
+              <td id="metal-weight">
+                {% if variant.metafields.custom.metal_weight %}Net Wt: {{ variant.metafields.custom.metal_weight }}g<br>{% endif %}
+                {% if variant.metafields.custom.gross_weight %}Gross Wt: {{ variant.metafields.custom.gross_weight }}g{% endif %}
+              </td>
+              <td id="metal-dimensions">
+                {% if variant.metafields.custom.top_width %}Width: {{ variant.metafields.custom.top_width }}mm<br>{% endif %}
+                {% if variant.metafields.custom.top_height %}Height: {{ variant.metafields.custom.top_height }}mm{% endif %}
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
-    <!-- Diamond Information -->
-    <div class="pdp-details-accordion-item" id="diamond-accordion">
-      <label
-        for="pdp-details-accordion-item-3"
-        class="pdp-details-accordion-item-title"
-        onclick="pushPromo('Diamond Information')"
-      >
-        Diamond Information
-      </label>
-      <div class="pdp-details-accordion-item-content">
-        <table id="diamond-info-table">
-          <thead>
-            <tr>
-              <th>TYPE</th>
-              <th>PCS / SHAPE</th>
-              <th>SETTING / WT</th>
-            </tr>
-          </thead>
-          <tbody id="diamond-tbody">
-            <!-- Rows will be dynamically generated -->
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <!-- Diamond Information (rendered server-side for initial variant) -->
+    {% assign diamond_count = 4 %}
+    {% assign show_diamonds = false %}
+    {% for i in (1..diamond_count) %}
+      {% assign type_key = 'diamond_' | append: i | append: '_type_' %}
+      {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+      {% if type_value != blank %}
+        {% assign show_diamonds = true %}
+      {% endif %}
+    {% endfor %}
 
-       <!-- Gemstone Information -->
-    <div class="pdp-details-accordion-item" id="gemstone-accordion">
-      <label
-        for="pdp-details-accordion-item-4"
-        class="pdp-details-accordion-item-title"
-        onclick="pushPromo('Gemstone Information')"
-      >
-        Gemstone Information
-      </label>
-      <div class="pdp-details-accordion-item-content">
-        <table>
-          <thead>
-            <tr>
-              <th>TYPE</th>
-              <th>SHAPE / PCS</th>
-              <th>SETTING / WT</th>
-            </tr>
-          </thead>
-          <tbody id="gemstone-tbody">
-            <!-- Rows will be dynamically generated -->
-          </tbody>
-        </table>
+    {% if show_diamonds %}
+      <div class="pdp-details-accordion-item">
+        <input type="checkbox" id="pdp-details-accordion-item-3" />
+        <label for="pdp-details-accordion-item-3" class="pdp-details-accordion-item-title" onclick="pushPromo('Diamond Information')">
+          Diamond Information
+          <i class="fa-solid fa-angle-down"></i>
+        </label>
+        <div class="pdp-details-accordion-item-content">
+          <table>
+            <thead>
+              <tr>
+                <th>TYPE</th>
+                <th>PCS / SHAPE</th>
+                <th>SETTING / WT</th>
+              </tr>
+            </thead>
+            <tbody id="diamond-table-body">
+              {% for i in (1..diamond_count) %}
+                {% assign type_key = 'diamond_' | append: i | append: '_type_' %}
+                {% assign shape_key = 'diamond_' | append: i | append: '_shape' %}
+                {% assign numbers_key = 'diamond_' | append: i | append: '_numbers' %}
+                {% assign setting_key = 'diamond_' | append: i | append: '_setting' %}
+                {% assign weight_key = 'diamond_' | append: i | append: '_weight' %}
+                {% assign clarity_key = 'diamond_' | append: i | append: '_clarity' %}
+                {% assign color_key = 'diamond_' | append: i | append: '_color' %}
+                {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+                {% if type_value != blank %}
+                  <tr>
+                    <td>{{ type_value }}/ {{ variant.metafields.custom[clarity_key] | metafield_text }} - {{ variant.metafields.custom[color_key] | metafield_text }}</td>
+                    <td>{{ variant.metafields.custom[numbers_key] | metafield_text }} - {{ variant.metafields.custom[shape_key] | metafield_text }}</td>
+                    <td>{{ variant.metafields.custom[setting_key] | metafield_text }}: {{ variant.metafields.custom[weight_key] | metafield_text }}ct</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+    {% endif %}
+
+    <!-- Gemstone Information (rendered server-side for initial variant) -->
+    {% assign gemstone_count = 4 %}
+    {% assign show_gemstones = false %}
+    {% for i in (1..gemstone_count) %}
+      {% assign type_key = 'gemstone_' | append: i | append: '_type_' %}
+      {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+      {% if type_value != blank %}
+        {% assign show_gemstones = true %}
+      {% endif %}
+    {% endfor %}
+
+    {% if show_gemstones %}
+      <div class="pdp-details-accordion-item">
+        <input type="checkbox" id="pdp-details-accordion-item-4"/>
+        <label for="pdp-details-accordion-item-4" class="pdp-details-accordion-item-title" onclick="pushPromo('Gemstone Information')">
+          Gemstone Information
+          <i class="fa-solid fa-angle-down"></i>
+        </label>
+        <div class="pdp-details-accordion-item-content">
+          <table>
+            <thead>
+              <tr>
+                <th>TYPE</th>
+                <th>SHAPE / PCS</th>
+                <th>SETTING / WT</th>
+              </tr>
+            </thead>
+            <tbody id="gemstone-table-body">
+              {% for i in (1..gemstone_count) %}
+                {% assign type_key = 'gemstone_' | append: i | append: '_type_' %}
+                {% assign shape_key = 'gemstone_' | append: i | append: '_shape' %}
+                {% assign numbers_key = 'gemstone_' | append: i | append: '_numbers' %}
+                {% assign setting_key = 'gemstone_' | append: i | append: '_setting' %}
+                {% assign weight_key = 'gemstone_' | append: i | append: '_weight' %}
+                {% assign clarity_key = 'gemstone_' | append: i | append: '_clarity' %}
+                {% assign color_key = 'gemstone_' | append: i | append: '_color' %}
+                {% assign type_value = variant.metafields.custom[type_key] | metafield_text %}
+                {% if type_value != blank %}
+                  <tr>
+                    <td>{{ variant.metafields.custom[color_key] | metafield_text }} - {{ type_value }}</td>
+                    <td>{{ variant.metafields.custom[numbers_key] | metafield_text }} - {{ variant.metafields.custom[shape_key] | metafield_text }}</td>
+                    <td>{{ variant.metafields.custom[setting_key] | metafield_text }}: {{ variant.metafields.custom[weight_key] | metafield_text }}ct</td>
+                  </tr>
+                {% endif %}
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
 
   </div>
 </div>
 
 
+
 <script>
-  // Build variants data with escaped metafields JSON (components approach)
-  var variantsData = {
-    {% for variant in product.variants %}
-    {% assign ornaverse = variant.metafields.ornaverse.components | default: '{}' | strip %}
-    "{{ variant.id }}": '{{ ornaverse | replace: "'", "\\'" | replace: "\n", " " }}'{% unless forloop.last %},{% endunless %}
-    {% endfor %}
-  };
-
-
-  // Build metafields fallback data
-  window.variantMetafields = {};
-
-  {% for v in product.variants %}
-
-    {% assign diamonds_array = "" %}
-    {% for i in (1..4) %}
-      {% assign key_type = "diamond_" | append: i | append: "_type_" %}
-      {% if v.metafields.custom[key_type] != blank %}
-        {% assign key_shape = "diamond_" | append: i | append: "_shape" %}
-        {% assign key_numbers = "diamond_" | append: i | append: "_numbers" %}
-        {% assign key_setting = "diamond_" | append: i | append: "_setting" %}
-        {% assign key_weight = "diamond_" | append: i | append: "_weight" %}
-        {% assign key_clarity = "diamond_" | append: i | append: "_clarity" %}
-        {% assign key_color = "diamond_" | append: i | append: "_color" %}
-
-        {% capture diamond_item %}
-          {
-            "type": {{ v.metafields.custom[key_type] | json }},
-            "shape": {{ v.metafields.custom[key_shape] | json }},
-            "numbers": {{ v.metafields.custom[key_numbers] | json }},
-            "setting": {{ v.metafields.custom[key_setting] | json }},
-            "weight": {{ v.metafields.custom[key_weight] | json }},
-            "clarity": {{ v.metafields.custom[key_clarity] | json }},
-            "color": {{ v.metafields.custom[key_color] | json }}
-          }
-        {% endcapture %}
-
-        {% if forloop.first %}
-          {% assign diamonds_array = diamond_item %}
-        {% else %}
-          {% assign diamonds_array = diamonds_array | append: "," | append: diamond_item %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
-
-    {% assign gemstones_array = "" %}
-    {% for i in (1..4) %}
-      {% assign key_type = "gemstone_" | append: i | append: "_type_" %}
-      {% if v.metafields.custom[key_type] != blank %}
-        {% assign key_shape = "gemstone_" | append: i | append: "_shape" %}
-        {% assign key_numbers = "gemstone_" | append: i | append: "_numbers" %}
-        {% assign key_setting = "gemstone_" | append: i | append: "_setting" %}
-        {% assign key_weight = "gemstone_" | append: i | append: "_weight" %}
-        {% assign key_clarity = "gemstone_" | append: i | append: "_clarity" %}
-        {% assign key_color = "gemstone_" | append: i | append: "_color" %}
-
-        {% capture gemstone_item %}
-          {
-            "type": {{ v.metafields.custom[key_type] | json }},
-            "shape": {{ v.metafields.custom[key_shape] | json }},
-            "numbers": {{ v.metafields.custom[key_numbers] | json }},
-            "setting": {{ v.metafields.custom[key_setting] | json }},
-            "weight": {{ v.metafields.custom[key_weight] | json }},
-            "clarity": {{ v.metafields.custom[key_clarity] | json }},
-            "color": {{ v.metafields.custom[key_color] | json }}
-          }
-        {% endcapture %}
-
-        {% if forloop.first %}
-          {% assign gemstones_array = gemstone_item %}
-        {% else %}
-          {% assign gemstones_array = gemstones_array | append: "," | append: gemstone_item %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
-
-    window.variantMetafields["{{ v.id }}"] = {
-      sku: {{ v.sku | json }},
-      metal_purity: {{ v.metafields.custom.metal_purity | json }},
-      metal_color: {{ v.metafields.custom.metal_color | json }},
-       metal_weight: {{ v.metafields.ornaverse.metal_weight | default: v.metafields.custom.metal_weight | json }},
-      gross_weight: {{ v.metafields.ornaverse.gross_weight | default: v.metafields.custom.gross_weight | json }},
-      top_width: {{ v.metafields.custom.top_width | json }},
-      top_height: {{ v.metafields.custom.top_height | json }},
-      diamonds: [{{ diamonds_array }}],
-      gemstones: [{{ gemstones_array }}]
-    };
-
-  {% endfor %}
-
-  // Helper: robust property finder (case/format tolerant)
-  function getProp(obj, keys) {
-    if (!obj) return undefined;
-    for (var i = 0; i < keys.length; i++) {
-      var k = keys[i];
-      if (k in obj && obj[k] !== null && obj[k] !== undefined && obj[k] !== '') return obj[k];
-    }
-    // fallback: case-insensitive match
-    for (var prop in obj) {
-      for (var j = 0; j < keys.length; j++) {
-        if (prop.toLowerCase() === String(keys[j]).toLowerCase() && obj[prop] !== null && obj[prop] !== undefined && obj[prop] !== '') {
-          return obj[prop];
-        }
-      }
-    }
-    return undefined;
-  }
-
-  function safeNum(v, decimals) {
-    var n = parseFloat(v);
-    if (isNaN(n)) return null;
-    return (typeof decimals === 'number') ? parseFloat(n.toFixed(decimals)) : n;
-  }
+(function(){
 
   function escapeHtml(str) {
-    if (!str) return '';
+    if (str === null || str === undefined) return '';
     return String(str)
-      .replace(/&/g,'&amp;')
-      .replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;')
-      .replace(/'/g,'&#39;');
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
-  // Check if component data exists and is valid
-  function hasValidComponents(variantId) {
-    var raw = variantsData[variantId] || '{}';
-    if (!raw || raw === '{}' || raw === '') return false;
-    try {
-      var parsed = JSON.parse(raw);
-      return parsed.components && Array.isArray(parsed.components) && parsed.components.length > 0;
-    } catch(e) {
-      console.log('Component parse error:', e);
-      return false;
-    }
+  function clearTables() {
+    var d = document.getElementById('diamond-table-body');
+    var g = document.getElementById('gemstone-table-body');
+    if (d) d.innerHTML = '';
+    if (g) g.innerHTML = '';
   }
 
-  // Get metal weights from metafields
-  function getMetalWeightsFromMetafields(variantId) {
+  function updateAccordionForVariant(variantId) {
+    if (!variantId) return;
     var data = window.variantMetafields && window.variantMetafields[variantId];
-    if (!data) return { net: null, gross: null };
-
-    return {
-      net: data.metal_weight,
-      gross: data.gross_weight
-    };
-  }
-
-  // Render using metafields (fallback approach)
-  function renderFromMetafields(variantId) {
-    console.log('Rendering from metafields for variant:', variantId);
-    var data = window.variantMetafields && window.variantMetafields[variantId];
-
     if (!data) {
-      console.warn('No metafield data found for variant', variantId);
-      // Set all to blank
-      document.getElementById('metal-label').textContent = '';
-      document.getElementById('metal-net-weight').textContent = '';
-      document.getElementById('metal-gross-weight').textContent = '';
+      // no metafields for this variant -> clear
+      document.getElementById('metal-type').textContent = '';
+      document.getElementById('metal-weight').textContent = '';
       document.getElementById('metal-dimensions').textContent = '';
-      document.getElementById('diamond-tbody').innerHTML = '';
-      
-      // Handle gemstone tbody - check if it exists
-      var gemstoneTbody = document.getElementById('gemstone-tbody');
-      if (gemstoneTbody) {
-        gemstoneTbody.innerHTML = '';
-      }
-      
-      document.getElementById('diamond-accordion').style.display = 'none';
-      document.getElementById('gemstone-accordion').style.display = 'none';
+      clearTables();
+      // clear SKU
+      var skuEl = document.getElementById('Sku-{{ section.id }}');
+      if (skuEl) skuEl.textContent = '';
       return;
     }
 
-    // Update SKU
-    document.getElementById('Sku-{{ section.id }}').textContent = data.sku || '';
-
-    // METAL Information
-    var metalLabel = [data.metal_purity, data.metal_color].filter(Boolean).join(' - ');
-    document.getElementById('metal-label').textContent = metalLabel || '';
-
-    var netWt = data.metal_weight ? 'Net Wt: ' + data.metal_weight + 'g' : '';
-    var grossWt = data.gross_weight ? 'Gross Wt: ' + data.gross_weight + 'g' : '';
-    document.getElementById('metal-net-weight').textContent = netWt;
-    document.getElementById('metal-gross-weight').textContent = grossWt;
-
-    var dimParts = [];
-    if (data.top_width) dimParts.push('Width: ' + data.top_width + 'mm');
-    if (data.top_height) dimParts.push('Height: ' + data.top_height + 'mm');
-    document.getElementById('metal-dimensions').innerHTML = dimParts.length ? dimParts.join('<br>') : '';
-
-    // DIAMOND Information - Show all diamonds
-    var diamondAccordion = document.getElementById('diamond-accordion');
-    var diamonds = (data.diamonds || []).filter(function(d) { return d.type; });
-
-    if (diamonds.length > 0) {
-      diamondAccordion.style.display = 'block';
-      var diamondTbody = document.getElementById('diamond-tbody');
-      diamondTbody.innerHTML = '';
-
-      diamonds.forEach(function(d) {
-        var row = document.createElement('tr');
-
-        // TYPE cell
-        var typeCell = document.createElement('td');
-        var dType = d.type || '';
-        var dClarity = d.clarity || '';
-        var dColor = d.color || '';
-        var typeParts = [dType];
-        if (dClarity || dColor) {
-          typeParts.push([dClarity, dColor].filter(Boolean).join('-'));
-        }
-        typeCell.textContent = typeParts.filter(Boolean).join(' / ') || '';
-        row.appendChild(typeCell);
-
-        // PCS / SHAPE cell
-        var pcsShapeCell = document.createElement('td');
-        var pcsShape = [d.numbers, d.shape].filter(Boolean).join(' - ');
-        pcsShapeCell.textContent = pcsShape || '';
-        row.appendChild(pcsShapeCell);
-
-        // SETTING / WT cell
-        var settingWtCell = document.createElement('td');
-        var settingWt = d.setting && d.weight ? d.setting + ': ' + d.weight + 'ct' : '';
-        settingWtCell.textContent = settingWt;
-        row.appendChild(settingWtCell);
-
-        diamondTbody.appendChild(row);
-      });
-    } else {
-      diamondAccordion.style.display = 'none';
-      document.getElementById('diamond-tbody').innerHTML = '';
+    // SKU
+    var skuEl = document.getElementById('Sku-{{ section.id }}');
+    if (skuEl) {
+      skuEl.textContent = (data.sku || '');
     }
 
-    // GEMSTONE Information - Show ALL gemstones in table format
-    var gemstoneAccordion = document.getElementById('gemstone-accordion');
-    var gemstones = (data.gemstones || []).filter(function(g) { return g.type; });
+    // Metal
+    var metalType = '';
+    if (data.metal_purity) metalType += data.metal_purity;
+    if (data.metal_color) metalType += (metalType ? ' - ' : '') + data.metal_color;
+    document.getElementById('metal-type').textContent = metalType;
 
-    if (gemstones.length > 0) {
-      gemstoneAccordion.style.display = 'block';
-      var gemstoneTbody = document.getElementById('gemstone-tbody');
-      gemstoneTbody.innerHTML = '';
+    var metalWeight = '';
+    if (data.metal_weight) metalWeight += 'Net Wt: ' + data.metal_weight + 'g<br>';
+    if (data.gross_weight) metalWeight += 'Gross Wt: ' + data.gross_weight + 'g';
+    document.getElementById('metal-weight').innerHTML = metalWeight;
 
-      gemstones.forEach(function(g) {
-        var row = document.createElement('tr');
+    var metalDimensions = '';
+    if (data.top_width) metalDimensions += 'Width: ' + data.top_width + 'mm<br>';
+    if (data.top_height) metalDimensions += 'Height: ' + data.top_height + 'mm';
+    document.getElementById('metal-dimensions').innerHTML = metalDimensions;
 
-        // TYPE cell
-        var typeCell = document.createElement('td');
-        var gColor = g.color || '';
-        var gType = g.type || '';
-        var typeParts = [];
-        if (gColor) typeParts.push(gColor);
-        if (gType) typeParts.push(gType);
-        typeCell.textContent = typeParts.length ? typeParts.join(' - ') : '';
-        row.appendChild(typeCell);
-
-        // PCS / SHAPE cell
-        var pcsShapeCell = document.createElement('td');
-        var pcsShape = [g.numbers, g.shape].filter(Boolean).join(' - ');
-        pcsShapeCell.textContent = pcsShape || '';
-        row.appendChild(pcsShapeCell);
-
-        // SETTING / WT cell
-        var settingWtCell = document.createElement('td');
-        var settingWt = g.setting && g.weight ? g.setting + ': ' + g.weight + 'ct' : '';
-        settingWtCell.textContent = settingWt;
-        row.appendChild(settingWtCell);
-
-        gemstoneTbody.appendChild(row);
-      });
-    } else {
-      gemstoneAccordion.style.display = 'none';
-      document.getElementById('gemstone-tbody').innerHTML = '';
-    }
-  }
-
-  // Extract & render logic for the accordion sections (components approach)
-  function renderFromComponents(variantId) {
-    console.log('Rendering from components for variant:', variantId);
-    var raw = variantsData[variantId] || '{}';
-    var parsed;
-    try {
-      parsed = JSON.parse(raw);
-    } catch(e) {
-      console.error('components JSON parse error for variant', variantId, e, raw);
-      parsed = {};
-    }
-    var comps = parsed.components || [];
-
-    // Initialize defaults to blank
-    document.getElementById('metal-label').textContent = '';
-    document.getElementById('metal-net-weight').textContent = '';
-    document.getElementById('metal-gross-weight').textContent = '';
-    document.getElementById('metal-dimensions').textContent = '';
-
-    document.getElementById('diamond-tbody').innerHTML = '';
-    document.getElementById('gemstone-tbody').innerHTML = '';
-
-    // Hide/show accordions
-    var diamondAccordion = document.getElementById('diamond-accordion');
-    var gemstoneAccordion = document.getElementById('gemstone-accordion');
-
-    // METAL: find Gold/Metal component
-    var metal = comps.find(function(c){
-      var ig = c.item_group_name && String(c.item_group_name).toLowerCase();
-      if (ig && (ig.indexOf('gold') !== -1 || ig.indexOf('metal') !== -1)) return true;
-      if (getProp(c, ['Metal'])) return true;
-      return false;
-    });
-
-    if (metal) {
-      // label e.g. "14KT - Rose Gold"
-      var karat = getProp(metal, ['karat_code','karat','Karat']);
-      var metalName = getProp(metal, ['Metal','item_group_name','metal_label']) || '';
-      var labelParts = [];
-      if (karat && karat !== 'NA') labelParts.push((String(karat).trim()) + 'KT');
-      if (metalName) labelParts.push(String(metalName).trim());
-      document.getElementById('metal-label').textContent = labelParts.length ? labelParts.join(' - ') : (metal.item_group_name || '');
-
-      // ALWAYS get Net & Gross weight from metafields
-      var weights = getMetalWeightsFromMetafields(variantId);
-      document.getElementById('metal-net-weight').textContent = weights.net ? ('Net Wt: ' + safeNum(weights.net,3) + 'g') : '';
-      document.getElementById('metal-gross-weight').textContent = weights.gross ? ('Gross Wt: ' + safeNum(weights.gross,3) + 'g') : '';
-
-      // dimensions
-      var dims = getProp(metal, ['dimensions','Dimensions','size','Size']);
-      if (dims) {
-        document.getElementById('metal-dimensions').textContent = dims;
-      } else {
-        // Try to build from width/height
-        var width = getProp(metal, ['width','Width','top_width']);
-        var height = getProp(metal, ['height','Height','top_height']);
-        if (width || height) {
-          var dimParts = [];
-          if (width) dimParts.push('Width: ' + width + 'mm');
-          if (height) dimParts.push('Height: ' + height + 'mm');
-          document.getElementById('metal-dimensions').innerHTML = dimParts.join('<br>');
+    // Diamonds
+    var diamondBody = document.getElementById('diamond-table-body');
+    if (diamondBody) {
+      var html = '';
+      for (var i = 1; i <= 4; i++) {
+        var d = (data.diamonds && data.diamonds[String(i)]) || {};
+        if (d && d.type) {
+          var clarity = d.clarity || '';
+          var color = d.color || '';
+          var numbers = d.numbers || '';
+          var shape = d.shape || '';
+          var setting = d.setting || '';
+          var weight = d.weight || '';
+          var typeCell = escapeHtml(d.type) + ((clarity || color) ? ('/ ' + escapeHtml(clarity) + '-' + escapeHtml(color)) : '');
+          html += '<tr>';
+          html += '<td>' + typeCell + '</td>';
+          html += '<td>' + escapeHtml(numbers) + ' - ' + escapeHtml(shape) + '</td>';
+          html += '<td>' + escapeHtml(setting) + ': ' + escapeHtml(weight) + 'ct</td>';
+          html += '</tr>';
         }
       }
+      diamondBody.innerHTML = html;
     }
 
-    // DIAMOND: find ALL components with item_group_name 'Diamond'
-    var diamonds = comps.filter(function(c){
-      return c.item_group_name && String(c.item_group_name).toLowerCase().indexOf('diamond') !== -1;
-    });
-
-    if (diamonds.length > 0) {
-      diamondAccordion.style.display = 'block';
-      var diamondTbody = document.getElementById('diamond-tbody');
-      diamondTbody.innerHTML = '';
-
-      diamonds.forEach(function(diamond) {
-        var row = document.createElement('tr');
-
-        // TYPE cell
-        var typeCell = document.createElement('td');
-        var dType = getProp(diamond, ['Type','type']) || '';
-        var quality = getProp(diamond, ['quality_code','quality','clarity']) || '';
-        var colorCode = getProp(diamond, ['stone_color_code','stone_color','color']) || '';
-        var typeParts = [];
-        if (dType) typeParts.push(String(dType));
-        var qualColor = [quality, colorCode].filter(Boolean).join('-');
-        if (qualColor) typeParts.push(qualColor);
-        typeCell.textContent = typeParts.length ? typeParts.join(' / ') : '';
-        row.appendChild(typeCell);
-
-        // PCS / SHAPE cell
-        var pcsShapeCell = document.createElement('td');
-        var pcsShape = getProp(diamond, ['PCs-shape','PCs_shape','pcs-shape','shape-pcs','shape_pcs']);
-        if (!pcsShape) {
-          var pieces = getProp(diamond, ['pieces','Pieces','numbers']);
-          var shape = getProp(diamond, ['shape_code','shape','shapeCode']);
-          if (pieces && shape) pcsShape = pieces + ' - ' + shape;
-          else if (pieces) pcsShape = String(pieces);
-          else if (shape) pcsShape = String(shape);
+    // Gemstones
+    var gemBody = document.getElementById('gemstone-table-body');
+    if (gemBody) {
+      var html = '';
+      for (var i = 1; i <= 4; i++) {
+        var g = (data.gemstones && data.gemstones[String(i)]) || {};
+        if (g && g.type) {
+          html += '<tr>';
+          html += '<td>' + escapeHtml(g.color || '') + ' - ' + escapeHtml(g.type) + '</td>';
+          html += '<td>' + escapeHtml(g.numbers || '') + ' - ' + escapeHtml(g.shape || '') + '</td>';
+          html += '<td>' + escapeHtml(g.setting || '') + ': ' + escapeHtml(g.weight || '') + 'ct</td>';
+          html += '</tr>';
         }
-        pcsShapeCell.textContent = pcsShape || '';
-        row.appendChild(pcsShapeCell);
-
-        // SETTING / WT cell
-        var settingWtCell = document.createElement('td');
-        var dSetting = getProp(diamond, ['setting-weight','setting_weight','settingWeight','setting']);
-        var dWeight = getProp(diamond, ['pointer_weight','pointer-weight','pointerWeight','weight']);
-        if (dSetting && dWeight) {
-          settingWtCell.textContent = dSetting + ': ' + dWeight + 'ct';
-        } else if (dSetting) {
-          settingWtCell.textContent = dSetting;
-        } else if (dWeight) {
-          settingWtCell.textContent = 'Prong: ' + dWeight + 'ct';
-        } else {
-          settingWtCell.textContent = '';
-        }
-        row.appendChild(settingWtCell);
-
-        diamondTbody.appendChild(row);
-      });
-    } else {
-      diamondAccordion.style.display = 'none';
-    }
-
-    // GEMSTONE: find ALL components with item_group_name containing 'gem' or 'stone' (excluding diamond)
-    var gemstones = comps.filter(function(c){
-      var ig = c.item_group_name && String(c.item_group_name).toLowerCase();
-      return ig && (ig.indexOf('gem') !== -1 || ig.indexOf('stone') !== -1) && ig.indexOf('diamond') === -1;
-    });
-
-    if (gemstones.length > 0) {
-      gemstoneAccordion.style.display = 'block';
-      var gemstoneTbody = document.getElementById('gemstone-tbody');
-      gemstoneTbody.innerHTML = '';
-
-      gemstones.forEach(function(gem) {
-        var row = document.createElement('tr');
-
-        // TYPE cell
-        var typeCell = document.createElement('td');
-        var gColor = getProp(gem, ['color','Color','stone_color','stone_color_code']) || '';
-        var gType = getProp(gem, ['type','Type','item_group_name']) || '';
-        var typeParts = [];
-        if (gColor) typeParts.push(gColor);
-        if (gType) typeParts.push(gType);
-        typeCell.textContent = typeParts.length ? typeParts.join(' - ') : '';
-        row.appendChild(typeCell);
-
-        // PCS / SHAPE cell
-        var pcsShapeCell = document.createElement('td');
-        var gShape = getProp(gem, ['shape-pcs','shape_pcs','PCs-shape','pcs-shape']);
-        if (!gShape) {
-          var gPieces = getProp(gem, ['pieces','Pieces','numbers']);
-          var gShapeCode = getProp(gem, ['shape_code','shapeCode','shape']);
-          if (gPieces && gShapeCode) gShape = gPieces + ' - ' + gShapeCode;
-          else if (gPieces) gShape = String(gPieces);
-          else if (gShapeCode) gShape = String(gShapeCode);
-        }
-        pcsShapeCell.textContent = gShape || '';
-        row.appendChild(pcsShapeCell);
-
-        // SETTING / WT cell
-        var settingWtCell = document.createElement('td');
-        var gSetting = getProp(gem, ['setting-weight','setting_weight','settingWeight','setting']);
-        var gWeight = getProp(gem, ['pointer_weight','pointer-weight','pointerWeight','weight']);
-        if (gSetting && gWeight) {
-          settingWtCell.textContent = gSetting + ': ' + gWeight + 'ct';
-        } else if (gSetting) {
-          settingWtCell.textContent = gSetting;
-        } else if (gWeight) {
-          settingWtCell.textContent = 'Prong: ' + gWeight + 'ct';
-        } else {
-          settingWtCell.textContent = '';
-        }
-        row.appendChild(settingWtCell);
-
-        gemstoneTbody.appendChild(row);
-      });
-    } else {
-      gemstoneAccordion.style.display = 'none';
-    }
-
-    // Update SKU
-    document.getElementById('Sku-{{ section.id }}').textContent = parsed.sku || '{{ variant.sku }}';
-  }
-
-  // Main render function with fallback logic
-  function renderForVariant(variantId) {
-    console.log('renderForVariant called with:', variantId);
-    console.log('variantsData:', variantsData);
-    console.log('variantMetafields:', window.variantMetafields);
-
-    // Check if components data exists and is valid
-    if (hasValidComponents(variantId)) {
-      console.log('Using components data for variant', variantId);
-      renderFromComponents(variantId);
-    } else {
-      console.log('Using metafields data for variant', variantId);
-      renderFromMetafields(variantId);
-    }
-  }
-
-  // Initial render and event wiring
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('DOM Content Loaded');
-    var initialVariant = {{ product.selected_or_first_available_variant.id }};
-    console.log('Initial variant:', initialVariant);
-    renderForVariant(initialVariant);
-
-    // Listen to theme variant change event
-    document.addEventListener('variant:change', function(e) {
-      console.log('variant:change event:', e);
-      if (e && e.detail && e.detail.variant && e.detail.variant.id) {
-        renderForVariant(e.detail.variant.id);
       }
-    });
+      gemBody.innerHTML = html;
+    }
+  }
 
-    // Fallback for select / radio changes
-    var selectors = document.querySelectorAll('select[name="id"], input[name="id"], .product-form__input input[type="radio"]');
-    console.log('Found selectors:', selectors.length);
-    selectors.forEach(function(el) {
-      el.addEventListener('change', function(ev) {
-        var val = ev.target.value;
-        console.log('Selector changed to:', val);
-        if (!isNaN(parseInt(val))) renderForVariant(parseInt(val));
-      });
-    });
-  });
-</script>
+  // Push promo helper (for your labels)
+  window.pushPromo = function(promoName) {
+    var currentVariantId = null;
+    // First try to read the currently selected variant id from common selectors
+    var sel = document.querySelector('select[name="id"], input[name="id"]');
+    if (sel) currentVariantId = sel.value || sel.getAttribute('value');
+    // fallback to data stored on window (if your theme sets current variant elsewhere)
+    if (!currentVariantId && window.currentVariant && window.currentVariant.id) currentVariantId = window.currentVariant.id;
+    // fallback to server-warmed variant
+    if (!currentVariantId) currentVariantId = '{{ variant.id }}';
 
-<script>
-  window.pushPromo = function (promoName) {
-    var currentVariantId = document.querySelector('select[name="id"], input[name="id"]')?.value || '{{ variant.id }}';
-    var sku = document.getElementById('Sku-{{ section.id }}').textContent || '';
-
+    var sku = (window.variantMetafields && window.variantMetafields[currentVariantId] && window.variantMetafields[currentVariantId].sku) || '';
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: 'promoClick',
       promoClick: {
         promo_id: sku,
         promo_name: '{{ product.title }}',
-        creative_name: promoName,
-      },
+        creative_name: promoName
+      }
+    });
+  };
+
+  // Listen for variant changes
+  document.addEventListener('DOMContentLoaded', function() {
+    // initial render: use selected id if present, otherwise server-side variant id
+    var initialVariantId = '{{ variant.id }}';
+    var sel = document.querySelector('select[name="id"], input[name="id"]');
+    if (sel && sel.value) initialVariantId = sel.value;
+
+    updateAccordionForVariant(initialVariantId);
+
+    // Theme event (Dawn etc.)
+    document.addEventListener('variant:change', function(e) {
+      var vid = e && e.detail && e.detail.variant && e.detail.variant.id;
+      if (vid) updateAccordionForVariant(vid);
     });
 
-    console.log('GA4 event pushed:', { promo_id: sku, promo_name: '{{ product.title }}', creative_name: promoName });
-  };
+    // select fallback
+    var selector = document.querySelector('select[name="id"], input[name="id"]');
+    if (selector) {
+      selector.addEventListener('change', function() {
+        updateAccordionForVariant(this.value);
+      });
+    }
+
+    // swatch / clickable elements sometimes use data-variant-id
+    document.body.addEventListener('click', function(e) {
+      var el = e.target;
+      if (!el) return;
+      var vid = el.getAttribute && (el.getAttribute('data-variant-id') || el.dataset && el.dataset.variantId);
+      if (vid) {
+        updateAccordionForVariant(vid);
+      }
+    });
+  });
+})();
 </script>

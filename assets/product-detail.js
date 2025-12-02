@@ -25,8 +25,7 @@ document.addEventListener("DOMContentLoaded", function () {
         promo_id: productSku,
         promo_name: productTitle,
         creative_name: "pincodeEntered",
-        promo_position: pincode,
-        pincode: pincode
+        promo_position: pincode
       };
 
       window.dataLayer = window.dataLayer || [];
