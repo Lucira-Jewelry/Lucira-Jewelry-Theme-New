@@ -469,7 +469,7 @@ class ComparisonTableManager {
     this.config = priceGuideConfig;
     this.labGrownRates = {
       'sc': 40000,
-      'vvs': 34000,
+      'vvs': 32000,
       'default': 40000
     };
     
