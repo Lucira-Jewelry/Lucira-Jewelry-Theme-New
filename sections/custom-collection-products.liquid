@@ -1,4 +1,4 @@
-{%- assign skip_card_product_styles = false -%}
+{% comment %} {%- assign skip_card_product_styles = false -%}
 
 {{ 'plp-product-card.css' | asset_url | stylesheet_tag: preload: true }}
 {{ 'product-card.css' | asset_url | stylesheet_tag: preload: true }}
@@ -473,6 +473,483 @@
           "type": "textarea",
           "id": "fact_text",
           "label": "Fact Text"
+        }
+      ]
+    }
+  ],
+
+  "presets": [{ "name": "Custom Collection" }]
+}
+{% endschema %} {% endcomment %}
+
+
+{%- assign skip_card_product_styles = false -%}
+
+{{ 'plp-product-card.css' | asset_url | stylesheet_tag: preload: true }}
+{{ 'product-card.css' | asset_url | stylesheet_tag: preload: true }}
+{{ 'template-collection.css' | asset_url | stylesheet_tag: preload: true }}
+
+<link
+  rel="preload"
+  href="{{ 'component-card.css' | asset_url }}"
+  as="style"
+  onload="this.onload=null;this.rel='stylesheet'"
+>
+<noscript><link rel="stylesheet" href="{{ 'component-card.css' | asset_url }}"></noscript>
+
+{{ 'product-detail.css' | asset_url | stylesheet_tag: preload: true }}
+
+<style>
+  .collection-row{display:flex;gap:30px;align-items:flex-start;margin-bottom:70px}
+  .collection-left{width:70%}
+  .collection-left-inner{display:flex;flex-direction:column;gap:16px}
+  .collection-right{height:355px;width:30%;background:#fbf3ec;padding:24px;border-radius:12px;display:flex;flex-direction:column;overflow:hidden;border:1px solid #00000033}
+  .collection-right .fact-text{overflow-y:auto;overflow-x:hidden}
+  .collection-right .fact-text{font-family:Futura Std;font-weight:300;font-style:Light;font-size:16px;leading-trim:NONE;line-height:150%;letter-spacing:4%;margin:0}
+  .collection-right .fact-text{margin-right:10px}
+  .collection-right .fact-text::-webkit-scrollbar{width:4px}
+  .collection-right .fact-text::-webkit-scrollbar-track{background:0 0}
+  .collection-right .fact-text::-webkit-scrollbar-thumb{background:#ccc;border-radius:3px}
+  .chips_main{display:flex;gap:12px;margin-bottom:40px;margin-top:10px;overflow-x:scroll;overflow-y:hidden;-ms-overflow-style:none;scrollbar-width:none}
+  .chips_main::-webkit-scrollbar{display:none}
+  .chips_capsule{border:1px solid #1a1a1a;padding:10px 28px;border-radius:60px;cursor:pointer}
+  .collection-products-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .facts_head{margin:0;margin-bottom:12px;font-weight:500;font-size:26px;line-height:150%;letter-spacing:4%;vertical-align:middle;text-transform:uppercase}
+  .read-more-btn{padding:inherit;border:#ffdead;background:0 0;cursor:pointer}
+  .fact-text-wrapper{flex:1;overflow-y:scroll}
+  .fact-text-wrapper{overflow-y:auto;-ms-overflow-style:none}
+  .fact-text-wrapper::-webkit-scrollbar{width:2px}
+  .fact-text-wrapper::-webkit-scrollbar-track{box-shadow:inset 0 0 5px grey;border-radius:10px}
+  .fact-text-wrapper::-webkit-scrollbar-thumb{background:#000;border-radius:10px}
+  .fact-text{margin:0}
+  .fact-text ul, .fact-text ol{margin:10px 0;padding-left:20px}
+  .fact-text li{margin:5px 0}
+  .fact-text p{margin:10px 0}
+  .fact-text strong{font-weight:600}
+  .fact-text em{font-style:italic}
+  .flex-row-reverse{flex-direction:row-reverse}
+  .card_4{display:none}
+  .view-all-wrapper{max-width:max-content;margin:0 auto;margin-top:20px}
+  .view-all-wrapper a{color:#fff;background-color:#a68380;padding:16px 24px;font-weight:500;font-size:12px;line-height:100%;letter-spacing:4%;text-transform:uppercase;border-radius:8px}
+  .facts_mob_main{display:none}
+  @media (max-width:768px){
+  .card_4{display:block}
+  .collection-row{flex-direction:column;gap:20px}
+  .collection-left,.collection-right{width:100%}
+  .collection-right{display:none}
+  .facts_mob_main{display:block;margin-bottom:24px;padding:20px;background-color:#fbf3ec;border-radius:12px;border:1px solid #00000033}
+  .facts_head_mob{margin:0 0 10px;font-weight:600;text-transform:uppercase}
+  .collection-products-grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+
+<div class="page-width">
+
+  {% assign index = 0 %}
+
+  {% for block in section.blocks %}
+    {% assign index = index | plus: 1 %}
+    {% assign is_even = index | modulo: 2 %}
+    {% if is_even == 0 %}
+      {% assign is_even = true %}
+    {% else %}
+      {% assign is_even = false %}
+    {% endif %}
+
+    {% if block.type == 'collection_block' %}
+      <div
+        class="collection-row {% if is_even %}flex-row-reverse{% endif %}"
+        id="collection-{{ block.settings.chips_text | handleize }}"
+        {{ block.shopify_attributes }}
+      >
+        <div class="facts_mob_main">
+          <p class="facts_head_mob">{{ block.settings.fact_heading }}</p>
+          <div class="fact-text-wrapper">
+            <div class="fact-text fact-text-rich" data-full-text="{{ block.settings.fact_text }}">
+              {{ block.settings.fact_text | truncate: 120 }}
+              <button class="read-more-btn" onclick="toggleReadMore(this)">Read More</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="collection-left collection-left-inner">
+          {% comment %} Determine source type {% endcomment %}
+          {% assign source_type = block.settings.product_source | default: 'individual' %}
+          
+          {% comment %} Determine collection URL for View All button {% endcomment %}
+          {% if block.settings.collection %}
+            {% assign collection_url = block.settings.collection.url %}
+          {% else %}
+            {% assign collection_url = '#' %}
+          {% endif %}
+
+          {% if source_type == 'individual' %}
+            {% comment %} Individual Products Mode - Direct rendering {% endcomment %}
+            {% assign product_count = 0 %}
+            {% if block.settings.product_1 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+            {% if block.settings.product_2 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+            {% if block.settings.product_3 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+            {% if block.settings.product_4 %}{% assign product_count = product_count | plus: 1 %}{% endif %}
+
+            {% if product_count > 0 %}
+              <div class="collection-products-grid">
+                {% if block.settings.product_1 %}
+                  {% assign selected_product_1 = all_products[block.settings.product_1] %}
+                  {% if selected_product_1 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-1' %}
+                    {% render 'card-product',
+                      card_product: selected_product_1,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+
+                {% if block.settings.product_2 %}
+                  {% assign selected_product_2 = all_products[block.settings.product_2] %}
+                  {% if selected_product_2 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-2' %}
+                    {% render 'card-product',
+                      card_product: selected_product_2,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+
+                {% if block.settings.product_3 %}
+                  {% assign selected_product_3 = all_products[block.settings.product_3] %}
+                  {% if selected_product_3 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-3' %}
+                    {% render 'card-product',
+                      card_product: selected_product_3,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add
+                    %}
+                  {% endif %}
+                {% endif %}
+
+                {% if block.settings.product_4 %}
+                  {% assign selected_product_4 = all_products[block.settings.product_4] %}
+                  {% if selected_product_4 %}
+                    {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-4' %}
+                    <div class="card_4">
+                      {% render 'card-product',
+                        card_product: selected_product_4,
+                        media_aspect_ratio: section.settings.image_ratio,
+                        image_shape: section.settings.image_shape,
+                        show_secondary_image: section.settings.show_secondary_image,
+                        show_vendor: section.settings.show_vendor,
+                        show_rating: section.settings.show_rating,
+                        skip_styles: skip_card_product_styles,
+                        section_id: card_id,
+                        quick_add: section.settings.quick_add
+                      %}
+                    </div>
+                  {% endif %}
+                {% endif %}
+              </div>
+
+              {% if collection_url != '#' %}
+                <div class="view-all-wrapper">
+                  <a href="{{ collection_url }}" class="view-all-btn">
+                    {{ block.settings.button_text }}
+                  </a>
+                </div>
+              {% endif %}
+            {% else %}
+              <p style="text-align: center; padding: 40px 0;">No products selected. Please select at least one product.</p>
+            {% endif %}
+
+          {% else %}
+            {% comment %} Collection Mode with Sorting {% endcomment %}
+            {% if block.settings.collection %}
+              {% assign sort_order = block.settings.price_sort | default: 'default' %}
+              
+              {% if sort_order == 'low_to_high' %}
+                {% assign sorted_products = block.settings.collection.products | sort: 'price' %}
+              {% elsif sort_order == 'high_to_low' %}
+                {% assign sorted_products = block.settings.collection.products | sort: 'price' | reverse %}
+              {% else %}
+                {% assign sorted_products = block.settings.collection.products %}
+              {% endif %}
+
+              <div class="collection-products-grid">
+                {% for product in sorted_products limit: 4 %}
+                  {% assign card_id = 'card-' | append: section.id | append: '-' | append: block.id | append: '-' | append: forloop.index %}
+                  
+                  {% if forloop.index == 4 %}
+                    <div class="card_4">
+                      {% render 'card-product',
+                        card_product: product,
+                        media_aspect_ratio: section.settings.image_ratio,
+                        image_shape: section.settings.image_shape,
+                        show_secondary_image: section.settings.show_secondary_image,
+                        show_vendor: section.settings.show_vendor,
+                        show_rating: section.settings.show_rating,
+                        skip_styles: skip_card_product_styles,
+                        section_id: card_id,
+                        quick_add: section.settings.quick_add,
+                        forloop: forloop
+                      %}
+                    </div>
+                  {% else %}
+                    {% render 'card-product',
+                      card_product: product,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      skip_styles: skip_card_product_styles,
+                      section_id: card_id,
+                      quick_add: section.settings.quick_add,
+                      forloop: forloop
+                    %}
+                  {% endif %}
+                {% endfor %}
+              </div>
+
+              {% if collection_url != '#' %}
+                <div class="view-all-wrapper">
+                  <a href="{{ collection_url }}" class="view-all-btn">
+                    {{ block.settings.button_text }}
+                  </a>
+                </div>
+              {% endif %}
+            {% else %}
+              <p style="text-align: center; padding: 40px 0;">No collection selected. Please select a collection.</p>
+            {% endif %}
+          {% endif %}
+        </div>
+
+        <div class="collection-right">
+          <p class="facts_head">{{ block.settings.fact_heading }}</p>
+          <div class="fact-text-wrapper">
+            <div class="fact-text">
+              {{ block.settings.fact_text }}
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  {% endfor %}
+</div>
+
+<script>
+  function toggleReadMore(btn) {
+    const container = btn.closest('.fact-text-rich');
+    const full = container.getAttribute('data-full-text');
+    const truncated = full.length > 120 ? full.substring(0, 120) : full;
+
+    if (container.classList.contains('expanded')) {
+      container.classList.remove('expanded');
+      container.innerHTML = truncated + ' <button class="read-more-btn" onclick="toggleReadMore(this)">Read More</button>';
+    } else {
+      container.classList.add('expanded');
+      container.innerHTML = full + ' <button class="read-more-btn" onclick="toggleReadMore(this)">Read Less</button>';
+    }
+  }
+
+  function scrollToCollection(handle) {
+    const target = document.getElementById('collection-' + handle);
+    if (!target) return;
+
+    const header = document.querySelector('.sticky-header');
+    const headerHeight = header ? header.offsetHeight : 0;
+
+    const topPos = target.getBoundingClientRect().top + window.scrollY;
+
+    window.scrollTo({
+      top: topPos - headerHeight - 200,
+      behavior: 'smooth',
+    });
+  }
+
+  function updateFactHeights() {
+    if (window.innerWidth <= 768) return;
+
+    document.querySelectorAll('.collection-row').forEach((row) => {
+      const left = row.querySelector('.collection-products-grid');
+      const right = row.querySelector('.collection-right');
+      if (left && right) {
+        right.style.height = left.offsetHeight + 'px';
+      }
+    });
+  }
+
+  window.addEventListener('load', updateFactHeights);
+  window.addEventListener('resize', updateFactHeights);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      if (typeof window.reinitializeProductCards === 'function') {
+        window.reinitializeProductCards();
+      }
+    }, 100);
+  });
+
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      if (typeof window.reinitializeProductCards === 'function') {
+        window.reinitializeProductCards();
+      }
+    }, 200);
+  });
+</script>
+
+{% render 'product-collection-card' %}
+
+{% schema %}
+{
+  "name": "Custom Collection",
+  "settings": [
+    {
+      "type": "select",
+      "id": "image_ratio",
+      "label": "Image Aspect Ratio",
+      "default": "square",
+      "options": [
+        { "label": "Square", "value": "square" },
+        { "label": "Portrait", "value": "portrait" },
+        { "label": "Landscape", "value": "landscape" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "show_secondary_image",
+      "label": "Show secondary image",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_vendor",
+      "label": "Show vendor",
+      "default": false
+    },
+    {
+      "type": "checkbox",
+      "id": "show_rating",
+      "label": "Show rating",
+      "default": false
+    }
+  ],
+
+  "blocks": [
+    {
+      "type": "collection_block",
+      "name": "Collection Block",
+      "settings": [
+        {
+          "type": "header",
+          "content": "Product Source"
+        },
+        {
+          "type": "select",
+          "id": "product_source",
+          "label": "Choose Product Source",
+          "default": "individual",
+          "options": [
+            { "label": "Individual Products", "value": "individual" },
+            { "label": "Collection", "value": "collection" }
+          ]
+        },
+        {
+          "type": "header",
+          "content": "Individual Products"
+        },
+        {
+          "type": "paragraph",
+          "content": "Select up to 4 products. The 4th product will only display on mobile devices."
+        },
+        {
+          "type": "product",
+          "id": "product_1",
+          "label": "Product 1"
+        },
+        {
+          "type": "product",
+          "id": "product_2",
+          "label": "Product 2"
+        },
+        {
+          "type": "product",
+          "id": "product_3",
+          "label": "Product 3"
+        },
+        {
+          "type": "product",
+          "id": "product_4",
+          "label": "Product 4 (Mobile Only)"
+        },
+        {
+          "type": "header",
+          "content": "Collection Settings"
+        },
+        {
+          "type": "paragraph",
+          "content": "Select a collection (displays 4 products, 4th product mobile only)."
+        },
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select Collection"
+        },
+        {
+          "type": "select",
+          "id": "price_sort",
+          "label": "Collection Price Sorting",
+          "info": "Only applies when using collection source",
+          "default": "default",
+          "options": [
+            { "label": "Default (Collection Order)", "value": "default" },
+            { "label": "Price: Low to High", "value": "low_to_high" },
+            { "label": "Price: High to Low", "value": "high_to_low" }
+          ]
+        },
+        {
+          "type": "header",
+          "content": "Display Settings"
+        },
+        {
+          "type": "text",
+          "id": "chips_text",
+          "label": "Chips Name"
+        },
+        {
+          "type": "text",
+          "id": "button_text",
+          "label": "Button Text",
+          "default": "View All"
+        },
+        {
+          "type": "text",
+          "id": "fact_heading",
+          "label": "Fact Heading"
+        },
+        {
+          "type": "richtext",
+          "id": "fact_text",
+          "label": "Fact Text",
+          "info": "Use the rich text editor to add formatting, bullets, and styling"
         }
       ]
     }
