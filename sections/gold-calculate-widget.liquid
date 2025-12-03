@@ -1009,7 +1009,7 @@ input[type=number] {
     });
   });
 </script>
-<script>
+{% comment %} <script>
   $(document).ready(function () {
     let selectedKarat = 9; // Default based on initial HTML selection
 
@@ -1185,6 +1185,185 @@ input[type=number] {
       calculateAndDisplayPrice(); // Recalculate using the newly active mode
     });
   });
+</script> {% endcomment %}
+
+<script>
+  $(document).ready(function () {
+  let selectedKarat = 9; // Default based on initial HTML selection
+
+  // Get the base rate from the data attribute (for 10 grams)
+  const baseRate = parseFloat($('#goldRate').data('base'));
+
+  // Helper function to calculate the rate for 1 gram at a specific karatage
+  function getRateByKarat(baseRate, karat) {
+    const perGramRate = baseRate / 10; // Rate for 1 gram of 24kt
+    return perGramRate * (karat / 24); // Rate for 1 gram of selected karat
+  }
+
+  // Function to update the visible rate display for the selected karat
+  function updateRateDisplay(karat) {
+    const calculatedRate = karat === 24 ? baseRate / 10 : getRateByKarat(baseRate, karat);
+
+    $('.gold-calc__label--desktop').text(`Today's Standard Rate of ${karat}kt Gold`);
+    $('.gold-calc__label--mobile').text(`Today's ${karat}kt Gold Rate`);
+    // Update the gold rate display on the main page (Rate is for 1 gram)
+    $('#goldRate').text(
+      '₹ ' +
+        parseFloat(calculatedRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    );
+  }
+
+  // The core function to calculate and display Gold Price (with/without GST)
+  function calculateAndDisplayPrice() {
+    const weight = parseFloat($('#weightInput').val());
+    const gstResultsContainer = $('#gstResults');
+    const activeKaratText = $('.gold-calc__karat.gold-calc__karat--active').text();
+    const activeKarat = parseInt(activeKaratText.replace('kt', ''));
+
+    // 1. Input Validation
+    if (isNaN(weight) || weight <= 0) {
+      $('#goldCalcResult').hide();
+      gstResultsContainer
+        .html(
+          `
+              <p style="text-align:center; font-size:16px; color:#A68380; margin-top:20px;">
+                  Please enter a valid weight in grams.
+              </p>
+          `
+        )
+        .slideDown();
+      return;
+    }
+
+    // 2. Gold Price Calculation
+    const currentRate = activeKarat === 24 ? baseRate / 10 : getRateByKarat(baseRate, activeKarat);
+
+    const goldPrice = weight * currentRate;
+    const totalExcludingGST = goldPrice.toFixed(2);
+
+    // 3. Update Main Calculator Result (Always Excluding GST)
+    $('#goldValueOutput').text(
+      `₹${parseFloat(totalExcludingGST).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    );
+    $('#goldCalcResult').show();
+
+    // 4. Update GST Calculator Result (Based on active toggle)
+
+    // If 'Excluding GST' is active
+    if ($('.gst-button.excluding-gst').hasClass('active')) {
+      gstResultsContainer
+        .html(
+          `
+              <div class="gst-result-item">
+                  <span class="gst-label">Gold Price</span>
+                  <span class="gst-value" id="goldPriceGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item final-amount">
+                  <p class="gst-label-son">Final Amount <span class="includesmall"> (Excluding GST)</span></p>
+                  <p class="gst-value-son" id="finalAmountGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</p>
+              </div>
+              <p class="gold-calc__note">*This value is not the final value as Gold Rate might change*</p>
+          `
+        )
+        .slideDown();
+    }
+    // If 'Including GST' is active (Default)
+    else {
+      const gstRate = 0.03; // 3% GST on gold
+      const totalGST = goldPrice * gstRate;
+      const finalAmountGST = goldPrice + totalGST;
+      const cgstValue = totalGST / 2; // 1.5%
+      const sgstValue = totalGST / 2; // 1.5%
+
+      gstResultsContainer
+        .html(
+          `
+              <div class="gst-result-item">
+                  <span class="gst-label">Gold Price</span>
+                  <span class="gst-value" id="goldPriceGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item">
+                  <span class="gst-label">CGST (Central GST)</span>
+                  <span class="gst-value" id="cgstValue">₹${cgstValue.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item">
+                  <span class="gst-label">SGST/UTGST (State GST)</span>
+                  <span class="gst-value" id="sgstValue">₹${sgstValue.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item total-gst">
+                  <span class="gst-label">Total GST Amount</span>
+                  <span class="gst-value" id="totalGST">₹${totalGST.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item final-amount">
+                  <p class="gst-label vv">Final Amount <span class="includesmall"> ( Including GST)</span></p>
+                  <p class="gst-value nn" id="finalAmountGST">₹${finalAmountGST.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</p>
+              </div>
+              <p class="gold-calc__note">*This value is not the final value as Gold Rate might change*</p>
+          `
+        )
+        .slideDown();
+    }
+  }
+
+  // --- Initial Setup and Events ---
+
+  // 1. Initial display setup - ONLY update rate display, DO NOT calculate
+  updateRateDisplay(selectedKarat);
+  
+  // Hide results initially
+  $('#goldCalcResult').hide();
+  $('#gstResults').hide();
+
+  // 2. Karat Button Click Handler (Only updates rate display, no auto-calculation)
+  $('.gold-calc__karat').on('click', function () {
+    $('.gold-calc__karat').removeClass('gold-calc__karat--active');
+    $(this).addClass('gold-calc__karat--active');
+
+    selectedKarat = parseInt($(this).text().replace('kt', ''));
+    updateRateDisplay(selectedKarat);
+    
+    // DO NOT auto-calculate here
+  });
+
+  // 3. Weight Input Handler (No auto-calculation)
+  $('#weightInput').on('input', function () {
+    // DO NOT auto-calculate here
+  });
+
+  // 4. Calculate Button - ONLY calculate when clicked
+  $('.gold-calc__button').on('click', calculateAndDisplayPrice);
+
+  // 5. GST Toggle Buttons (Only changes view mode, then recalculates for that mode)
+  $('.gst-button').on('click', function () {
+    $('.gst-button').removeClass('active');
+    $(this).addClass('active');
+    calculateAndDisplayPrice(); // Recalculate using the newly active mode
+  });
+});
 </script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
