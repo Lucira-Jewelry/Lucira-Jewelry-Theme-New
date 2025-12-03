@@ -964,7 +964,82 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
+// pdp-delivery-details
+function luciraLocateMe() {
+  const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
+  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
 
+  // Show loading state
+  submitBtn.innerHTML = "Locating...";
+  submitBtn.disabled = true;
+
+  if (navigator.geolocation) {
+    // Force fresh and accurate location
+    const geoOptions = {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    };
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+
+        const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&timestamp=${Date.now()}`;
+
+        fetch(url)
+          .then((response) => response.json())
+          .then((data) => {
+            if (data.address && data.address.postcode) {
+              pincodeInput.value = data.address.postcode;
+
+              // Trigger input event to update button to Submit
+              pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
+
+              // Push GA4 event
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                event: "promoClick",
+                promoClick: {
+                  promo_id: "{{ product.selected_or_first_available_variant.sku }}",
+                  promo_name: "{{ product.title }}",
+                  creative_name: "Locate Me Clicked"
+                }
+              });
+            } else {
+              alert("Pincode not found for your location.");
+              resetToLocateMe();
+            }
+          })
+          .catch((error) => {
+            console.error("Error fetching pincode:", error);
+            alert("Error fetching pincode. Please try again.");
+            resetToLocateMe();
+          });
+      },
+      (error) => {
+        console.error("Geolocation error:", error);
+        alert("Unable to retrieve location. Please allow location access.");
+        resetToLocateMe();
+      },
+      geoOptions
+    );
+  } else {
+    alert("Geolocation is not supported by this browser.");
+    resetToLocateMe();
+  }
+
+  // helper function to reset button back to "Locate Me"
+  function resetToLocateMe() {
+    submitBtn.innerHTML = `
+      <svg width="16" height="16" class="icon icon-locate">
+        <use xlink:href="#icon-locate"></use>
+      </svg> Locate Me
+    `;
+    submitBtn.disabled = false;
+  }
+}
 
 
 
