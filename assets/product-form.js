@@ -964,32 +964,6 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-document.addEventListener("DOMContentLoaded", function () {
-  const stickyBar = document.getElementById("sticky-add-to-cart");
-  const targetEl = document.querySelector(".small-devicePosition");
-
-  if (!stickyBar || !targetEl) return;
-
-  // Check if target is above the viewport
-  function isElementAboveViewport(el) {
-    const rect = el.getBoundingClientRect();
-    return rect.bottom < 0;
-  }
-
-  // Toggle sticky bar
-  function toggleStickyBar() {
-    const elementAbove = isElementAboveViewport(targetEl);
-    if (elementAbove) {
-      stickyBar.classList.add("show");
-    } else {
-      stickyBar.classList.remove("show");
-    }
-  }
-
-  window.addEventListener("scroll", toggleStickyBar);
-});
-
-
 // pdp-delivery-details
 function luciraLocateMe() {
   const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
