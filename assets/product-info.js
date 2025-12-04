@@ -239,29 +239,22 @@ if (!customElements.get('product-info')) {
 
       updateMetafields(html) {
         const sourceRoot = html.querySelector('product-info') || html;
-
-        // Match elements explicitly marked with data-field OR elements that have an id (covers Ornaverse/json fragments)
-        const sourceElements = Array.from(
-          sourceRoot.querySelectorAll('[data-field], [id]')
+        const fieldElements = Array.from(sourceRoot.querySelectorAll('[data-field]'));
+        const gridIdElements = Array.from(
+          sourceRoot.querySelectorAll('.grid-information [id]')
         );
-
+        const sourceElements = [...fieldElements, ...gridIdElements];
+        const seen = new Set();
         sourceElements.forEach((srcEl) => {
           try {
-            // must have an id to map to a destination
             const id = srcEl.id;
-            if (!id) return;
-
+            if (!id || seen.has(id)) return;
+            seen.add(id);
             const destEl = this.querySelector(`#${id}`);
             if (!destEl) return;
-
-            // copy innerHTML (server truth wins)
             destEl.innerHTML = srcEl.innerHTML;
-
-            // Mirror 'hidden'
             if (srcEl.classList.contains('hidden')) destEl.classList.add('hidden');
             else destEl.classList.remove('hidden');
-
-            // Copy aria- and data- attributes (useful for labels and for data-source=json)
             Array.from(srcEl.attributes).forEach((attr) => {
               if (attr.name === 'id') return;
               if (attr.name.startsWith('data-') || attr.name.startsWith('aria-')) {
@@ -273,7 +266,6 @@ if (!customElements.get('product-info')) {
           }
         });
       }
-
 
       updatePriceBreakup(html) {
         try {
