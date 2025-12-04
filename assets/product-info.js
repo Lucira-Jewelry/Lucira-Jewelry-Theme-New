@@ -273,14 +273,9 @@ if (!customElements.get('product-info')) {
           const src = html.querySelector('#sku-content');
           const dest = this.querySelector('#sku-content');
           if (!src || !dest) return;
-
           dest.innerHTML = src.innerHTML;
-
-          // mirror hidden state if needed
           if (src.classList.contains('hidden')) dest.classList.add('hidden');
           else dest.classList.remove('hidden');
-
-          // copy aria/data attributes if you ever add any
           Array.from(src.attributes).forEach((attr) => {
             if (attr.name === 'id') return;
             if (attr.name.startsWith('data-') || attr.name.startsWith('aria-')) {
