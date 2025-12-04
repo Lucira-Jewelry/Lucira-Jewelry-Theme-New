@@ -164,21 +164,26 @@ window.MainBaseCharm = function () {
     updateMinusButtonsForCap(atCap);
   }
 
-  function updateMinusButtonsForCap(atCap) {
-    document.querySelectorAll('.charm-card').forEach((card) => {
-      const minus = card.querySelector('.qty-decr');
-      const input = card.querySelector('.qty-input');
-      if (!minus || !input) return;
+ function updateMinusButtonsForCap(atCap) {
+  document.querySelectorAll('.charm-card').forEach((card) => {
+    const minus = card.querySelector('.qty-decr');
+    const input = card.querySelector('.qty-input');
+    if (!minus || !input) return;
 
-      const qty = Number(input.value || 0);
-      const shouldDisable = atCap && qty === 0;
+    const qty = Number(input.value || 0);
 
-      minus.disabled = shouldDisable;
-      minus.style.opacity = shouldDisable ? 0.35 : 1;
-      minus.style.pointerEvents = shouldDisable ? 'none' : 'auto';
-      minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
-    });
-  }
+    // ✅ minus tabhi disable jab qty 0 ho
+    const shouldDisable = qty === 0;
+
+    minus.disabled = shouldDisable;
+    minus.style.opacity = shouldDisable ? 0.35 : 1;
+    minus.style.pointerEvents = shouldDisable ? 'none' : 'auto';
+    minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+  });
+}
+
+
+
 
   function setSelectedBorder(card) {
     try {
@@ -911,17 +916,6 @@ class BVCanvas {
         kimg.on('mouseleave', () => {
           document.body.style.cursor = 'default';
           kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
-        });
-
-        kimg.on('click tap', () => {
-          const pid = kimg._productId;
-          if (typeof pid !== 'undefined') {
-            document.dispatchEvent(
-              new CustomEvent('visualiser:remove', {
-                detail: { productId: pid },
-              })
-            );
-          }
         });
 
         this.charmLayer.add(kimg);
