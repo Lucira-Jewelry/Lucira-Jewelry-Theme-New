@@ -75,6 +75,11 @@
               {% assign final_item = found_product | default: fallback_item %}
 
               {% if final_item %}
+                {% assign product_url = final_item.url | default: '' %}
+                {% if product_url == '' %}
+                  {% assign product_url = '/products/' | append: final_item.handle %}
+                {% endif %}
+
                 <div
                   class="related-product-card"
                   data-handle="{{ final_item.handle }}"
@@ -82,23 +87,13 @@
                   data-id="{{ final_item.id }}"
                   data-price="{{ final_item.price | divided_by: 100.0 }}"
                   data-category="{{ final_item.type | escape }}"
-                  onclick="
-                    window.dataLayer = window.dataLayer || [];
-                    window.dataLayer.push({
-                      'event': 'promoClick',
-                      'promoClick': {
-                        'promo_id': '{{ final_item.selected_or_first_available_variant.sku }}',
-                        'promo_name': '{{ final_item.title | escape }}',
-                        'creative_name': 'Match and shine',
-                      }
-                    });
-                    window.location.href = '/products/{{ final_item.handle }}';
-                  "
+                  data-sku="{{ final_item.selected_or_first_available_variant.sku }}"
+                  data-url="{{ product_url }}"
+                  onclick="handleProductClick(this)"
                 >
                   {% render 'card-product', card_product: final_item %}
                 </div>
 
-                {% assign displayed_products = displayed_products | push: final_item.handle %}
                 {% assign counter = counter | plus: 1 %}
               {% endif %}
             {% endif %}
@@ -113,6 +108,28 @@
   </div>
 
   {% render 'product-collection-card' %}
+
+  <script>
+    function handleProductClick(element) {
+      var productUrl = element.getAttribute('data-url');
+      var productName = element.getAttribute('data-name');
+      var productSku = element.getAttribute('data-sku');
+      
+      console.log('Navigating to:', productUrl);
+      
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        'event': 'promoClick',
+        'promoClick': {
+          'promo_id': productSku,
+          'promo_name': productName,
+          'creative_name': 'Match and shine',
+        }
+      });
+      
+      window.location.href = productUrl;
+    }
+  </script>
 
   <style>
     .match-and-shine {
