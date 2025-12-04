@@ -141,7 +141,7 @@
         }
       </style>
 
-      <div>
+      {% comment %} <div>
         <div class="page-width">
           <h2 class="section-heading">You May Also Like</h2>
           <p class="section-sub-heading">Other picks based on your interest</p>
@@ -185,7 +185,81 @@
             {% endfor %}
           </div>
         </div>
+      </div> {% endcomment %}
+      <div>
+      <div class="page-width">
+        <h2 class="section-heading">You May Also Like</h2>
+        <p class="section-sub-heading">Other picks based on your interest</p>
+
+        <div class="product-grid">
+          {% for product_handle in products_to_render %}
+            {% assign related_product = nil %}
+            
+            {% for p in target_collection.products %}
+              {% if p.handle == product_handle %}
+                {% assign related_product = p %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+
+            {% if related_product %}
+              <div
+                class="related-product-card"
+                data-handle="{{ related_product.handle }}"
+                data-name="{{ related_product.title | escape }}"
+                data-id="{{ related_product.id }}"
+                data-price="{{ related_product.price | divided_by: 100.0 }}"
+                data-category="{{ related_product.type | escape }}"
+                data-sku="{{ related_product.selected_or_first_available_variant.sku }}"
+                data-url="{{ related_product.url }}"
+              >
+                {% render 'card-product', card_product: related_product %}
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
       </div>
+    </div>
+
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        // Target only actual product links within the related product cards
+        const productCards = document.querySelectorAll('.related-product-card');
+        
+        productCards.forEach(function(card) {
+          // Find the main product link (adjust selector based on your card-product snippet structure)
+          const productLink = card.querySelector('a[href*="/products/"]');
+          
+          if (productLink) {
+            productLink.addEventListener('click', function(e) {
+              e.preventDefault();
+              
+              const cardData = card.dataset;
+              const productUrl = cardData.url;
+              
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                'event': 'promoClick',
+                'promoClick': {
+                  'promo_id': cardData.sku,
+                  'creative_name': 'You May Also Like',
+                  'promo_name': cardData.name
+                },
+                'event_callback': function() {
+                  window.location.href = productUrl;
+                },
+                'event_timeout': 2000 // Fallback timeout
+              });
+              
+              // Fallback navigation in case callback doesn't fire
+              setTimeout(function() {
+                window.location.href = productUrl;
+              }, 2000);
+            });
+          }
+        });
+      });
+    </script>
     </div>
   {% endif %}
 
