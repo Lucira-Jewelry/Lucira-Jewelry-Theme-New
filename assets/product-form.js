@@ -874,28 +874,23 @@ document.addEventListener('DOMContentLoaded', function() {
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
     const animatedButton = document.querySelector('.animated-cart-btn');
+
     if (!animatedButton) return;
+
     const form = animatedButton.closest('form');
-    const cartIcon = animatedButton.querySelector('.cart-icon');
-    const customCartIcon = animatedButton.querySelector('.custom-cart-icon');
-    const boxIcon = animatedButton.querySelector('.box-icon');
-    [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-      if (icon) icon.style.opacity = '0';
-    });
+
     if (form) {
       form.addEventListener('submit', function (e) {
         if (animatedButton.disabled || animatedButton.classList.contains('cart-animating')) return;
-        [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-          if (icon) icon.style.opacity = '1';
-        });
+
+        // Add animation class - CSS will handle showing/hiding icons
         animatedButton.classList.add('cart-animating');
+
+        // Reset animation after complete
         setTimeout(function () {
           animatedButton.classList.remove('cart-animating');
-          [cartIcon, customCartIcon, boxIcon].forEach((icon) => {
-            if (icon) icon.style.opacity = '0';
-          });
         }, 2000);
       });
     }
   });
-})();
+ })();
