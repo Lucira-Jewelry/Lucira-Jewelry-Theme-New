@@ -1092,6 +1092,7 @@ max-width: 700px !important;
     const locationData = JSON.parse(locationDataEl.textContent);
 
     const RADIUS_KM = 50; // 50km radius
+    const geocodeCache = {}; // Cache geocoded addresses
 
     // Haversine formula to calculate distance between two coordinates
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -1106,8 +1107,49 @@ max-width: 700px !important;
       return R * c;
     }
 
+    // Geocode an address to get coordinates
+    async function geocodeAddress(address) {
+      const cacheKey = address.toLowerCase().trim();
+      
+      // Check cache first
+      if (geocodeCache[cacheKey]) {
+        return geocodeCache[cacheKey];
+      }
+
+      try {
+        // Add delay to respect rate limits
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json&limit=1&countrycodes=in`, {
+          headers: {
+            'User-Agent': 'ShopifyStoreLocator/1.0'
+          }
+        });
+        const data = await response.json();
+        
+        if (data && data.length > 0) {
+          const coords = {
+            lat: parseFloat(data[0].lat),
+            lon: parseFloat(data[0].lon)
+          };
+          geocodeCache[cacheKey] = coords;
+          return coords;
+        }
+        return null;
+      } catch (error) {
+        console.error('Geocoding error:', error);
+        return null;
+      }
+    }
+
     // Geocode pincode to get coordinates
     async function geocodePincode(pincode) {
+      const cacheKey = `pincode_${pincode}`;
+      
+      if (geocodeCache[cacheKey]) {
+        return geocodeCache[cacheKey];
+      }
+
       try {
         const response = await fetch(`https://nominatim.openstreetmap.org/search?postalcode=${pincode}&country=India&format=json&limit=1`, {
           headers: {
@@ -1117,16 +1159,40 @@ max-width: 700px !important;
         const data = await response.json();
         
         if (data && data.length > 0) {
-          return {
+          const coords = {
             lat: parseFloat(data[0].lat),
             lon: parseFloat(data[0].lon)
           };
+          geocodeCache[cacheKey] = coords;
+          return coords;
         }
         return null;
       } catch (error) {
         console.error('Geocoding error:', error);
         return null;
       }
+    }
+
+    // Get store coordinates (from Shopify or geocode the address)
+    async function getStoreCoordinates(store) {
+      // If store has valid coordinates from Shopify, use them
+      if (store.latitude && store.longitude) {
+        return { lat: store.latitude, lon: store.longitude };
+      }
+
+      // Otherwise, geocode the address
+      const addressParts = [];
+      if (store.address1) addressParts.push(store.address1);
+      if (store.address2) addressParts.push(store.address2);
+      if (store.city) addressParts.push(store.city);
+      if (store.province) addressParts.push(store.province);
+      if (store.zip) addressParts.push(store.zip);
+      if (store.country) addressParts.push(store.country);
+
+      const fullAddress = addressParts.join(', ');
+      console.log('Geocoding store address:', fullAddress);
+      
+      return await geocodeAddress(fullAddress);
     }
 
     // Filter and display stores within radius
@@ -1145,15 +1211,28 @@ max-width: 700px !important;
         userLon = coords.lon;
       }
 
-      // Calculate distance for all stores with coordinates
-      const storesWithDistance = locationData
-        .filter(store => store.latitude && store.longitude)
-        .map(store => {
-          const distance = calculateDistance(userLat, userLon, store.latitude, store.longitude);
-          return { ...store, distance };
-        })
-        .filter(store => store.distance <= RADIUS_KM) // Only stores within 50km
-        .sort((a, b) => a.distance - b.distance); // Sort by distance
+      console.log('User location:', userLat, userLon);
+
+      // Get coordinates for all stores and calculate distances
+      const storesWithDistance = [];
+      
+      for (const store of locationData) {
+        const storeCoords = await getStoreCoordinates(store);
+        
+        if (storeCoords) {
+          const distance = calculateDistance(userLat, userLon, storeCoords.lat, storeCoords.lon);
+          console.log(`Store: ${store.name}, Distance: ${distance.toFixed(2)}km`);
+          
+          if (distance <= RADIUS_KM) {
+            storesWithDistance.push({ ...store, distance, coords: storeCoords });
+          }
+        } else {
+          console.warn(`Could not geocode store: ${store.name}`);
+        }
+      }
+
+      // Sort by distance
+      storesWithDistance.sort((a, b) => a.distance - b.distance);
 
       storeList.innerHTML = '';
 
