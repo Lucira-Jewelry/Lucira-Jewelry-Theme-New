@@ -170,6 +170,7 @@ if (!customElements.get('product-info')) {
           this.updateURL(productUrl, variant?.id);
           this.updateVariantInputs(variant?.id);
           this.updateMetafields(html);
+          this.updateSku(html);
           this.updatePriceBreakup(html);
           this.updateComparison?.(html);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
@@ -267,6 +268,30 @@ if (!customElements.get('product-info')) {
         });
       }
 
+      updateSku(html) {
+        try {
+          const src = html.querySelector('#sku-content');
+          const dest = this.querySelector('#sku-content');
+          if (!src || !dest) return;
+
+          dest.innerHTML = src.innerHTML;
+
+          // mirror hidden state if needed
+          if (src.classList.contains('hidden')) dest.classList.add('hidden');
+          else dest.classList.remove('hidden');
+
+          // copy aria/data attributes if you ever add any
+          Array.from(src.attributes).forEach((attr) => {
+            if (attr.name === 'id') return;
+            if (attr.name.startsWith('data-') || attr.name.startsWith('aria-')) {
+              dest.setAttribute(attr.name, attr.value);
+            }
+          });
+        } catch (e) {
+          console.error('updateSku error', e);
+        }
+      }
+
       updatePriceBreakup(html) {
         try {
           const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
@@ -334,6 +359,9 @@ if (!customElements.get('product-info')) {
           console.error('updateComparison error', e);
         }
       }
+
+      
+
 
       updateURL(url, variantId) {
         this.querySelector('share-button')?.updateUrl(
