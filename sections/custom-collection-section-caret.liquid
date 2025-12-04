@@ -1,0 +1,477 @@
+<style>
+.carat-section{text-align:center;max-width:1200px;margin:20px auto}
+.carat-filter{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-bottom:25px}
+.carat-filter-btn{background:#f3ecea;border:none;color:#000;padding:8px 16px;border-radius:50px;font-size:14px;cursor:pointer;transition:.3s}
+.carat-filter-btn.active{background:#b9968d;color:#fff}
+.carat-panels{position:relative}
+.carat-panel{display:none}
+.carat-panel.active{display:block}
+.carat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:25px;justify-items:center}
+.carat-item{text-align:center;width:100%}
+.carat-item img{width:100%;border-radius:10px;transition:.3s}
+.color-group{justify-content:center;flex-wrap:wrap;display:flex}
+.color-option{border:none;background:none;padding:0;cursor:pointer;transition:.3s}
+.color-option img{width:26px;height:26px;border-radius:50%;border:1px solid transparent}
+.color-option.active img{border-color:#000}
+.carat-title{font-size:16px;font-weight:500;margin-top:8px}
+.carat-price{font-size:16px;font-weight:600;margin-top:4px}
+.select-class span{color:#000;border-bottom:1px solid #000;font-size:20px;margin-top:12px;cursor:pointer}
+.carat-price_detail{display:flex;justify-content:center;align-items:baseline;gap:6px}
+.carat-price{font-size:18px;font-weight:600;color:#000}
+.carat-comp_price{font-size:14px;font-weight:500;color:#999;text-decoration:line-through}
+@media screen and (min-width:900px) and (max-width:1600px){
+
+.carat-item img {
+height:300px;
+width:300px;
+}
+.color-option img {
+    width: 20px;
+    height: 20px;
+  
+}
+.carat-title
+ {
+font-size:14px;
+}
+.select-class span{
+font-size:16px;
+}
+.carat-price{
+font-size:14px;
+
+}
+}
+
+@media(max-width:992px){
+  .carat-grid
+  {
+    grid-template-columns:repeat(2,1fr)
+  }
+  .carat-filter {
+margin-bottom:20px;
+  }
+}
+@media(max-width:768px){.carat-grid{grid-template-columns:repeat(2,2fr)}.carat-image{width:100%}.carat-price{font-size:16px}.carat-comp_price{font-size:12px}.select-class span{font-size:16px}}
+</style>
+    {% comment %} <script src="{{ 'custom-collection-section-caret.js' | asset_url }}" defer="defer"></script> {% endcomment %}
+
+<div class="carat-section" id="carat-section-{{ section.id }}">
+  <div class="carat-filter">
+    {% assign carat_options = "14KT,18KT" | split: "," %}
+    {% for carat in carat_options %}
+      <button class="carat-filter-btn {% if forloop.first %}active{% endif %}" data-carat="{{ carat }}">{{ carat }}</button>
+    {% endfor %}
+  </div>
+
+  <div class="carat-panels">
+    {% for block in section.blocks %}
+      {% if block.settings.collection != blank %}
+        {% assign c = collections[block.settings.collection] %}
+        {% if c and c.products_count > 0 %}
+          <div class="carat-panel" id="panel-{{ section.id }}-{{ forloop.index }}" role="tabpanel" data-handle="{{ c.handle }}">
+            <div class="carat-grid">
+              {% for product in c.products %}
+                {% assign has_variant = false %}
+                {% for variant in product.variants %}
+                  {% if variant.title contains '9KT' or variant.title contains '14KT' or variant.title contains '18KT' %}
+                    {% assign has_variant = true %}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+
+                {% if has_variant %}
+                  <div class="carat-item" data-product-id="{{ product.id }}">
+
+                  
+                    <script type="application/json" id="product-data-{{ product.id }}">
+                      {{ product | json }}
+                    </script>
+
+                
+                    <script type="application/json" id="product-mf-{{ product.id }}">
+                      {
+                        "variant_metafields": {
+                          {% for v in product.variants %}
+                            "{{ v.id }}": {
+                              "diamond_1_weight": {{ v.metafields.custom.diamond_1_weight.value | json }},
+                              "metal_weight": {{ v.metafields.custom.metal_weight.value | json }}
+                            }{% unless forloop.last %},{% endunless %}
+                          {% endfor %}
+                        }
+                      }
+                    </script>
+
+                    <div class="carat-image">
+                      <img src="{{ product.featured_image | img_url: '600x' }}"
+                           alt="{{ product.title | escape }}"
+                           class="product-img"
+                           loading="lazy"
+                           width="auto" height="auto">
+                    </div>
+
+                    <div class="color-variants-group">
+                      {% assign color_mapping = "Yellow Gold,Rose Gold,White Gold" | split: "," %}
+                      {% for carat in carat_options %}
+                        <div class="color-group" data-carat="{{ carat }}" {% unless forloop.first %}style="display:none"{% endunless %}>
+                          {% for color in color_mapping %}
+                            {% assign found_variant = null %}
+                            {% assign carat_up = carat | upcase %}
+                            {% assign color_up = color | upcase %}
+                            {% for variant in product.variants %}
+                              {% assign variant_title_up = variant.title | upcase %}
+                              {% if variant_title_up contains carat_up and variant_title_up contains color_up %}
+                                {% assign found_variant = variant %}
+                                {% break %}
+                              {% endif %}
+                            {% endfor %}
+
+                            {% if found_variant %}
+                              {% assign color_icon = '' %}
+                              {% case color %}
+                                {% when 'Yellow Gold' %}
+                                  {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
+                                {% when 'Rose Gold' %}
+                                  {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
+                                {% when 'White Gold' %}
+                                  {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
+                              {% endcase %}
+
+                             
+                              <button
+                                class="color-option "
+                                data-variant-id="{{ found_variant.id }}"
+                                data-carat="{{ carat }}"
+                                data-color="{{ color }}"
+                                data-image-src="{{ found_variant.featured_media | image_url: width:533 }}"
+                                data-image-alt="{{ found_variant.featured_media.alt | escape }}"
+                                data-price="{{ found_variant.price | money }}"
+                                data-compare="{% if found_variant.compare_at_price > found_variant.price %}{{ found_variant.compare_at_price | money }}{% endif %}"
+                                data-product-id="{{ product.id }}"
+                                data-product-title="{{ product.title | escape }}"
+                                title="{{ color }}">
+                                <img src="{{ color_icon }}" alt="{{ color }}" width="30" height="30" loading="lazy">
+                              </button>
+                            {% endif %}
+                          {% endfor %}
+                        </div>
+                      {% endfor %}
+                    </div>
+
+                    <div class="carat-title">{{ product.title }}</div>
+
+                    <div class="carat-price_detail">
+                      {% assign compare_price = product.compare_at_price %}
+                      {% assign current_price = product.price %}
+                      {% if compare_price > current_price %}
+                        <div class="carat-price"><b class="price-text">{{ current_price | money }}</b></div>
+                        <div class="carat-comp_price"><b class="price-comp_text">{{ compare_price | money }}</b></div>
+                      {% else %}
+                        <div class="carat-price"><b class="price-text">{{ current_price | money }}</b></div>
+                      {% endif %}
+                    </div>
+
+                    <div class="select-class" data-carat="{{ carat_options[0] }}"><span>Select</span></div>
+
+                    <script>
+                      const productSizes_{{ product.id }} = [
+                        {% for option in product.options_with_values %}
+                          {% if option.name == 'Size' %}
+                            {% for value in option.values %}
+                              "{{ value }}"{% unless forloop.last %},{% endunless %}
+                            {% endfor %}
+                          {% endif %}
+                        {% endfor %}
+                      ];
+                    </script>
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+<script>
+
+
+document.addEventListener('DOMContentLoaded', function () {
+  document.body.addEventListener('click', function (e) {
+    if (!e.target.closest('.select-class')) return;
+    const step2 = document.querySelector('.progress-steps.svg-steps .step[data-step="2"]');
+    const tpl   = document.getElementById('svg-check');
+    if (step2 && tpl) {
+      step2.innerHTML = '';
+      step2.append(tpl.content.cloneNode(true));
+      step2.dataset.svg = 'check';
+      step2.classList.add('is-complete');
+    }
+  }, { passive: true });
+});
+document.body.addEventListener('click', function (evt) {
+  if (evt.target.closest('.select-class')) {
+    window.progressSteps.complete(2);
+    document.querySelector('.progress-steps.svg-steps')
+      ?.classList.add('step-2-done');
+  }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  const root = document.getElementById('carat-section-{{ section.id }}');
+  if (!root) return;
+
+  const caratBtns = Array.from(root.querySelectorAll('.carat-filter-btn'));
+  const panels = Array.from(root.querySelectorAll('.carat-panel'));
+
+  function ensureActivePanel() {
+    let active = root.querySelector('.carat-panel.active');
+    if (!active && panels.length) {
+      panels.forEach(p => p.classList.remove('active'));
+      panels[0].classList.add('active');
+      active = panels[0];
+    }
+    return active;
+  }
+
+  function getActivePanel() {
+    return root.querySelector('.carat-panel.active') || ensureActivePanel();
+  }
+
+  function applyCaratFilter(carat){
+    if (carat == null) return;
+    caratBtns.forEach(b => b.classList.toggle('active', b.dataset.carat == carat));
+    const panel = getActivePanel();
+    if (!panel) return;
+    const cards = Array.from(panel.querySelectorAll('.carat-item'));
+    cards.forEach(card => {
+      const groups = Array.from(card.querySelectorAll('.color-group'));
+      let anyShown = false;
+      groups.forEach(g => {
+        const match = (g.dataset.carat == carat);
+        g.style.display = match ? '' : 'none';
+        if (match) anyShown = true;
+      });
+      if (!anyShown && groups.length) {
+        groups.forEach((g, i) => g.style.display = i === 0 ? '' : 'none');
+      }
+      const shownGroup = card.querySelector(`.color-group[data-carat="${carat}"]`);
+      const firstSwatch = shownGroup ? shownGroup.querySelector('.color-option') : null;
+      const imgEl = card.querySelector('.product-img');
+      const priceEl = card.querySelector('.price-text');
+         if (firstSwatch) {
+      // 🔹 1) Sab swatches se .active hatao (card level pe)
+      card.querySelectorAll('.color-option').forEach(btn => {
+        btn.classList.remove('active');
+      });
+
+      // 🔹 2) Ab is carat ke group ka first swatch active karo
+      firstSwatch.classList.add('active');
+
+      // 🔹 3) Image & price update karo
+      const newSrc   = firstSwatch.dataset.imageSrc;
+      const newAlt   = firstSwatch.dataset.imageAlt;
+      const newPrice = firstSwatch.dataset.price;
+      if (imgEl && newSrc) {
+        imgEl.setAttribute('src', newSrc);
+        if (newAlt) imgEl.setAttribute('alt', newAlt);
+      }
+      if (priceEl && newPrice) priceEl.textContent = newPrice;
+    }
+
+      const selectBtn = card.querySelector('.select-class');
+      if (selectBtn) selectBtn.dataset.carat = carat;
+    });
+  }
+
+  function switchToHandle(handle){
+    if (!handle) return false;
+    let matched = null;
+    panels.forEach(p => { if (p.dataset.handle === handle) matched = p; });
+    if (!matched) return false;
+    panels.forEach(p => p.classList.remove('active'));
+    matched.classList.add('active');
+    const activeCarat = root.querySelector('.carat-filter-btn.active')?.dataset.carat || caratBtns[0]?.dataset.carat || '9KT';
+    applyCaratFilter(activeCarat);
+    return true;
+  }
+
+  caratBtns.forEach(btn => btn.addEventListener('click', () => {
+    applyCaratFilter(btn.dataset.carat);
+  }));
+
+  const qs = new URLSearchParams(location.search);
+  const urlHandle = (qs.get('collection') || '').trim();
+  let lsHandle = null; try{ lsHandle = localStorage.getItem('selected_chain_type'); }catch(_){}
+  const initialHandle = urlHandle || lsHandle || null;
+
+  if (initialHandle) {
+    const ok = switchToHandle(initialHandle);
+    if (!ok) {
+      ensureActivePanel();
+      applyCaratFilter(root.querySelector('.carat-filter-btn.active')?.dataset.carat || caratBtns[0]?.dataset.carat || '9KT');
+    }
+  } else {
+    ensureActivePanel();
+    applyCaratFilter(root.querySelector('.carat-filter-btn.active')?.dataset.carat || caratBtns[0]?.dataset.carat || '9KT');
+  }
+
+  root.addEventListener('click', e => {
+    const sw = e.target.closest('.color-option');
+    if (!sw) return;
+    const card = sw.closest('.carat-item'); if (!card) return;
+    sw.closest('.color-group')?.querySelectorAll('.color-option').forEach(b=>b.classList.remove('active'));
+    sw.classList.add('active');
+    const imgEl = card.querySelector('.product-img');
+    const priceEl = card.querySelector('.price-text');
+    if (imgEl && sw.dataset.imageSrc) imgEl.src = sw.dataset.imageSrc;
+    if (priceEl && sw.dataset.price)  priceEl.textContent = sw.dataset.price;
+  }, { passive: true });
+});
+
+document.addEventListener('DOMContentLoaded', function(){
+  var root = document.getElementById('carat-section-{{ section.id }}');
+  if (!root) return;
+
+  function safeParse(id){
+    try { var n = document.getElementById(id); return n? JSON.parse(n.textContent||n.innerText||'{}') : {}; } catch(e){ return {}; }
+  }
+
+  function findVariantId(card){
+    if (!card) return null;
+    var sw = card.querySelector('.color-group .color-option.active') || card.querySelector('.color-group .color-option');
+    if (sw){
+      var d = sw.getAttribute('data-variant-id') || sw.dataset.variantId;
+      if (d) return String(d);
+    }
+    var pid = card.getAttribute('data-product-id');
+    var selectBtn = card.querySelector('.select-class');
+    var carat = selectBtn && selectBtn.dataset.carat ? selectBtn.dataset.carat : (sw && (sw.getAttribute('data-carat')||sw.dataset.carat));
+    var color = sw && (sw.getAttribute('data-color')||sw.dataset.color);
+    if (!pid || !carat || !color) return null;
+    try {
+      var prod = safeParse('product-data-' + pid);
+      if (!prod || !Array.isArray(prod.variants)) return null;
+      carat = String(carat).toUpperCase(); color = String(color).toUpperCase();
+      for (var i=0;i<prod.variants.length;i++){
+        var v = prod.variants[i]; if (!v || !v.title) continue;
+        var t = String(v.title).toUpperCase();
+        if (t.indexOf(carat)!==-1 && t.indexOf(color)!==-1) return String(v.id);
+      }
+    } catch(e){ return null; }
+    return null;
+  }
+
+  function findVariantData(variantId, productId){
+    var out = { image: null, title: null };
+    if (variantId){
+      var v = safeParse('variant-meta-' + variantId) || safeParse('product-json-' + variantId);
+      if (v && (v.image || v.featured_image || v.title)) {
+        out.image = v.image || v.featured_image || null;
+        out.title = v.title || v.name || null;
+        if (out.image && out.image.indexOf('//')===0) out.image = window.location.protocol + out.image;
+        return out;
+      }
+    }
+    if (productId){
+      var p = safeParse('product-data-' + productId);
+      if (p && Array.isArray(p.variants)){
+        for (var i=0;i<p.variants.length;i++){
+          var vv = p.variants[i];
+          if (!vv) continue;
+          if (String(vv.id) === String(variantId)){
+            out.image = (vv.featured_image && (vv.featured_image.src||vv.featured_image)) || vv.image || null;
+            out.title = vv.title || vv.name || null;
+            if (out.image && out.image.indexOf('//')===0) out.image = window.location.protocol + out.image;
+            return out;
+          }
+        }
+      }
+    }
+    return out;
+  }
+
+  function parseMf(productId){
+    var m = safeParse('product-mf-' + productId);
+    return m.variant_metafields || {};
+  }
+
+  function updateUI(img, title, sub){
+    try {
+      var i = document.getElementById('lucira-variant-img');
+      var t = document.getElementById('lucira-variant-title');
+      var s = document.getElementById('lucira-variant-sub');
+      if (i && img) i.src = img;
+      if (t && title) t.textContent = title;
+      if (s && sub) s.textContent = sub;
+    } catch(e){}
+  }
+
+  root.addEventListener('click', function(e){
+    var btn = e.target.closest && e.target.closest('.select-class');
+    if (!btn) return;
+    var card = btn.closest && btn.closest('.carat-item');
+    if (!card) return;
+
+    var pid = card.getAttribute('data-product-id') || '';
+    var vid = findVariantId(card);
+    let cardTitle = card.querySelector('.carat-title').innerText.replace(/\s+/g, '');
+    {% comment %} console.log('380------------------------', vid, card.querySelector('.carat-title').innerText.replace(/\s+/g, '')); {% endcomment %}
+    if (!vid){
+      try { localStorage.setItem('SelectedProductFallback', JSON.stringify({ product_id: pid, selected_carat: btn.dataset.carat||null })); } catch(e){}
+      return;
+    }
+
+    var mfMap = parseMf(pid);
+    var mf = mfMap[String(vid)] || {};
+
+    var vd = findVariantData(vid, pid);
+    var payload = {
+      id: String(vid),
+      product_id: String(pid||''),
+      diamond_1_weight: (mf.diamond_1_weight && (mf.diamond_1_weight.value || mf.diamond_1_weight)) || null,
+      metal_weight: (mf.metal_weight && (mf.metal_weight.value || mf.metal_weight)) || null,
+      image: vd.image || null,
+      title: vd.title || null
+    };
+
+    try { localStorage.setItem('SelectedVariant', JSON.stringify(payload)); } catch(e){ console.error(e); }
+    try { localStorage.setItem('SelectedVariantTitle', cardTitle); } catch(e){ console.error(e); }
+
+    var label = {
+      product_id: pid,
+      variant_id: String(vid),
+      carat: btn.dataset.carat || null,
+      diamond_1_weight: payload.diamond_1_weight,
+      metal_weight: payload.metal_weight,
+      image: payload.image,
+      title: payload.title
+    };
+    try { localStorage.setItem('SelectedVariantLabel', JSON.stringify(label)); } catch(e){}
+
+    updateUI(payload.image, payload.title, label.variant_id ? ('Variant: '+label.variant_id) : ('Product: '+(label.product_id||'')));
+  }, { passive: true });
+
+});
+  </script>
+{%- render 'select-popoup-custom' -%}
+
+{% schema %}
+{
+  "name": "Carat Collection Grid ",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "collection_block",
+      "name": "Collection",
+      "settings": [
+        { "type": "collection", "id": "collection", "label": "Choose Collection" },
+        { "type": "text", "id": "tab_label", "label": "Label (optional)" }
+      ]
+    }
+  ],
+  "presets": [
+    { "name": "Carat Grid " }
+  ]
+}
+{% endschema %}
