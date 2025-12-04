@@ -679,7 +679,7 @@
   });
 </script>
 
-<script>
+{% comment %} <script>
   document.addEventListener('DOMContentLoaded', function () {
     const priceBreakupButton = document.querySelector('#price-breakup-button');
     if (!priceBreakupButton) return;
@@ -730,4 +730,70 @@
 
     console.log('GA4 event pushed:', { promo_id: sku, promo_name: '{{ product.title }}', creative_name: promoName });
   };
+</script> {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const productName = '{{ product.title }}';
+  const sku = '{{ product.selected_or_first_available_variant.sku }}';
+  
+  function pushTabClick(creativeName) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        product_name: productName,
+        sku: sku,
+        creative_name: creativeName,
+        location_id: 'PDP Tab Section'
+      }
+    });
+    console.log('✅ Tab Click:', creativeName);
+  }
+
+  function onTabClick(event) {
+    const switchItem = event.target.closest('.contained-switch');
+    if (!switchItem) return;
+    
+    const wrapper = switchItem.closest('.pdp-tab-wrapper');
+    if (!wrapper) return;
+    
+    const tabId = switchItem.getAttribute('data-tab');
+    
+    // Push dataLayer based on tab
+    if (tabId === 'price-breakup') {
+      pushTabClick('Price Breakup');
+    } else if (tabId === 'comparison') {
+      pushTabClick('LGD vs Mined');
+    }
+    
+    const allSwitches = wrapper.querySelectorAll('.contained-switch');
+    allSwitches.forEach(s => s.classList.remove('active'));
+    switchItem.classList.add('active');
+    
+    const index = Array.from(allSwitches).indexOf(switchItem);
+    if (switchItem.parentElement) {
+      switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
+    }
+    
+    const allContents = wrapper.querySelectorAll('.tab-content');
+    allContents.forEach(content => content.classList.remove('active'));
+    
+    const activeContent = wrapper.querySelector(`#${tabId}`);
+    if (activeContent) {
+      activeContent.classList.add('active');
+    }
+  }
+  
+  document.addEventListener('click', onTabClick);
+  document.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      const switchItem = e.target.closest('.contained-switch');
+      if (switchItem) {
+        e.preventDefault();
+        switchItem.click();
+      }
+    }
+  });
+});
 </script>
