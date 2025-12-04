@@ -172,7 +172,17 @@ if (!customElements.get('product-info')) {
           this.updateMetafields(html);
           this.updatePriceBreakup(html);
           this.updateComparison?.(html);
-          
+          const propInputs = html.querySelectorAll('input[id^="prop-"]');
+          propInputs.forEach((src) => {
+            const dest = document.getElementById(src.id);
+            if (dest && dest.value !== src.value) {
+              dest.value = src.value;
+
+              // Trigger input & change events so scripts using these fields react correctly
+              dest.dispatchEvent(new Event('input', { bubbles: true }));
+              dest.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
 
           if (!variant) {
             this.setUnavailable();
