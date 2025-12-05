@@ -4,12 +4,18 @@ document.addEventListener("DOMContentLoaded", function () {
   function s(n){ return isFinite(Number(n)) ? Number(n) : 0; }
 
   function fmt(v){ 
-    try {
-      return Number(v).toLocaleString('en-IN',{style:'currency',currency:'INR'});
-    } catch(e){
-      return String(v);
-    }
+  try {
+    return Number(v).toLocaleString('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  } catch (e) {
+    return String(v);
   }
+}
+
 
   function getLS(k){ 
     try {
