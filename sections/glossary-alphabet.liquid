@@ -2476,9 +2476,24 @@
     });
   });
 
+  // Function to set active letter
+  function setActiveLetter(letter) {
+    document.querySelectorAll('.alphabet-link, .alphabet-btn').forEach((l) => {
+      l.classList.remove('active');
+    });
+    
+    // Activate all elements with this letter
+    document.querySelectorAll(`[data-letter="${letter}"]`).forEach((l) => {
+      l.classList.add('active');
+    });
+  }
+
   // Smooth scroll to letter
   function scrollToLetter(letter) {
     calculateOffsets(); // Recalculate offsets before scrolling
+    
+    // Immediately set the clicked letter as active
+    setActiveLetter(letter);
     
     const section = document.getElementById(`letter-${letter}`);
     if (!section) return;
@@ -2501,7 +2516,7 @@
     }
   }
 
-  // Alphabet link clicks
+  // Alphabet link clicks - FIXED
   document.querySelectorAll('.alphabet-link').forEach((link) => {
     link.addEventListener('click', function (e) {
       e.preventDefault();
@@ -2510,30 +2525,65 @@
     });
   });
 
-  // Active letter highlighting on scroll
+  // Mobile alphabet button clicks - FIXED
+  document.querySelectorAll('.alphabet-btn').forEach((button) => {
+    button.addEventListener('click', function () {
+      const letter = this.dataset.letter;
+      scrollToLetter(letter);
+    });
+  });
+
+  // Active letter highlighting on scroll - IMPROVED
   let ticking = false;
+  let scrollTimeout;
+  
   window.addEventListener('scroll', function () {
     if (!ticking) {
       window.requestAnimationFrame(function () {
-        const sections = document.querySelectorAll('.letter-section');
-        const scrollPos = window.pageYOffset + 300;
+        // Clear any existing timeout
+        if (scrollTimeout) clearTimeout(scrollTimeout);
+        
+        // Set a timeout to delay the scroll-based highlighting
+        // This prevents conflicts with click-based highlighting
+        scrollTimeout = setTimeout(function() {
+          const sections = document.querySelectorAll('.letter-section');
+          const scrollPos = window.pageYOffset + (window.innerWidth <= 968 ? 200 : 150);
 
-        sections.forEach((section) => {
-          const top = section.offsetTop;
-          const bottom = top + section.offsetHeight;
-          const letter = section.dataset.letter;
+          let activeLetter = null;
+          let closestDistance = Infinity;
 
-          if (scrollPos >= top && scrollPos < bottom) {
+          // Find the section closest to the current scroll position
+          sections.forEach((section) => {
+            const top = section.offsetTop;
+            const bottom = top + section.offsetHeight;
+            const letter = section.dataset.letter;
+
+            if (scrollPos >= top && scrollPos < bottom) {
+              activeLetter = letter;
+            }
+            
+            // Calculate distance from section top to scroll position
+            const distance = Math.abs(top - scrollPos);
+            if (distance < closestDistance) {
+              closestDistance = distance;
+              // If no active section found yet, use the closest one
+              if (!activeLetter) {
+                activeLetter = letter;
+              }
+            }
+          });
+
+          if (activeLetter) {
             document.querySelectorAll('.alphabet-link, .alphabet-btn').forEach((l) => {
               l.classList.remove('active');
             });
-            document.querySelectorAll(`[data-letter="${letter}"]`).forEach((l) => {
+            document.querySelectorAll(`[data-letter="${activeLetter}"]`).forEach((l) => {
               l.classList.add('active');
             });
           }
-        });
 
-        ticking = false;
+          ticking = false;
+        }, 100); // 100ms delay to prevent rapid updates during smooth scroll
       });
       ticking = true;
     }
@@ -2546,6 +2596,30 @@
       outline: 2px solid #333;
       outline-offset: -2px;
     }
+    
+    /* Ensure active state is visible */
+    .alphabet-link.active,
+    .alphabet-btn.active {
+      background: #333 !important;
+      color: #fff !important;
+      border-color: #333 !important;
+    }
   `;
   document.head.appendChild(style);
+  
+  // Set initial active state based on first visible section on page load
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      const sections = document.querySelectorAll('.letter-section');
+      if (sections.length > 0) {
+        const firstSection = sections[0];
+        const firstLetter = firstSection.dataset.letter;
+        
+        // Check if we're at the top of the page
+        if (window.pageYOffset < 100) {
+          setActiveLetter(firstLetter);
+        }
+      }
+    }, 500);
+  });
 </script>
