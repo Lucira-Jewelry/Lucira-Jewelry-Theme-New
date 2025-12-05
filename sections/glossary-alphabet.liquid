@@ -1060,7 +1060,7 @@
   </div>
 </div>
 
-<script>
+{% comment %} <script>
   // Enhanced search functionality
   function setupSearch(inputClass) {
     const input = document.querySelector(`.${inputClass}`);
@@ -1264,7 +1264,221 @@
   style.textContent = `
     mark {
       background-color: #fffacd;
-      color: yellow;
+      color: #333;
+      padding: 1px 3px;
+      border-radius: 2px;
+      font-weight: 600;
+    }
+    
+    .search-input:focus {
+      outline: 2px solid #333;
+      outline-offset: -2px;
+    }
+  `;
+  document.head.appendChild(style);
+</script> {% endcomment %}
+
+<script>
+  // Mobile accordion - MUST BE DEFINED FIRST
+  function toggleAccordion() {
+    const content = document.querySelector('.accordion-content');
+    const icon = document.querySelector('.accordion-icon');
+    if (content && icon) {
+      content.classList.toggle('open');
+      icon.classList.toggle('open');
+    }
+  }
+
+  // Store offset values globally
+  let DESKTOP_OFFSET, MOBILE_OFFSET;
+
+  // Calculate offsets dynamically
+  function calculateOffsets() {
+    if (window.innerWidth <= 968) {
+      const mobileSticky = document.querySelector('.sticky-search-mobile');
+      MOBILE_OFFSET = mobileSticky ? mobileSticky.offsetHeight + 62 + 20 : 200;
+    } else {
+      const stickySearch = document.querySelector('.sticky-search-container');
+      DESKTOP_OFFSET = stickySearch ? stickySearch.offsetHeight + 20 : 100;
+    }
+  }
+
+  // Calculate on load and resize
+  window.addEventListener('load', calculateOffsets);
+  window.addEventListener('resize', calculateOffsets);
+
+  // Enhanced search functionality
+  function setupSearch(inputClass) {
+    const input = document.querySelector(`.${inputClass}`);
+    if (!input) return;
+
+    input.addEventListener('input', function (e) {
+      const query = e.target.value.toLowerCase().trim();
+      const sections = document.querySelectorAll('.letter-section');
+      const terms = document.querySelectorAll('.term-item');
+      const noResults = document.querySelector('.no-results');
+      let hasResults = false;
+
+      // Clear search if query is empty
+      if (query === '') {
+        sections.forEach((s) => {
+          s.style.display = 'block';
+          const sectionTerms = s.querySelectorAll('.term-item');
+          sectionTerms.forEach((t) => (t.style.display = 'block'));
+        });
+        noResults.style.display = 'none';
+        return;
+      }
+
+      // Hide all sections and terms initially
+      sections.forEach((s) => {
+        s.style.display = 'none';
+        const sectionTerms = s.querySelectorAll('.term-item');
+        sectionTerms.forEach((t) => (t.style.display = 'none'));
+      });
+
+      // Split query into individual words
+      const searchWords = query.split(/\s+/).filter((word) => word.length > 0);
+
+      sections.forEach((section) => {
+        const sectionTerms = section.querySelectorAll('.term-item');
+        let sectionHasMatch = false;
+
+        sectionTerms.forEach((term) => {
+          const termText = term.dataset.term || '';
+          const termDef = term.dataset.def || '';
+          const combinedText = (termText + ' ' + termDef).toLowerCase();
+
+          // Check if ALL search words are found in the term
+          const allWordsMatch = searchWords.every((word) => combinedText.includes(word));
+
+          if (allWordsMatch) {
+            term.style.display = 'block';
+            sectionHasMatch = true;
+            hasResults = true;
+          }
+        });
+
+        // Show section if it has any matching terms
+        if (sectionHasMatch) {
+          section.style.display = 'block';
+        }
+      });
+
+      // Show/hide no results message
+      noResults.style.display = hasResults ? 'none' : 'block';
+
+      // Highlight search terms in results
+      if (hasResults && searchWords.length > 0) {
+        highlightSearchTerms(searchWords);
+      } else {
+        removeHighlights();
+      }
+    });
+  }
+
+  // Function to highlight search terms in the results
+  function highlightSearchTerms(searchWords) {
+    const terms = document.querySelectorAll('.term-item[style="display: block;"]');
+
+    terms.forEach((term) => {
+      const titleElement = term.querySelector('.term-title');
+      const defElement = term.querySelector('.term-definition');
+
+      if (titleElement && defElement) {
+        let titleText = titleElement.textContent;
+        let defText = defElement.textContent;
+
+        // Highlight each search word
+        searchWords.forEach((word) => {
+          const regex = new RegExp(`(${word})`, 'gi');
+          titleText = titleText.replace(regex, '<mark>$1</mark>');
+          defText = defText.replace(regex, '<mark>$1</mark>');
+        });
+
+        titleElement.innerHTML = titleText;
+        defElement.innerHTML = defText;
+      }
+    });
+  }
+
+  // Function to remove highlights
+  function removeHighlights() {
+    document.querySelectorAll('.term-item').forEach((term) => {
+      const titleElement = term.querySelector('.term-title');
+      const defElement = term.querySelector('.term-definition');
+
+      if (titleElement) {
+        titleElement.innerHTML = titleElement.textContent;
+      }
+      if (defElement) {
+        defElement.innerHTML = defElement.textContent;
+      }
+    });
+  }
+
+  // Initialize search for both desktop and mobile
+  setupSearch('desktop-search');
+  setupSearch('mobile-search');
+
+  // Clear search when clicking on alphabet links
+  document.querySelectorAll('.alphabet-link, .alphabet-btn').forEach((link) => {
+    link.addEventListener('click', function () {
+      // Clear search inputs
+      document.querySelectorAll('.search-input').forEach((input) => {
+        input.value = '';
+      });
+
+      // Trigger search to show all results
+      document.querySelectorAll('.search-input').forEach((input) => {
+        input.dispatchEvent(new Event('input'));
+      });
+
+      // Remove highlights
+      removeHighlights();
+    });
+  });
+
+  // FIXED: Smooth scroll to letter
+  function scrollToLetter(letter) {
+    calculateOffsets(); // Recalculate offsets before scrolling
+    
+    const section = document.getElementById(`letter-${letter}`);
+    if (!section) return;
+
+    const offset = window.innerWidth <= 968 ? MOBILE_OFFSET : DESKTOP_OFFSET;
+    const elementPosition = section.getBoundingClientRect().top;
+    const offsetPosition = elementPosition + window.pageYOffset - offset;
+
+    window.scrollTo({
+      top: offsetPosition,
+      behavior: 'smooth'
+    });
+
+    // Close accordion on mobile
+    if (window.innerWidth <= 968) {
+      const content = document.querySelector('.accordion-content');
+      if (content && content.classList.contains('open')) {
+        toggleAccordion();
+      }
+    }
+  }
+
+  // Alphabet link clicks
+  document.querySelectorAll('.alphabet-link').forEach((link) => {
+    link.addEventListener('click', function (e) {
+      e.preventDefault();
+      const letter = this.dataset.letter;
+      scrollToLetter(letter);
+    });
+  });
+
+  // Add CSS for highlight
+  const style = document.createElement('style');
+  style.textContent = `
+    mark {
+      background-color: #fffacd;
+      color: #333;
       padding: 1px 3px;
       border-radius: 2px;
       font-weight: 600;
