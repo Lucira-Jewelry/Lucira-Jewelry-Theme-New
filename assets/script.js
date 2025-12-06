@@ -15,6 +15,7 @@ document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
   });
 });
 
+
 // Lazy load videos when they enter viewport
 document.addEventListener("DOMContentLoaded", function() {
   const lazyVideos = [].slice.call(document.querySelectorAll("video.lazy-video"));
@@ -210,25 +211,108 @@ $(document).ready(function () {
 });
 
 $(document).ready(function(){
-    $('.pdp-match-shine-slider').slick({
-      slidesToShow: 3,
-      slidesToScroll: 1,
-      infinite: true,
-      centerMode: false,
-      centerPadding: '15%',
-      prevArrow: '<button type="button" class="slick-prev pdp-match-shine-slider-btn"><i class="fas fa-angle-left"></i></button>',
-      nextArrow: '<button type="button" class="slick-next pdp-match-shine-slider-btn"><i class="fas fa-angle-right"></i></button>',
-      responsive: [
-        {
-          breakpoint: 750,
-          settings: {
-            arrows: false,
-            slidesToShow: 1,
-            centerMode: true,
-          }
-        },
-      ]
-    });
+  $('.pdp-match-shine-slider').slick({
+    slidesToShow: 3,
+    slidesToScroll: 1,
+    infinite: true,
+    centerMode: false,
+    centerPadding: '15%',
+    prevArrow: '<button type="button" class="slick-prev pdp-match-shine-slider-btn"><i class="fas fa-angle-left"></i></button>',
+    nextArrow: '<button type="button" class="slick-next pdp-match-shine-slider-btn"><i class="fas fa-angle-right"></i></button>',
+    responsive: [
+      {
+        breakpoint: 750,
+        settings: {
+          arrows: false,
+          slidesToShow: 1,
+          centerMode: true,
+        }
+      },
+    ]
   });
+});
 
+(function() {
+  function getParam(param) {
+    return new URLSearchParams(window.location.search).get(param);
+  }
+  function setCookie(name, value, days = 90) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days*24*60*60*1000));
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`;
+  }
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+  const utm_source = getParam('utm_source');
+  const utm_medium = getParam('utm_medium');
+  const utm_campaign = getParam('utm_campaign');
+  const utm_term = getParam('utm_term');
+  const utm_content = getParam('utm_content');
+  const gclid = getParam('gclid');
+  const fbclid = getParam('fbclid');
+  const referrer = document.referrer;
+  const hasUTM = utm_source && utm_medium && utm_campaign;
+  const isDirect = (!referrer || referrer.includes(window.location.hostname)) && !hasUTM;
+  const isReferral = referrer && !hasUTM && !referrer.includes(window.location.hostname);
+  const existingSource = getCookie('utm_source');
+  const existingMedium = getCookie('utm_medium');
+  if (hasUTM) {
+    setCookie('utm_source', utm_source);
+    setCookie('utm_medium', utm_medium);
+    setCookie('utm_campaign', utm_campaign);
+    if (utm_term) setCookie('utm_term', utm_term);
+    if (utm_content) setCookie('utm_content', utm_content);
+    if (gclid) setCookie('gclid', gclid);
+    if (fbclid) setCookie('fbclid', fbclid);
+  } else if (isReferral) {
+    if (!existingSource || !existingMedium) {
+      const link = document.createElement('a');
+      link.href = referrer;
+      setCookie('utm_source', link.hostname);
+      setCookie('utm_medium', 'referral');
+    }
+  } else if (isDirect) {
+    if (!existingSource) {
+      console.log('Direct traffic, first-time visitor, no cookies stored.');
+    }
+  }
+})();
 
+(function() {
+  function getCookie(name) {
+    const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+
+  function collectCookies() {
+    return document.cookie.split(';').reduce((acc, c) => {
+      const [key, value] = c.trim().split('=');
+      acc[key] = decodeURIComponent(value);
+      return acc;
+    }, {});
+  }
+  function sendWebhook(eventType, data) {
+    fetch('https://cookies-webhook-385594025448.asia-south1.run.app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: eventType, ...data })
+    }).catch(console.error);
+  }
+
+  // --- Product View ---
+  if (window.location.pathname.includes('/products/')) {
+    const productHandle = window.location.pathname.split('/products/')[1].split('/')[0];
+    sendWebhook('product_view', { product_handle: productHandle, cookies: collectCookies() });
+  }
+
+  // --- Add To Cart ---
+  document.addEventListener('submit', function(e) {
+    const form = e.target.closest('form[action^="/cart/add"]');
+    if(!form) return;
+    const formData = new FormData(form);
+    const productId = formData.get('id');
+    sendWebhook('add_to_cart', { product_id: productId, cookies: collectCookies() });
+  });
+})();
