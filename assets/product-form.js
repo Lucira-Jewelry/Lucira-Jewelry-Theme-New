@@ -716,7 +716,8 @@ document.addEventListener("DOMContentLoaded", function () {
       window.dataLayer.push({
         event: "promoClick",
         promoClick: {
-          creative_name: "Customize Button Clicked",
+          promo_id:'{{ product.selected_or_first_available_variant.sku }}',
+          creative_name: 'Customize Button Clicked',
           location_id:'Pdp'
         }
       });
