@@ -451,7 +451,7 @@ document.addEventListener("DOMContentLoaded", function () {
         promo_name: productTitle,
         creative_name: "pincodeEntered",
         promo_position: pincode,
-        pincode: pincode
+        location_id: "pdp"
       };
 
       window.dataLayer = window.dataLayer || [];
