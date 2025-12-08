@@ -6,16 +6,19 @@
   "
 >
   <div class="interlocked-container">
+    
+    <!-- LEFT IMAGE -->
     <div class="interlocked-left">
       {% if section.settings.left_image %}
         <img
           src="{{ section.settings.left_image | image_url: width: 900 }}"
-          alt="rating-left-image"
+          alt="interlocked-left-image"
           loading="lazy"
         >
       {% endif %}
     </div>
 
+    <!-- RIGHT CONTENT -->
     <div class="interlocked-right">
       <h2 class="interlocked-heading">{{ section.settings.heading }}</h2>
       <p class="interlocked-subheading">{{ section.settings.subheading }}</p>
@@ -23,24 +26,30 @@
       <h3 class="rating-title">{{ section.settings.rating_heading }}</h3>
 
       <div class="rating-wrapper">
-        {% for i in (1..4) %}
-          <div class="rating-item">
-            <div
-              class="rating-circle"
-              data-rating="{{ section.settings.rating_value }}"
-            >
-              <span class="rating-value">{{ section.settings.rating_value }}</span>
+
+        {% for block in section.blocks %}
+        <div class="rating-item">
+          <div class="rating-circle" data-rating="{{ block.settings.rating_value }}">
+            <svg width="90" height="90">
+              <circle class="bg" cx="45" cy="45" r="40" stroke-width="6" />
+              <circle class="progress" cx="45" cy="45" r="40" stroke-width="6" />
+            </svg>
+            <div class="rating-text">
+              <span>{{ block.settings.rating_value }}</span>
               <small>out of 5</small>
             </div>
-            <p class="rating-sub">{{ section.settings.rating_subheading }}</p>
           </div>
+          <p class="rating-sub">{{ block.settings.rating_subheading }}</p>
+        </div>
         {% endfor %}
+
       </div>
 
       {% if section.settings.cta_text != blank %}
         <a href="#" class="rating-cta">{{ section.settings.cta_text }}</a>
       {% endif %}
     </div>
+
   </div>
 </section>
 
@@ -58,7 +67,7 @@
 
 .interlocked-left img {
   width: 100%;
-  max-width: 550px;
+  max-width: 580px;
 }
 
 .interlocked-heading {
@@ -89,31 +98,55 @@
   text-align: center;
 }
 
+/* CIRCULAR STROKE RING */
 .rating-circle {
-  width: 85px;
-  height: 85px;
-  border-radius: 50%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  width: 90px;
+  height: 90px;
   position: relative;
-  font-size: 20px;
-  background: conic-gradient(#ddd 0deg, #ddd 360deg);
-  transition: background 1s ease;
 }
 
-.rating-circle.filled {
-  /* Filled via JS dynamically */
+.rating-circle svg {
+  transform: rotate(-90deg);
 }
 
-.rating-circle span {
+.rating-circle circle {
+  fill: none;
+  stroke-linecap: round;
+}
+
+/* Background Ring */
+.rating-circle .bg {
+  stroke: #ddd;
+}
+
+/* Animated Border */
+.rating-circle .progress {
+  stroke: #a58885;
+  stroke-dasharray: 251;
+  stroke-dashoffset: 251;
+  transition: stroke-dashoffset 1.2s ease;
+}
+
+.rating-circle.filled .progress {
+  stroke-dashoffset: var(--progress-offset);
+}
+
+.rating-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -52%);
+  text-align: center;
+}
+
+.rating-text span {
   font-size: 20px;
   font-weight: bold;
 }
 
-.rating-circle small {
+.rating-text small {
   font-size: 10px;
+  display: block;
   margin-top: -3px;
 }
 
@@ -123,6 +156,7 @@
   color: #6a6a6a;
 }
 
+/* CTA */
 .rating-cta {
   padding: 10px 25px;
   background: #a58885;
@@ -154,17 +188,14 @@
 document.addEventListener("DOMContentLoaded", function () {
   const observer = new IntersectionObserver(
     (entries) => {
-      entries.forEach((entry) => {
+      entries.forEach(entry => {
         if (entry.isIntersecting) {
-          const circles = document.querySelectorAll(".rating-circle");
-
-          circles.forEach((circle) => {
+          
+          document.querySelectorAll(".rating-circle").forEach(circle => {
             let rating = parseFloat(circle.dataset.rating);
-            let percent = (rating / 5) * 360;
+            let percentage = (rating / 5) * 251; // circumference
 
-            circle.style.background =
-              `conic-gradient(#a58885 ${percent}deg, #ddd ${percent}deg)`;
-
+            circle.style.setProperty("--progress-offset", 251 - percentage);
             circle.classList.add("filled");
           });
 
@@ -183,37 +214,34 @@ document.addEventListener("DOMContentLoaded", function () {
 {% schema %}
 {
   "name": "Interlocked Rating",
+
   "settings": [
     {
       "type": "range",
       "id": "mt_desktop",
       "label": "Margin Top (Desktop)",
-      "min": 0,
-      "max": 100,
+      "min": 0, "max": 100,
       "default": 40
     },
     {
       "type": "range",
       "id": "mb_desktop",
       "label": "Margin Bottom (Desktop)",
-      "min": 0,
-      "max": 100,
+      "min": 0, "max": 100,
       "default": 40
     },
     {
       "type": "range",
       "id": "mt_mobile",
       "label": "Margin Top (Mobile)",
-      "min": 0,
-      "max": 100,
+      "min": 0, "max": 100,
       "default": 20
     },
     {
       "type": "range",
       "id": "mb_mobile",
       "label": "Margin Bottom (Mobile)",
-      "min": 0,
-      "max": 100,
+      "min": 0, "max": 100,
       "default": 20
     },
 
@@ -239,25 +267,8 @@ document.addEventListener("DOMContentLoaded", function () {
     {
       "type": "text",
       "id": "rating_heading",
-      "label": "Rating Heading",
+      "label": "Rating Title",
       "default": "RECOMMENDED FOR"
-    },
-
-    {
-      "type": "range",
-      "id": "rating_value",
-      "label": "Rating Value (Out of 5)",
-      "min": 0,
-      "max": 5,
-      "step": 0.1,
-      "default": 3.5
-    },
-
-    {
-      "type": "text",
-      "id": "rating_subheading",
-      "label": "Rating Subheading",
-      "default": "Party Wear"
     },
 
     {
@@ -267,6 +278,33 @@ document.addEventListener("DOMContentLoaded", function () {
       "default": "EXPLORE SIMILAR DESIGN"
     }
   ],
+
+  "blocks": [
+    {
+      "type": "rating",
+      "name": "Rating Item",
+      "settings": [
+        {
+          "type": "range",
+          "id": "rating_value",
+          "label": "Rating (0 - 5)",
+          "min": 0,
+          "max": 5,
+          "step": 0.1,
+          "default": 3.5
+        },
+        {
+          "type": "text",
+          "id": "rating_subheading",
+          "label": "Rating Label",
+          "default": "Party Wear"
+        }
+      ]
+    }
+  ],
+
+  "max_blocks": 4,
+
   "presets": [
     {
       "name": "Interlocked Rating"
