@@ -10,10 +10,10 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_POSITION = 0.62;
 
   const SIZE_MULTIPLIER = 2.0;
-  const VERTICAL_LIFT_PX = 20;
 
-  const ARC_START_DEG = 205;
-  const ARC_END_DEG = 335;
+
+  const ARC_START_DEG = 210;
+  const ARC_END_DEG = 330;
 
   const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
@@ -24,7 +24,7 @@ window.MainBaseCharm = function () {
 
   const CHAIN_CENTER_Y_FACTOR = 0.42;
   const CHAIN_RADIUS_FACTOR = 0.55;
-  const CHARM_ATTACH_OFFSET_FACTOR = 0.015;
+  const CHARM_ATTACH_OFFSET_FACTOR = 0.008;
   const CHARM_TOUCH_OVERLAP = 3;
 
   const $ = (id) => document.getElementById(id);
@@ -870,18 +870,19 @@ class BVCanvas {
 
     this._placedCharmPositions = [];
 
-    const geom =
-      this._chainGeom || {
-        center: {
-          x: this.stageSize / 2,
-          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-        },
-        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
-      };
+   const geom =
+  this._chainGeom || {
+    center: {
+      x: this.stageSize / 2,
+      y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+    },
+    radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+  };
 
-    const chainR = geom.radius;
-    const CHARM_GAP = 4;
-    const charmR = chainR - CHARM_GAP;
+const chainR = geom.radius;
+
+const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
+
 
     for (let i = 0; i < count; i++) {
       const c = charms[i];
@@ -1067,52 +1068,60 @@ class BVCanvas {
 
   // ---------- MAIN ZOOM ENTRY (slider / buttons / wheel) ----------
 
-  setZoom(scale, opts = { animate: true }) {
-    const stage = this.stage;
-    if (!stage) return;
+ setZoom(scale, opts = { animate: true }) {
+  const stage = this.stage;
+  if (!stage) return;
 
-    // clamp
-    scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
-    this.zoomFactor = scale;
-    const animate = opts && opts.animate !== false;
+  // clamp
+  scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+  this.zoomFactor = scale;
 
-   const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
+  const animate = opts && opts.animate !== false;
+  const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
 
-if (hasCharms) {
-  // ✅ Agar charms placed hain → har zoom level pe unhi ke around zoom/pan
-  this._focusCharmsAtScale(scale, animate);
-} else {
-  // ✅ Agar charms nahi hain → purane jaise chain center ke around zoom
   const center = {
     x: this.stageSize / 2,
     y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
   };
-  const posX = center.x - center.x * scale;
-  const posY = center.y - center.y * scale;
 
-  if (animate) {
-    stage.to({
-      scaleX: scale,
-      scaleY: scale,
-      x: posX,
-      y: posY,
-      duration: 0.18,
-    });
+  const applyCenterZoom = () => {
+    const posX = center.x - center.x * scale;
+    const posY = center.y - center.y * scale;
+
+    if (animate) {
+      stage.to({
+        scaleX: scale,
+        scaleY: scale,
+        x: posX,
+        y: posY,
+        duration: 0.18,
+      });
+    } else {
+      stage.scale({ x: scale, y: scale });
+      stage.position({ x: posX, y: posY });
+      stage.batchDraw();
+    }
+  };
+
+  if (!hasCharms || scale <= 1.0001) {
+    // ✅ ya to charms hi nahi, ya user min zoom pe hai
+    //    → full necklace / chain-center view
+    applyCenterZoom();
   } else {
-    stage.scale({ x: scale, y: scale });
-    stage.position({ x: posX, y: posY });
-    stage.batchDraw();
+    // ✅ charms present + zoom > 1
+    //    → charms ke bounding box ke around focus
+    this._focusCharmsAtScale(scale, animate);
   }
+
+  if (this.slider) {
+    this.slider.value = scale.toFixed(2);
+    this._updateZoomTrack && this._updateZoomTrack();
+  }
+
+  // sirf zoom > 1 pe drag allow
+  stage.draggable(scale > 1);
 }
 
-
-    if (this.slider) {
-      this.slider.value = scale.toFixed(2);
-      this._updateZoomTrack && this._updateZoomTrack();
-    }
-
-    stage.draggable(scale > 1);
-  }
 }
 
 
