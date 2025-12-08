@@ -709,21 +709,19 @@ function initEngraving() {
 document.addEventListener("DOMContentLoaded", function () {
   var customizeBtn = document.getElementById("product_variant_drawer");
 
-//   if (customizeBtn) {
-//     customizeBtn.addEventListener("click", function () {
-//       window.dataLayer = window.dataLayer || [];
+  if (customizeBtn) {
+    customizeBtn.addEventListener("click", function () {
+      window.dataLayer = window.dataLayer || [];
 
-//       window.dataLayer.push({
-//         event: "promoClick",
-//         promoClick: {
-//           promo_id:'{{ product.selected_or_first_available_variant.sku }}',
-//           creative_name: "Customize Button Clicked",
-//           location_id:"Pdp"
-//         }
-//       });    
-//     });
-//   }
-// });
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          creative_name: "Customize Button Clicked"
+        }
+      });
+    });
+  }
+});
 
 
 // pdp-delivery-details
