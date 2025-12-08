@@ -762,9 +762,8 @@ function luciraLocateMe() {
               window.dataLayer.push({
                 event: "promoClick",
                 promoClick: {
-                  promo_id: "{{ product.selected_or_first_available_variant.sku }}",
-                  promo_name: "{{ product.title }}",
-                  creative_name: "Locate Me Clicked"
+                  creative_name:"Locate Me Clicked",
+                  location_id:"Pdp"
                 }
               });
             } else {
