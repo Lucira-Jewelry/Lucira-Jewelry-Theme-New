@@ -717,8 +717,8 @@ document.addEventListener("DOMContentLoaded", function () {
         event: "promoClick",
         promoClick: {
           promo_id:'{{ product.selected_or_first_available_variant.sku }}',
-          creative_name: 'Customize Button Clicked',
-          location_id:'Pdp'
+          creative_name: "Customize Button Clicked",
+          location_id:"Pdp"
         }
       });
     });
