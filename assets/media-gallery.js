@@ -570,19 +570,18 @@ if (!customElements.get('media-gallery')) {
 
   function initialize() {
     if (isInitialized) return;
-    
+
     cacheDOMElements();
     if (!mediaList) return;
 
     currentSelectedColor = getSelectedColor();
-    
+
     const wrapper = mediaList.closest('.media-gallery-wrapper');
     if (wrapper) {
       wrapper.classList.add('loaded');
     }
 
     safeReorderByColor(currentSelectedColor);
-    playAllVideos();
     setupVariantChangeListeners();
     isInitialized = true;
   }
