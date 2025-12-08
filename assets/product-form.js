@@ -716,7 +716,8 @@ document.addEventListener("DOMContentLoaded", function () {
       window.dataLayer.push({
         event: "promoClick",
         promoClick: {
-          creative_name: "Customize Button Clicked"
+          creative_name: "Customize Button Clicked",
+          location_id:"Pdp"
         }
       });
     });
