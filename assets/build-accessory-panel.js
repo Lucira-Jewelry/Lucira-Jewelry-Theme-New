@@ -19,7 +19,7 @@ window.MainBaseCharm = function () {
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
-  const MIN_ZOOM = 0.5;
+  const MIN_ZOOM = 1.0;
   const MAX_ZOOM = 2.0;
 
   const CHAIN_CENTER_Y_FACTOR = 0.42;
@@ -1076,34 +1076,35 @@ class BVCanvas {
     this.zoomFactor = scale;
     const animate = opts && opts.animate !== false;
 
-    const isMaxZoom = scale >= MAX_ZOOM - 0.0001;
+   const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
 
-    if (isMaxZoom && this._placedCharmPositions && this._placedCharmPositions.length) {
-      // 🔥 full zoom: focus directly on charms area
-      this._focusCharmsAtScale(scale, animate);
-    } else {
-      // normal zoom: center on chain arc
-      const center = {
-        x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-      };
-      const posX = center.x - center.x * scale;
-      const posY = center.y - center.y * scale;
+if (hasCharms) {
+  // ✅ Agar charms placed hain → har zoom level pe unhi ke around zoom/pan
+  this._focusCharmsAtScale(scale, animate);
+} else {
+  // ✅ Agar charms nahi hain → purane jaise chain center ke around zoom
+  const center = {
+    x: this.stageSize / 2,
+    y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+  };
+  const posX = center.x - center.x * scale;
+  const posY = center.y - center.y * scale;
 
-      if (animate) {
-        stage.to({
-          scaleX: scale,
-          scaleY: scale,
-          x: posX,
-          y: posY,
-          duration: 0.18,
-        });
-      } else {
-        stage.scale({ x: scale, y: scale });
-        stage.position({ x: posX, y: posY });
-        stage.batchDraw();
-      }
-    }
+  if (animate) {
+    stage.to({
+      scaleX: scale,
+      scaleY: scale,
+      x: posX,
+      y: posY,
+      duration: 0.18,
+    });
+  } else {
+    stage.scale({ x: scale, y: scale });
+    stage.position({ x: posX, y: posY });
+    stage.batchDraw();
+  }
+}
+
 
     if (this.slider) {
       this.slider.value = scale.toFixed(2);
