@@ -717,7 +717,7 @@ document.addEventListener("DOMContentLoaded", function () {
         event: "promoClick",
         promoClick: {
           creative_name: "Customize Button Clicked",
-          location_id:"Pdp"
+          location_id:'Pdp'
         }
       });
     });
