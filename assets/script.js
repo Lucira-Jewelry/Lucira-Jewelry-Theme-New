@@ -79,24 +79,49 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 jQuery(document).ready(function () {
-  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").append(
-    "<i class='fa fa-angle-down accordion-icon' aria-hidden='true'></i>"
-  );
   
+  const plusIcon = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <mask id="mask0_10852_4780" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+    <rect width="24" height="24" fill="#D9D9D9"/>
+    </mask>
+    <g mask="url(#mask0_10852_4780)">
+    <path d="M11.25 12.75H6.25C6.0375 12.75 5.85942 12.6781 5.71575 12.5342C5.57192 12.3904 5.5 12.2122 5.5 11.9997C5.5 11.7871 5.57192 11.609 5.71575 11.4655C5.85942 11.3218 6.0375 11.25 6.25 11.25H11.25V6.25C11.25 6.0375 11.3219 5.85942 11.4658 5.71575C11.6096 5.57192 11.7878 5.5 12.0003 5.5C12.2129 5.5 12.391 5.57192 12.5345 5.71575C12.6782 5.85942 12.75 6.0375 12.75 6.25V11.25H17.75C17.9625 11.25 18.1406 11.3219 18.2843 11.4658C18.4281 11.6096 18.5 11.7878 18.5 12.0003C18.5 12.2129 18.4281 12.391 18.2843 12.5345C18.1406 12.6782 17.9625 12.75 17.75 12.75H12.75V17.75C12.75 17.9625 12.6781 18.1406 12.5342 18.2843C12.3904 18.4281 12.2122 18.5 11.9997 18.5C11.7871 18.5 11.609 18.4281 11.4655 18.2843C11.3218 18.1406 11.25 17.9625 11.25 17.75V12.75Z" fill="#666"/>
+    </g>
+    </svg>
+  `;
+
+  const closeIcon = `
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <mask id="mask0_10852_4798" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+    <rect width="24" height="24" fill="#D9D9D9"/>
+    </mask>
+    <g mask="url(#mask0_10852_4798)">
+    <path d="M12 13.0635L8.75377 16.3095C8.60893 16.4545 8.43335 16.5253 8.22702 16.522C8.02052 16.5188 7.84485 16.4448 7.70002 16.3C7.55518 16.1552 7.48277 15.9779 7.48277 15.7682C7.48277 15.5586 7.55518 15.3813 7.70002 15.2365L10.9365 12L7.69052 8.77874C7.54552 8.6339 7.47468 8.45665 7.47802 8.24699C7.48118 8.03749 7.55518 7.86032 7.70002 7.71549C7.84485 7.57049 8.0221 7.49799 8.23177 7.49799C8.44143 7.49799 8.61868 7.57049 8.76352 7.71549L12 10.9615L15.2213 7.71549C15.3661 7.57049 15.5417 7.49799 15.748 7.49799C15.9545 7.49799 16.1302 7.57049 16.275 7.71549C16.4302 7.87049 16.5078 8.05024 16.5078 8.25474C16.5078 8.45924 16.4302 8.6339 16.275 8.77874L13.0385 12L16.2845 15.2462C16.4295 15.3911 16.502 15.5667 16.502 15.773C16.502 15.9795 16.4295 16.1552 16.2845 16.3C16.1295 16.4552 15.9498 16.5327 15.7453 16.5327C15.5408 16.5327 15.3661 16.4552 15.2213 16.3L12 13.0635Z" fill="#666"/>
+    </g>
+    </svg>
+  `;
+
+
+  jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").append(
+    `<span class="accordion-icon">${plusIcon}</span>`
+  );
+
   jQuery(".pdp-details-accordion .pdp-details-accordion-item-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
-    
+
     if (jQuery(this).hasClass("active")) {
       jQuery(this).removeClass("active");
-      icon.removeClass("fa-angle-up").addClass("fa-angle-down");
+      icon.html(plusIcon);
     } else {
       jQuery(this).addClass("active");
-      icon.removeClass("fa-angle-down").addClass("fa-angle-up");
+      icon.html(closeIcon);
     }
-    
+
     jQuery(this).next(".pdp-details-accordion-item-content").slideToggle();
   });
 });
+
 
 $(document).ready(function () {
   let initialized = false;
