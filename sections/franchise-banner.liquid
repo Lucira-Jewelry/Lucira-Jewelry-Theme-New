@@ -845,7 +845,6 @@
   .franchise-hero-enhanced__image {
     position: absolute;
     overflow: hidden;
-    {% comment %} border-radius: 6px; {% endcomment %}
     background-color: #f5f5f5;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   }
@@ -979,12 +978,42 @@
     height: calc(90vh - 80px);
     max-height: 600px;
     overflow: hidden;
+    position: relative;
   }
 
   .franchise-iframe-wrapper iframe {
     width: 100%;
     height: 100%;
     border: none;
+  }
+
+  .franchise-loading-message {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 18px;
+    color: #666;
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .franchise-loading-message.active {
+    display: flex;
+  }
+
+  .franchise-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #A68380;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 
   @media (max-width: 1200px) {
@@ -1180,25 +1209,37 @@
     <h3 class="franchise-topic">{{ section.settings.form_title }}</h3>
     
     <div class="franchise-iframe-wrapper">
-     <iframe 
-        src="https://docs.google.com/forms/d/e/1FAIpQLScNWHT4WkZTuS8DCCQUOvM7MeUrdOrwqKxxcYfsEJUlapR5CQ/viewform?usp=sharing&ouid=113968896276132378000"
+      <iframe 
+        id="franchiseFormIframe"
+        src="https://docs.google.com/forms/d/e/1FAIpQLScNWHT4WkZTuS8DCCQUOvM7MeUrdOrwqKxxcYfsEJUlapR5CQ/viewform?embedded=true"
         frameborder="0"
         marginheight="0"
         marginwidth="0"
         loading="lazy">
         Loading…
-      </iframe> 
+      </iframe>
+      
+      <div class="franchise-loading-message" id="franchiseLoadingMessage">
+        <div class="franchise-spinner"></div>
+        <div>Submitting your form...</div>
+      </div>
     </div>
   </div>
 </div>
 
-
 <script>
+  // Store the monitoring interval
+  let formMonitoringInterval = null;
+  let formSubmitted = false;
+
   function openFranchiseOverlay() {
     const overlay = document.getElementById('franchiseOverlay');
     overlay.style.display = 'flex';
     document.body.classList.add('no-scroll');
 
+    // Reset state
+    formSubmitted = false;
+    
     // Track event in dataLayer
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
@@ -1207,20 +1248,164 @@
       formType: 'google_form',
       timestamp: new Date().toISOString()
     });
+
+    // Start monitoring for form submission
+    startFormMonitoring();
   }
 
   function closeFranchiseOverlay() {
     const overlay = document.getElementById('franchiseOverlay');
     overlay.style.display = 'none';
     document.body.classList.remove('no-scroll');
+    
+    // Stop monitoring
+    if (formMonitoringInterval) {
+      clearInterval(formMonitoringInterval);
+      formMonitoringInterval = null;
+    }
+    
+    // Reload iframe to reset form
+    const iframe = document.getElementById('franchiseFormIframe');
+    iframe.src = iframe.src;
+    
+    // Hide loading message
+    document.getElementById('franchiseLoadingMessage').classList.remove('active');
   }
 
+  function startFormMonitoring() {
+    const iframe = document.getElementById('franchiseFormIframe');
+    let checkCount = 0;
+    const maxChecks = 600; // Check for 5 minutes max (600 * 500ms = 5 minutes)
+    
+    // Clear any existing interval
+    if (formMonitoringInterval) {
+      clearInterval(formMonitoringInterval);
+    }
+    
+    // Method 1: Try to monitor iframe URL (will work if same-origin)
+    formMonitoringInterval = setInterval(() => {
+      checkCount++;
+      
+      try {
+        // Try to access iframe location (will throw error if cross-origin)
+        const iframeLocation = iframe.contentWindow.location.href;
+        
+        // Check if URL contains "formResponse" which indicates submission
+        if (iframeLocation.includes('formResponse') && !formSubmitted) {
+          formSubmitted = true;
+          handleFormSubmission();
+        }
+      } catch (e) {
+        // Expected CORS error - iframe is cross-origin
+        // We'll rely on other methods
+      }
+      
+      // Stop checking after max time
+      if (checkCount >= maxChecks) {
+        clearInterval(formMonitoringInterval);
+      }
+    }, 500);
+
+    // Method 2: Listen for postMessage from iframe
+    window.addEventListener('message', handlePostMessage);
+    
+    // Method 3: Monitor iframe load events
+    iframe.addEventListener('load', handleIframeLoad);
+  }
+
+  function handlePostMessage(event) {
+    // Only accept messages from Google
+    if (event.origin !== 'https://docs.google.com') {
+      return;
+    }
+    
+    // Check if message indicates form submission
+    if (event.data && !formSubmitted) {
+      const data = event.data;
+      
+      // Look for submission indicators in the message
+      if (
+        (typeof data === 'string' && data.includes('formResponse')) ||
+        (typeof data === 'object' && (data.type === 'formSubmitted' || data.formResponse))
+      ) {
+        formSubmitted = true;
+        handleFormSubmission();
+      }
+    }
+  }
+
+  let iframeLoadCount = 0;
+  function handleIframeLoad() {
+    iframeLoadCount++;
+    
+    // The form typically loads twice: initial load and after submission
+    // We check on the second load which might be the submission
+    if (iframeLoadCount >= 2 && !formSubmitted) {
+      // Wait a bit to see if this was a submission
+      setTimeout(() => {
+        const iframe = document.getElementById('franchiseFormIframe');
+        try {
+          // Try to check if we're on the response page
+          if (iframe.contentWindow.location.href.includes('formResponse')) {
+            formSubmitted = true;
+            handleFormSubmission();
+          }
+        } catch (e) {
+          // Can't access due to CORS, assume submission after 2nd load
+          // This is a fallback - might cause false positives
+        }
+      }, 1000);
+    }
+  }
+
+  function handleFormSubmission() {
+    console.log('Form submitted! Redirecting...');
+    
+    // Clear monitoring interval
+    if (formMonitoringInterval) {
+      clearInterval(formMonitoringInterval);
+      formMonitoringInterval = null;
+    }
+    
+    // Show loading message
+    const iframe = document.getElementById('franchiseFormIframe');
+    const loadingMessage = document.getElementById('franchiseLoadingMessage');
+    
+    iframe.style.display = 'none';
+    loadingMessage.classList.add('active');
+    
+    // Track submission in dataLayer
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'formSubmit',
+      formName: 'Franchise Registration Form',
+      formType: 'google_form',
+      timestamp: new Date().toISOString()
+    });
+    
+    // Redirect to thank you page after 1.5 seconds
+    setTimeout(() => {
+      window.location.href = 'https://www.lucirajewelry.com/pages/franchise-thank-you';
+    }, 1500);
+  }
+
+  // Close overlay when clicking outside
   document.addEventListener('DOMContentLoaded', function () {
     const overlay = document.getElementById('franchiseOverlay');
 
     overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) closeFranchiseOverlay();
+      if (e.target === overlay) {
+        closeFranchiseOverlay();
+      }
     });
+  });
+
+  // Cleanup event listeners when page unloads
+  window.addEventListener('beforeunload', function() {
+    if (formMonitoringInterval) {
+      clearInterval(formMonitoringInterval);
+    }
+    window.removeEventListener('message', handlePostMessage);
   });
 </script>
 
