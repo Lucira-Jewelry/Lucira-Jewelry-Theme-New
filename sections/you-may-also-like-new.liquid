@@ -1,119 +1,124 @@
+{% render 'product-collection-card' %}
 {% if request.page_type == 'product' and product %}
 
-  {% comment %}
-    1. Define initialization variables.
-  {% endcomment %}
-  {% assign current_product_type = product.type %}
   {% assign max_products = 16 %}
   {% assign current_product_handle = product.handle %}
-  {% assign current_price = product.price %}
 
-  {% comment %}
-    2. DEFINE PRICE TIERS (Waterfall)
-  {% endcomment %}
+  {%- comment -%}
+    1. Detect current product gender (simple + reliable)
+  {%- endcomment -%}
 
-  {% assign min_t1 = current_price | times: 0.9 %}
-  {% assign max_t1 = current_price | times: 1.1 %}
+  {% assign current_gender = '' %}
+  {% assign gmf = product.metafields.shopify['target-gender'] %}
 
-  {% assign min_t2 = current_price | times: 0.8 %}
-  {% assign max_t2 = current_price | times: 1.2 %}
-
-  {% assign min_t3 = current_price | times: 0.7 %}
-  {% assign max_t3 = current_price | times: 1.3 %}
-
-  {% assign min_t4 = current_price | times: 0.6 %}
-  {% assign max_t4 = current_price | times: 1.4 %}
-
-  {% assign min_t5 = current_price | times: 0.3 %}
-  {% assign max_t5 = current_price | times: 3.0 %}
-
-  {% comment %}
-    3. DETERMINE TARGET COLLECTION
-  {% endcomment %}
-  {% assign current_product_type_handle = current_product_type | handleize %}
-
-  {% if current_product_type_handle == 'charms-and-pendants' %}
-    {% assign target_collection_handle = 'all-charmspendants' %}
-  {% elsif current_product_type_handle == 'nose-pin' %}
-    {% assign target_collection_handle = 'all-nosepins' %}
-  {% else %}
-    {% assign target_collection_handle = 'all-' | append: current_product_type_handle %}
+  {% if gmf and gmf.value != blank %}
+    {% assign g = gmf.value | first %}
+    {% assign current_gender = g.handle | default: g.base_target_gender | default: g.label | downcase %}
   {% endif %}
 
-  {% assign target_collection = collections[target_collection_handle] %}
+  {%- comment -%}
+    Fallback gender from category
+  {%- endcomment -%}
+  {% if current_gender == '' and product.category %}
+    {% assign catglist = product.category.metafields.shopify.target_gender %}
+    {% if catglist != blank %}
+      {% assign cg = catglist.first %}
+      {% assign current_gender = cg.base_target_gender.value | downcase %}
+    {% endif %}
+  {% endif %}
 
-  {% assign handles_tier1 = '' %}
-  {% assign handles_tier2 = '' %}
-  {% assign handles_tier3 = '' %}
-  {% assign handles_tier4 = '' %}
-  {% assign handles_tier5 = '' %}
-  {% assign products_to_render = '' %}
+  {%- comment -%}
+    Normalize values: ensure only male / female / unisex
+  {%- endcomment -%}
+  {% assign allowed = 'male,female,unisex' | split: ',' %}
+  {% unless allowed contains current_gender %}
+    {% assign current_gender = 'unisex' %}
+  {% endunless %}
 
-  {% if target_collection != blank %}
+  {%- comment -%}
+    2. Determine correct target collection (with special rule for Men's Rings)
+  {%- endcomment -%}
 
-    {% comment %}
-      4. SINGLE PASS → PUT PRODUCTS INTO TIERS
-      T1 (closest price) → T2 → T3 → T4 → T5
-    {% endcomment %}
-    {% for p in target_collection.products %}
+  {% assign type_handle = product.type | handleize %}
+
+  {% if type_handle == 'rings' and current_gender == 'male' %}
+    
+    {%- comment -%}
+      Special rule: Men's Rings should browse jewelry-mens-collection
+    {%- endcomment -%}
+    {% assign target_collection_handle = 'jewelry-mens-collection' %}
+
+  {% else %}
+  {% if type_handle == 'earrings' and current_gender == 'male' %}
+        {% assign target_collection_handle = 'mens-studs' %}
+
+  {% else %}
+
+    {% case type_handle %}
+      {% when 'charms-and-pendants' %}
+        {% assign target_collection_handle = 'all-charmspendants' %}
+      {% when 'nose-pin' %}
+        {% assign target_collection_handle = 'all-nosepins' %}
+      {% else %}
+        {% assign target_collection_handle = 'all-' | append: type_handle %}
+    {% endcase %}
+  {% endif %}
+  {% endif %}
+
+  {% assign coll = collections[target_collection_handle] %}
+
+  {% if coll and coll.products.size > 0 %}
+
+    {% assign same_gender = '' %}
+    {% assign others = '' %}
+
+    {% for p in coll.products %}
       {% unless p.handle == current_product_handle %}
-        {% if p.price >= min_t1 and p.price <= max_t1 %}
-          {% assign handles_tier1 = handles_tier1 | append: p.handle | append: ',' %}
 
-        {% elsif p.price >= min_t2 and p.price <= max_t2 %}
-          {% assign handles_tier2 = handles_tier2 | append: p.handle | append: ',' %}
+        {%- comment -%} Get product gender {%- endcomment -%}
+        {% assign pg = '' %}
+        {% assign pgmf = p.metafields.shopify['target-gender'] %}
 
-        {% elsif p.price >= min_t3 and p.price <= max_t3 %}
-          {% assign handles_tier3 = handles_tier3 | append: p.handle | append: ',' %}
-
-        {% elsif p.price >= min_t4 and p.price <= max_t4 %}
-          {% assign handles_tier4 = handles_tier4 | append: p.handle | append: ',' %}
-
-        {% elsif p.price >= min_t5 and p.price <= max_t5 %}
-          {% assign handles_tier5 = handles_tier5 | append: p.handle | append: ',' %}
+        {% if pgmf and pgmf.value != blank %}
+          {% assign pg_obj = pgmf.value | first %}
+          {% assign pg = pg_obj.handle | default: pg_obj.base_target_gender | default: pg_obj.label | downcase %}
         {% endif %}
+
+        {% if pg == '' and p.category %}
+          {% assign pcglist = p.category.metafields.shopify.target_gender %}
+          {% if pcglist != blank %}
+            {% assign pcg = pcglist.first %}
+            {% assign pg = pcg.base_target_gender.value | downcase %}
+          {% endif %}
+        {% endif %}
+
+        {% unless allowed contains pg %}
+          {% assign pg = 'unisex' %}
+        {% endunless %}
+
+        {%- comment -%} Sort into correct bucket {%- endcomment -%}
+        {% if pg == current_gender %}
+          {% assign same_gender = same_gender | append: p.handle | append: ',' %}
+        {% else %}
+          {% assign others = others | append: p.handle | append: ',' %}
+        {% endif %}
+
       {% endunless %}
     {% endfor %}
 
-    {% comment %}
-      5. STACK TIERS: T1 → T2 → T3 → T4 → T5
-    {% endcomment %}
-    {% assign handles_all = handles_tier1 | append: handles_tier2 | append: handles_tier3 | append: handles_tier4 | append: handles_tier5 %}
-    {% assign products_to_render = handles_all | split: ',' | compact | slice: 0, max_products %}
-
-    {% comment %}
-      6. FALLBACK: FILL REMAINING SLOTS WITH ANY OTHER PRODUCTS FROM COLLECTION
-    {% endcomment %}
-    {% assign current_size = products_to_render.size %}
-
-    {% if current_size < max_products %}
-      {% assign extra_needed = max_products | minus: current_size %}
-      {% assign added_extra = 0 %}
-      {% assign extra_handles = '' %}
-
-      {% for p in target_collection.products %}
-        {% if added_extra >= extra_needed %}
-          {% break %}
-        {% endif %}
-
-        {% unless p.handle == current_product_handle or products_to_render contains p.handle %}
-          {% assign extra_handles = extra_handles | append: p.handle | append: ',' %}
-          {% assign added_extra = added_extra | plus: 1 %}
-        {% endunless %}
-      {% endfor %}
-
-      {% assign extra_array = extra_handles | split: ',' | compact %}
-      {% assign products_to_render = products_to_render | concat: extra_array %}
-    {% endif %}
+    {%- comment -%}
+      3. Merge lists → same gender first → then others → guarantee up to 16
+    {%- endcomment -%}
+    {% assign combined = same_gender | append: others %}
+    {% assign final_list = combined | split: ',' | compact | slice: 0, max_products %}
 
   {% endif %}
 
-  {% comment %}
-    *** RENDERING ***
-  {% endcomment %}
-  {% if products_to_render.size > 0 %}
-    <div class="you-may-also-like-section">
-      <style>
+  {%- comment -%}
+    4. Render products
+  {%- endcomment -%}
+  {% if final_list and final_list.size > 0 %}
+<style>
         p.section-sub-heading{color: #535361; font-weight: 400; font-size: 14px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
         .card__information{padding:10px !important;}
         .card__inner.color-scheme-2.gradient.ratio{border: 1px solid #ffffff !important;}
@@ -142,88 +147,34 @@
             .product-grid{grid-template-columns:repeat(4,1fr) !important}
         }
       </style>
+  <div class="you-may-also-like-section">
+    <div class="page-width">
+      <h2 class="section-heading">You May Also Like</h2>
+      <p class="section-sub-heading">Other picks based on your interest</p>
 
-      {% comment %} <div>
-        <div class="page-width">
-          <h2 class="section-heading">You May Also Like</h2>
-          <p class="section-sub-heading">Other picks based on your interest</p>
+      <div class="product-grid">
+        {% for h in final_list %}
+          {% assign p = collections[target_collection_handle].products | where: "handle", h | first %}
+          {% if p %}
+            <div class="related-product-card"
+                            data-handle="{{ p.handle }}"
+                data-name="{{ p.title | escape }}"
+                data-id="{{ p.id }}"
+                data-price="{{ p.price | divided_by: 100.0 }}"
+                data-category="{{ p.type | escape }}"
+                data-sku="{{ p.selected_or_first_available_variant.sku }}"
+                data-url="{{ p.url }}"
 
-          <div class="product-grid">
-            {% for product_handle in products_to_render %}
-              {% assign related_product = nil %}
-              
-              {% for p in target_collection.products %}
-                {% if p.handle == product_handle %}
-                  {% assign related_product = p %}
-                  {% break %}
-                {% endif %}
-              {% endfor %}
-
-              {% if related_product %}
-                <div
-                  class="related-product-card"
-                  data-handle="{{ related_product.handle }}"
-                  data-name="{{ related_product.title | escape }}"
-                  data-id="{{ related_product.id }}"
-                  data-price="{{ related_product.price | divided_by: 100.0 }}"
-                  data-category="{{ related_product.type | escape }}"
-                  onclick="
-                    window.dataLayer = window.dataLayer || []; window.dataLayer.push({
-                      'event': 'promoClick',
-                        'promoClick': {
-                            'promo_id': '{{ related_product.selected_or_first_available_variant.sku }}',
-                            'creative_name': 'You May Also Like',
-                            'promo_name': '{{ related_product.title | escape }}',
-                      },
-                      'event_callback': function() {
-                        window.location.href = '{{ related_product.url }}';
-                      }
-                    });
-                  "
-                >
-                  {% render 'card-product', card_product: related_product %}
-                </div>
-              {% endif %}
-            {% endfor %}
-          </div>
-        </div>
-      </div> {% endcomment %}
-      <div>
-      <div class="page-width">
-        <h2 class="section-heading">You May Also Like</h2>
-        <p class="section-sub-heading">Other picks based on your interest</p>
-
-        <div class="product-grid">
-          {% for product_handle in products_to_render %}
-            {% assign related_product = nil %}
-            
-            {% for p in target_collection.products %}
-              {% if p.handle == product_handle %}
-                {% assign related_product = p %}
-                {% break %}
-              {% endif %}
-            {% endfor %}
-
-            {% if related_product %}
-              <div
-                class="related-product-card"
-                data-handle="{{ related_product.handle }}"
-                data-name="{{ related_product.title | escape }}"
-                data-id="{{ related_product.id }}"
-                data-price="{{ related_product.price | divided_by: 100.0 }}"
-                data-category="{{ related_product.type | escape }}"
-                data-sku="{{ related_product.selected_or_first_available_variant.sku }}"
-                data-url="{{ related_product.url }}"
-              >
-                {% render 'card-product', card_product: related_product %}
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
+            >
+              {% render 'card-product', card_product: p %}
+            </div>
+          {% endif %}
+        {% endfor %}
       </div>
     </div>
+  </div>
 
-    <script>
+  <script>
       document.addEventListener('DOMContentLoaded', function() {
         // Target only actual product links within the related product cards
         const productCards = document.querySelectorAll('.related-product-card');
@@ -243,7 +194,7 @@
               window.dataLayer.push({
                 'event': 'promoClick',
                 'promoClick': {
-                  'promo_id': cardData.sku,
+                  'promo_id': cardData.id,
                   'creative_name': 'You May Also Like',
                   'promo_name': cardData.name
                 },
@@ -262,19 +213,6 @@
         });
       });
     </script>
-    </div>
   {% endif %}
 
 {% endif %}
-
-{% schema %}
-{
-  "name": "You may also like (lazy)",
-  "settings": [],
-  "presets": [
-    {
-      "name": "You may also like (lazy)"
-    }
-  ]
-}
-{% endschema %}
