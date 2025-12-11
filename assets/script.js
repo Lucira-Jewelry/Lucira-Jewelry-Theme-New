@@ -190,3 +190,115 @@ $(document).ready(function(){
     sendWebhook('add_to_cart', { product_id: productId, cookies: collectCookies() });
   });
 })();
+
+$(document).ready(function () {
+  let initialized = false;
+
+  function setupBradAccordion() {
+    const isMobile = $(window).width() <= 768;
+
+    if (!isMobile) {
+      if (initialized) {
+        $(".lucira-accordion-content").removeAttr("style").removeClass("open");
+        $(".lucira-accordion-toggle").removeClass("active")
+          .off("click")
+          .find(".lucira-accordion-icon")
+          .html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+        initialized = false;
+      }
+      return;
+    }
+
+    if (initialized) return;
+
+    const $toggles = $(".lucira-accordion-toggle");
+
+    $toggles.each(function () {
+      $(this).replaceWith($(this).clone(true));
+    });
+
+    const $newToggles = $(".lucira-accordion-toggle");
+
+    $newToggles.each(function () {
+      const $toggle = $(this);
+      const $content = $toggle.next();
+      const $icon = $toggle.find(".lucira-accordion-icon");
+
+      if ($content.length) {
+        // Initial collapsed state
+        $toggle.removeClass("active");
+        $content.removeClass("open").css({
+          display: "block",
+          height: "0px",
+          overflow: "hidden",
+          opacity: 0,
+          paddingTop: "0",
+          paddingBottom: "0"
+        });
+        $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+      }
+
+      $toggle.on("click", function () {
+        $newToggles.each(function () {
+          const $el = $(this);
+          if ($el[0] !== $toggle[0]) {
+            const $otherContent = $el.next();
+            $el.removeClass("active");
+            $otherContent.stop().removeClass("open").animate({
+              height: 0,
+              opacity: 0,
+              paddingTop: 0,
+              paddingBottom: 0
+            }, 300, function () {
+              $otherContent.css("overflow", "hidden");
+            });
+            $el.find(".lucira-accordion-icon").html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+          }
+        });
+
+        const isOpen = $content.hasClass("open");
+
+        if (isOpen) {
+          $toggle.removeClass("active");
+          $content.removeClass("open").stop().animate({
+            height: 0,
+            opacity: 0,
+            paddingTop: 0,
+            paddingBottom: 0
+          }, 300, function () {
+            $content.css("overflow", "hidden");
+          });
+          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-plus"></use></svg>');
+        } else {
+          const naturalHeight = $content.css({ height: "auto", paddingTop: "12px", paddingBottom: "12px" }).outerHeight();
+
+          $content.css({
+            height: 0,
+            opacity: 0,
+            paddingTop: 0,
+            paddingBottom: 0,
+            overflow: "hidden"
+          }).addClass("open").stop().animate({
+            height: naturalHeight,
+            opacity: 1,
+            paddingTop: 0,
+            paddingBottom: 12
+          }, 300, function () {
+            $content.css({
+              height: "auto",
+              overflow: "visible"
+            });
+          });
+
+          $toggle.addClass("active");
+          $icon.html('<svg width="20" height="21"><use xlink:href="#icon-minus"></use></svg>');
+        }
+      });
+    });
+
+    initialized = true;
+  }
+
+  setupBradAccordion();
+  $(window).on("resize", setupBradAccordion);
+});
