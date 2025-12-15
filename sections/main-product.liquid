@@ -1341,11 +1341,37 @@
 
 <script>
   (function () {
-    // Prevent double binding
+
+    /* ----------------------------
+      GLOBAL SAFETY FLAGS
+    ----------------------------- */
     if (window.atcListenerInitialized) return;
     window.atcListenerInitialized = true;
     window.lastAddToCartTime = window.lastAddToCartTime || 0;
 
+    /* ----------------------------
+      UTILITY: GET SELECTED VARIANT
+    ----------------------------- */
+    function getSelectedVariant(atcForm) {
+      if (!atcForm) return null;
+
+      const variantInput = atcForm.querySelector('input[name="id"]');
+      if (!variantInput) return null;
+
+      const variantId = variantInput.value;
+
+      // Shopify exposes product JSON in most themes
+      if (window.meta && window.meta.product && window.meta.product.variants) {
+        return window.meta.product.variants.find(v => v.id == variantId) || null;
+      }
+
+      // Fallback if product JSON is unavailable
+      return { id: variantId };
+    }
+
+    /* ----------------------------
+      SETUP LISTENER
+    ----------------------------- */
     function setupEventListener() {
       const atcButton = document.querySelector('[type="submit"][name="add"]');
       const atcForm = atcButton ? atcButton.closest('form') : null;
@@ -1355,61 +1381,73 @@
         return;
       }
 
+      /* ----------------------------
+        ADD TO CART HANDLER
+      ----------------------------- */
       function handleAddToCart(e) {
         const now = Date.now();
 
         // Prevent duplicate firing within 2 seconds
         if (now - window.lastAddToCartTime < 2000) {
-          console.log('⛔ Prevented duplicate Add to Cart event');
+          console.log('⛔ Duplicate Add to Cart prevented');
           return;
         }
-
         window.lastAddToCartTime = now;
 
-        // Build product data object
+        const variant = getSelectedVariant(atcForm);
+
         const productData = {
           productId: '{{ product.id }}',
-          variantId: '{{ product.selected_or_first_available_variant.id }}',
-          sku: '{{ product.selected_or_first_available_variant.sku }}',
-          productName: '{{ product.title }}',
-          productType: '{{ product.type }}',
-          price: '{{ product.price | money_without_trailing_zeros }}',
+          variantId: variant?.id || null,
+          sku: variant?.sku || null,
+          variantTitle: variant?.title || null,
 
-          productUrlw: '{{ product.url }}',
-          offerPrice: '{{ product.compare_at_price | money_without_trailing_zeros }}',
+          productName: '{{ product.title | escape }}',
+          productType: '{{ product.type | escape }}',
+          vendor: '{{ product.vendor | escape }}',
+
+          price: variant?.price
+            ? (variant.price / 100).toFixed(2)
+            : '{{ product.price | money_without_trailing_zeros }}',
+
+          productUrl: '{{ product.url }}',
           image: '{{ product.featured_image | image_url }}',
+
           category: '{{ product.metafields.custom.category.value }}',
           subCategory: '{{ product.metafields.custom.sub_category_1.value }}',
           productPersona: '{{ product.metafields.custom.persona.value }}',
-          vendorCode: '{{ product.vendor }}',
+
+          // Optional – helps analytics & CRM
+          option1: variant?.option1 || null,
+          option2: variant?.option2 || null,
+          option3: variant?.option3 || null
         };
 
-        console.log('✅ dataLayer.push about to fire', productData);
+        console.log('✅ dataLayer.push → addToCart', productData);
 
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
           event: 'addToCart',
           eventId: 'atc_' + now,
-          products: productData,
+          products: productData
         });
       }
 
-      // Attach listeners
-      atcButton.addEventListener('click', handleAddToCart, { once: false });
-      atcForm.addEventListener('submit', handleAddToCart, { once: false });
-
-      console.log('🚀 Add to Cart listeners attached.');
+      /* ----------------------------
+        BIND EVENT (ONCE)
+      ----------------------------- */
+      atcForm.addEventListener('submit', handleAddToCart, true);
     }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      setTimeout(setupEventListener, 1);
-    } else {
+    /* ----------------------------
+      INIT (DOM READY SAFE)
+    ----------------------------- */
+    if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', setupEventListener);
+    } else {
+      setupEventListener();
     }
 
-    document.addEventListener('cart:updated', function () {
-      console.log('🛒 Cart updated');
-    });
   })();
 
   function share() {
