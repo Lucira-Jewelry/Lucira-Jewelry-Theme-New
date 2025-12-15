@@ -64,11 +64,11 @@
     const productData = dataLayer.find(i => i.event === "productView");
     if (!productData) return;
 
-    dataLayer.push({
-      event: "addToCart",
-      products: { ...productData, quantity: 1 }
-    });
-  };
+  //   dataLayer.push({
+  //     event: "addToCart",
+  //     products: { ...productData, quantity: 1 }
+  //   });
+  // };
 
   // View cart
   window.handleGTMViewCart = function () {
