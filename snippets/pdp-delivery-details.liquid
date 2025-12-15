@@ -1,4 +1,4 @@
-{% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
+{% comment %} {% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
 
 <div 
   class="lucira-delivery-container" 
@@ -452,4 +452,263 @@
       processDelivery(savedPin);
     }
 
-</script> 
+</script> {% endcomment %}
+
+
+
+{% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
+
+<div 
+  class="lucira-delivery-container" 
+  id="pdp-delivery-check"
+  data-delivery-days="{{ delivery_days }}"
+  data-product-sku="{{ product.selected_or_first_available_variant.sku }}"
+  data-product-title="{{ product.title | escape }}"
+  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+  data-inventory-quantity="{{ product.selected_or_first_available_variant.inventory_quantity }}"
+  data-available="{{ product.selected_or_first_available_variant.available }}"
+  data-variant-count="{{ product.variants.size }}"
+>
+
+  <div class="lucira-delivery-input-container">
+    <div class="input-wrapper">
+      <svg class="pin-beside-pincode" width="18" height="18">
+        <use href="#icon-location"></use>
+      </svg>
+
+      <input
+        type="text"
+        id="lucira-delivery-zipcode"
+        placeholder="Enter Pincode"
+        maxlength="6"
+        inputmode="numeric"
+        title="enter pincode"
+      >
+
+      <button class="submitButton" data-mode="locate">
+        <svg class="locate-me-icon" width="16" height="16">
+          <use xlink:href="#icon-locate"></use>
+        </svg>
+        Locate Me
+      </button>
+    </div>
+  </div>
+
+  {% assign total_seconds = delivery_days | times: 86400 %}
+  {% assign now = 'now' | date: '%s' %}
+  {% assign future_timestamp = now | plus: total_seconds %}
+  {% assign delivery_date = future_timestamp | date: '%B %d, %Y' %}
+
+  <div class="lucira-delivery-info">
+    <span class="lucira-delivery-time">
+      Estimated Free Dispatch by
+      <span class="delivry_txt">{{ delivery_date }}</span>
+    </span>
+  </div>
+</div>
+
+{%- if customer and customer.metafields.custom.pincode_history -%}
+  <!-- 🔹 ADDED -->
+  <input
+    type="hidden"
+    id="lucira-customer-pincode-history"
+    value='{{ customer.metafields.custom.pincode_history.value }}'
+  >
+{%- endif -%}
+
+<script>
+(() => {
+  const container = document.getElementById("pdp-delivery-check");
+  if (!container) return;
+
+  const submitBtn = container.querySelector(".submitButton");
+  const pincodeInput = document.getElementById("lucira-delivery-zipcode");
+  const dateSpan = container.querySelector(".lucira-delivery-time .delivry_txt");
+
+  const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
+  let isProcessingLocate = false;
+  let lastEnteredPincode = null;
+
+  /* ============================
+     🔹 ADDED — PINCODE PREFETCH
+  ============================ */
+  const LOCAL_PIN_KEY = "lucira_last_pincode";
+
+  const getLatestCustomerPincode = () => {
+    const el = document.getElementById("lucira-customer-pincode-history");
+    if (!el || !el.value) return null;
+
+    try {
+      const pins = JSON.parse(el.value);
+      if (!Array.isArray(pins)) return null;
+
+      const validPins = pins
+        .map(p => String(p))
+        .filter(p => /^\d{6}$/.test(p));
+
+      return validPins.length
+        ? validPins[validPins.length - 1]
+        : null;
+    } catch (e) {
+      console.warn("Invalid pincode_history JSON", e);
+      return null;
+    }
+  };
+
+  const getLocalPincode = () => {
+    const pin = localStorage.getItem(LOCAL_PIN_KEY);
+    return /^\d{6}$/.test(pin) ? pin : null;
+  };
+
+  const saveLocalPincode = (pin) => {
+    if (/^\d{6}$/.test(pin)) {
+      localStorage.setItem(LOCAL_PIN_KEY, pin);
+    }
+  };
+  /* ============================ */
+
+  const fmtDatePlus = (plusDays) => {
+    const d = new Date();
+    d.setDate(d.getDate() + Number(plusDays));
+    return d.toLocaleDateString("en-US", {
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    });
+  };
+
+  const getSelected = (label) => {
+    const radio = document.querySelector(`input[name*="${label}"]:checked`);
+    if (radio) return radio.value;
+    const sel = document.querySelector(`select[name*="${label}"]`);
+    if (sel) return sel.value;
+    return null;
+  };
+
+  const hasPicker = (label) =>
+    !!document.querySelector(`input[name*="${label}"], select[name*="${label}"]`);
+
+  const getBadgeActive = (label) =>
+    document.querySelector(
+      `input[name*="${label}"]:checked + label .Variant_Stock_Status .stock-active,` +
+      `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
+    );
+
+  const ds = () => {
+    const avail = String(container.dataset.available || "").toLowerCase();
+    const qty = Number(container.dataset.inventoryQuantity || 0);
+    const variantCount = Number(container.dataset.variantCount || 0);
+    return { avail, qty, variantCount };
+  };
+
+  function isVariantInStock() {
+    const colorVal = getSelected("Color");
+    const sizeVal = getSelected("Size");
+    const hasColor = hasPicker("Color");
+    const hasSize = hasPicker("Size");
+    const { avail, qty, variantCount } = ds();
+
+    if (window.variantStockData) {
+      if (colorVal && sizeVal && window.variantStockData[colorVal]) {
+        const node = window.variantStockData[colorVal][sizeVal];
+        if (node && node.available && Number(node.inventory) > 0) return true;
+      }
+    }
+
+    if (qty > 0) return true;
+    if ((avail === "true" || avail === "1") && qty > 0) return true;
+    return false;
+  }
+
+  const computeDays = () => (isVariantInStock() ? 2 : 15);
+
+  function repaint() {
+    if (!dateSpan) return;
+    const days = computeDays();
+    dateSpan.textContent = fmtDatePlus(days);
+  }
+
+  function setLocateView() {
+    isProcessingLocate = false;
+    lastEnteredPincode = null;
+    submitBtn.setAttribute("data-mode", "locate");
+    submitBtn.innerHTML = `
+      <svg width="16" height="16">
+        <use xlink:href="#icon-locate"></use>
+      </svg> Locate Me
+    `;
+    submitBtn.disabled = false;
+    pincodeInput.disabled = false;
+  }
+
+  function setSubmitView() {
+    submitBtn.setAttribute("data-mode", "submit");
+    submitBtn.textContent = "Submit";
+    submitBtn.disabled = false;
+    pincodeInput.disabled = false;
+  }
+
+  function setChangeView() {
+    submitBtn.setAttribute("data-mode", "change");
+    submitBtn.textContent = "Change";
+    submitBtn.disabled = false;
+  }
+
+  function processDelivery(pin) {
+    // 🔹 ADDED
+    saveLocalPincode(pin);
+
+    lastEnteredPincode = pin;
+
+    try {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_id: container.dataset.productSku,
+          promo_name: container.dataset.productTitle,
+          creative_name: "Pincode_Entered",
+          location_id: pin
+        }
+      });
+    } catch (_) {}
+
+    const days = computeDays();
+    if (dateSpan) dateSpan.textContent = fmtDatePlus(days);
+    setChangeView();
+  }
+
+  submitBtn.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const mode = submitBtn.getAttribute("data-mode");
+    const pin = (pincodeInput.value || "").replace(/\D/g, "");
+
+    if (mode === "locate" && window.luciraLocateMe) {
+      await window.luciraLocateMe();
+      return;
+    }
+
+    if (mode === "submit" && pin.length === 6) {
+      processDelivery(pin);
+    }
+  });
+
+  /* ============================
+     🔹 ADDED — PREFETCH ON LOAD
+  ============================ */
+  setLocateView();
+  repaint();
+
+  setTimeout(() => {
+    let prefillPin = getLatestCustomerPincode();
+    if (!prefillPin) prefillPin = getLocalPincode();
+
+    if (prefillPin && pincodeInput) {
+      pincodeInput.value = prefillPin;
+      processDelivery(prefillPin);
+    }
+  }, 300);
+  /* ============================ */
+
+})();
+</script>
