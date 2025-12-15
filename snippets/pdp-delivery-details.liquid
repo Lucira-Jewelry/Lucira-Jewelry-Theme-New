@@ -521,23 +521,51 @@
     // ============= PINCODE PREFETCH FUNCTIONALITY =============
     const LOCALSTORAGE_KEY = "lucira_last_pincode";
 
+    function isUserLoggedIn() {
+      const historyInput = document.getElementById("lucira-pincode-history");
+      return !!(historyInput && historyInput.value !== undefined);
+    }
+
     function getLatestPincodeFromHistory(historyString) {
       if (!historyString || historyString.trim() === "") return null;
       
-      const pincodes = historyString.split(',').map(p => p.trim()).filter(p => /^\d{6}$/.test(p));
+      try {
+        const parsed = JSON.parse(historyString);
+        if (Array.isArray(parsed)) {
+          const validPincodes = parsed.map(p => String(p).trim()).filter(p => /^\d{6}$/.test(p));
+          const latestPincode = validPincodes.length > 0 ? validPincodes[0] : null;
+          console.log('Prefetch: Parsed array from metafield:', parsed, '-> Latest:', latestPincode);
+          return latestPincode;
+        }
+      } catch (e) {
+        const pincodes = historyString.split(',').map(p => p.trim().replace(/["\[\]]/g, '')).filter(p => /^\d{6}$/.test(p));
+        const latestPincode = pincodes.length > 0 ? pincodes[0] : null;
+        console.log('Prefetch: Parsed comma-separated from metafield:', pincodes, '-> Latest:', latestPincode);
+        return latestPincode;
+      }
       
-      return pincodes.length > 0 ? pincodes[pincodes.length - 1] : null;
+      return null;
     }
 
     function getPrefetchPincode() {
       const historyInput = document.getElementById("lucira-pincode-history");
       
-      if (historyInput && historyInput.value) {
-        const latestPincode = getLatestPincodeFromHistory(historyInput.value);
-        console.log('Prefetch: Found pincode from customer metafield:', latestPincode);
-        return latestPincode;
+      // Check if user is logged in by presence of history input
+      if (historyInput) {
+        console.log('Prefetch: User is logged in');
+        
+        if (historyInput.value && historyInput.value.trim() !== "") {
+          const latestPincode = getLatestPincodeFromHistory(historyInput.value);
+          console.log('Prefetch: Found pincode from customer metafield:', latestPincode);
+          return latestPincode;
+        } else {
+          console.log('Prefetch: User logged in but no pincode history in metafield yet');
+          return null;
+        }
       }
       
+      // User is NOT logged in - check localStorage
+      console.log('Prefetch: User is not logged in, checking localStorage');
       try {
         const storedPincode = localStorage.getItem(LOCALSTORAGE_KEY);
         if (storedPincode && /^\d{6}$/.test(storedPincode)) {
@@ -555,9 +583,9 @@
     function savePincodeToStorage(pincode) {
       if (!/^\d{6}$/.test(pincode)) return;
       
-      const historyInput = document.getElementById("lucira-pincode-history");
-      if (historyInput && historyInput.value) {
-        console.log('Prefetch: User logged in, pincode will be saved to customer metafield via backend');
+      // Only save to localStorage if user is NOT logged in
+      if (isUserLoggedIn()) {
+        console.log('Prefetch: User logged in, pincode will be saved to customer metafield via backend, NOT saving to localStorage');
         return;
       }
       
