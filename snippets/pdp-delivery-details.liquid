@@ -454,8 +454,13 @@
 
 </script> {% endcomment %}
 
+
 {% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
 {% assign pincode_history = customer.metafields.custom.pincode_history | default: '' %}
+{% comment %} Debug: Output pincode history {% endcomment %}
+{% if customer %}
+  {% comment %} Customer is logged in {% endcomment %}
+{% endif %}
 
 <div 
   class="lucira-delivery-container" 
@@ -658,25 +663,49 @@
 
     // Extract latest pincode from metafield history (JSON format)
     function getLatestPincodeFromHistory() {
-      if (!pincodeHistory || pincodeHistory.trim() === '') return '';
+      console.log('Raw pincodeHistory:', pincodeHistory);
+      
+      if (!pincodeHistory || pincodeHistory.trim() === '') {
+        console.log('Pincode history is empty');
+        return '';
+      }
       
       try {
+        // Try parsing as JSON array
         const pincodes = JSON.parse(pincodeHistory);
+        console.log('Parsed pincodes:', pincodes);
+        
         if (Array.isArray(pincodes) && pincodes.length > 0) {
           const lastPincode = pincodes[pincodes.length - 1];
+          console.log('Last pincode from array:', lastPincode);
+          
           // Validate it's a 6-digit pincode
           const cleaned = String(lastPincode).replace(/\D/g, '');
+          console.log('Cleaned pincode:', cleaned, 'Length:', cleaned.length);
           return cleaned.length === 6 ? cleaned : '';
         }
       } catch (e) {
         console.error('Error parsing pincode history JSON:', e);
+        console.log('Attempting to use raw value as pincode');
+        
+        // Fallback: try using the raw value directly
+        const cleaned = String(pincodeHistory).replace(/\D/g, '');
+        if (cleaned.length === 6) {
+          console.log('Using raw value as pincode:', cleaned);
+          return cleaned;
+        }
       }
       
+      console.log('No valid pincode found');
       return '';
     }
 
     // Prefetch and prefill pincode on initialization
     function prefetchPincode() {
+      console.log('=== PREFETCH PINCODE START ===');
+      console.log('Is logged in:', isLoggedIn);
+      console.log('Pincode history from dataset:', pincodeHistory);
+      
       let savedPincode = '';
 
       if (isLoggedIn) {
@@ -689,11 +718,18 @@
         console.log('Non-logged-in user - fetched from localStorage:', savedPincode);
       }
 
+      console.log('Final saved pincode:', savedPincode);
+      
       if (savedPincode && savedPincode.length === 6 && pincodeInput) {
+        console.log('Prefilling pincode input with:', savedPincode);
         pincodeInput.value = savedPincode;
         processDelivery(savedPincode);
-        console.log('Pincode prefilled:', savedPincode);
+        console.log('Pincode prefilled and processed');
+      } else {
+        console.log('No valid pincode to prefill');
       }
+      
+      console.log('=== PREFETCH PINCODE END ===');
     }
 
     async function handleLocateMe() {
