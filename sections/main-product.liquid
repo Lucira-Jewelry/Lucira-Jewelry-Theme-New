@@ -1340,77 +1340,81 @@
 </script>
 
 <script>
-  (function () {
-    // Prevent double binding
-    if (window.atcListenerInitialized) return;
-    window.atcListenerInitialized = true;
-    window.lastAddToCartTime = window.lastAddToCartTime || 0;
+(function () {
+  if (window.atcListenerInitialized) return;
+  window.atcListenerInitialized = true;
+  window.lastAddToCartTime = window.lastAddToCartTime || 0;
 
-    function setupEventListener() {
-      const atcButton = document.querySelector('[type="submit"][name="add"]');
-      const atcForm = atcButton ? atcButton.closest('form') : null;
+  function setupEventListener() {
+    const atcForm = document.querySelector('form[action*="/cart/add"]');
+    if (!atcForm) {
+      console.warn('⚠️ Add to Cart form not found.');
+      return;
+    }
 
-      if (!atcButton || !atcForm) {
-        console.warn('⚠️ Add to Cart button or form not found.');
+    function handleAddToCart(e) {
+      const now = Date.now();
+      if (now - window.lastAddToCartTime < 2000) {
+        console.log('⛔ Duplicate ATC prevented');
+        return;
+      }
+      window.lastAddToCartTime = now;
+
+      /* 🔥 READ LIVE VARIANT DATA */
+      const variantId = atcForm.querySelector('[name="id"]')?.value;
+      const quantity = atcForm.querySelector('[name="quantity"]')?.value || 1;
+
+      if (!variantId) {
+        console.warn('❌ Variant ID not found');
         return;
       }
 
-      function handleAddToCart(e) {
-        const now = Date.now();
+      /* 🔥 GET VARIANT DETAILS FROM SHOPIFY OBJECT */
+      const product = window.ShopifyAnalytics?.meta?.product;
+      const variant = product?.variants?.find(v => v.id == variantId);
 
-        // Prevent duplicate firing within 2 seconds
-        if (now - window.lastAddToCartTime < 2000) {
-          console.log('⛔ Prevented duplicate Add to Cart event');
-          return;
-        }
-
-        window.lastAddToCartTime = now;
-
-        // Build product data object
-        const productData = {
-          productId: '{{ product.id }}',
-          variantId: '{{ product.selected_or_first_available_variant.id }}',
-          sku: '{{ product.selected_or_first_available_variant.sku }}',
-          productName: '{{ product.title }}',
-          productType: '{{ product.type }}',
-          price: '{{ product.price | money_without_trailing_zeros }}',
-
-          productUrlw: '{{ product.url }}',
-          offerPrice: '{{ product.compare_at_price | money_without_trailing_zeros }}',
-          image: '{{ product.featured_image | image_url }}',
-          category: '{{ product.metafields.custom.category.value }}',
-          subCategory: '{{ product.metafields.custom.sub_category_1.value }}',
-          productPersona: '{{ product.metafields.custom.persona.value }}',
-          vendorCode: '{{ product.vendor }}',
-        };
-
-        console.log('✅ dataLayer.push about to fire', productData);
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'addToCart',
-          eventId: 'atc_' + now,
-          products: productData,
-        });
+      if (!variant) {
+        console.warn('❌ Variant data not found');
+        return;
       }
 
-      // Attach listeners
-      atcButton.addEventListener('click', handleAddToCart, { once: false });
-      atcForm.addEventListener('submit', handleAddToCart, { once: false });
+      const productData = {
+        productId: product.id,
+        variantId: variant.id,
+        sku: variant.sku,
+        productName: product.title,
+        productType: product.type,
+        price: variant.price / 100,
+        quantity: Number(quantity),
+        image: product.featured_image,
+        vendor: product.vendor
+      };
 
-      console.log('🚀 Add to Cart listeners attached.');
+      console.log('✅ Variant ATC DataLayer push', productData);
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'addToCart',
+        eventId: 'atc_' + now,
+        ecommerce: {
+          currency: 'INR',
+          value: productData.price * productData.quantity,
+          products: productData
+        }
+      });
     }
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-      setTimeout(setupEventListener, 1);
-    } else {
-      document.addEventListener('DOMContentLoaded', setupEventListener);
-    }
+    atcForm.addEventListener('submit', handleAddToCart);
+    console.log('🚀 Variant-safe ATC listener attached');
+  }
 
-    document.addEventListener('cart:updated', function () {
-      console.log('🛒 Cart updated');
-    });
-  })();
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', setupEventListener);
+  } else {
+    setupEventListener();
+  }
+})();
+
 
   function share() {
     const shareData = {
