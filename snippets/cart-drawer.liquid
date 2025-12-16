@@ -688,9 +688,11 @@
 
   function initInsurance() {
     const checkbox = document.getElementById('insuranceCheckbox');
+    const loader = document.getElementById('insuranceLoader');
+
     if (!checkbox) return;
 
-    // Sync checkbox with cart
+    // Sync checkbox state
     fetch('/cart.js')
       .then(res => res.json())
       .then(cart => {
@@ -700,6 +702,9 @@
       });
 
     checkbox.addEventListener('change', function () {
+      if (loader) loader.classList.remove('hidden');
+      checkbox.disabled = true;
+
       if (this.checked) {
         addInsurance();
       } else {
@@ -718,9 +723,8 @@
           quantity: 1
         }]
       })
-    })
-    .then(res => res.json())
-    .then(updateCartSections);
+      .then(res => res.json())
+      .then(updateCartSections);
   }
 
   function removeInsurance() {
@@ -732,33 +736,40 @@
           [INSURANCE_VARIANT_ID]: 0
         }
       })
-    })
-    .then(res => res.json())
-    .then(updateCartSections);
+      .then(res => res.json())
+      .then(updateCartSections);
   }
 
   function updateCartSections(data) {
-    if (!data.sections) return;
+    if (data.sections) {
+      SECTIONS.forEach(section => {
+        const container =
+          section === 'cart-drawer'
+            ? document.querySelector('cart-drawer')
+            : document.getElementById(section);
 
-    SECTIONS.forEach(section => {
-      const container =
-        section === 'cart-drawer'
-          ? document.querySelector('cart-drawer')
-          : document.getElementById(section);
+        if (!container || !data.sections[section]) return;
 
-      if (!container || !data.sections[section]) return;
+        const parsed = new DOMParser()
+          .parseFromString(data.sections[section], 'text/html')
+          .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
 
-      const html = new DOMParser()
-        .parseFromString(data.sections[section], 'text/html')
-        .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
+        if (parsed) container.innerHTML = parsed.innerHTML;
+      });
+    }
 
-      if (html) container.innerHTML = html.innerHTML;
-    });
+    // Hide loader + re-enable checkbox
+    const loader = document.getElementById('insuranceLoader');
+    const checkbox = document.getElementById('insuranceCheckbox');
 
-    // Rebind checkbox after DOM update
+    if (loader) loader.classList.add('hidden');
+    if (checkbox) checkbox.disabled = false;
+
+    // Re-bind after DOM replacement
     initInsurance();
   }
 </script>
+
 
 
 <script>
