@@ -676,18 +676,21 @@
 
 <script>
   const INSURANCE_VARIANT_ID = 47220042989786;
+  const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
 
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', initInsurance);
+
+  function initInsurance() {
     const checkbox = document.getElementById('insuranceCheckbox');
-
     if (!checkbox) return;
 
-    // Check if insurance already exists in cart
+    // Sync checkbox with cart
     fetch('/cart.js')
-      .then((res) => res.json())
-      .then((cart) => {
-        const insuranceItem = cart.items.find((item) => item.variant_id === INSURANCE_VARIANT_ID);
-        if (insuranceItem) checkbox.checked = true;
+      .then(res => res.json())
+      .then(cart => {
+        checkbox.checked = cart.items.some(
+          item => item.variant_id === INSURANCE_VARIANT_ID
+        );
       });
 
     checkbox.addEventListener('change', function () {
@@ -697,31 +700,60 @@
         removeInsurance();
       }
     });
-  });
+  }
 
   function addInsurance() {
-    fetch('/cart/add.js', {
+    fetch(`/cart/add.js?sections=${SECTIONS.join(',')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        id: INSURANCE_VARIANT_ID,
-        quantity: 1,
-      }),
-    }).then(() => location.reload());
+        items: [{
+          id: INSURANCE_VARIANT_ID,
+          quantity: 1
+        }]
+      })
+    })
+    .then(res => res.json())
+    .then(updateCartSections);
   }
 
   function removeInsurance() {
-    fetch('/cart/update.js', {
+    fetch(`/cart/update.js?sections=${SECTIONS.join(',')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         updates: {
-          [INSURANCE_VARIANT_ID]: 0,
-        },
-      }),
-    }).then(() => location.reload());
+          [INSURANCE_VARIANT_ID]: 0
+        }
+      })
+    })
+    .then(res => res.json())
+    .then(updateCartSections);
+  }
+
+  function updateCartSections(data) {
+    if (!data.sections) return;
+
+    SECTIONS.forEach(section => {
+      const container =
+        section === 'cart-drawer'
+          ? document.querySelector('cart-drawer')
+          : document.getElementById(section);
+
+      if (!container || !data.sections[section]) return;
+
+      const html = new DOMParser()
+        .parseFromString(data.sections[section], 'text/html')
+        .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
+
+      if (html) container.innerHTML = html.innerHTML;
+    });
+
+    // Rebind checkbox after DOM update
+    initInsurance();
   }
 </script>
+
 
 <script>
   document.addEventListener('click', function (e) {
