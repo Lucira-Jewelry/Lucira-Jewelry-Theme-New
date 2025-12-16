@@ -335,6 +335,7 @@ window.MainBaseCharm = function () {
   }
 
   function setActiveCollectionById(targetId) {
+    console.log('339')
     const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
 
