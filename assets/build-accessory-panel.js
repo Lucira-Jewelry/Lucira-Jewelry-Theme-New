@@ -2168,9 +2168,9 @@ function scheduleUpdateCounts() {
   document.querySelectorAll('.qty-input').forEach((each)=>{
       totalQty+=Number(each.value)
   });
-
-  console.log(totalQty);
   if(totalQty >= 5) return;
+  console.log('2172');
+
 
   if (__countsScheduled) return;
   __countsScheduled = true;
