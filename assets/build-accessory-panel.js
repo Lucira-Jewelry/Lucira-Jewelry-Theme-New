@@ -2164,6 +2164,14 @@ function updateCountsUI() {
 let __countsScheduled = false;
 function scheduleUpdateCounts() {
   console.log('2166');
+  let totalQty = 0;
+  document.querySelectorAll('.qty-input').forEach((each)=>{
+      totalQty+=Number(each.value)
+  });
+
+  console.log(totalQty);
+  if(totalQty >= 5) return;
+
   if (__countsScheduled) return;
   __countsScheduled = true;
   const run = () => {
