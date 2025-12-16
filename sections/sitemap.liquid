@@ -1,4 +1,48 @@
-
+{% comment %}
+==============================================================================
+  SHOPIFY SITEMAP SECTION - EASY NESTED STRUCTURE
+  
+  INSTALLATION:
+  
+  STEP 1: CREATE SECTION
+  -----------------------
+  1. Shopify Admin → Online Store → Themes → Actions → Edit code
+  2. Sections → Add a new section → Name: "sitemap"
+  3. Paste this entire code → Save
+  
+  STEP 2: CREATE PAGE TEMPLATE
+  -----------------------------
+  For .json theme (Dawn, newer themes):
+     - Templates → Add new template → page → Name: "sitemap"
+     - Replace content with:
+     {
+       "sections": {
+         "main": {
+           "type": "sitemap"
+         }
+       },
+       "order": ["main"]
+     }
+  
+  For .liquid theme (older themes):
+     - Templates → Add new template → page → Name: "sitemap"
+     - Content: {% section 'sitemap' %}
+  
+  STEP 3: CREATE PAGE
+  -------------------
+  1. Pages → Add page
+  2. Title: "Sitemap"
+  3. Template: page.sitemap
+  4. Save
+  
+  STEP 4: CUSTOMIZE
+  -----------------
+  1. Themes → Customize
+  2. Navigate to Sitemap page
+  3. Add blocks in order (sections with their subsections grouped together)
+  
+==============================================================================
+{% endcomment %}
 
 <style>
   .sitemap-page {
@@ -34,7 +78,7 @@
     padding-top: 0;
   }
 
-  /* Section Title (e.g., JEWELRY, FAVORITES) */
+  /* Section Title */
   .sitemap-section-header {
     margin-bottom: 40px;
   }
@@ -57,14 +101,14 @@
     opacity: 0.7;
   }
 
-  /* Grid for subsections (e.g., RINGS, EARRINGS side by side) */
+  /* Grid for subsections */
   .sitemap-subsections-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
     gap: 40px;
   }
 
-  /* Individual Column (e.g., RINGS) */
+  /* Individual Column */
   .sitemap-column {
     min-width: 0;
   }
@@ -94,7 +138,6 @@
     color: #666;
     text-decoration: none;
     line-height: 1.6;
-    transition: color 0.2s;
     display: block;
   }
 
@@ -118,7 +161,6 @@
     
     .sitemap-section-title {
       font-size: 13px;
-      margin-bottom: 30px;
     }
     
     .sitemap-main-section {
@@ -153,60 +195,89 @@
     <h1 class="sitemap-page-title">{{ section.settings.page_title }}</h1>
   </div>
 
-  <!-- Loop through all main sections -->
-  {% assign current_section_id = '' %}
+  {% comment %} 
+    Logic: Process blocks in order. When we hit a section_start, 
+    collect all following subsections until the next section_start or end.
+  {% endcomment %}
+  
+  {% assign in_section = false %}
+  {% assign section_title = '' %}
+  {% assign section_url = '' %}
+  {% assign subsections = '' %}
+  
   {% for block in section.blocks %}
-    {% if block.type == 'main_section' %}
+    {% if block.type == 'section_start' %}
       
-      {% comment %} Close previous section if exists {% endcomment %}
-      {% if current_section_id != '' %}
-        </div></div>
+      {% comment %} If we were already in a section, close it first {% endcomment %}
+      {% if in_section %}
+        <div class="sitemap-main-section">
+          <div class="sitemap-section-header">
+            <h2 class="sitemap-section-title">
+              {% if section_url != blank %}
+                <a href="{{ section_url }}">{{ section_title }}</a>
+              {% else %}
+                {{ section_title }}
+              {% endif %}
+            </h2>
+          </div>
+          <div class="sitemap-subsections-grid">
+            {{ subsections }}
+          </div>
+        </div>
+        {% assign subsections = '' %}
       {% endif %}
       
-      {% comment %} Start new main section {% endcomment %}
-      <div class="sitemap-main-section" {{ block.shopify_attributes }}>
-        <div class="sitemap-section-header">
-          <h2 class="sitemap-section-title">
-            {% if block.settings.section_url != blank %}
-              <a href="{{ block.settings.section_url }}">{{ block.settings.section_title }}</a>
-            {% else %}
-              {{ block.settings.section_title }}
-            {% endif %}
-          </h2>
-        </div>
-        <div class="sitemap-subsections-grid">
+      {% comment %} Start new section {% endcomment %}
+      {% assign in_section = true %}
+      {% assign section_title = block.settings.section_title %}
+      {% assign section_url = block.settings.section_url %}
       
-      {% assign current_section_id = block.id %}
-    {% endif %}
-    
-    {% comment %} Add subsection columns that belong to current main section {% endcomment %}
-    {% if block.type == 'subsection' and block.settings.parent_section == current_section_id %}
-      <div class="sitemap-column" {{ block.shopify_attributes }}>
-        <h3 class="sitemap-column-title">{{ block.settings.subsection_title }}</h3>
-        
-        {% if block.settings.links != blank %}
-          <ul class="sitemap-links-list">
-            {% assign links_array = block.settings.links | newline_to_br | split: '<br />' %}
-            {% for link_item in links_array %}
-              {% assign link_item = link_item | strip %}
-              {% if link_item != '' %}
-                {% assign link_parts = link_item | split: '|' %}
-                {% if link_parts.size == 2 %}
-                  <li><a href="{{ link_parts[1] | strip }}">{{ link_parts[0] | strip }}</a></li>
-                {% else %}
-                  <li><a href="#">{{ link_item }}</a></li>
+    {% elsif block.type == 'subsection' and in_section %}
+      
+      {% comment %} Collect subsection HTML {% endcomment %}
+      {% capture subsection_html %}
+        <div class="sitemap-column" {{ block.shopify_attributes }}>
+          <h3 class="sitemap-column-title">{{ block.settings.subsection_title }}</h3>
+          
+          {% if block.settings.links != blank %}
+            <ul class="sitemap-links-list">
+              {% assign links_array = block.settings.links | newline_to_br | split: '<br />' %}
+              {% for link_item in links_array %}
+                {% assign link_item = link_item | strip %}
+                {% if link_item != '' %}
+                  {% assign link_parts = link_item | split: '|' %}
+                  {% if link_parts.size == 2 %}
+                    <li><a href="{{ link_parts[1] | strip }}">{{ link_parts[0] | strip }}</a></li>
+                  {% else %}
+                    <li><a href="#">{{ link_item }}</a></li>
+                  {% endif %}
                 {% endif %}
-              {% endif %}
-            {% endfor %}
-          </ul>
-        {% endif %}
-      </div>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endcapture %}
+      {% assign subsections = subsections | append: subsection_html %}
+      
     {% endif %}
   {% endfor %}
   
-  {% comment %} Close last section {% endcomment %}
-  {% if current_section_id != '' %}
-    </div></div>
+  {% comment %} Close the last section if exists {% endcomment %}
+  {% if in_section %}
+    <div class="sitemap-main-section">
+      <div class="sitemap-section-header">
+        <h2 class="sitemap-section-title">
+          {% if section_url != blank %}
+            <a href="{{ section_url }}">{{ section_title }}</a>
+          {% else %}
+            {{ section_title }}
+          {% endif %}
+        </h2>
+      </div>
+      <div class="sitemap-subsections-grid">
+        {{ subsections }}
+      </div>
+    </div>
   {% endif %}
 </div>
 
@@ -222,56 +293,64 @@
     },
     {
       "type": "paragraph",
-      "content": "HOW TO USE: 1) Add 'Main Section' blocks for major categories (FAVORITES, ENGAGEMENT RINGS, etc.). 2) Add 'Subsection' blocks for columns (RINGS, EARRINGS, etc.). 3) Set the Parent Section ID in each subsection to match its main section. 4) Drag blocks to reorder them."
+      "content": "📖 HOW TO USE: Add blocks in order: 1) 'Section Start' for main category (FAVORITES), 2) Add multiple 'Subsection' blocks right after it (FAST SHIPPING, NEW ARRIVALS, etc.), 3) Add next 'Section Start' (ENGAGEMENT RINGS), 4) Add its subsections. The blocks are grouped automatically by order!"
     }
   ],
   "blocks": [
     {
-      "type": "main_section",
-      "name": "⭐ Main Section",
+      "type": "section_start",
+      "name": "🔵 Section Start",
       "settings": [
+        {
+          "type": "paragraph",
+          "content": "⭐ This starts a new main section (like FAVORITES, ENGAGEMENT RINGS, JEWELRY, etc.). All 'Subsection' blocks you add after this will belong to this section, until you add another 'Section Start'."
+        },
         {
           "type": "text",
           "id": "section_title",
           "label": "Main Section Title",
           "default": "JEWELRY",
-          "info": "Example: FAVORITES, ENGAGEMENT RINGS, JEWELRY"
+          "info": "Examples: FAVORITES, ENGAGEMENT RINGS, WEDDING RINGS, JEWELRY, SOLITAIRE, COLLECTION, GIFTING"
         },
         {
           "type": "url",
           "id": "section_url",
           "label": "Section URL (Optional)",
-          "info": "If you want the title to be clickable"
-        },
-        {
-          "type": "paragraph",
-          "content": "⚠️ IMPORTANT: After saving this block, copy its ID from the browser URL (the numbers after 'blocks/') and use it as the Parent Section ID in the subsections below."
+          "info": "Make the title clickable by adding a URL"
         }
       ]
     },
     {
       "type": "subsection",
-      "name": "📄 Subsection Column",
+      "name": "📄 Subsection",
       "settings": [
         {
-          "type": "text",
-          "id": "parent_section",
-          "label": "Parent Section ID",
-          "info": "REQUIRED: Enter the block ID of the main section this belongs to. Find the ID in the URL when you click on the parent section block (e.g., 1234567890_abcd)"
+          "type": "paragraph",
+          "content": "📌 This is a column that appears under the most recent 'Section Start'. Add multiple subsection blocks to create side-by-side columns."
         },
         {
           "type": "text",
           "id": "subsection_title",
           "label": "Column Title",
           "default": "RINGS",
-          "info": "Example: RINGS, FAST SHIPPING, Shop by Style"
+          "info": "Examples: RINGS, FAST SHIPPING, Shop by Style, NEW ARRIVALS, EDUCATION"
         },
         {
           "type": "textarea",
           "id": "links",
           "label": "Links (one per line)",
-          "info": "Format: 'Link Text|/url' OR just 'Link Text'. Example: 'Engagement Rings|/collections/engagement' OR 'Engagement Rings'",
-          "default": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire\nEternity Rings|/collections/eternity\nStackable Rings|/collections/stackable\nCasual Rings|/collections/casual\nMen's Ring|/collections/mens-rings"
+          "placeholder": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire\nEternity Rings|/collections/eternity",
+          "info": "Format: 'Link Text|/url' OR just 'Link Text' for placeholder links"
+        }
+      ]
+    },
+    {
+      "type": "divider",
+      "name": "➖ Visual Divider",
+      "settings": [
+        {
+          "type": "paragraph",
+          "content": "📐 This is just a visual separator in the editor to help you organize blocks. It doesn't appear on your sitemap page. Use it to visually separate different main sections while editing."
         }
       ]
     }
@@ -281,7 +360,7 @@
       "name": "Sitemap",
       "blocks": [
         {
-          "type": "main_section",
+          "type": "section_start",
           "settings": {
             "section_title": "JEWELRY"
           }
@@ -289,7 +368,6 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "RINGS",
             "links": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire\nEternity Rings|/collections/eternity\nStackable Rings|/collections/stackable\nCasual Rings|/collections/casual\nMen's Ring|/collections/mens-rings"
           }
@@ -297,7 +375,6 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "EARRINGS",
             "links": "Studs|/collections/studs\nHoops|/collections/hoops\nSui Dhagas|/collections/sui-dhagas\nDangles|/collections/dangles"
           }
@@ -305,7 +382,6 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "BRACELETS",
             "links": "Chain Bracelets|/collections/chain-bracelets\nTennis Bracelets|/collections/tennis-bracelets\nCuff Bracelets|/collections/cuff-bracelets\nMangalsutra Bracelets|/collections/mangalsutra-bracelets"
           }
@@ -313,7 +389,6 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "NECKLACES",
             "links": "Chain Necklaces|/collections/chain-necklaces\nPendant Necklaces|/collections/pendant-necklaces\nMangalsutra Necklaces|/collections/mangalsutra-necklaces\nTennis Necklace|/collections/tennis-necklace"
           }
@@ -321,7 +396,6 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "OTHERS",
             "links": "Nose Pins|/collections/nose-pins\nMen's Studs|/collections/mens-studs"
           }
@@ -329,9 +403,31 @@
         {
           "type": "subsection",
           "settings": {
-            "parent_section": "jewelry",
             "subsection_title": "EDUCATION",
             "links": "Hoop Earring Styles|/pages/hoop-styles\nDifferent types of Diamond|/pages/diamond-types\nJewelry Trends 2025|/blogs/news/trends-2025\nHow to read certificate|/pages/certificate-guide"
+          }
+        },
+        {
+          "type": "divider"
+        },
+        {
+          "type": "section_start",
+          "settings": {
+            "section_title": "FAVORITES"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "subsection_title": "FAST SHIPPING",
+            "links": "Rings|/collections/fast-shipping-rings\nEarrings|/collections/fast-shipping-earrings\nBracelets|/collections/fast-shipping-bracelets\nPendant Necklaces|/collections/fast-shipping-pendants"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "subsection_title": "NEW ARRIVALS",
+            "links": "Rings|/collections/new-rings\nEarrings|/collections/new-earrings\nNose Pins|/collections/new-nose-pins\nBracelets|/collections/new-bracelets\nPendant Necklaces|/collections/new-pendants"
           }
         }
       ]
@@ -339,3 +435,57 @@
   ]
 }
 {% endschema %}
+
+{% comment %}
+==============================================================================
+  EXAMPLE: ADDING YOUR FAVORITES SECTION
+==============================================================================
+
+In Theme Customizer:
+
+1. Add block: "🔵 Section Start"
+   - Section Title: FAVORITES
+
+2. Add block: "📄 Subsection"
+   - Column Title: FAST SHIPPING
+   - Links:
+     Rings|/collections/rings
+     Earrings|/collections/earrings
+     Bracelets|/collections/bracelets
+     Pendant Necklaces|/collections/pendant-necklaces
+
+3. Add block: "📄 Subsection"
+   - Column Title: NEW ARRIVALS
+   - Links:
+     Rings|/collections/new-rings
+     Earrings|/collections/new-earrings
+     Nose Pins|/collections/nose-pins
+     Bracelets|/collections/new-bracelets
+     Pendant Necklaces|/collections/new-pendants
+
+4. Add block: "📄 Subsection"
+   - Column Title: TRENDING
+   - Links:
+     Rings|/collections/trending-rings
+     Earrings|/collections/trending-earrings
+     Nose Pins|/collections/trending-nose-pins
+     Bracelets|/collections/trending-bracelets
+     Pendant Necklaces|/collections/trending-pendants
+
+5. Add block: "📄 Subsection"
+   - Column Title: EDUCATION
+   - Links:
+     Online Shopping Tips|/pages/shopping-tips
+     How to read IGI Certificate|/pages/igi-certificate
+
+6. (Optional) Add block: "➖ Visual Divider" to separate sections
+
+7. Add block: "🔵 Section Start"
+   - Section Title: ENGAGEMENT RINGS
+
+8. Continue adding subsections for ENGAGEMENT RINGS...
+
+The blocks will automatically group together based on order!
+
+==============================================================================
+{% endcomment %}
