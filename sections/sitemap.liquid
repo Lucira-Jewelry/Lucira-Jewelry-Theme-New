@@ -1,0 +1,341 @@
+
+
+<style>
+  .sitemap-page {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 60px 20px 80px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  .sitemap-page-header {
+    text-align: center;
+    margin-bottom: 80px;
+  }
+
+  .sitemap-page-title {
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin: 0;
+    color: #000;
+  }
+
+  /* Main Section Container */
+  .sitemap-main-section {
+    margin-bottom: 60px;
+    padding-top: 40px;
+    border-top: 1px solid #000;
+  }
+
+  .sitemap-main-section:first-of-type {
+    border-top: none;
+    padding-top: 0;
+  }
+
+  /* Section Title (e.g., JEWELRY, FAVORITES) */
+  .sitemap-section-header {
+    margin-bottom: 40px;
+  }
+
+  .sitemap-section-title {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin: 0;
+    color: #000;
+  }
+
+  .sitemap-section-title a {
+    color: #000;
+    text-decoration: none;
+  }
+
+  .sitemap-section-title a:hover {
+    opacity: 0.7;
+  }
+
+  /* Grid for subsections (e.g., RINGS, EARRINGS side by side) */
+  .sitemap-subsections-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 40px;
+  }
+
+  /* Individual Column (e.g., RINGS) */
+  .sitemap-column {
+    min-width: 0;
+  }
+
+  .sitemap-column-title {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin: 0 0 15px 0;
+    color: #000;
+  }
+
+  /* Links List */
+  .sitemap-links-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .sitemap-links-list li {
+    margin-bottom: 8px;
+  }
+
+  .sitemap-links-list a {
+    font-size: 12px;
+    color: #666;
+    text-decoration: none;
+    line-height: 1.6;
+    transition: color 0.2s;
+    display: block;
+  }
+
+  .sitemap-links-list a:hover {
+    color: #000;
+  }
+
+  /* Responsive Design */
+  @media (max-width: 1200px) {
+    .sitemap-subsections-grid {
+      grid-template-columns: repeat(4, 1fr);
+      gap: 35px;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .sitemap-subsections-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+    }
+    
+    .sitemap-section-title {
+      font-size: 13px;
+      margin-bottom: 30px;
+    }
+    
+    .sitemap-main-section {
+      margin-bottom: 50px;
+      padding-top: 35px;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .sitemap-subsections-grid {
+      grid-template-columns: repeat(2, 1fr);
+      gap: 25px;
+    }
+    
+    .sitemap-page {
+      padding: 40px 15px 60px;
+    }
+    
+    .sitemap-page-header {
+      margin-bottom: 50px;
+    }
+    
+    .sitemap-page-title {
+      font-size: 22px;
+    }
+  }
+</style>
+
+<div class="sitemap-page">
+  <!-- Page Header -->
+  <div class="sitemap-page-header">
+    <h1 class="sitemap-page-title">{{ section.settings.page_title }}</h1>
+  </div>
+
+  <!-- Loop through all main sections -->
+  {% assign current_section_id = '' %}
+  {% for block in section.blocks %}
+    {% if block.type == 'main_section' %}
+      
+      {% comment %} Close previous section if exists {% endcomment %}
+      {% if current_section_id != '' %}
+        </div></div>
+      {% endif %}
+      
+      {% comment %} Start new main section {% endcomment %}
+      <div class="sitemap-main-section" {{ block.shopify_attributes }}>
+        <div class="sitemap-section-header">
+          <h2 class="sitemap-section-title">
+            {% if block.settings.section_url != blank %}
+              <a href="{{ block.settings.section_url }}">{{ block.settings.section_title }}</a>
+            {% else %}
+              {{ block.settings.section_title }}
+            {% endif %}
+          </h2>
+        </div>
+        <div class="sitemap-subsections-grid">
+      
+      {% assign current_section_id = block.id %}
+    {% endif %}
+    
+    {% comment %} Add subsection columns that belong to current main section {% endcomment %}
+    {% if block.type == 'subsection' and block.settings.parent_section == current_section_id %}
+      <div class="sitemap-column" {{ block.shopify_attributes }}>
+        <h3 class="sitemap-column-title">{{ block.settings.subsection_title }}</h3>
+        
+        {% if block.settings.links != blank %}
+          <ul class="sitemap-links-list">
+            {% assign links_array = block.settings.links | newline_to_br | split: '<br />' %}
+            {% for link_item in links_array %}
+              {% assign link_item = link_item | strip %}
+              {% if link_item != '' %}
+                {% assign link_parts = link_item | split: '|' %}
+                {% if link_parts.size == 2 %}
+                  <li><a href="{{ link_parts[1] | strip }}">{{ link_parts[0] | strip }}</a></li>
+                {% else %}
+                  <li><a href="#">{{ link_item }}</a></li>
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} Close last section {% endcomment %}
+  {% if current_section_id != '' %}
+    </div></div>
+  {% endif %}
+</div>
+
+{% schema %}
+{
+  "name": "Sitemap",
+  "settings": [
+    {
+      "type": "text",
+      "id": "page_title",
+      "label": "Page Title",
+      "default": "SITEMAP"
+    },
+    {
+      "type": "paragraph",
+      "content": "HOW TO USE: 1) Add 'Main Section' blocks for major categories (FAVORITES, ENGAGEMENT RINGS, etc.). 2) Add 'Subsection' blocks for columns (RINGS, EARRINGS, etc.). 3) Set the Parent Section ID in each subsection to match its main section. 4) Drag blocks to reorder them."
+    }
+  ],
+  "blocks": [
+    {
+      "type": "main_section",
+      "name": "⭐ Main Section",
+      "settings": [
+        {
+          "type": "text",
+          "id": "section_title",
+          "label": "Main Section Title",
+          "default": "JEWELRY",
+          "info": "Example: FAVORITES, ENGAGEMENT RINGS, JEWELRY"
+        },
+        {
+          "type": "url",
+          "id": "section_url",
+          "label": "Section URL (Optional)",
+          "info": "If you want the title to be clickable"
+        },
+        {
+          "type": "paragraph",
+          "content": "⚠️ IMPORTANT: After saving this block, copy its ID from the browser URL (the numbers after 'blocks/') and use it as the Parent Section ID in the subsections below."
+        }
+      ]
+    },
+    {
+      "type": "subsection",
+      "name": "📄 Subsection Column",
+      "settings": [
+        {
+          "type": "text",
+          "id": "parent_section",
+          "label": "Parent Section ID",
+          "info": "REQUIRED: Enter the block ID of the main section this belongs to. Find the ID in the URL when you click on the parent section block (e.g., 1234567890_abcd)"
+        },
+        {
+          "type": "text",
+          "id": "subsection_title",
+          "label": "Column Title",
+          "default": "RINGS",
+          "info": "Example: RINGS, FAST SHIPPING, Shop by Style"
+        },
+        {
+          "type": "textarea",
+          "id": "links",
+          "label": "Links (one per line)",
+          "info": "Format: 'Link Text|/url' OR just 'Link Text'. Example: 'Engagement Rings|/collections/engagement' OR 'Engagement Rings'",
+          "default": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire\nEternity Rings|/collections/eternity\nStackable Rings|/collections/stackable\nCasual Rings|/collections/casual\nMen's Ring|/collections/mens-rings"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Sitemap",
+      "blocks": [
+        {
+          "type": "main_section",
+          "settings": {
+            "section_title": "JEWELRY"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "RINGS",
+            "links": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire\nEternity Rings|/collections/eternity\nStackable Rings|/collections/stackable\nCasual Rings|/collections/casual\nMen's Ring|/collections/mens-rings"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "EARRINGS",
+            "links": "Studs|/collections/studs\nHoops|/collections/hoops\nSui Dhagas|/collections/sui-dhagas\nDangles|/collections/dangles"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "BRACELETS",
+            "links": "Chain Bracelets|/collections/chain-bracelets\nTennis Bracelets|/collections/tennis-bracelets\nCuff Bracelets|/collections/cuff-bracelets\nMangalsutra Bracelets|/collections/mangalsutra-bracelets"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "NECKLACES",
+            "links": "Chain Necklaces|/collections/chain-necklaces\nPendant Necklaces|/collections/pendant-necklaces\nMangalsutra Necklaces|/collections/mangalsutra-necklaces\nTennis Necklace|/collections/tennis-necklace"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "OTHERS",
+            "links": "Nose Pins|/collections/nose-pins\nMen's Studs|/collections/mens-studs"
+          }
+        },
+        {
+          "type": "subsection",
+          "settings": {
+            "parent_section": "jewelry",
+            "subsection_title": "EDUCATION",
+            "links": "Hoop Earring Styles|/pages/hoop-styles\nDifferent types of Diamond|/pages/diamond-types\nJewelry Trends 2025|/blogs/news/trends-2025\nHow to read certificate|/pages/certificate-guide"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
