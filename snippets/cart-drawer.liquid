@@ -679,29 +679,18 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     const checkbox = document.getElementById('insuranceCheckbox');
+
     if (!checkbox) return;
 
-    // Prevent cart form submission
-    checkbox.addEventListener('click', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    });
-
-    // Sync checkbox with cart state
+    // Check if insurance already exists in cart
     fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        const insuranceItem = cart.items.find(
-          item => item.variant_id === INSURANCE_VARIANT_ID
-        );
-        checkbox.checked = !!insuranceItem;
+      .then((res) => res.json())
+      .then((cart) => {
+        const insuranceItem = cart.items.find((item) => item.variant_id === INSURANCE_VARIANT_ID);
+        if (insuranceItem) checkbox.checked = true;
       });
 
-    // Toggle insurance (NO reload)
-    checkbox.addEventListener('change', function (e) {
-      e.preventDefault();
-      e.stopPropagation();
-
+    checkbox.addEventListener('change', function () {
       if (this.checked) {
         addInsurance();
       } else {
@@ -711,16 +700,14 @@
   });
 
   function addInsurance() {
-    fetch('{{ routes.cart_add_url }}', {
+    fetch('/cart/add.js', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        items: [{
-          id: INSURANCE_VARIANT_ID,
-          quantity: 1
-        }]
-      })
-    }).then(refreshCartDrawer);
+        id: INSURANCE_VARIANT_ID,
+        quantity: 1,
+      }),
+    }).then(() => location.reload());
   }
 
   function removeInsurance() {
@@ -729,37 +716,12 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         updates: {
-          [INSURANCE_VARIANT_ID]: 0
-        }
-      })
-    }).then(refreshCartDrawer);
-  }
-
-  function refreshCartDrawer() {
-    fetch('/?sections=cart-drawer,cart-icon-bubble')
-      .then(res => res.json())
-      .then(sections => {
-        // Update cart drawer
-        const drawer = document.querySelector('cart-drawer');
-        if (drawer && sections['cart-drawer']) {
-          const newDrawer = new DOMParser()
-            .parseFromString(sections['cart-drawer'], 'text/html')
-            .querySelector('cart-drawer');
-          if (newDrawer) drawer.innerHTML = newDrawer.innerHTML;
-        }
-
-        // Update cart icon bubble
-        const bubble = document.querySelector('#cart-icon-bubble');
-        if (bubble && sections['cart-icon-bubble']) {
-          const newBubble = new DOMParser()
-            .parseFromString(sections['cart-icon-bubble'], 'text/html')
-            .querySelector('#cart-icon-bubble');
-          if (newBubble) bubble.innerHTML = newBubble.innerHTML;
-        }
-      });
+          [INSURANCE_VARIANT_ID]: 0,
+        },
+      }),
+    }).then(() => location.reload());
   }
 </script>
-
 
 <script>
   document.addEventListener('click', function (e) {
