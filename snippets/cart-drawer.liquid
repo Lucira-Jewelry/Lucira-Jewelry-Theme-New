@@ -676,28 +676,40 @@
 
 <script>
   const INSURANCE_VARIANT_ID = 47220042989786;
+  const CART_SECTIONS = 'cart-drawer,cart-icon-bubble';
 
-  document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', initInsurance);
+
+  function initInsurance() {
     const checkbox = document.getElementById('insuranceCheckbox');
-
     if (!checkbox) return;
 
-    // Check if insurance already exists in cart
+    // Prevent cart form submission
+    checkbox.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    // Sync checkbox state with cart
     fetch('/cart.js')
-      .then((res) => res.json())
-      .then((cart) => {
-        const insuranceItem = cart.items.find((item) => item.variant_id === INSURANCE_VARIANT_ID);
-        if (insuranceItem) checkbox.checked = true;
+      .then(res => res.json())
+      .then(cart => {
+        checkbox.checked = cart.items.some(
+          item => item.variant_id === INSURANCE_VARIANT_ID
+        );
       });
 
-    checkbox.addEventListener('change', function () {
+    checkbox.addEventListener('change', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+
       if (this.checked) {
         addInsurance();
       } else {
         removeInsurance();
       }
     });
-  });
+  }
 
   function addInsurance() {
     fetch('/cart/add.js', {
@@ -705,9 +717,9 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         id: INSURANCE_VARIANT_ID,
-        quantity: 1,
-      }),
-    }).then(() => location.reload());
+        quantity: 1
+      })
+    }).then(refreshCart);
   }
 
   function removeInsurance() {
@@ -716,12 +728,38 @@
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         updates: {
-          [INSURANCE_VARIANT_ID]: 0,
-        },
-      }),
-    }).then(() => location.reload());
+          [INSURANCE_VARIANT_ID]: 0
+        }
+      })
+    }).then(refreshCart);
+  }
+
+  function refreshCart() {
+    fetch(`/?sections=${CART_SECTIONS}`)
+      .then(res => res.json())
+      .then(sections => {
+        updateSection('cart-drawer', sections['cart-drawer']);
+        updateSection('cart-icon-bubble', sections['cart-icon-bubble']);
+
+        // Re-bind insurance checkbox after DOM replacement
+        initInsurance();
+      });
+  }
+
+  function updateSection(selector, html) {
+    if (!html) return;
+
+    const current = document.querySelector(selector);
+    if (!current) return;
+
+    const parsed = new DOMParser()
+      .parseFromString(html, 'text/html')
+      .querySelector(selector);
+
+    if (parsed) current.innerHTML = parsed.innerHTML;
   }
 </script>
+
 
 <script>
   document.addEventListener('click', function (e) {
