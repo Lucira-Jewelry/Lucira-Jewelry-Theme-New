@@ -2163,6 +2163,7 @@ function updateCountsUI() {
 
 let __countsScheduled = false;
 function scheduleUpdateCounts() {
+  console.log('2166');
   if (__countsScheduled) return;
   __countsScheduled = true;
   const run = () => {
