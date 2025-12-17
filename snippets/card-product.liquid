@@ -11,7 +11,7 @@
     endif
   -%}
 
-  {%- assign first_instock_variant = nil -%}
+  {%- assign first_instock_variant = null -%}
   {%- for v in card_product.variants -%}
     {%- if v.inventory_quantity > 0 -%}
       {%- assign first_instock_variant = v -%}
@@ -25,8 +25,11 @@
     {%- assign variant_delim = '?' -%}
   {%- endif -%}
 
-  <div class="card-wrapper product-card-wrapper underline-links-hover card_{{ forloop.index0 }}" data-product-handle="{{ card_product.handle }}">
-    {% render 'wishlist-app-links', linkType: 'list-product', product: card_product  %}
+  <div
+    class="card-wrapper product-card-wrapper underline-links-hover card_{{ forloop.index0 }}"
+    data-product-handle="{{ card_product.handle }}"
+  >
+    {% render 'wishlist-app-links', linkType: 'list-product', product: card_product %}
     <div
       class="
         card card--{{ settings.card_style }}
@@ -45,255 +48,139 @@
         style="--ratio-percent: {{ 1 | divided_by: ratio | times: 100 }}%;"
         data-desktop-ratio="{{ section.settings.image_ratio }}"
       >
-{%- if card_product.featured_media -%}
-  {%- comment -%}
-    Prefer variant-specific images for both primary and secondary:
-      - primary: media whose alt contains any label from first_instock_variant (title/options)
-      - secondary: another media also containing same labels (if available), else fallback to other in-stock variant.featured_media, else first other product media
-  {%- endcomment -%}
-  {%- assign primary_media = nil -%}
-  {%- assign secondary_media = nil -%}
+        {%- if card_product.featured_media -%}
+          <!--
+            ================= PRODUCT MEDIA DEBUG =================
+            PRODUCT: {{ card_product.title }} (ID: {{ card_product.id }})
+            HAS FEATURED MEDIA: YES
+            FIRST INSTOCK VARIANT: {% if first_instock_variant %}YES ({{ first_instock_variant.id }}){% else %}NO{% endif %}
+            =========================================================
+          -->
 
-  {%- if first_instock_variant -%}
-    {%- assign product_title_down = card_product.title | default: '' | downcase -%}
-    {%- assign variant_labels = '' | split: ',' -%}
-    {%- assign variant_labels = variant_labels | push: first_instock_variant.title | uniq -%}
-    {%- if first_instock_variant.option1 != blank -%}
-      {%- assign variant_labels = variant_labels | push: first_instock_variant.option1 -%}
-    {%- endif -%}
-    {%- if first_instock_variant.option2 != blank -%}
-      {%- assign variant_labels = variant_labels | push: first_instock_variant.option2 -%}
-    {%- endif -%}
-    {%- if first_instock_variant.option3 != blank -%}
-      {%- assign variant_labels = variant_labels | push: first_instock_variant.option3 -%}
-    {%- endif -%}
+          {%- assign primary_media = null -%}
+          {%- assign secondary_media = null -%}
 
-    {%- comment -%} find primary_media by scanning product media alt for variant labels {%- endcomment -%}
-    {%- for media in card_product.media -%}
-      {%- if media.media_type == 'image' -%}
-        {%- assign alt_text = media.alt | default: '' | downcase -%}
-        {%- assign matched_primary = false -%}
-        {%- for label in variant_labels -%}
-          {%- assign lab = label | default: '' | downcase -%}
-          {%- if lab != '' and alt_text contains lab -%}
-            {%- assign primary_media = media -%}
-            {%- assign matched_primary = true -%}
-            {%- break -%}
+          {%- if first_instock_variant -%}
+            {%- assign product_title_down = card_product.title | default: '' | downcase -%}
+            {%- assign variant_labels = '' | split: ',' -%}
+            {%- assign variant_labels = variant_labels | push: first_instock_variant.title | uniq -%}
+            {%- if first_instock_variant.option1 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option1 -%}
+            {%- endif -%}
+            {%- if first_instock_variant.option2 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option2 -%}
+            {%- endif -%}
+            {%- if first_instock_variant.option3 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option3 -%}
+            {%- endif -%}
+
+            <!-- VARIANT LABELS: {{ variant_labels | join: ' | ' }} -->
+
+            {%- for media in card_product.media -%}
+              {%- if media.media_type == 'image' -%}
+                <!-- CHECKING MEDIA {{ media.id }} ALT="{{ media.alt }}" -->
+                {%- assign alt_text = media.alt | default: '' | downcase -%}
+                {%- for label in variant_labels -%}
+                  {%- assign lab = label | default: '' | downcase -%}
+                  {%- if lab != '' and alt_text contains lab -%}
+                    {%- assign primary_media = media -%}
+                    <!-- PRIMARY FOUND BY VARIANT LABEL -->
+                    {%- break -%}
+                  {%- endif -%}
+                {%- endfor -%}
+                {%- if primary_media -%}{%- break -%}{%- endif -%}
+              {%- endif -%}
+            {%- endfor -%}
+
+            {%- if primary_media == null and first_instock_variant.featured_media -%}
+              {%- assign primary_media = first_instock_variant.featured_media -%}
+              <!-- PRIMARY FALLBACK: VARIANT FEATURED MEDIA -->
+            {%- endif -%}
           {%- endif -%}
-        {%- endfor -%}
-        {%- if matched_primary == false and product_title_down != '' -%}
-          {%- if alt_text contains product_title_down -%}
-            {%- assign remainder = alt_text | replace: product_title_down, '' | strip -%}
-            {%- for label in variant_labels -%}
-              {%- assign lab = label | default: '' | downcase -%}
-              {%- if lab != '' and remainder contains lab -%}
-                {%- assign primary_media = media -%}
-                {%- assign matched_primary = true -%}
+
+          {%- if primary_media == null and card_product.featured_media -%}
+            {%- assign primary_media = card_product.featured_media -%}
+            <!-- PRIMARY FALLBACK: PRODUCT FEATURED MEDIA -->
+          {%- endif -%}
+
+          <!--
+            PRIMARY RESULT:
+            ID={{ primary_media.id }}
+            ALT="{{ primary_media.alt }}"
+          -->
+
+          {%- if primary_media == nil and card_product.featured_media -%}
+              {%- assign primary_media = card_product.featured_media -%}
+          {%- endif -%}
+
+          {%- assign primary_alt = primary_media.alt | default: '' | downcase | strip -%}
+          {%- assign primary_color = '' -%}
+
+          {%- if primary_alt contains 'yellow' -%}
+            {%- assign primary_color = 'yellow' -%}
+          {%- elsif primary_alt contains 'rose' -%}
+            {%- assign primary_color = 'rose' -%}
+          {%- elsif primary_alt contains 'white' -%}
+            {%- assign primary_color = 'white' -%}
+          {%- elsif primary_alt contains 'platinum' -%}
+            {%- assign primary_color = 'platinum' -%}
+          {%- endif -%}
+
+
+          {%- if secondary_media == null -%}
+            {%- for media in card_product.media -%}
+              {%- assign alt_text = media.alt | default: '' | downcase | strip -%}
+              {%- if media.media_type == 'image' and media.id != primary_media.id and alt_text contains 'mq'or alt_text contains 'mh' -%}
+                {%- assign secondary_media = media -%}
                 {%- break -%}
               {%- endif -%}
             {%- endfor -%}
           {%- endif -%}
-        {%- endif -%}
-        {%- if primary_media -%}
-          {%- break -%}
-        {%- endif -%}
-      {%- endif -%}
-    {%- endfor -%}
 
-    {%- comment -%} if no primary_media found via alt, try variant.featured_media {%- endcomment -%}
-    {%- if primary_media == nil and first_instock_variant.featured_media -%}
-      {%- assign primary_media = first_instock_variant.featured_media -%}
-    {%- endif -%}
-
-    {%- if primary_media == nil and first_instock_variant.featured_media -%}
-    {%- assign primary_media = first_instock_variant.featured_media -%}
-    {%- endif -%}
-
-    {%- comment -%} NEW LOGIC: Prioritize image with alt text 'MQ' (case-insensitive, exact match) {%- endcomment -%}
-    {%- for media in card_product.media -%}
-      {%- assign alt_text = media.alt | default: '' | downcase | strip -%}
-      {%- if media.media_type == 'image' and media.id != primary_media.id and alt_text == 'mq' -%}
-        {%- assign secondary_media = media -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-    {%- comment -%} END NEW LOGIC {%- endcomment -%}
-
-    {%- comment -%}
-      Prefer secondary media that contains the same color/label as the primary. (Original logic, only runs if secondary_media is still nil)
-    {%- endcomment -%}
-    {%- if secondary_media == nil -%}
-      {%- assign primary_alt = primary_media.alt | default: '' | downcase -%}
-      {%- assign color_label = primary_alt | split: '-' | last | strip -%}
-
-      {%- if color_label != '' -%}
-        {%- for media in card_product.media -%}
-          {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-            {%- assign alt_text = media.alt | default: '' | downcase -%}
-            {%- if alt_text contains color_label -%}
-              {%- assign secondary_media = media -%}
-              {%- break -%}
-            {%- endif -%}
+          {%- if secondary_media == null -%}
+            {%- for media in card_product.media -%}
+              {%- if media.media_type == 'image' and media.id != primary_media.id -%}
+                {%- assign secondary_media = media -%}
+                {%- break -%}
+              {%- endif -%}
+            {%- endfor -%}
           {%- endif -%}
-        {%- endfor -%}
-      {%- endif -%}
-    {%- endif -%}
 
-    {%- comment -%} if still nil, fallback to product featured_media below (after loop) {%- endcomment -%}
 
-    {%- comment -%} Now try to find a secondary media that also matches the variant labels (another view) (Original logic, only runs if secondary_media is still nil) {%- endcomment -%}
-    {%- if secondary_media == nil -%}
-      {%- for media in card_product.media -%}
-        {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-          {%- assign alt_text = media.alt | default: '' | downcase -%}
-          {%- assign matched_secondary = false -%}
-          {%- for label in variant_labels -%}
-            {%- assign lab = label | default: '' | downcase -%}
-            {%- if lab != '' and alt_text contains lab -%}
-              {%- assign secondary_media = media -%}
-              {%- assign matched_secondary = true -%}
-              {%- break -%}
-            {%- endif -%}
-          {%- endfor -%}
-          {%- if matched_secondary == false and product_title_down != '' -%}
-            {%- if alt_text contains product_title_down -%}
-              {%- assign remainder = alt_text | replace: product_title_down, '' | strip -%}
-              {%- for label in variant_labels -%}
-                {%- assign lab = label | default: '' | downcase -%}
-                {%- if lab != '' and remainder contains lab -%}
-                  {%- assign secondary_media = media -%}
-                  {%- assign matched_secondary = true -%}
-                  {%- break -%}
-                {%- endif -%}
-              {%- endfor -%}
-            {%- endif -%}
-          {%- endif -%}
-          {%- if secondary_media -%}
-            {%- break -%}
-          {%- endif -%}
-        {%- endif -%}
-      {%- endfor -%}
-    {%- endif -%}
 
-  {%- endif -%}
-
-  {%- comment -%} fallback: if secondary_media not found, try other in-stock variant.featured_media (Original logic) {%- endcomment -%}
-  {%- if secondary_media == nil -%}
-    {%- for v in card_product.variants -%}
-      {%- if first_instock_variant and v.id == first_instock_variant.id -%}
-        {%- continue -%}
-      {%- endif -%}
-      {%- if v.available and v.featured_media -%}
-        {%- assign secondary_media = v.featured_media -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
-
-  {%- if primary_media == nil and card_product.featured_media -%}
-    {%- assign primary_media = card_product.featured_media -%}
-  {%- endif -%}
-
-  {%- if secondary_media == nil -%}
-    {%- for media in card_product.media -%}
-      {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-        {%- assign secondary_media = media -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
-  
-  <a
-    href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
-    class="product-image-link custom-image-link open-in-new-tab"
-    aria-label="{{ card_product.title | escape }}"
-    data-product-url="{{ card_product.url }}"
-    data-product-id="{{ card_product.id }}"
-    data-variant-id="{% if first_instock_variant %}{{ first_instock_variant.id }}{% else %}{{ card_product.variants.first.id }}{% endif %}"
-    data-sku="{{ card_product.variants.first.sku }}"
-    data-product-name="{{ card_product.title | escape }}"
-    data-product-type="{{ card_product.type | escape }}"
-    data-product-category="{{ card_product.collections.first.title | escape }}"
-    data-category="{{ card_product.vendor | escape }}"
-    data-sub-category="{{ card_product.tags | join: ',' | escape }}"
-    data-thumbnail-image="{% if primary_media %}{{ primary_media | image_url: '300x' }}{% else %}{{ card_product.featured_image | img_url: '300x' }}{% endif %}"
-    data-purity="{{ card_product.metafields.custom.purity }}"
-    data-price="{{ card_product.price | money_without_currency }}"
-    data-offer-price="{{ card_product.compare_at_price | money_without_currency }}"
-    data-expected-delivery-date="{{ card_product.metafields.custom.expected_delivery_date }}"
-    data-coupon-code="{{ card_product.metafields.custom.coupon_code }}"
-    data-making-charges="{{ card_product.metafields.custom.making_charges }}"
-    data-number-of-review="{{ card_product.metafields.reviews.rating_count }}"
-    data-rating="{{ card_product.metafields.reviews.rating.value }}"
-  >
-    
-    <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
-      <div class="media media--transparent media--hover-effect">
-        {%- if primary_media -%}
-          <img
-            id="product-image-{{ card_product.id }}"
-            class="motion-reduce primary-image"
-            srcset="
-              {%- if primary_media.width >= 165 -%}{{ primary_media | image_url: width: 165 }} 165w,{%- endif -%}
-              {%- if primary_media.width >= 360 -%}{{ primary_media | image_url: width: 360 }} 360w,{%- endif -%}
-              {%- if primary_media.width >= 533 -%}{{ primary_media | image_url: width: 533 }} 533w,{%- endif -%}
-              {%- if primary_media.width >= 720 -%}{{ primary_media | image_url: width: 720 }} 720w,{%- endif -%}
-              {%- if primary_media.width >= 940 -%}{{ primary_media | image_url: width: 940 }} 940w,{%- endif -%}
-              {%- if primary_media.width >= 1066 -%}{{ primary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
-              {{ primary_media | image_url }} {{ primary_media.width }}w
-            "
-            src="{{ primary_media | image_url: width: 533 }}"
-            sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
-            alt="{{ card_product.title }} - {{ primary_media.alt }}"
-            loading="lazy"
-            decoding="async"
-            width="400"
-            height="400"
-            title="{{ card_product.title }}"
-            data-current-variant="{{ primary_media.alt | escape }}"
+          <a
+            href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
+            class="product-image-link custom-image-link open-in-new-tab"
           >
-          {%- if show_secondary_image -%}
-            <img
-              id="product-image-secondary-{{ card_product.id }}"
-              class="motion-reduce secondary-image"
-              style="{% unless secondary_media %}display: none;{% endunless %}"
-              {% if secondary_media %}
-                src="{{ secondary_media | image_url: width: 533 }}"
-                srcset="
-                  {%- if secondary_media.width >= 165 -%}{{ secondary_media | image_url: width: 165 }} 165w,{%- endif -%}
-                  {%- if secondary_media.width >= 360 -%}{{ secondary_media | image_url: width: 360 }} 360w,{%- endif -%}
-                  {%- if secondary_media.width >= 533 -%}{{ secondary_media | image_url: width: 533 }} 533w,{%- endif -%}
-                  {%- if secondary_media.width >= 720 -%}{{ secondary_media | image_url: width: 720 }} 720w,{%- endif -%}
-                  {%- if secondary_media.width >= 940 -%}{{ secondary_media | image_url: width: 940 }} 940w,{%- endif -%}
-                  {%- if secondary_media.width >= 1066 -%}{{ secondary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
-                  {{ secondary_media | image_url }} {{ secondary_media.width }}w
-                "
-                sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
-                width="400"
-                height="400"
-                title="{{ card_product.title | escape }}"
-              {% endif %}
-                alt="{{ card_product.title }} - {{ secondary_media.alt }}"
-              loading="lazy" width="400" height="400"
-            >
-          {%- endif -%}
-        {%- else -%}
-          {%- if placeholder_image -%}
-            {{ placeholder_image | placeholder_svg_tag: 'placeholder-svg' }}
-          {%- else -%}
-            {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
-          {% endif %}
+            <div class="card__media">
+              <div class="media media--transparent media--hover-effect">
+                {%- if primary_media -%}
+                  <img
+                    src="{{ primary_media | image_url: width: 533 }}"
+                    alt="{{ primary_media.alt }}"
+                    width="400"
+                    height="400"
+                  >
+                  {%- if show_secondary_image and secondary_media -%}
+                    <img
+                      class="secondary-image"
+                      src="{{ secondary_media | image_url: width: 533 }}"
+                      alt="{{ secondary_media.alt }}"
+                      width="400"
+                      height="400"
+                    >
+                  {%- endif -%}
+                {%- endif -%}
+              </div>
+            </div>
+          </a>
         {%- endif -%}
-      </div>        
-    </div>
-  </a>
-{%- endif -%}
 
         <div class="card__content">
           <div class="card__information">
             <div
               class="card__heading"
-              {% if card_product.featured_media == null and settings.card_style == 'standard' %} 
+              {% if card_product.featured_media == null and settings.card_style == 'standard' %}
                 id="title-{{ section_id }}-{{ card_product.id }}"
               {% endif %}
             >
@@ -301,9 +188,9 @@
                 href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
                 id="StandardCardNoMediaLink-{{ section_id }}-{{ card_product.id }}"
                 class="full-unstyled-link"
-                aria-labelledby="StandardCardNoMediaLink-{{ section_id }}-{{ card_product.id }} NoMediaStandardBadge-{{ section_id }}-{{ card_product.id }}" target="_blank"
+                aria-labelledby="StandardCardNoMediaLink-{{ section_id }}-{{ card_product.id }} NoMediaStandardBadge-{{ section_id }}-{{ card_product.id }}"
+                target="_blank"
               >
-                
                 {{ card_product.title | escape }}
               </a>
             </div>
@@ -374,7 +261,14 @@
                   title="{{ color }}"
                 >
                   {% if color_icon != '' %}
-                    <img src="{{ color_icon }}" alt="{{ color }}" width="20" height="20" title="{{ color }}" loading="lazy" >
+                    <img
+                      src="{{ color_icon }}"
+                      alt="{{ color }}"
+                      width="20"
+                      height="20"
+                      title="{{ color }}"
+                      loading="lazy"
+                    >
                   {% else %}
                     <span class="color-swatch color-{{ color | handleize }}"></span>
                   {% endif %}
@@ -408,9 +302,9 @@
                 class="rating-star desktop-show"
                 style="--rating: {{ card_product.metafields.reviews.rating.value.rating | floor }}; --rating-max: {{ card_product.metafields.reviews.rating.value.scale_max }}; --rating-decimal: {{ rating_decimal }};"
               ></span>
-              <span class=""
-                ><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 10" height="10" width="10">
-                <path fill="#FEC602" d="M5 8.3747L7.42493 9.90932C7.86901 10.1906 8.41243 9.77481 8.29556 9.24901L7.65281 6.36318L9.79727 4.41892C10.1888 4.0643 9.97841 3.39176 9.4642 3.34896L6.64194 3.09829L5.53757 0.371428C5.33891 -0.123809 4.6611 -0.123809 4.46243 0.371428L3.35806 3.09217L0.535797 3.34285C0.021595 3.38565 -0.18876 4.05819 0.202734 4.4128L2.34719 6.35707L1.70444 9.24289C1.58757 9.7687 2.13099 10.1845 2.57507 9.90321L5 8.3747Z"></path>
+              <span class="">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 10" height="10" width="10">
+                  <path fill="#FEC602" d="M5 8.3747L7.42493 9.90932C7.86901 10.1906 8.41243 9.77481 8.29556 9.24901L7.65281 6.36318L9.79727 4.41892C10.1888 4.0643 9.97841 3.39176 9.4642 3.34896L6.64194 3.09829L5.53757 0.371428C5.33891 -0.123809 4.6611 -0.123809 4.46243 0.371428L3.35806 3.09217L0.535797 3.34285C0.021595 3.38565 -0.18876 4.05819 0.202734 4.4128L2.34719 6.35707L1.70444 9.24289C1.58757 9.7687 2.13099 10.1845 2.57507 9.90321L5 8.3747Z"></path>
                 </svg>
               </span>
             </div>
@@ -429,122 +323,119 @@
           {%- endif -%}
         </div>
       </div>
-        
-        {% assign any_instock = false %}
-        {% for v in card_product.variants %}
-          {% if v.available %}
-            {% if v.inventory_management %}
-              {% if v.inventory_quantity > 0 %}
-                {% assign any_instock = true %}
-                {% break %}
-              {% endif %}
-            {% else %}
+
+      {% assign any_instock = false %}
+      {% for v in card_product.variants %}
+        {% if v.available %}
+          {% if v.inventory_management %}
+            {% if v.inventory_quantity > 0 %}
               {% assign any_instock = true %}
               {% break %}
             {% endif %}
+          {% else %}
+            {% assign any_instock = true %}
+            {% break %}
+          {% endif %}
+        {% endif %}
+      {% endfor %}
+
+      <div class="card__content">
+        {% if card_product.metafields.custom.product_card_tags.value != blank or any_instock %}
+          <div class="product-collection-card-icons">
+            <div class="carousel-container" data-product-id="{{ card_product.id }}">
+              <div class="icon-container">
+                {% assign first_tag = true %}
+                {% assign icon_index = 0 %}
+                {% assign all_labels = '' %}
+
+                {% for tag_icon in card_product.metafields.custom.product_card_tags.value %}
+                  {% if tag_icon.product_tags_enable and tag_icon.product_tags_image %}
+                    <img
+                      src="{{ tag_icon.product_tags_image | img_url: '16x16' }}"
+                      class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                      width="16"
+                      height="16"
+                      style="width:16px;height:16px;object-fit:contain;"
+                      alt="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
+                      title="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
+                      data-tag-type="{{ tag_icon.icon_type | default: 'tag' }}"
+                    >
+                    {% assign first_tag = false %}
+                    {% assign icon_index = icon_index | plus: 1 %}
+                    {% assign all_labels = all_labels | append: tag_icon.product_tags_label | append: '|' %}
+                  {% endif %}
+                {% endfor %}
+
+                {% if any_instock %}
+                  <img
+                    src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Fast Shipping"
+                    title="Fast Shipping"
+                    data-tag-type="shipping"
+                  >
+                  {% assign first_tag = false %}
+                  {% assign icon_index = icon_index | plus: 1 %}
+                  {% assign all_labels = all_labels | append: 'Fast Shipping' | append: '|' %}
+                {% endif %}
+
+                {% if card_product.tags contains 'Engraving Available' %}
+                  <img
+                    src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Engraving"
+                    title="Engraving"
+                    data-tag-type="engraving"
+                  >
+                  {% assign first_tag = false %}
+                  {% assign icon_index = icon_index | plus: 1 %}
+                  {% assign all_labels = all_labels | append: 'Engraving' | append: '|' %}
+                {% endif %}
+              </div>
+
+              <div class="text-content">
+                {% assign labels_array = all_labels | split: '|' %}
+                {% if labels_array[0] != blank %}
+                  {{ labels_array[0] }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% for variant in card_product.variants %}
+          {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+            {% assign discount = variant.compare_at_price | minus: variant.price %}
+            {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
+            <span class="label-amount">{{ discount_percent | round }}% OFF</span>
+            {% break %}
           {% endif %}
         {% endfor %}
 
-        <div class="card__content">
-          {% if card_product.metafields.custom.product_card_tags.value != blank
-            or any_instock
-          %}
-
-            <div class="product-collection-card-icons">
-              <div class="carousel-container" data-product-id="{{ card_product.id }}">
-                <div class="icon-container">
-                  {% assign first_tag = true %}
-                  {% assign icon_index = 0 %}
-                  {% assign all_labels = '' %}
-
-                  {% for tag_icon in card_product.metafields.custom.product_card_tags.value %}
-                    {% if tag_icon.product_tags_enable and tag_icon.product_tags_image %}
-                      <img
-                        src="{{ tag_icon.product_tags_image | img_url: '16x16' }}"
-                        class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
-                        width="16"
-                        height="16"
-                        style="width:16px;height:16px;object-fit:contain;"
-                        alt="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
-                        title="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
-                        data-tag-type="{{ tag_icon.icon_type | default: 'tag' }}"
-                      >
-                      {% assign first_tag = false %}
-                      {% assign icon_index = icon_index | plus: 1 %}
-                      {% assign all_labels = all_labels | append: tag_icon.product_tags_label | append: '|' %}
-                    {% endif %}
-                  {% endfor %}
-
-                  {% if any_instock %}
-                    <img
-                      src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
-                      class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
-                      width="16"
-                      height="16"
-                      style="width:16px;height:16px;object-fit:contain;"
-                      alt="Fast Shipping"
-                      title="Fast Shipping"
-                      data-tag-type="shipping"
-                    >
-                    {% assign first_tag = false %}
-                    {% assign icon_index = icon_index | plus: 1 %}
-                    {% assign all_labels = all_labels | append: 'Fast Shipping' | append: '|' %}
-                  {% endif %}
-
-
-                  {% if card_product.tags contains 'Engraving Available' %}
-                    <img
-                      src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108"
-                      class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
-                      width="16"
-                      height="16"
-                      style="width:16px;height:16px;object-fit:contain;"
-                      alt="Engraving"
-                      title="Engraving"
-                      data-tag-type="engraving"
-                    >
-                    {% assign first_tag = false %}
-                    {% assign icon_index = icon_index | plus: 1 %}
-                    {% assign all_labels = all_labels | append: 'Engraving' | append: '|' %}
-                  {% endif %}
-                </div>
-
-                <div class="text-content">
-                  {% assign labels_array = all_labels | split: '|' %}
-                  {% if labels_array[0] != blank %}
-                    {{ labels_array[0] }}
-                  {% endif %}
-                </div>
-              </div>
-            </div>
-          {% endif %}
-
-          
-          {% for variant in card_product.variants %}
-            {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
-              {% assign discount = variant.compare_at_price | minus: variant.price %}
-              {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
-              <span class="label-amount" >{{ discount_percent | round }}% OFF</span>
-              {% break %}
-            {% endif %}
-          {% endfor %}
-
-          {% assign video = card_product.media | where: 'media_type', 'video' | first %}
-          {% if video %}
-            <div class="product-video-icon-wrapper" 
-                  data-product-handle="{{ card_product.handle }}" 
-                  data-video-id="{{ video.id }}"
-                  data-product-id="{{ card_product.id }}">
-              <img
-                src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/play_circle.svg?v=1753099595"
-                width="28"
-                height="28"
-                loading="lazy"
-                alt="Play product video"
-                title="Play product video"
-                class="product-video-icon"
-              >
-        </div>
+        {% assign video = card_product.media | where: 'media_type', 'video' | first %}
+        {% if video %}
+          <div
+            class="product-video-icon-wrapper"
+            data-product-handle="{{ card_product.handle }}"
+            data-video-id="{{ video.id }}"
+            data-product-id="{{ card_product.id }}"
+          >
+            <img
+              src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/play_circle.svg?v=1753099595"
+              width="28"
+              height="28"
+              loading="lazy"
+              alt="Play product video"
+              title="Play product video"
+              class="product-video-icon"
+            >
+          </div>
         {% endif %}
 
         <div class="card__information">
@@ -558,7 +449,7 @@
               href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
               id="CardLink-{{ section_id }}-{{ card_product.id }}"
               class="full-unstyled-link"
-              aria-labelledby="CardLink-{{ section_id }}-{{ card_product.id }} Badge-{{ section_id }}-{{ card_product.id }}" 
+              aria-labelledby="CardLink-{{ section_id }}-{{ card_product.id }} Badge-{{ section_id }}-{{ card_product.id }}"
             >
               {{ card_product.title | escape }}
             </a>
@@ -576,8 +467,11 @@
               price_class: '',
               show_compare_at_price: true
             %}
-            <a href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}" class="product-card-link">
-              View details {{ "icon-right-arrow-cp.svg" | inline_asset_content }}
+            <a
+              href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
+              class="product-card-link"
+            >
+              View details {{ 'icon-right-arrow-cp.svg' | inline_asset_content }}
             </a>
             {%- if card_product.quantity_price_breaks_configured? -%}
               {% if card_product.variants.size == 1 and quick_add == 'bulk' %}
@@ -667,7 +561,11 @@
         {% if quick_add == 'standard' %}
           <div class="quick-add no-js-hidden">
             {% if card_product.variants.size > 1 %}
-              <a href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}" class="button button--full-width button--secondary" target="_blank">
+              <a
+                href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
+                class="button button--full-width button--secondary"
+                target="_blank"
+              >
                 {{ 'products.product.choose_options' | t }}
               </a>
             {% else %}
@@ -678,7 +576,9 @@
                     type="submit"
                     name="add"
                     class="quick-add__submit button button--full-width button--secondary"
-                    {% unless card_product.available %}disabled{% endunless %}
+                    {% unless card_product.available %}
+                      disabled
+                    {% endunless %}
                   >
                     {% if card_product.available %}
                       {{ 'products.product.add_to_cart' | t }}
@@ -805,14 +705,19 @@
                           {% else %}
                             href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
                           {% endif %}
-                          class="link product__view-details animate-arrow small-hide medium-hide" target="_blank"
+                          class="link product__view-details animate-arrow small-hide medium-hide"
+                          target="_blank"
                         >
                           {{ 'products.product.view_full_details' | t -}}
                           {{- 'icon-arrow.svg' | inline_asset_content -}}
                         </a>
                       </div>
                       <div class="quick-add-modal__content-info--bulk-details large-up-hide">
-                        <a href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}" class="full-unstyled-link" target="_blank">
+                        <a
+                          href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
+                          class="full-unstyled-link"
+                          target="_blank"
+                        >
                           <h3>{{ card_product.title | escape }}</h3>
                         </a>
                         {% render 'price', product: card_product, price_class: '', show_compare_at_price: true %}
@@ -825,7 +730,11 @@
                     </div>
                     <div>
                       <div class="quick-add-modal__content-info--bulk-details small-hide medium-hide">
-                        <a href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}" class="full-unstyled-link" target="_blank">
+                        <a
+                          href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
+                          class="full-unstyled-link"
+                          target="_blank"
+                        >
                           <h3 class="h2">
                             {{ card_product.title | escape }}
                           </h3>
@@ -895,15 +804,16 @@
         <a
           href="{{ card_product.url }}{% if first_instock_variant %}{{ variant_delim }}variant={{ first_instock_variant.id }}{% endif %}"
           class="product-image-link custom-image-link"
-          aria-label="{{ card_product.title | escape }}" target="_blank"
+          aria-label="{{ card_product.title | escape }}"
+          target="_blank"
         >
           <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
             <div class="media media--transparent media--hover-effect">
               {%- comment -%}
                 Prefer secondary from same in-stock variant, then other in-stock variant, then fallback media (fallback branch).
               {%- endcomment -%}
-              {%- assign primary_media = nil -%}
-              {%- assign secondary_media = nil -%}
+              {%- assign primary_media = null -%}
+              {%- assign secondary_media = null -%}
 
               {%- if first_instock_variant and first_instock_variant.featured_media -%}
                 {%- assign primary_media = first_instock_variant.featured_media -%}
@@ -920,7 +830,7 @@
                 {%- endfor -%}
               {%- endif -%}
 
-              {%- if secondary_media == nil -%}
+              {%- if secondary_media == null -%}
                 {%- for v in card_product.variants -%}
                   {%- if first_instock_variant and v.id == first_instock_variant.id -%}
                     {%- continue -%}
@@ -932,11 +842,11 @@
                 {%- endfor -%}
               {%- endif -%}
 
-              {%- if primary_media == nil and card_product.featured_media -%}
+              {%- if primary_media == null and card_product.featured_media -%}
                 {%- assign primary_media = card_product.featured_media -%}
               {%- endif -%}
 
-              {%- if secondary_media == nil -%}
+              {%- if secondary_media == null -%}
                 {%- for media in card_product.media offset: 1 -%}
                   {%- if media.media_type == 'image' -%}
                     {%- assign secondary_media = media -%}
