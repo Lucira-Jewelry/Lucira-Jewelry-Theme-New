@@ -4,11 +4,13 @@
       {% for block in section.blocks %}
         <div class="swiper-slide">
           <a
+            id="{{ block.settings.slide_id }}"
             href="{{ block.settings.slide_url }}"
-            class="store-experience-banner-slider-item"
-            aria-label="Explore store experience"
             data-promo-id="{{ block.settings.dlv_promo_id }}"
             data-promo-name="{{ block.settings.dlv_promo_name }}"
+            onclick="handleStoreExpGTMClick(event)"
+            aria-label="Explore store experience"
+            class="store-experience-banner-slider-item"
           >
             <picture>
               <source 
@@ -28,7 +30,10 @@
                 width="1920"
                 height="800"
                 alt="{{ block.settings.slide_image.alt | escape }}"
+                title="{{ block.settings.slide_image.alt | escape }}"
                 loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
+                decoding="async"
+                {% if forloop.first %}fetchpriority="high"{% endif %}
               >
             </picture>
 
@@ -40,11 +45,10 @@
                 {% if block.settings.slide_subheader != blank %}
                   <p class="store-experience-banner-slider-content-subheader">{{ block.settings.slide_subheader }}</p>
                 {% endif %}
-                
                 {% if block.settings.show_button and block.settings.slide_button_text != blank %}
-                  <span class="store-experience-banner-slider-content-button">
+                  <button class="store-experience-banner-slider-content-button">
                     {{ block.settings.slide_button_text }}
-                  </span>
+                  </button>
                 {% endif %}
               </div>
             </div>
@@ -102,56 +106,48 @@
 <script defer>
   window.addEventListener("load", function () {
     const swiper = new Swiper(".store-experience-banner-swiper", {
-      loop: true,
-      effect: "fade",
-      fadeEffect: {
-        crossFade: true
-      },
-      speed: 1000,
-      // --- ADDED SETTINGS TO FIX CLICKS ---
-      preventClicks: false,
-      preventClicksPropagation: false,
-      touchStartPreventDefault: false,
-      // ------------------------------------
-      autoplay: {{ section.settings.autoplay | json }} ? { 
-        delay: 4000, 
-        disableOnInteraction: false 
-      } : false,
-      pagination: { 
-        el: ".swiper-pagination", 
-        clickable: true 
-      },
-      navigation: { 
-        nextEl: ".store-experience-banner .swiper-button-next", 
-        prevEl: ".store-experience-banner .swiper-button-prev" 
-      },
-      on: {
-        init: function(){ 
-          trackStoreExpPromoView(this.slides[this.activeIndex]); 
-        },
-        slideChange: function(){ 
-          trackStoreExpPromoView(this.slides[this.activeIndex]); 
-        }
+      loop:true,
+      autoplay: {{ section.settings.autoplay | json }} ? { delay:3000, disableOnInteraction:false } : false,
+      pagination: { el:".swiper-pagination", clickable:true },
+      navigation: { nextEl:".swiper-button-next", prevEl:".swiper-button-prev" },
+      on:{
+        init:function(){ trackPromoView(this.slides[this.activeIndex]); },
+        slideChange:function(){ trackPromoView(this.slides[this.activeIndex]); }
       }
     });
 
     function trackStoreExpPromoView(slide){
       if(!slide) return;
-      const target = slide.querySelector("a");
-      // Added safety check for dataset
-      if(target && target.dataset && target.dataset.promoId){
+      const target=slide.querySelector("a");
+      if(target && target.dataset.promoId){
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
-          event: "promoView",
-          promoView: {
+          event:"promoView",
+          promoView:{
             promo_id: target.dataset.promoId,
             promo_name: target.dataset.promoName,
-            creative_name: "store_experience_banner",
-            promo_position: "Home Page"
+            creative_name:"store_experience_banner",
+            promo_position:"Home Page"
           }
         });
       }
     }
+
+    window.handleStoreExpGTMClick = function(event){
+      event.preventDefault();
+      const target = event.currentTarget;
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event:"promoClick",
+        promoClick:{
+          promo_id: target.dataset.promoId || target.id,
+          promo_name: target.dataset.promoName,
+          creative_name:"store_experience_banner_image",
+          promo_position:"Home Page"
+        }
+      });
+      setTimeout(()=>{ window.location.assign(target.href); }, 100);
+    };
   });
 </script>
 
