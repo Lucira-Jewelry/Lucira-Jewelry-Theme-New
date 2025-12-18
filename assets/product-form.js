@@ -741,7 +741,7 @@ document.addEventListener("DOMContentLoaded", function () {
       window.dataLayer.push({
         event: "Customize",
         products: {
-          shopify_product_id: selectedVariant.product_id,
+          shopify_product_id: selectedVariant.productId,
           shopify_variant_id: selectedVariant.id,
           shopify_sku: selectedVariant.sku || selectedVariant.id
         }
