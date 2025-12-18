@@ -1,3 +1,10 @@
+function resetJourneyOnLoad() {
+  try {
+    localStorage.removeItem('charm_cart_v1');
+    localStorage.removeItem('lucira_price_breakdown');
+  } catch (e) {}
+}
+resetJourneyOnLoad();
 window.MainBaseCharm = function () {
   const CANVAS_ID = 'vis-Visualiser_Canvas';
   const LS_KEY = 'SelectedVariant';
@@ -123,9 +130,19 @@ window.MainBaseCharm = function () {
   const __BASE_TYPE__ = detectBaseType();
   const MAX_CHARMS = getCapForBaseType(__BASE_TYPE__);
 
-  function getSelectedCount() {
-    return Array.isArray(visualiser.charms) ? visualiser.charms.length : 0;
+function getSelectedCount() {
+  try {
+    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+    if (!cart || !cart.items) return 0;
+
+    return Object.values(cart.items).reduce(
+      (sum, item) => sum + Number(item.qty || 0),
+      0
+    );
+  } catch {
+    return 0;
   }
+}
 
   function ensureCapLabel() {
     const bar = document.getElementById('lf-color-filter');
@@ -171,20 +188,13 @@ window.MainBaseCharm = function () {
     if (!minus || !input) return;
 
     const qty = Number(input.value || 0);
-
-    // ✅ minus tabhi disable jab qty 0 ho
     const shouldDisable = qty === 0;
-
     minus.disabled = shouldDisable;
     minus.style.opacity = shouldDisable ? 0.35 : 1;
     minus.style.pointerEvents = shouldDisable ? 'none' : 'auto';
     minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
   });
 }
-
-
-
-
   function setSelectedBorder(card) {
     try {
       const v = Number(card.querySelector('.qty-input')?.value || 0);
@@ -378,7 +388,6 @@ window.MainBaseCharm = function () {
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
-    updateCTATotal();
     refreshCapState();
   }
 
@@ -568,6 +577,21 @@ window.MainBaseCharm = function () {
       initUIFromCart();
     }
   })();
+document.addEventListener('charmCartUpdated', () => {
+  try {
+    syncUIFromCart();
+  } catch (e) {
+    console.warn('Visualiser sync failed', e);
+  }
+});
+
+document.addEventListener('charmCartLoaded', () => {
+  try {
+    syncUIFromCart();
+  } catch (e) {
+    console.warn('Sync after cart load failed', e);
+  }
+});
 
   function bindCollectionTiles() {
     const tiles = document.querySelectorAll('.collection-tile');
@@ -600,16 +624,12 @@ class BVCanvas {
     this._bindZoomUI();
     this.initStage();
   }
-
-  // ---------- ZOOM UI (slider + +/-) ----------
-
   _bindZoomUI() {
     const slider = this.slider;
     const btnIn = this.btnIn;
     const btnOut = this.btnOut;
 
     if (!slider) {
-      // Fallback: only basic zoom buttons (no slider)
       btnIn?.addEventListener('click', () =>
         this.setZoom(Math.min(MAX_ZOOM, this.zoomFactor + 0.1))
       );
@@ -684,9 +704,6 @@ class BVCanvas {
 
     updateTrack();
   }
-
-  // ---------- STAGE SETUP ----------
-
   initStage() {
     const container = document.getElementById(this.containerId);
     if (!container) return;
@@ -699,21 +716,19 @@ class BVCanvas {
     this.stageSize = size;
 
     if (this.stage) this.stage.destroy();
-
+    this._productRendered = false;
     this.stage = new Konva.Stage({
       container: this.containerId,
       width: this.stageSize,
       height: this.stageSize,
-      draggable: false, // setZoom() handle karega
+      draggable: false, 
     });
-
-    // 🔥 Wheel zoom: use same setZoom logic (so MAX_ZOOM behaves like slider)
     this.stage.on('wheel', (e) => {
       e.evt.preventDefault();
 
       const current = this.zoomFactor || this.stage.scaleX() || 1;
-      const step = 0.12; // feel adjust kar sakta hai
-      const dir = e.evt.deltaY > 0 ? -1 : 1; // scroll down = zoom out
+      const step = 0.12; 
+      const dir = e.evt.deltaY > 0 ? -1 : 1; 
       const target = current + dir * step;
 
       this.setZoom(target, { animate: false });
@@ -735,65 +750,99 @@ class BVCanvas {
 
     this._updateZoomTrack && this._updateZoomTrack();
   }
+createImage(url) {
+  return new Promise((resolve, reject) => {
+    if (!url) return reject('no-url');
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject('load-fail');
+    img.src = url;
+  });
+}
+_renderProductIfNeeded() {
+  if (this._productRendered) return;
 
-  // ---------- IMAGE HELPERS ----------
+  const imgUrl = this.visualiser?.product?.image;
+  if (!imgUrl) return;
 
-  createImage(url) {
-    return new Promise((resolve, reject) => {
-      if (!url) return reject('no-url');
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => resolve(img);
-      img.onerror = () => reject('load-fail');
-      img.src = url;
-    });
-  }
-
-  // ---------- MAIN RENDER ----------
-
-  async render(vis) {
-    if (!vis || !vis.product) return;
-
-    this.visualiser = vis;
-    this.charmScale = vis.product.charmScale || DEFAULT_CHARM_SCALE;
-    this.charmPosition = vis.product.charmPosition || DEFAULT_CHARM_POSITION;
-
-    this.productLayer.destroyChildren();
-    this.charmLayer.destroyChildren();
-    this._placedCharmPositions = [];
-
-    if (vis.product.image) {
-      try {
-        const pImg = await this.createImage(vis.product.image);
-        const p = new Konva.Image({
+  this.createImage(imgUrl)
+    .then((img) => {
+      this.productLayer.destroyChildren();
+      this.productLayer.add(
+        new Konva.Image({
           x: 0,
           y: 0,
-          image: pImg,
+          image: img,
           width: this.stageSize,
           height: this.stageSize,
-        });
-        this.productLayer.add(p);
-      } catch (e) {}
-    }
+        })
+      );
+      this.productLayer.draw();
+      this._productRendered = true;
+    })
+    .catch(() => {});
+}
 
-    if (Array.isArray(vis.charms) && vis.charms.length) {
-      await this._placeCharmsSymmetric(vis.charms);
+_resetToBaseView(animate = true) {
+  const stage = this.stage;
+  if (!stage) return;
 
-      if (vis.charms.length > 0 && vis.charms.length < 3) {
-        // tumhara existing behaviour – 1–2 charms pe auto focus
-        this.autoZoomToCharms();
-      } else {
-        // 3+ charms → normal full necklace view
-        this.setZoom(1, { animate: true });
-      }
-    } else {
-      this.setZoom(1, { animate: true });
-    }
+  const center = {
+    x: this.stageSize / 2,
+    y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+  };
 
-    this.stage.draw();
+  const posX = center.x - center.x * 1;
+  const posY = center.y - center.y * 1;
+
+  if (animate) {
+    stage.to({
+      scaleX: 1,
+      scaleY: 1,
+      x: posX,
+      y: posY,
+      duration: 0.18,
+    });
+  } else {
+    stage.scale({ x: 1, y: 1 });
+    stage.position({ x: posX, y: posY });
+    stage.batchDraw();
   }
 
-  // ---------- CHAIN ARC / CHARM POSITIONS ----------
+  this.zoomFactor = 1;
+  stage.draggable(false);
+
+  if (this.slider) {
+    this.slider.value = '1';
+    this._updateZoomTrack && this._updateZoomTrack();
+  }
+}
+
+ async render(vis) {
+  if (!vis || !vis.product) return;
+
+  this.visualiser = vis;
+  this.charmScale = vis.product.charmScale || DEFAULT_CHARM_SCALE;
+  this.charmPosition = vis.product.charmPosition || DEFAULT_CHARM_POSITION;
+  this.charmLayer.destroyChildren();
+  this._placedCharmPositions = [];
+  this._renderProductIfNeeded();
+
+  if (Array.isArray(vis.charms) && vis.charms.length) {
+    await this._placeCharmsSymmetric(vis.charms);
+
+    if (vis.charms.length < 3) {
+      this.autoZoomToCharms();
+    } else {
+      this._resetToBaseView(true);
+    }
+  } else {
+    this._resetToBaseView(true);
+  }
+
+  this.stage.draw();
+}
 
   _computeArcPositionsLinear(count) {
     const center = {
@@ -927,16 +976,12 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       }
     }
   }
-
-  // ---------- HELPER: focus charms at specific scale (for full zoom) ----------
-
   _focusCharmsAtScale(scale, animate = true) {
     const pts = this._placedCharmPositions || [];
     const stage = this.stage;
     if (!stage) return;
 
     if (!pts.length) {
-      // Fallback: normal chain-center zoom
       const center = {
         x: this.stageSize / 2,
         y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
@@ -959,8 +1004,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       }
       return;
     }
-
-    // Charms bounding box
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -1003,9 +1046,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       stage.batchDraw();
     }
   }
-
-  // ---------- AUTO ZOOM TO CHARMS (1–2 charms case) ----------
-
   autoZoomToCharms() {
     const pts = this._placedCharmPositions || [];
     if (!pts.length) {
@@ -1066,14 +1106,14 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
     this.stage.draggable(sx > 1);
   }
-
-  // ---------- MAIN ZOOM ENTRY (slider / buttons / wheel) ----------
-
- setZoom(scale, opts = { animate: true }) {
+  setZoom(scale, opts = { animate: true }) {
   const stage = this.stage;
   if (!stage) return;
 
-  // clamp
+  if (!this._placedCharmPositions || this._placedCharmPositions.length === 0) {
+    this._resetToBaseView(opts?.animate !== false);
+    return;
+  }
   scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
   this.zoomFactor = scale;
 
@@ -1105,12 +1145,8 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
   };
 
   if (!hasCharms || scale <= 1.0001) {
-    // ✅ ya to charms hi nahi, ya user min zoom pe hai
-    //    → full necklace / chain-center view
     applyCenterZoom();
   } else {
-    // ✅ charms present + zoom > 1
-    //    → charms ke bounding box ke around focus
     this._focusCharmsAtScale(scale, animate);
   }
 
@@ -1118,24 +1154,16 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
     this.slider.value = scale.toFixed(2);
     this._updateZoomTrack && this._updateZoomTrack();
   }
-
-  // sirf zoom > 1 pe drag allow
   stage.draggable(scale > 1);
 }
 
 }
-
-
-
   let bv = null;
-
   function ensureBV() {
     if (!bv) {
       bv = new BVCanvas(CANVAS_ID);
       window.bv = bv;
-
-      // Keep external helper for zoom slider value
-      window.setZoomSliderValue = function (v) {
+            window.setZoomSliderValue = function (v) {
         if (bv && typeof bv._setSliderValue === 'function') {
           bv._setSliderValue(v);
         }
@@ -1143,9 +1171,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
     }
     return bv;
   }
-
-  /* ---------- VARIANT PREVIEW ---------- */
-
   function readSavedVariantFromLS() {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -1190,26 +1215,45 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
     return null;
   }
-
   function renderLeftSafe(variant) {
-    try {
-      const img =
-        variant?.image ||
-        variant?.featured_image?.src ||
-        variant?.image_src ||
-        variant ||
-        '';
+  try {
+    const img =
+      variant?.image ||
+      variant?.featured_image?.src ||
+      variant?.image_src ||
+      variant ||
+      '';
 
-      if (img) {
-        visualiser.product.image = img;
-        if (typeof variant.price === 'number') visualiser.product.price = variant.price;
-
-        setTimeout(() => ensureBV().render(visualiser).catch(console.warn), 40);
-      }
-    } catch (e) {}
+    if (img) {
+      visualiser.product.image = img;
+      if (typeof variant.price === 'number')
+        visualiser.product.price = variant.price;
+      ensureBV()._productRendered = false;
+      bv.render(visualiser);
+        }
+  } catch (e) {}
   }
+function ensureBaseProductFromLS() {
+  if (visualiser.product.image) return;
 
-  /* ---------- PANEL OPEN/CLOSE ---------- */
+  const saved = readSavedVariantFromLS();
+  if (!saved) return;
+
+  const vid = saved.variantId || saved.id;
+  if (!vid) return;
+
+  const resolved = resolveVariantFromPage(vid);
+  if (!resolved) return;
+
+  visualiser.product.image =
+    resolved.image ||
+    resolved.featured_image?.src ||
+    '';
+
+  if (typeof resolved.price === 'number') {
+    visualiser.product.price = resolved.price;
+  }
+}
 
   const full = $('lucira-accessory-fullscreen');
 
@@ -1263,27 +1307,22 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       }
     } catch (e) {}
 
-    setTimeout(() => {
-      ensureBV();
-      attachQtyHandlersKonva();
-      refreshSelectedBorders();
-      updateCTATotal();
-      bv.initStage();
-      bv.render(visualiser).catch(console.warn);
-      bindCollectionTiles();
-      buildColorMapForActiveGrid();
-      buildSwatchDots();
-      refreshCapState();
-    }, 80);
-
+   setTimeout(() => {
+  ensureBV();
+  attachQtyHandlersKonva();
+  syncUIFromCart();
+  refreshSelectedBorders();
+  bindCollectionTiles();
+  buildColorMapForActiveGrid();
+  buildSwatchDots();
+}, 80);
     if (full) {
       full.style.display = 'block';
       document.querySelector('.carat-section').style.display = 'none';
       full.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
     }
-
-    setTimeout(() => {
+  setTimeout(() => {
       try {
         ensureBV();
         if (visualiser.charms && visualiser.charms.length && visualiser.charms.length < 3)
@@ -1299,9 +1338,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       full.setAttribute('aria-hidden', 'true');
       document.body.style.overflow = '';
     }
-
-    visualiser.charms = [];
-
     try {
       ensureBV().setZoom(1);
     } catch (_) {}
@@ -1369,9 +1405,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
     mo.observe(document.body, { childList: true, subtree: true });
   })();
-
-  /* ---------- CHARM QTY HANDLERS ---------- */
-
   function productJsonForCard(card) {
     const pid = card?.dataset?.productId;
     if (!pid) return null;
@@ -1410,10 +1443,7 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
   function getCharmMeta(variantId) {
     const el = document.getElementById('variant-meta-' + variantId);
-    // console.log('variantttttt', el);
-
     if (!el || !el.textContent) {
-    //   console.warn('Meta script not found for variant:', variantId);
       return { metal: 0, diamond: 0 };
     }
 
@@ -1454,30 +1484,52 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       diamond_1_weight: mf.diamond,
     };
   }
+function rebuildVisualiserFromCart() {
+  try {
+    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
 
-  function addCharmFromCard(card) {
-    const obj = buildCharmObjFromCard(card);
-    visualiser.charms.push(obj);
-    updateCTATotal();
-    return ensureBV().render(visualiser);
+    // 🔥 HARD RESET every time
+    visualiser.charms.length = 0;
+
+    if (!cart || !cart.items) return;
+
+    Object.keys(cart.items).forEach((variantId) => {
+      const qty = Number(cart.items[variantId].qty || 0);
+      if (qty <= 0) return;
+
+      // 🔥 FIX: variantId ≠ productId
+      const card = document.querySelector(
+        `.charm-card[data-variant-id="${variantId}"],
+         .charm-card[data-product-id="${variantId}"]`
+      );
+      if (!card) return;
+
+      for (let i = 0; i < qty; i++) {
+        visualiser.charms.push(buildCharmObjFromCard(card));
+      }
+    });
+  } catch (e) {
+    console.warn('rebuildVisualiserFromCart failed', e);
+    visualiser.charms.length = 0;
   }
+}
 
-  function removeCharmByProductId(productId) {
-    const idx = visualiser.charms
-      .map((c) => String(c.id))
-      .lastIndexOf(String(productId));
+function syncUIFromCart() {
+    ensureBaseProductFromLS();
+  rebuildVisualiserFromCart();
+  const bv = ensureBV();
+  bv._productRendered = false;
+  bv.render(visualiser).catch(() => {});
+  const selectedCount = getSelectedCount();
 
-    if (idx >= 0) {
-      visualiser.charms.splice(idx, 1);
-      ensureBV().render(visualiser);
-      updateCTATotal();
-      return true;
-    }
-
+  if (selectedCount > 0) {
     updateCTATotal();
-    return false;
+  } else {
+    const footer = document.querySelector('.cta-footer');
+    if (footer) footer.style.display = 'none';
   }
-
+  refreshCapState();
+}
   function attachQtyHandlersKonva() {
     const gridsWrapper = document.getElementById('lf-charms-grids-wrapper');
     if (!gridsWrapper) return;
@@ -1509,51 +1561,37 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       const newIn = card.querySelector('.qty-incr');
       const newDe = card.querySelector('.qty-decr');
 
-      newIn?.addEventListener(
-        'click',
-        () => {
-          if (getSelectedCount() >= MAX_CHARMS) {
-            (card.querySelector('.charm-thumb-wrap') || card).animate(
-              [{ transform: 'scale(1)' }, { transform: 'scale(1.03)' }, { transform: 'scale(1)' }],
-              { duration: 180 }
-            );
-            refreshCapState();
-            return;
-          }
+     newIn?.addEventListener(
+  'click',
+  () => {
+    if (getSelectedCount() >= MAX_CHARMS) {
+      refreshCapState();
+      return;
+    }
 
-          let v = clamp(input.value);
-          if (v < 99) v++;
+    let v = clamp(input.value);
+    input.value = String(++v);
+    setSelectedBorder(card);
+    updateBadgesKonva();
+    refreshCapState();
+  },
+  { passive: true }
+);
 
-          addCharmFromCard(card).catch(() => {});
-          input.value = String(v);
 
-          setSelectedBorder(card);
-          updateBadgesKonva();
-          updateCTATotal();
-          refreshCapState();
-        },
-        { passive: true }
-      );
+     newDe?.addEventListener(
+  'click',
+  () => {
+    let v = clamp(input.value);
+    if (v <= 0) return;
 
-      newDe?.addEventListener(
-        'click',
-        () => {
-          let v = clamp(input.value);
-          if (v <= 0) return;
-
-          const removed = removeCharmByProductId(card.dataset.productId);
-          if (!removed) return;
-
-          v--;
-          input.value = String(v);
-
-          setSelectedBorder(card);
-          updateBadgesKonva();
-          updateCTATotal();
-          refreshCapState();
-        },
-        { passive: true }
-      );
+    input.value = String(--v);
+    setSelectedBorder(card);
+    updateBadgesKonva();
+    refreshCapState();
+  },
+  { passive: true }
+);
 
       input?.addEventListener('keydown', (e) => e.preventDefault());
     });
@@ -1580,7 +1618,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
   IDLE(attachQtyHandlersKonva);
   IDLE(refreshSelectedBorders);
-  IDLE(updateCTATotal);
   IDLE(refreshCapState);
 
   const moCards = new MutationObserver((muts) => {
@@ -1608,12 +1645,9 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
     } else {
       const idx = Number(e?.detail?.index);
       if (!Number.isNaN(idx)) {
-        visualiser.charms.splice(idx, 1);
         ensureBV().render(visualiser).catch(() => {});
-        updateCTATotal();
       }
     }
-
     updateBadgesKonva();
     refreshCapState();
   });
@@ -1626,7 +1660,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
         bv.render(visualiser);
 
         if (typeof currentCollectionId === 'string' && currentCollectionId) {
-          /* moveGridsColumnBelowTile(currentCollectionId); */
         }
       } catch (e) {}
     },
@@ -1816,10 +1849,7 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
       dot.style.background = '#e5e7eb';
       return;
     }
-
     name.textContent = color;
-    // console.log('Setting active color label to', color);
-
     dot.style.background =
       color === 'Yellow Gold'
         ? '#f2c84b'
@@ -1888,8 +1918,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
         dot.classList.add('active');
 
         setActiveLabel(color);
-        // console.log('Building color dot for', color);
-        updateCTATotal();
         refreshCapState();
       });
 
@@ -1898,7 +1926,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
     applyColorFilter(currentColorLabel);
     setActiveLabel(currentColorLabel);
-    // console.log('Built swatch dots for colors:', colors);
   }
 
   function applyColorFilter(colorLabel) {
@@ -1944,7 +1971,6 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
   function runInit() {
     if (__initDone) return;
     __initDone = true;
-
     buildVariantIndexOnce();
 
     if (!currentCollectionId) {
@@ -1958,46 +1984,12 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
-    updateCTATotal();
+    // updateCTATotal();
     refreshCapState();
   }
 
   document.addEventListener('DOMContentLoaded', runInit);
   setTimeout(runInit, 500);
-
-  window.luciraAddCharm = function (productId, src) {
-    const card = document.querySelector(
-      '.charm-card[data-product-id="' + productId + '"]'
-    );
-
-    if (card) {
-      addCharmFromCard(card);
-      setSelectedBorder(card);
-      updateCTATotal();
-      refreshCapState();
-      return true;
-    }
-
-    visualiser.charms.push({ id: productId, image: src || '', name: 'Charm', price: 0 });
-    updateCTATotal();
-    refreshCapState();
-    ensureBV().render(visualiser).catch(() => {});
-    return true;
-  };
-
-  window.luciraRemoveCharm = function (productId) {
-    const ok = removeCharmByProductId(productId);
-    updateCTATotal();
-    refreshCapState();
-    return ok;
-  };
-
-  window.luciraClearCharms = function () {
-    visualiser.charms = [];
-    updateCTATotal();
-    refreshCapState();
-    return ensureBV().render(visualiser);
-  };
 
   window.luciraGetPreview = function () {
     try {
@@ -2010,22 +2002,15 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
 
   window.luciraOpenAccessory = openPanel;
   window.luciraCloseAccessory = closePanel;
-  window.__luciraUpdateCTATotal = updateCTATotal;
 
-//   console.log('Panel ready — charm cap active:', {
-//     baseType: __BASE_TYPE__,
-//     MAX_CHARMS,
-//   }
-// );
 };
+
 document.addEventListener('DOMContentLoaded', function () {
-  localStorage.removeItem('charm_cart_v1');
   const label = document.getElementById('lf-color-name');
 
   const dotsWrap = document.getElementById('lf-dots');
   const activeDot = document.getElementById('lf-active-dot');
   const caratValue = localStorage.getItem('Carat-value');
-//   console.log('label', label);
   if (caratValue) {
     label.insertAdjacentText('afterbegin', `<span class="carat-value">${caratValue}</span> `);
   }
@@ -2170,7 +2155,7 @@ function scheduleUpdateCounts() {
       totalQty+=Number(each.value)
   });
   if(totalQty >= 5) return;
-  console.log('2172');
+  // console.log('2172');
 
 
   if (__countsScheduled) return;
