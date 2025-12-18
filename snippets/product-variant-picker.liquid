@@ -91,8 +91,6 @@
   {%- endunless -%}
 </div>
 
-
-
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   window.dataLayer = window.dataLayer || [];
@@ -100,21 +98,19 @@ document.addEventListener('DOMContentLoaded', function () {
   const drawer = document.getElementById('variant-drawer');
   if (!drawer) return;
 
-  const variantsEl = drawer.querySelector('#drawer-variants-json');
-  if (!variantsEl) return;
-
-  const variants = JSON.parse(variantsEl.textContent);
+  // Get product variants from Liquid once
+  const variants = {{ product.variants | json }};
 
   function getCurrentVariant() {
     // Shopify always updates this input
-    const idInput = drawer.querySelector('input[name="id"]');
+    const idInput = document.querySelector('form[action*="/cart/add"] input[name="id"]');
     if (!idInput) return null;
 
     const variantId = Number(idInput.value);
     return variants.find(v => v.id === variantId) || null;
   }
 
-  function fireCustomizeEvent() {
+  function fireCustomize() {
     const variant = getCurrentVariant();
     if (!variant) return;
 
@@ -128,16 +124,18 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
-  // Fire on ANY option interaction inside drawer
+  // ✅ Detect ANY interaction inside drawer
   drawer.addEventListener('change', function (e) {
-    if (!e.target.matches('input[type="radio"], select')) return;
-    fireCustomizeEvent();
+    if (e.target.matches('input, select')) {
+      // allow Shopify JS to update variant id first
+      setTimeout(fireCustomize, 0);
+    }
   });
 
-  // Safety: some themes use click instead of change
   drawer.addEventListener('click', function (e) {
-    if (!e.target.closest('label')) return;
-    setTimeout(fireCustomizeEvent, 0);
+    if (e.target.closest('label')) {
+      setTimeout(fireCustomize, 0);
+    }
   });
 });
 </script>
