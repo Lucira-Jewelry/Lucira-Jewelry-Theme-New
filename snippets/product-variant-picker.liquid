@@ -91,7 +91,7 @@
   {%- endunless -%}
 </div>
 
-<script>
+{% comment %} <script>
 document.addEventListener('DOMContentLoaded', function () {
   window.dataLayer = window.dataLayer || [];
 
@@ -136,6 +136,58 @@ document.addEventListener('DOMContentLoaded', function () {
     if (e.target.closest('label')) {
       setTimeout(fireCustomize, 0);
     }
+  });
+});
+</script> {% endcomment %}
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.dataLayer = window.dataLayer || [];
+
+  const drawer = document.getElementById('variant-drawer');
+  if (!drawer) return;
+
+  const variants = {{ product.variants | json }};
+  let lastFiredVariantId = null;
+
+  function getCurrentVariant() {
+    const idInput = document.querySelector(
+      'form[action*="/cart/add"] input[name="id"]'
+    );
+    if (!idInput) return null;
+
+    const variantId = Number(idInput.value);
+    return variants.find(v => v.id === variantId) || null;
+  }
+
+  function fireCustomizeOnce() {
+    const variant = getCurrentVariant();
+    if (!variant) return;
+
+    // ✅ Deduplicate
+    if (variant.id === lastFiredVariantId) return;
+
+    lastFiredVariantId = variant.id;
+
+    window.dataLayer.push({
+      event: "Customize",
+      products: {
+        shopify_product_id: variant.product_id,
+        shopify_variant_id: variant.id,
+        shopify_sku: variant.sku
+      }
+    });
+  }
+
+  // ✅ ONLY listen to change (no click)
+  drawer.addEventListener('change', function (e) {
+    if (!e.target.matches('input[type="radio"], select')) return;
+
+    // ✅ Wait for Shopify to finish updating variant ID
+    requestAnimationFrame(() => {
+      requestAnimationFrame(fireCustomizeOnce);
+    });
   });
 });
 </script>
