@@ -706,114 +706,24 @@ function initEngraving() {
   };
 }
 //customise button clicked datalayer
-// document.addEventListener("DOMContentLoaded", function () {
-//   var customizeBtn = document.getElementById("product_variant_drawer");
-
-//   if (customizeBtn) {
-//     customizeBtn.addEventListener("click", function () {
-//       window.dataLayer = window.dataLayer || [];
-
-//       window.dataLayer.push({
-//         event: "Customize",
-//         products: {
-//           shopify_product_id: productId,
-//           shopify_variant_id:productTitle ,
-//           shopify_sku: productId
-//         }
-//       });
-//     });
-//   }
-// });
-
 document.addEventListener("DOMContentLoaded", function () {
-  // Function to push customize event to dataLayer
-  function pushCustomizeEvent(variantData) {
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: "Customize",
-      products: {
-        shopify_product_id: variantData.product_id,
-        shopify_variant_id: variantData.id,
-        shopify_sku: variantData.sku
-      }
-    });
-    console.log("Customize event fired:", variantData);
-  }
-
-  // Function to get current variant from the JSON script tag
-  function getCurrentVariant() {
-    var variantScript = document.querySelector('[data-selected-variant]');
-    if (variantScript) {
-      try {
-        return JSON.parse(variantScript.textContent);
-      } catch (e) {
-        console.error("Error parsing variant data:", e);
-      }
-    }
-    return null;
-  }
-
-  // Track customize button click (when drawer opens)
   var customizeBtn = document.getElementById("product_variant_drawer");
+
   if (customizeBtn) {
     customizeBtn.addEventListener("click", function () {
-      var currentVariant = getCurrentVariant();
-      if (currentVariant) {
-        pushCustomizeEvent(currentVariant);
-      }
-    });
-  }
+      window.dataLayer = window.dataLayer || [];
 
-  // Track variant changes in the drawer
-  var variantDrawer = document.getElementById("variant-drawer");
-  if (variantDrawer) {
-    // Listen to all variant option inputs (radio buttons) in the drawer
-    var variantInputs = variantDrawer.querySelectorAll('input[type="radio"][name^="options"]');
-    
-    variantInputs.forEach(function(input) {
-      input.addEventListener("change", function() {
-        // Small delay to allow Shopify to update the variant data
-        setTimeout(function() {
-          var updatedVariant = getCurrentVariant();
-          if (updatedVariant) {
-            pushCustomizeEvent(updatedVariant);
-          }
-        }, 200);
+      window.dataLayer.push({
+        event: "Customize",
+        products: {
+          shopify_product_id: productId,
+          shopify_variant_id:productTitle ,
+          shopify_sku: productId
+        }
       });
     });
   }
-
-  // Optional: Track when confirm customization is clicked
-  var confirmBtn = document.getElementById("customize_close_drawer");
-  if (confirmBtn) {
-    confirmBtn.addEventListener("click", function() {
-      var finalVariant = getCurrentVariant();
-      if (finalVariant) {
-        // You can add a different event name here if needed for confirmation
-        pushCustomizeEvent(finalVariant);
-      }
-    });
-  }
-
-  // Also listen to the close drawer button to track final selection
-  var closeBtn = document.getElementById("close-drawer");
-  if (closeBtn) {
-    closeBtn.addEventListener("click", function() {
-      var finalVariant = getCurrentVariant();
-      if (finalVariant) {
-        pushCustomizeEvent(finalVariant);
-      }
-    });
-  }
-
-  // Listen for Shopify's variant change event (if theme uses it)
-  document.addEventListener('variant:change', function(event) {
-    if (event.detail && event.detail.variant) {
-      pushCustomizeEvent(event.detail.variant);
-    }
-  });
 });
-
 
 
 // pdp-delivery-details
