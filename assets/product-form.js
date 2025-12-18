@@ -706,24 +706,89 @@ function initEngraving() {
   };
 }
 //customise button clicked datalayer
+// document.addEventListener("DOMContentLoaded", function () {
+//   var customizeBtn = document.getElementById("product_variant_drawer");
+
+//   if (customizeBtn) {
+//     customizeBtn.addEventListener("click", function () {
+//       window.dataLayer = window.dataLayer || [];
+
+//       window.dataLayer.push({
+//         event: "Customize",
+//         products: {
+//           shopify_product_id: productId,
+//           shopify_variant_id:productTitle ,
+//           shopify_sku: productId
+//         }
+//       });
+//     });
+//   }
+// });
+
 document.addEventListener("DOMContentLoaded", function () {
   var customizeBtn = document.getElementById("product_variant_drawer");
+  var variantDrawer = document.getElementById("variant-drawer");
 
-  if (customizeBtn) {
-    customizeBtn.addEventListener("click", function () {
-      window.dataLayer = window.dataLayer || [];
-
+  // Function to push data to dataLayer
+  function pushCustomizeEvent() {
+    window.dataLayer = window.dataLayer || [];
+    
+    // Get the selected variant data from the script tag
+    var selectedVariantScript = document.querySelector('[data-selected-variant]');
+    var selectedVariant = selectedVariantScript ? JSON.parse(selectedVariantScript.textContent) : null;
+    
+    if (selectedVariant) {
       window.dataLayer.push({
         event: "Customize",
         products: {
-          shopify_product_id: productId,
-          shopify_variant_id:productTitle ,
-          shopify_sku: productId
+          shopify_product_id: selectedVariant.product_id,
+          shopify_variant_id: selectedVariant.id,
+          shopify_sku: selectedVariant.sku || selectedVariant.id
         }
       });
+      
+      console.log("DataLayer pushed:", {
+        event: "Customize",
+        products: {
+          shopify_product_id: selectedVariant.product_id,
+          shopify_variant_id: selectedVariant.id,
+          shopify_sku: selectedVariant.sku || selectedVariant.id
+        }
+      });
+    }
+  }
+
+  // Fire on initial customize button click
+  if (customizeBtn) {
+    customizeBtn.addEventListener("click", function () {
+      pushCustomizeEvent();
+    });
+  }
+
+  // Fire on variant change (when radio buttons or variant options are selected)
+  if (variantDrawer) {
+    variantDrawer.addEventListener("change", function (e) {
+      // Check if the change is from a variant input (radio button or other input)
+      if (e.target.matches('input[type="radio"]') || 
+          e.target.closest('.product-form__input')) {
+        
+        // Small delay to ensure the selected variant data is updated
+        setTimeout(function() {
+          pushCustomizeEvent();
+        }, 100);
+      }
+    });
+  }
+
+  // Optional: Fire on confirm customization button click
+  var confirmBtn = document.getElementById("customize_close_drawer");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", function () {
+      pushCustomizeEvent();
     });
   }
 });
+
 
 
 // pdp-delivery-details
