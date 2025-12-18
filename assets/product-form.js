@@ -727,107 +727,91 @@ function initEngraving() {
 
 document.addEventListener("DOMContentLoaded", function () {
   // Function to push customize event to dataLayer
-  function pushCustomizeEvent(variant) {
+  function pushCustomizeEvent(variantData) {
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: "Customize",
       products: {
-        shopify_product_id: variant.product_id || productId,
-        shopify_variant_id: variant.id || productId,
-        shopify_sku: variant.sku || productId
+        shopify_product_id: variantData.product_id,
+        shopify_variant_id: variantData.id,
+        shopify_sku: variantData.sku
       }
     });
-    console.log("Customize event fired:", variant); // For debugging
+    console.log("Customize event fired:", variantData);
   }
 
-  // Track customize button click (drawer open)
+  // Function to get current variant from the JSON script tag
+  function getCurrentVariant() {
+    var variantScript = document.querySelector('[data-selected-variant]');
+    if (variantScript) {
+      try {
+        return JSON.parse(variantScript.textContent);
+      } catch (e) {
+        console.error("Error parsing variant data:", e);
+      }
+    }
+    return null;
+  }
+
+  // Track customize button click (when drawer opens)
   var customizeBtn = document.getElementById("product_variant_drawer");
   if (customizeBtn) {
     customizeBtn.addEventListener("click", function () {
-      // Get current selected variant
-      var currentVariant = window.currentVariant || {
-        product_id: productId,
-        id: productId,
-        sku: productId
-      };
-      pushCustomizeEvent(currentVariant);
+      var currentVariant = getCurrentVariant();
+      if (currentVariant) {
+        pushCustomizeEvent(currentVariant);
+      }
     });
   }
 
-  // Track variant changes within the customize drawer
-  var confirmBtn = document.getElementById("confirm_customization");
-  var variantInputs = document.querySelectorAll('input[name^="options"]');
-  
-  // Listen to variant option changes (radio buttons or other inputs)
-  variantInputs.forEach(function(input) {
-    input.addEventListener("change", function() {
-      // Wait a moment for Shopify to update the variant
-      setTimeout(function() {
-        // Get the newly selected variant
-        var selectedVariant = getSelectedVariant();
-        if (selectedVariant) {
-          pushCustomizeEvent(selectedVariant);
-        }
-      }, 100);
+  // Track variant changes in the drawer
+  var variantDrawer = document.getElementById("variant-drawer");
+  if (variantDrawer) {
+    // Listen to all variant option inputs (radio buttons) in the drawer
+    var variantInputs = variantDrawer.querySelectorAll('input[type="radio"][name^="options"]');
+    
+    variantInputs.forEach(function(input) {
+      input.addEventListener("change", function() {
+        // Small delay to allow Shopify to update the variant data
+        setTimeout(function() {
+          var updatedVariant = getCurrentVariant();
+          if (updatedVariant) {
+            pushCustomizeEvent(updatedVariant);
+          }
+        }, 200);
+      });
     });
-  });
+  }
 
-  // Also track when confirm button is clicked (optional, but recommended)
+  // Optional: Track when confirm customization is clicked
+  var confirmBtn = document.getElementById("customize_close_drawer");
   if (confirmBtn) {
     confirmBtn.addEventListener("click", function() {
-      var selectedVariant = getSelectedVariant();
-      if (selectedVariant) {
-        pushCustomizeEvent(selectedVariant);
+      var finalVariant = getCurrentVariant();
+      if (finalVariant) {
+        // You can add a different event name here if needed for confirmation
+        pushCustomizeEvent(finalVariant);
       }
     });
   }
 
-  // Helper function to get currently selected variant
-  function getSelectedVariant() {
-    // Method 1: Check if Shopify stores current variant in window
-    if (window.currentVariant) {
-      return window.currentVariant;
-    }
-    
-    // Method 2: Try to get from product JSON (common Shopify pattern)
-    if (typeof product !== 'undefined' && product.variants) {
-      var selectedOptions = [];
-      variantInputs.forEach(function(input) {
-        if (input.checked || input.selected) {
-          selectedOptions.push(input.value);
-        }
-      });
-      
-      // Find matching variant
-      var matchedVariant = product.variants.find(function(variant) {
-        return variant.options.every(function(option, index) {
-          return option === selectedOptions[index];
-        });
-      });
-      
-      if (matchedVariant) {
-        return matchedVariant;
+  // Also listen to the close drawer button to track final selection
+  var closeBtn = document.getElementById("close-drawer");
+  if (closeBtn) {
+    closeBtn.addEventListener("click", function() {
+      var finalVariant = getCurrentVariant();
+      if (finalVariant) {
+        pushCustomizeEvent(finalVariant);
       }
-    }
-    
-    // Method 3: Get from hidden select or input (fallback)
-    var variantIdInput = document.querySelector('select[name="id"], input[name="id"]');
-    if (variantIdInput && variantIdInput.value) {
-      // Find variant by ID
-      if (typeof product !== 'undefined' && product.variants) {
-        return product.variants.find(function(v) {
-          return v.id == variantIdInput.value;
-        });
-      }
-    }
-    
-    // Fallback: return basic structure with available data
-    return {
-      product_id: productId,
-      id: variantIdInput ? variantIdInput.value : productId,
-      sku: productId
-    };
+    });
   }
+
+  // Listen for Shopify's variant change event (if theme uses it)
+  document.addEventListener('variant:change', function(event) {
+    if (event.detail && event.detail.variant) {
+      pushCustomizeEvent(event.detail.variant);
+    }
+  });
 });
 
 
