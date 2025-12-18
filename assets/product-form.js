@@ -706,76 +706,24 @@ function initEngraving() {
   };
 }
 //customise button clicked datalayer
-// document.addEventListener("DOMContentLoaded", function () {
-//   var customizeBtn = document.getElementById("product_variant_drawer");
-
-//   if (customizeBtn) {
-//     customizeBtn.addEventListener("click", function () {
-//       window.dataLayer = window.dataLayer || [];
-
-//       window.dataLayer.push({
-//         event: "Customize",
-//         products: {
-//           shopify_product_id: productId,
-//           shopify_variant_id:productTitle ,
-//           shopify_sku: productId
-//         }
-//       });
-//     });
-//   }
-// });
-
-<script>
 document.addEventListener("DOMContentLoaded", function () {
-  window.dataLayer = window.dataLayer || [];
+  var customizeBtn = document.getElementById("product_variant_drawer");
 
-  /* ----------------------------------------
-     Helper: Push Customize Event
-  ---------------------------------------- */
-  function pushCustomizeEvent(variant) {
-    if (!variant || !variant.id) return;
+  if (customizeBtn) {
+    customizeBtn.addEventListener("click", function () {
+      window.dataLayer = window.dataLayer || [];
 
-    window.dataLayer.push({
-      event: "Customize",
-      ecommerce: {
-        items: [{
-          shopify_product_id: variant.product_id,
-          shopify_variant_id: variant.id,
-          shopify_sku: variant.sku,
-          item_name: variant.name,
-          item_variant: variant.title
-        }]
-      }
-    });
-
-    console.log("Customize event fired:", variant);
-  }
-
-  /* ----------------------------------------
-     1. FIRE ON VARIANT CHANGE (Metal / Size)
-  ---------------------------------------- */
-  document.addEventListener("variant:change", function (event) {
-    if (!event.detail || !event.detail.variant) return;
-    pushCustomizeEvent(event.detail.variant);
-  });
-
-  /* ----------------------------------------
-     2. FIRE ON CONFIRM CUSTOMIZATION
-  ---------------------------------------- */
-  var confirmBtn = document.getElementById("customize_close_drawer");
-  if (confirmBtn) {
-    confirmBtn.addEventListener("click", function () {
-      var variantJsonEl = document.querySelector('[data-selected-variant]');
-      if (!variantJsonEl) return;
-
-      var variant = JSON.parse(variantJsonEl.textContent);
-      pushCustomizeEvent(variant);
+      window.dataLayer.push({
+        event: "Customize",
+        products: {
+          shopify_product_id: productId,
+          shopify_variant_id:productTitle ,
+          shopify_sku: productId
+        }
+      });
     });
   }
 });
-</script>
-
-
 
 
 // pdp-delivery-details
