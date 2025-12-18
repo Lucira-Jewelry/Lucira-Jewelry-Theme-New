@@ -92,42 +92,51 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener("DOMContentLoaded", function () {
   window.dataLayer = window.dataLayer || [];
 
-  /**
-   * Listen for variant option changes INSIDE the drawer only
-   */
-  document.addEventListener('change', function (e) {
-    const drawer = document.getElementById('variant-drawer');
-    if (!drawer || !drawer.contains(e.target)) return;
-
-    // Only react to variant option inputs
-    if (
-      !e.target.matches('input[type="radio"], select')
-    ) return;
-
-    // Get selected variant JSON from drawer
-    const variantJsonEl = drawer.querySelector('[data-selected-variant]');
-    if (!variantJsonEl) return;
-
-    let variant;
-    try {
-      variant = JSON.parse(variantJsonEl.textContent);
-    } catch (err) {
-      return;
-    }
-
+  /* ----------------------------------------
+     Helper: Push Customize Event
+  ---------------------------------------- */
+  function pushCustomizeEvent(variant) {
     if (!variant || !variant.id) return;
 
     window.dataLayer.push({
       event: "Customize",
-      products: {
-        shopify_product_id: variant.product_id,
-        shopify_variant_id: variant.id,
-        shopify_sku: variant.sku
+      ecommerce: {
+        items: [{
+          shopify_product_id: variant.product_id,
+          shopify_variant_id: variant.id,
+          shopify_sku: variant.sku,
+          item_name: variant.name,
+          item_variant: variant.title
+        }]
       }
     });
+
+    console.log("Customize event fired:", variant);
+  }
+
+  /* ----------------------------------------
+     1. FIRE ON VARIANT CHANGE (Metal / Size)
+  ---------------------------------------- */
+  document.addEventListener("variant:change", function (event) {
+    if (!event.detail || !event.detail.variant) return;
+    pushCustomizeEvent(event.detail.variant);
   });
+
+  /* ----------------------------------------
+     2. FIRE ON CONFIRM CUSTOMIZATION
+  ---------------------------------------- */
+  var confirmBtn = document.getElementById("customize_close_drawer");
+  if (confirmBtn) {
+    confirmBtn.addEventListener("click", function () {
+      var variantJsonEl = document.querySelector('[data-selected-variant]');
+      if (!variantJsonEl) return;
+
+      var variant = JSON.parse(variantJsonEl.textContent);
+      pushCustomizeEvent(variant);
+    });
+  }
 });
 </script>
