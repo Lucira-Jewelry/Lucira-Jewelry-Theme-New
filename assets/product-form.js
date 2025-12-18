@@ -714,11 +714,10 @@ document.addEventListener("DOMContentLoaded", function () {
       window.dataLayer = window.dataLayer || [];
 
       window.dataLayer.push({
-        event: "Customize",
-        products: {
-          shopify_product_id: productId,
-          shopify_variant_id:productTitle ,
-          shopify_sku: productId
+        event: "promoClick",
+        promoClick: {
+          creative_name: "Customize Button Clicked",
+          location_id:"PDP"
         }
       });
     });
