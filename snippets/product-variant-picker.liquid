@@ -90,7 +90,7 @@
     </variant-selects>
   {%- endunless -%}
 </div>
-
+{% comment %} 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   window.dataLayer = window.dataLayer || [];
@@ -136,6 +136,45 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ✅ Use setTimeout to ensure Shopify has updated the variant ID
     setTimeout(fireCustomizeOnce, 200);
+  });
+});
+</script> {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.dataLayer = window.dataLayer || [];
+
+  const drawer = document.getElementById('variant-drawer');
+  if (!drawer) return;
+
+  const variants = {{ product.variants | json }};
+  let lastFiredVariantId = null;
+
+  const idInput = document.querySelector('form[action*="/cart/add"] input[name="id"]');
+  if (!idInput) return;
+
+  // ✅ Watch for changes to the hidden input field
+  const observer = new MutationObserver(function() {
+    const variantId = Number(idInput.value);
+    const variant = variants.find(v => v.id === variantId);
+    
+    if (!variant || variant.id === lastFiredVariantId) return;
+    
+    lastFiredVariantId = variant.id;
+
+    window.dataLayer.push({
+      event: "Customize",
+      products: {
+        shopify_product_id: {{ product.id }},
+        shopify_variant_id: variant.id,
+        shopify_sku: variant.sku
+      }
+    });
+  });
+
+  observer.observe(idInput, { 
+    attributes: true, 
+    attributeFilter: ['value'] 
   });
 });
 </script>
