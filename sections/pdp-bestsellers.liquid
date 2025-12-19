@@ -1,0 +1,665 @@
+
+{% if template.name == 'product' %}
+
+{% assign current_product = product %}
+{% assign limit = section.settings.products_limit %}
+{% assign product_type = product.type %}
+{% assign product_type_norm = product.type | downcase | remove: 's' %}
+
+{%- comment -%}
+  ================= GENDER (EXCLUDE MEN) =================
+{%- endcomment -%}
+{% assign current_gender = '' %}
+{% assign gender_metafield = product.metafields.shopify.target-gender %}
+{% if gender_metafield and gender_metafield.value != blank %}
+  {% assign gender_entry = gender_metafield.value | first %}
+  {% assign current_gender = gender_entry.handle | default: gender_entry.base_target_gender | default: gender_entry.label | downcase %}
+{% endif %}
+
+{%- comment -%} Shape code mapping for abbreviations {%- endcomment -%}
+{% assign shape_mappings = "EM:emerald,RD:round,PR:princess,CU:cushion,OV:oval,PE:pear,MQ:marquise,HS:heart,AS:asscher,RA:radiant" | split: "," %}
+
+{%- comment -%} Get all current product shapes with PRIORITY from components JSON {%- endcomment -%}
+{% assign current_shapes = '' %}
+{% assign display_shape = '' %}
+
+{%- comment -%} PRIORITY 1: Try to get shapes from components JSON metafield {%- endcomment -%}
+{% assign components_json = product.selected_or_first_available_variant.metafields.custom.components.value %}
+{% if components_json %}
+  {% assign components_data = components_json | parse_json %}
+  {% if components_data.components %}
+    {% for component in components_data.components %}
+      {% if component.shape_code and component.shape_code != blank %}
+        {% assign shape_code = component.shape_code | strip | upcase %}
+        {% assign shape_clean = component.shape_code | strip | downcase %}
+
+        {%- comment -%} Try to map abbreviated code to full name {%- endcomment -%}
+        {% assign mapped_shape = shape_clean %}
+        {% for mapping in shape_mappings %}
+          {% assign map_parts = mapping | split: ":" %}
+          {% if map_parts[0] == shape_code %}
+            {% assign mapped_shape = map_parts[1] %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        {% assign current_shapes = current_shapes | append: ',' | append: mapped_shape | append: ',' %}
+        {% if display_shape == blank %}
+          {% assign display_shape = mapped_shape %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+{% endif %}
+
+{%- comment -%} FALLBACK: If no shapes from components, use diamond_X_shape metafields {%- endcomment -%}
+{% if current_shapes == blank %}
+  {% for i in (1..4) %}
+    {% capture field_name %}diamond_{{ i }}_shape{% endcapture %}
+    {% assign shape_value = product.selected_or_first_available_variant.metafields.custom[field_name].value %}
+    {% if shape_value and shape_value != blank %}
+      {% assign shape_clean = shape_value | strip | downcase %}
+      {% assign current_shapes = current_shapes | append: ',' | append: shape_clean | append: ',' %}
+      {% if display_shape == blank %}
+        {% assign display_shape = shape_value | strip %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{%- comment -%}
+==================================================
+PRIORITY COLLECTION (All Jewelry Categories)
+==================================================
+{%- endcomment -%}
+{% assign priority_collection = nil %}
+{% for c in product.collections %}
+  {% assign title = c.title | downcase %}
+
+  {%- comment -%} RINGS {%- endcomment -%}
+  {% if title contains 'engagement ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'solitaire ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'eternity ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'stackable ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'casual ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains "men's ring" or title contains 'mens ring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  
+  {%- comment -%} EARRINGS {%- endcomment -%}
+  {% elsif title contains 'stud' and title contains 'earring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'hoop' and title contains 'earring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'sui dhaga' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'dangle' and title contains 'earring' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  
+  {%- comment -%} BRACELETS {%- endcomment -%}
+  {% elsif title contains 'chain bracelet' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'tennis bracelet' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'cuff bracelet' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'mangalsutra bracelet' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  
+  {%- comment -%} NECKLACES {%- endcomment -%}
+  {% elsif title contains 'chain necklace' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'pendant necklace' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'mangalsutra necklace' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'tennis necklace' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  
+  {%- comment -%} OTHERS {%- endcomment -%}
+  {% elsif title contains 'nosepin' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains "men's stud" or title contains 'mens stud' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  
+  {%- comment -%} GENERIC FALLBACKS {%- endcomment -%}
+  {% elsif title contains 'wedding' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% elsif title contains 'engagement' %}
+    {% assign priority_collection = c %}
+    {% break %}
+  {% endif %}
+{% endfor %}
+
+{%- comment -%}
+==================================================
+BASE COLLECTION + BROADER FALLBACK COLLECTION
+==================================================
+{%- endcomment -%}
+{% assign base_collection = nil %}
+{% assign broader_collection = nil %}
+
+{% if priority_collection %}
+  {% assign base_collection = priority_collection %}
+{% else %}
+  {% for c in product.collections %}
+    {% assign c_title_norm = c.title | downcase | remove: 's' %}
+    {% if c_title_norm contains product_type_norm %}
+      {% assign base_collection = c %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{%- comment -%} Find broader collection for fallback (e.g., "Necklaces" for "Tennis Necklaces") {%- endcomment -%}
+{% for c in product.collections %}
+  {% assign c_title_norm = c.title | downcase | remove: 's' %}
+  {% if c_title_norm == product_type_norm and c.id != base_collection.id %}
+    {% assign broader_collection = c %}
+    {% break %}
+  {% endif %}
+{% endfor %}
+
+{%- comment -%}
+Final safety fallback
+{%- endcomment -%}
+{% if base_collection == nil and product.collections.size > 0 %}
+  {% for c in product.collections %}
+    {% if c.handle != 'frontpage' %}
+      {% assign base_collection = c %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{%- comment -%}
+==================================================
+PRODUCT TYPE NORMALIZATION (Fallbacks)
+==================================================
+{%- endcomment -%}
+
+{% assign normalized_product_type = product_type %}
+{% assign normalized_product_type_handle = product_type | downcase | replace: ' ', '-' %}
+
+{% if product_type == 'Charms & Pendants' %}
+  {% assign normalized_product_type = 'Necklaces' %}
+  {% assign normalized_product_type_handle = 'necklaces' %}
+{% endif %}
+
+{%- comment -%}
+==================================================
+COLLECTION REDIRECTION URLS
+==================================================
+{%- endcomment -%}
+
+{% assign product_type_handle = product_type | downcase | replace: ' ', '-' %}
+
+{% comment %} Fallback logic: redirect charms & pendants to necklaces {% endcomment %}
+{% assign is_charms_or_pendants = false %}
+{% if product_type_handle == 'charms-&-pendants' or product_type_handle == 'charms-and-pendants' or product_type_handle == 'pendants' or product_type_handle == 'charms' %}
+  {% assign is_charms_or_pendants = true %}
+{% endif %}
+
+{% comment %} Build all-type collection URL {% endcomment %}
+{% if is_charms_or_pendants %}
+  {% assign all_type_collection_url = '/collections/necklace' %}
+{% else %}
+  {% assign all_type_collection_url = '/collections/all-' | append: product_type_handle %}
+{% endif %}
+
+{% comment %} Build bestseller collection URL {% endcomment %}
+{% if is_charms_or_pendants %}
+  {% assign bestseller_collection_url = '/collections/bestsellers-1?sort_by=best-selling&filter.v.price.gte=&filter.v.price.lte=&filter.p.product_type=Necklaces' %}
+{% else %}
+  {% assign bestseller_collection_url = '/collections/all/bestsellers?sort_by=title-ascending' %}
+  {% assign bestseller_collection_url = bestseller_collection_url
+    | append: '&filter.p.product_type='
+    | append: product_type
+  %}
+{% endif %}
+
+{% comment %} Build shape collection URL {% endcomment %}
+{% assign shape_collection_url = all_type_collection_url
+  | append: '?sort_by=manual'
+  | append: '&filter.v.price.gte='
+  | append: '&filter.v.price.lte='
+%}
+
+{% if display_shape != blank %}
+  {% assign shape_value = display_shape | capitalize %}
+  {% assign shape_collection_url = shape_collection_url
+    | append: '&filter.v.m.custom.diamond_1_shape='
+    | append: shape_value
+  %}
+{% endif %}
+
+{%- comment -%}
+==================================================
+GLOBAL TRACKING: Track all shown products across ALL sections
+==================================================
+{%- endcomment -%}
+ 
+{% assign global_shown_ids = '' %}
+
+{% if base_collection and current_gender != 'men' and current_gender != 'male' %}
+<div class="page-width">
+  <div class="pdp-dynamic-recommendations">
+
+{%- comment -%}
+    ================= BESTSELLER WITH FALLBACK =================
+    First: Same collection + matching type + bestseller tag
+    Fallback: Broader collection or any collection with matching type
+    {%- endcomment -%}
+    {% if section.settings.enable_bestseller %}
+      {% assign count = 0 %}
+      {% capture bestseller_content %}
+        {%- comment -%} PHASE 1: Strict matching (same collection + type + tag) {%- endcomment -%}
+        {% for p in base_collection.products %}
+          {% assign p_type_norm = p.type | downcase | remove: 's' %}
+
+          {% assign in_same_collection = false %}
+          {% for p_col in p.collections %}
+            {% if p_col.id == base_collection.id %}
+              {% assign in_same_collection = true %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+
+          {% if p.id != current_product.id
+          and in_same_collection
+          and p_type_norm == product_type_norm
+          and p.tags contains section.settings.bestseller_tag
+          and p.featured_image != blank
+          and count < limit
+          %}
+            {% assign check_id = ',' | append: p.id | append: ',' %}
+            {% unless global_shown_ids contains check_id %}
+              <a 
+                href="{{ bestseller_collection_url }}" 
+                class="recommendation-item bestseller-promo-item"
+                data-promo-sku="{{ p.selected_or_first_available_variant.sku | default: p.id }}"
+                data-product-title="{{ p.title | escape }}"
+                data-product-id="{{ p.id }}"
+                onclick="trackBestsellerPromoClick(event, this)"
+              >
+                <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+              </a>
+              {% assign global_shown_ids = global_shown_ids | append: check_id %}
+              {% assign count = count | plus: 1 %}
+            {% endunless %}
+          {% endif %}
+        {% endfor %}
+
+        {%- comment -%} PHASE 2: Fallback to broader collection with bestseller tag {%- endcomment -%}
+        {% if count < limit and broader_collection %}
+          {% for p in broader_collection.products %}
+            {% assign p_type_norm = p.type | downcase | remove: 's' %}
+            
+            {% if p.id != current_product.id
+            and p_type_norm == product_type_norm
+            and p.tags contains section.settings.bestseller_tag
+            and p.featured_image != blank
+            and count < limit
+            %}
+              {% assign check_id = ',' | append: p.id | append: ',' %}
+              {% unless global_shown_ids contains check_id %}
+                <a 
+                  href="{{ bestseller_collection_url }}" 
+                  class="recommendation-item bestseller-promo-item"
+                  data-promo-sku="{{ p.selected_or_first_available_variant.sku | default: p.id }}"
+                  data-product-title="{{ p.title | escape }}"
+                  data-product-id="{{ p.id }}"
+                  onclick="trackBestsellerPromoClick(event, this)"
+                >
+                  <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                </a>
+                {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                {% assign count = count | plus: 1 %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {%- comment -%} PHASE 3: Final fallback - same type without bestseller tag {%- endcomment -%}
+        {% if count < limit %}
+          {% for p in base_collection.products %}
+            {% assign p_type_norm = p.type | downcase | remove: 's' %}
+            
+            {% if p.id != current_product.id
+            and p_type_norm == product_type_norm
+            and p.featured_image != blank
+            and count < limit
+            %}
+              {% assign check_id = ',' | append: p.id | append: ',' %}
+              {% unless global_shown_ids contains check_id %}
+                <a 
+                  href="{{ bestseller_collection_url }}" 
+                  class="recommendation-item bestseller-promo-item"
+                  data-promo-sku="{{ p.selected_or_first_available_variant.sku | default: p.id }}"
+                  data-product-title="{{ p.title | escape }}"
+                  data-product-id="{{ p.id }}"
+                  onclick="trackBestsellerPromoClick(event, this)"
+                >
+                  <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                </a>
+                {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                {% assign count = count | plus: 1 %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endcapture %}
+
+      {% assign bestseller_content = bestseller_content | strip %}
+      {% if bestseller_content != blank %}
+        <div class="recommendation-block">
+          <h3>Explore Bestseller {{ product_type }}</h3>
+          <div class="recommendation-grid">
+            {{ bestseller_content }}
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+{%- comment -%}
+    ================= COLLECTION WITH FALLBACK =================
+    First: Same specific collection + type
+    Fallback: Broader collection with same type
+    {%- endcomment -%}
+    {% if section.settings.enable_collection %}
+      {% assign count = 0 %}
+      {% capture collection_content %}
+        {%- comment -%} PHASE 1: Products from specific collection {%- endcomment -%}
+        {% for p in base_collection.products %}
+          {% assign p_type_norm = p.type | downcase | remove: 's' %}
+
+          {% if p.id != current_product.id
+          and p_type_norm == product_type_norm
+          and p.featured_image != blank
+          and count < limit
+          %}
+            {% assign check_id = ',' | append: p.id | append: ',' %}
+            {% unless global_shown_ids contains check_id %}
+              <a href="{{ all_type_collection_url }}" class="recommendation-item">
+                <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+              </a>
+              {% assign global_shown_ids = global_shown_ids | append: check_id %}
+              {% assign count = count | plus: 1 %}
+            {% endunless %}
+          {% endif %}
+        {% endfor %}
+
+        {%- comment -%} PHASE 2: Fallback to broader collection {%- endcomment -%}
+        {% if count < limit and broader_collection %}
+          {% for p in broader_collection.products %}
+            {% assign p_type_norm = p.type | downcase | remove: 's' %}
+            
+            {% if p.id != current_product.id
+            and p_type_norm == product_type_norm
+            and p.featured_image != blank
+            and count < limit
+            %}
+              {% assign check_id = ',' | append: p.id | append: ',' %}
+              {% unless global_shown_ids contains check_id %}
+                <a href="{{ all_type_collection_url }}" class="recommendation-item">
+                  <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                </a>
+                {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                {% assign count = count | plus: 1 %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {%- comment -%} PHASE 3: Fallback to any collection with matching type {%- endcomment -%}
+        {% if count < limit %}
+          {% for c in product.collections %}
+            {% if count >= limit %}{% break %}{% endif %}
+            {% for p in c.products %}
+              {% assign p_type_norm = p.type | downcase | remove: 's' %}
+              
+              {% if p.id != current_product.id
+              and p_type_norm == product_type_norm
+              and p.featured_image != blank
+              and count < limit
+              %}
+                {% assign check_id = ',' | append: p.id | append: ',' %}
+                {% unless global_shown_ids contains check_id %}
+                  <a href="{{ all_type_collection_url }}" class="recommendation-item">
+                    <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                  </a>
+                  {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                  {% assign count = count | plus: 1 %}
+                {% endunless %}
+              {% endif %}
+            {% endfor %}
+          {% endfor %}
+        {% endif %}
+      {% endcapture %}
+
+      {% assign collection_content = collection_content | strip %}
+      {% if collection_content != blank %}
+        <div class="recommendation-block">
+          <h3>Explore All {{ product_type }}</h3>
+          <div class="recommendation-grid">
+            {{ collection_content }}
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+{%- comment -%}
+    ================= SHAPE WITH FALLBACK =================
+    First: Same shape + same collection
+    Fallback: Same type without shape requirement
+    {%- endcomment -%}
+    {% if section.settings.enable_shape and current_shapes != blank %}
+      {% assign count = 0 %}
+      {% capture shape_content %}
+        {%- comment -%} PHASE 1: Products with matching shape {%- endcomment -%}
+        {% for p in base_collection.products %}
+          {% assign p_type_norm = p.type | downcase | remove: 's' %}
+
+          {% assign in_same_collection = false %}
+          {% for p_col in p.collections %}
+            {% if p_col.id == base_collection.id %}
+              {% assign in_same_collection = true %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+
+          {% assign shape_match = false %}
+          
+          {%- comment -%} Check components JSON for shape_code {%- endcomment -%}
+          {% assign p_components_json = p.selected_or_first_available_variant.metafields.custom.components.value %}
+          {% if p_components_json %}
+            {% assign p_components_data = p_components_json | parse_json %}
+            {% if p_components_data.components %}
+              {% for p_component in p_components_data.components %}
+                {% if p_component.shape_code and p_component.shape_code != blank %}
+                  {% assign p_shape_code = p_component.shape_code | strip | upcase %}
+                  {% assign p_shape_clean = p_component.shape_code | strip | downcase %}
+                  
+                  {% assign p_mapped_shape = p_shape_clean %}
+                  {% for mapping in shape_mappings %}
+                    {% assign map_parts = mapping | split: ":" %}
+                    {% if map_parts[0] == p_shape_code %}
+                      {% assign p_mapped_shape = map_parts[1] %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                  
+                  {% assign check_shape = ',' | append: p_mapped_shape | append: ',' %}
+                  {% if current_shapes contains check_shape %}
+                    {% assign shape_match = true %}
+                    {% break %}
+                  {% endif %}
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          {% endif %}
+
+          {%- comment -%} FALLBACK: Check diamond shape metafields {%- endcomment -%}
+          {% if shape_match == false %}
+            {% for i in (1..4) %}
+              {% capture field_name %}diamond_{{ i }}_shape{% endcapture %}
+              {% assign p_shape = p.selected_or_first_available_variant.metafields.custom[field_name].value %}
+              {% if p_shape and p_shape != blank %}
+                {% assign p_shape_clean = p_shape | strip | downcase %}
+                {% assign check_shape = ',' | append: p_shape_clean | append: ',' %}
+                {% if current_shapes contains check_shape %}
+                  {% assign shape_match = true %}
+                  {% break %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          {%- comment -%} FALLBACK: Check tags {%- endcomment -%}
+          {% if shape_match == false %}
+            {% for tag in p.tags %}
+              {% assign tag_clean = tag | downcase %}
+              {% assign tag_check = ',' | append: tag_clean | append: ',' %}
+              {% if current_shapes contains tag_check %}
+                {% assign shape_match = true %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+          {% endif %}
+
+          {% if p.id != current_product.id
+          and in_same_collection
+          and p_type_norm == product_type_norm
+          and shape_match
+          and p.featured_image != blank
+          and count < limit
+          %}
+            {% assign check_id = ',' | append: p.id | append: ',' %}
+            {% unless global_shown_ids contains check_id %}
+              <a href="{{ shape_collection_url }}" class="recommendation-item">
+                <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+              </a>
+              {% assign global_shown_ids = global_shown_ids | append: check_id %}
+              {% assign count = count | plus: 1 %}
+            {% endunless %}
+          {% endif %}
+        {% endfor %}
+
+        {%- comment -%} PHASE 2: Fallback to same type products without shape requirement {%- endcomment -%}
+        {% if count < limit %}
+          {% for p in base_collection.products %}
+            {% assign p_type_norm = p.type | downcase | remove: 's' %}
+            
+            {% if p.id != current_product.id
+            and p_type_norm == product_type_norm
+            and p.featured_image != blank
+            and count < limit
+            %}
+              {% assign check_id = ',' | append: p.id | append: ',' %}
+              {% unless global_shown_ids contains check_id %}
+                <a href="{{ shape_collection_url }}" class="recommendation-item">
+                  <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                </a>
+                {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                {% assign count = count | plus: 1 %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {%- comment -%} PHASE 3: Fallback to broader collection {%- endcomment -%}
+        {% if count < limit and broader_collection %}
+          {% for p in broader_collection.products %}
+            {% assign p_type_norm = p.type | downcase | remove: 's' %}
+            
+            {% if p.id != current_product.id
+            and p_type_norm == product_type_norm
+            and p.featured_image != blank
+            and count < limit
+            %}
+              {% assign check_id = ',' | append: p.id | append: ',' %}
+              {% unless global_shown_ids contains check_id %}
+                <a href="{{ shape_collection_url }}" class="recommendation-item">
+                  <img src="{{ p.featured_image | image_url: width: 400 }}" alt="{{ p.title | escape }}" loading="lazy">
+                </a>
+                {% assign global_shown_ids = global_shown_ids | append: check_id %}
+                {% assign count = count | plus: 1 %}
+              {% endunless %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+      {% endcapture %}
+
+      {% assign shape_content = shape_content | strip %}
+      {% if shape_content != blank %}
+        <div class="recommendation-block">
+          <h3>Explore {{ display_shape | capitalize }} {{ product_type }}</h3>
+          <div class="recommendation-grid">
+            {{ shape_content }}
+          </div>
+        </div>
+      {% endif %}
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+<script>
+function trackBestsellerPromoClick(event, element) {
+  const promoSku = element.getAttribute('data-promo-sku');
+  const productId = element.getAttribute('data-product-id');
+  
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+    event: 'promoClick',
+    promoClick: {
+      creative_name: 'Bestseller Section',
+      promo_name: promoSku,
+      promo_id: productId,
+      location_id: 'bottom of pdp',
+    },
+  });
+}
+</script>
+
+{% schema %}
+{
+  "name": "PDP Recommendations",
+  "settings": [
+    { "type": "text", "id": "bestseller_tag", "label": "Bestseller Tag", "default": "bestseller" },
+    { "type": "range", "id": "products_limit", "label": "Products per section", "min": 3, "max": 12, "step": 1, "default": 6 },
+    { "type": "checkbox", "id": "enable_bestseller", "label": "Enable Bestseller Section", "default": true },
+    { "type": "checkbox", "id": "enable_collection", "label": "Enable Same Collection", "default": true },
+    { "type": "checkbox", "id": "enable_shape", "label": "Enable Same Shape", "default": true }
+  ],
+  "presets": [{ "name": "PDP Recommendations" }]
+}
+{% endschema %}
