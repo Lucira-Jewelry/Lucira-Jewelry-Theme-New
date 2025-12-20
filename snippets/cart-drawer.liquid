@@ -1517,8 +1517,8 @@
 <script>
   (function() {
     const INSURANCE_VARIANT_ID = 47220042989786;
-    const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
     let isUpdating = false;
+    let initalized = false;
 
     function initInsurance() {
       console.log('🔧 Initializing insurance...');
@@ -1526,12 +1526,17 @@
       
       if (!checkbox) {
         console.error('❌ Insurance checkbox not found!');
-        // Try again after a delay
         setTimeout(initInsurance, 500);
         return;
       }
       
       console.log('✅ Checkbox found');
+
+      // If already initialized, just sync state
+      if (initalized && !isUpdating) {
+        syncCheckboxState();
+        return;
+      }
 
       // Sync checkbox with cart
       fetch('/cart.js')
@@ -1543,24 +1548,38 @@
           );
           console.log('Insurance in cart?', hasInsurance);
           checkbox.checked = hasInsurance;
-          
-          // Store initial state
-          checkbox.dataset.initialState = hasInsurance ? 'true' : 'false';
         })
         .catch(err => console.error('❌ Error syncing insurance:', err));
 
-      // Remove existing event listeners
-      const newCheckbox = checkbox.cloneNode(true);
-      checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+      // Only attach listener once
+      if (!initalized) {
+        checkbox.addEventListener('change', handleInsuranceChange);
+        console.log('✅ Event listener attached to checkbox');
+        initalized = true;
+      }
+    }
 
-      newCheckbox.addEventListener('change', handleInsuranceChange);
-      console.log('✅ Event listener attached to checkbox');
+    function syncCheckboxState() {
+      const checkbox = document.getElementById('insuranceCheckbox');
+      if (!checkbox) return;
+      
+      fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          const hasInsurance = cart.items.some(
+            item => item.variant_id === INSURANCE_VARIANT_ID
+          );
+          checkbox.checked = hasInsurance;
+          console.log('✅ Checkbox synced, insurance present:', hasInsurance);
+        });
     }
 
     function handleInsuranceChange(e) {
       if (isUpdating) {
-        console.log('⏳ Already updating, skipping...');
+        console.log('⏳ Already updating, reverting checkbox...');
         e.preventDefault();
+        // Revert checkbox to previous state
+        e.target.checked = !e.target.checked;
         return;
       }
       
@@ -1573,19 +1592,16 @@
       checkbox.disabled = true;
       if (loader) loader.classList.remove('hidden');
 
-      // Use a small delay to ensure UI updates
-      setTimeout(() => {
-        if (checkbox.checked) {
-          console.log('➕ Adding insurance...');
-          addInsurance();
-        } else {
-          console.log('➖ Removing insurance...');
-          removeInsurance();
-        }
-      }, 100);
+      if (checkbox.checked) {
+        console.log('➕ Adding insurance...');
+        addInsurance(checkbox);
+      } else {
+        console.log('➖ Removing insurance...');
+        removeInsurance(checkbox);
+      }
     }
 
-    function addInsurance() {
+    function addInsurance(checkbox) {
       console.log('➕ Starting add insurance process...');
       
       fetch('/cart/add.js', {
@@ -1601,22 +1617,24 @@
       .then(res => {
         console.log('📡 Add API response status:', res.status);
         if (!res.ok) {
-          throw new Error('Failed to add insurance: ' + res.status);
+          return res.text().then(text => {
+            throw new Error('Failed to add insurance: ' + res.status + ' - ' + text);
+          });
         }
         return res.json();
       })
       .then(data => {
         console.log('✅ Insurance added successfully:', data);
-        return refreshCartSections();
+        return refreshCartDisplay();
       })
       .then(() => {
-        console.log('✅ Cart sections refreshed');
-        finishUpdate();
+        console.log('✅ Cart display refreshed');
+        finishUpdate(true);
       })
-      .catch(handleError);
+      .catch(err => handleError(err, checkbox, false));
     }
 
-    function removeInsurance() {
+    function removeInsurance(checkbox) {
       console.log('➖ Starting remove insurance process...');
       
       fetch('/cart/update.js', {
@@ -1631,95 +1649,100 @@
       .then(res => {
         console.log('📡 Remove API response status:', res.status);
         if (!res.ok) {
-          throw new Error('Failed to remove insurance: ' + res.status);
+          return res.text().then(text => {
+            throw new Error('Failed to remove insurance: ' + res.status + ' - ' + text);
+          });
         }
         return res.json();
       })
       .then(data => {
         console.log('✅ Insurance removed successfully:', data);
-        return refreshCartSections();
+        return refreshCartDisplay();
       })
       .then(() => {
-        console.log('✅ Cart sections refreshed');
-        finishUpdate();
+        console.log('✅ Cart display refreshed');
+        finishUpdate(false);
       })
-      .catch(handleError);
+      .catch(err => handleError(err, checkbox, true));
     }
 
-    function refreshCartSections() {
-      console.log('🔄 Refreshing cart sections...');
+    function refreshCartDisplay() {
+      console.log('🔄 Refreshing cart display...');
       
-      return fetch(`/cart.js`)
+      return fetch(`/?sections=cart-drawer,cart-icon-bubble`)
         .then(res => res.json())
-        .then(cart => {
-          console.log('📦 Updated cart:', cart);
+        .then(sections => {
+          console.log('✅ Got updated sections');
           
-          // Update cart icon bubble count
-          const cartBubble = document.querySelector('.cart-count-bubble span');
-          if (cartBubble) {
-            // Exclude insurance from count
-            const itemCount = cart.items.reduce((count, item) => {
-              return item.variant_id === INSURANCE_VARIANT_ID ? count : count + item.quantity;
-            }, 0);
-            cartBubble.textContent = itemCount;
-            console.log('Updated cart count to:', itemCount);
+          // Update cart icon bubble
+          if (sections['cart-icon-bubble']) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(sections['cart-icon-bubble'], 'text/html');
+            const newBubble = doc.querySelector('.cart-count-bubble');
+            const currentBubble = document.querySelector('.cart-count-bubble');
+            
+            if (newBubble && currentBubble) {
+              currentBubble.innerHTML = newBubble.innerHTML;
+            }
           }
           
-          // Trigger cart drawer refresh by fetching sections
-          return fetch(`/?sections=cart-drawer,cart-icon-bubble`)
-            .then(res => res.json())
-            .then(sections => {
-              console.log('✅ Got updated sections');
-              
-              // Update the cart drawer HTML
-              if (sections['cart-drawer']) {
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(sections['cart-drawer'], 'text/html');
-                const newDrawer = doc.querySelector('cart-drawer');
-                const currentDrawer = document.querySelector('cart-drawer');
-                
-                if (newDrawer && currentDrawer) {
-                  // Preserve the open state
-                  const wasOpen = currentDrawer.classList.contains('active');
-                  currentDrawer.innerHTML = newDrawer.innerHTML;
-                  if (wasOpen) {
-                    currentDrawer.classList.add('active');
-                  }
-                  console.log('✅ Cart drawer HTML updated');
-                  
-                  // Reinitialize after DOM update
-                  setTimeout(initInsurance, 100);
-                }
-              }
-            });
+          // Update cart items list and totals
+          if (sections['cart-drawer']) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(sections['cart-drawer'], 'text/html');
+            
+            // Update cart items
+            const newItemsWrapper = doc.querySelector('.drawer__cart-items-wrapper');
+            const currentItemsWrapper = document.querySelector('.drawer__cart-items-wrapper');
+            if (newItemsWrapper && currentItemsWrapper) {
+              currentItemsWrapper.innerHTML = newItemsWrapper.innerHTML;
+            }
+            
+            // Update footer (totals)
+            const newFooter = doc.querySelector('.cart-drawer__footer');
+            const currentFooter = document.querySelector('.cart-drawer__footer');
+            if (newFooter && currentFooter) {
+              currentFooter.innerHTML = newFooter.innerHTML;
+            }
+            
+            // Update checkout info
+            const newCheckoutInfo = doc.querySelector('.checkout-info');
+            const currentCheckoutInfo = document.querySelector('.checkout-info');
+            if (newCheckoutInfo && currentCheckoutInfo) {
+              currentCheckoutInfo.innerHTML = newCheckoutInfo.innerHTML;
+            }
+            
+            console.log('✅ Cart display updated');
+          }
         });
     }
 
-    function finishUpdate() {
+    function finishUpdate(shouldBeChecked) {
       console.log('✅ Finishing update...');
       isUpdating = false;
       const checkbox = document.getElementById('insuranceCheckbox');
       const loader = document.getElementById('insuranceLoader');
       
-      if (checkbox) checkbox.disabled = false;
+      if (checkbox) {
+        checkbox.disabled = false;
+        checkbox.checked = shouldBeChecked;
+      }
       if (loader) loader.classList.add('hidden');
-      
-      // Re-sync checkbox state
-      fetch('/cart.js')
-        .then(res => res.json())
-        .then(cart => {
-          const hasInsurance = cart.items.some(
-            item => item.variant_id === INSURANCE_VARIANT_ID
-          );
-          if (checkbox) checkbox.checked = hasInsurance;
-          console.log('✅ Checkbox synced, insurance present:', hasInsurance);
-        });
     }
 
-    function handleError(err) {
+    function handleError(err, checkbox, revertTo) {
       console.error('❌ Insurance update error:', err);
-      alert('Failed to update insurance: ' + err.message + '\n\nCheck console for details.');
-      finishUpdate();
+      alert('Failed to update insurance. Please try again.');
+      
+      // Revert checkbox
+      if (checkbox) {
+        checkbox.checked = revertTo;
+      }
+      
+      isUpdating = false;
+      const loader = document.getElementById('insuranceLoader');
+      if (checkbox) checkbox.disabled = false;
+      if (loader) loader.classList.add('hidden');
     }
 
     // Initialize when DOM is ready
@@ -1738,8 +1761,24 @@
       }
     });
 
-    // Re-initialize on cart updates
-    window.addEventListener('cart:refresh', initInsurance);
+    // Re-initialize on cart updates (from quantity changes, etc.)
+    if (typeof MutationObserver !== 'undefined') {
+      const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+          if (mutation.target.classList && mutation.target.classList.contains('drawer__cart-items-wrapper')) {
+            console.log('🔄 Cart items changed, syncing insurance checkbox');
+            syncCheckboxState();
+          }
+        });
+      });
+      
+      setTimeout(() => {
+        const cartWrapper = document.querySelector('.drawer__cart-items-wrapper');
+        if (cartWrapper) {
+          observer.observe(cartWrapper, { childList: true, subtree: true });
+        }
+      }, 1000);
+    }
     
     console.log('🚀 Insurance script loaded');
   })();
