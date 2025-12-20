@@ -1285,7 +1285,7 @@
         </ul>
       </div>
 
-      <script>
+      {% comment %} <script>
         // Inline script - guaranteed to run
         console.log('🎯 INLINE INSURANCE SCRIPT LOADED!');
         
@@ -1425,7 +1425,91 @@
         })();
         
         console.log('✅ Insurance system ready!');
+      </script> {% endcomment %}
+      <script>
+        window.INSURANCE_VARIANT_ID = 47220042989786;
+
+        function showLoader(show) {
+          const loader = document.getElementById('insuranceLoader');
+          if (!loader) return;
+          loader.classList.toggle('hidden', !show);
+        }
+
+        window.handleInsuranceChange = function (checkbox) {
+          checkbox.disabled = true;
+          showLoader(true);
+
+          if (checkbox.checked) {
+            addInsurance();
+          } else {
+            removeInsurance();
+          }
+        };
+
+        function addInsurance() {
+          fetch('/cart/add.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              items: [{ id: window.INSURANCE_VARIANT_ID, quantity: 1 }]
+            })
+          })
+          .then(res => res.json())
+          .then(() => refreshCart())
+          .catch(() => rollbackCheckbox(false));
+        }
+
+        function removeInsurance() {
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              updates: { [window.INSURANCE_VARIANT_ID]: 0 }
+            })
+          })
+          .then(res => res.json())
+          .then(() => refreshCart())
+          .catch(() => rollbackCheckbox(true));
+        }
+
+        function refreshCart() {
+          fetch('/cart.js')
+            .then(res => res.json())
+            .then(cart => {
+              syncCheckbox(cart);
+              document.dispatchEvent(new CustomEvent('cart:refresh'));
+            })
+            .finally(() => {
+              showLoader(false);
+              document.getElementById('insuranceCheckbox').disabled = false;
+            });
+        }
+
+        function syncCheckbox(cart) {
+          const checkbox = document.getElementById('insuranceCheckbox');
+          if (!checkbox) return;
+
+          checkbox.checked = cart.items.some(
+            item => item.variant_id === window.INSURANCE_VARIANT_ID
+          );
+        }
+
+        function rollbackCheckbox(state) {
+          alert('Insurance update failed. Please try again.');
+          const checkbox = document.getElementById('insuranceCheckbox');
+          checkbox.checked = state;
+          checkbox.disabled = false;
+          showLoader(false);
+        }
+
+        // Initial sync on drawer load
+        document.addEventListener('DOMContentLoaded', () => {
+          fetch('/cart.js')
+            .then(res => res.json())
+            .then(syncCheckbox);
+        });
       </script>
+
 
       <div id="insuranceLoader" class="insurance-loader hidden">
         <span class="loader-spinner"></span>
