@@ -1543,6 +1543,9 @@
           );
           console.log('Insurance in cart?', hasInsurance);
           checkbox.checked = hasInsurance;
+          
+          // Store initial state
+          checkbox.dataset.initialState = hasInsurance ? 'true' : 'false';
         })
         .catch(err => console.error('❌ Error syncing insurance:', err));
 
@@ -1557,6 +1560,7 @@
     function handleInsuranceChange(e) {
       if (isUpdating) {
         console.log('⏳ Already updating, skipping...');
+        e.preventDefault();
         return;
       }
       
@@ -1569,13 +1573,16 @@
       checkbox.disabled = true;
       if (loader) loader.classList.remove('hidden');
 
-      if (checkbox.checked) {
-        console.log('➕ Adding insurance...');
-        addInsurance();
-      } else {
-        console.log('➖ Removing insurance...');
-        removeInsurance();
-      }
+      // Use a small delay to ensure UI updates
+      setTimeout(() => {
+        if (checkbox.checked) {
+          console.log('➕ Adding insurance...');
+          addInsurance();
+        } else {
+          console.log('➖ Removing insurance...');
+          removeInsurance();
+        }
+      }, 100);
     }
 
     function addInsurance() {
@@ -1658,18 +1665,32 @@
             console.log('Updated cart count to:', itemCount);
           }
           
-          // Trigger cart drawer refresh
-          if (typeof window.dispatchEvent === 'function') {
-            window.dispatchEvent(new CustomEvent('cart:refresh'));
-          }
-          
-          // Force reload cart drawer sections
+          // Trigger cart drawer refresh by fetching sections
           return fetch(`/?sections=cart-drawer,cart-icon-bubble`)
-            .then(res => res.text())
-            .then(html => {
-              console.log('✅ Got updated sections HTML');
-              // Parse and update sections if needed
-              location.reload(); // Temporary: reload to show changes
+            .then(res => res.json())
+            .then(sections => {
+              console.log('✅ Got updated sections');
+              
+              // Update the cart drawer HTML
+              if (sections['cart-drawer']) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(sections['cart-drawer'], 'text/html');
+                const newDrawer = doc.querySelector('cart-drawer');
+                const currentDrawer = document.querySelector('cart-drawer');
+                
+                if (newDrawer && currentDrawer) {
+                  // Preserve the open state
+                  const wasOpen = currentDrawer.classList.contains('active');
+                  currentDrawer.innerHTML = newDrawer.innerHTML;
+                  if (wasOpen) {
+                    currentDrawer.classList.add('active');
+                  }
+                  console.log('✅ Cart drawer HTML updated');
+                  
+                  // Reinitialize after DOM update
+                  setTimeout(initInsurance, 100);
+                }
+              }
             });
         });
     }
