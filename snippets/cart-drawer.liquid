@@ -1266,19 +1266,24 @@
       </div>
       
       <div class="insurance-box">
-        <label class="insurance-label">
-          <input type="checkbox" id="insuranceCheckbox">
-          <span class="insurance-text">
-            <h3>Include Insurance For Your Jewellery</h3>
-          </span>
-          <span class="insurance-price">₹100</span>
-        </label>
+        <form id="insuranceForm" method="post" action="/cart/add">
+          <input type="hidden" name="id" value="47220042989786">
+          <input type="hidden" name="quantity" id="insuranceQuantity" value="0">
+          
+          <label class="insurance-label">
+            <input type="checkbox" id="insuranceCheckbox">
+            <span class="insurance-text">
+              <h3>Include Insurance For Your Jewellery</h3>
+            </span>
+            <span class="insurance-price">₹100</span>
+          </label>
 
-        <ul class="insurance-points">
-          <li>✔ Full Year Jewelry Guard</li>
-          <li>✔ Trusted Partner</li>
-          <li>✔ Hassle Free Claim</li>
-        </ul>
+          <ul class="insurance-points">
+            <li>✔ Full Year Jewelry Guard</li>
+            <li>✔ Trusted Partner</li>
+            <li>✔ Hassle Free Claim</li>
+          </ul>
+        </form>
       </div>
 
       <div id="insuranceLoader" class="insurance-loader hidden">
@@ -1430,223 +1435,122 @@
 </cart-drawer>
 
 <script>
-  // SIMPLE APPROACH - Direct cart manipulation with page reload
-  const INSURANCE_VARIANT_ID = 47220042989786;
-  let isProcessing = false;
-
-  document.addEventListener('DOMContentLoaded', function() {
-    console.log('=== INSURANCE SCRIPT LOADED ===');
-    console.log('Insurance Variant ID:', INSURANCE_VARIANT_ID);
-    initInsurance();
-  });
-
-  function initInsurance() {
-    const checkbox = document.getElementById('insuranceCheckbox');
+  // FORM-BASED APPROACH - More reliable than fetch
+  const INSURANCE_VARIANT_ID = '47220042989786';
+  
+  (function() {
+    console.log('🚀 Insurance script starting...');
     
-    if (!checkbox) {
-      console.error('❌ Insurance checkbox not found!');
-      setTimeout(initInsurance, 500); // Retry
-      return;
-    }
-
-    console.log('✅ Checkbox found');
-
-    // Check current cart state on page load
-    fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        console.log('📦 Current cart:', cart);
-        console.log('📦 Cart items:', cart.items);
-        
-        const hasInsurance = cart.items.some(item => {
-          console.log('Checking item:', item.variant_id, 'against', INSURANCE_VARIANT_ID);
-          return item.variant_id === INSURANCE_VARIANT_ID;
-        });
-        
-        checkbox.checked = hasInsurance;
-        console.log('🔍 Has insurance in cart:', hasInsurance);
-        console.log('🔍 Checkbox state set to:', checkbox.checked);
-      })
-      .catch(err => {
-        console.error('❌ Error fetching cart:', err);
-      });
-
-    // Handle checkbox clicks
-    checkbox.addEventListener('click', function(e) {
-      if (isProcessing) {
-        e.preventDefault();
-        console.log('⏳ Already processing, please wait...');
+    function init() {
+      const checkbox = document.getElementById('insuranceCheckbox');
+      const form = document.getElementById('insuranceForm');
+      const quantityInput = document.getElementById('insuranceQuantity');
+      
+      if (!checkbox || !form || !quantityInput) {
+        console.log('⏳ Waiting for elements...');
+        setTimeout(init, 200);
         return;
       }
 
-      const isChecked = e.target.checked;
-      console.log('👆 Checkbox clicked, new state:', isChecked);
-
-      if (isChecked) {
-        addInsuranceToCart();
-      } else {
-        removeInsuranceFromCart();
-      }
-    });
-
-    console.log('✅ Event listener attached to checkbox');
-  }
-
-  function addInsuranceToCart() {
-    console.log('➕ === ADDING INSURANCE ===');
-    isProcessing = true;
-    showLoader();
-
-    const requestBody = {
-      items: [{
-        id: INSURANCE_VARIANT_ID,
-        quantity: 1
-      }]
-    };
-
-    console.log('📤 Request body:', JSON.stringify(requestBody));
-
-    fetch('/cart/add.js', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
-    .then(response => {
-      console.log('📥 Response status:', response.status);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('✅ Insurance added successfully!');
-      console.log('📦 Response data:', data);
+      console.log('✅ All elements found!');
       
-      // Verify it was added
-      return fetch('/cart.js');
-    })
-    .then(res => res.json())
-    .then(cart => {
-      console.log('📦 Updated cart:', cart);
-      const hasInsurance = cart.items.some(item => item.variant_id === INSURANCE_VARIANT_ID);
-      console.log('🔍 Insurance now in cart:', hasInsurance);
-      
-      if (hasInsurance) {
-        console.log('✅ Reloading page...');
-        window.location.reload();
-      } else {
-        console.error('❌ Insurance was not added to cart!');
-        alert('Failed to add insurance. The product may not be available.');
-        const checkbox = document.getElementById('insuranceCheckbox');
-        if (checkbox) checkbox.checked = false;
-        hideLoader();
-        isProcessing = false;
-      }
-    })
-    .catch(error => {
-      console.error('❌ ERROR adding insurance:', error);
-      console.error('Error details:', error.message);
-      alert('Failed to add insurance: ' + error.message);
-      const checkbox = document.getElementById('insuranceCheckbox');
-      if (checkbox) checkbox.checked = false;
-      hideLoader();
-      isProcessing = false;
-    });
-  }
+      // Check current cart state
+      fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          console.log('📦 Cart loaded:', cart);
+          const insuranceItem = cart.items.find(item => item.variant_id == INSURANCE_VARIANT_ID);
+          
+          if (insuranceItem) {
+            console.log('✅ Insurance found in cart:', insuranceItem);
+            checkbox.checked = true;
+            quantityInput.value = 1;
+          } else {
+            console.log('❌ Insurance NOT in cart');
+            checkbox.checked = false;
+            quantityInput.value = 0;
+          }
+        })
+        .catch(err => console.error('❌ Error loading cart:', err));
 
-  function removeInsuranceFromCart() {
-    console.log('➖ === REMOVING INSURANCE ===');
-    isProcessing = true;
-    showLoader();
-
-    const requestBody = {
-      updates: {
-        [INSURANCE_VARIANT_ID]: 0
-      }
-    };
-
-    console.log('📤 Request body:', JSON.stringify(requestBody));
-
-    fetch('/cart/update.js', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
-    .then(response => {
-      console.log('📥 Response status:', response.status);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return response.json();
-    })
-    .then(data => {
-      console.log('✅ Insurance removed successfully!');
-      console.log('📦 Response data:', data);
-      
-      // Verify it was removed
-      return fetch('/cart.js');
-    })
-    .then(res => res.json())
-    .then(cart => {
-      console.log('📦 Updated cart:', cart);
-      const hasInsurance = cart.items.some(item => item.variant_id === INSURANCE_VARIANT_ID);
-      console.log('🔍 Insurance still in cart:', hasInsurance);
-      
-      if (!hasInsurance) {
-        console.log('✅ Reloading page...');
-        window.location.reload();
-      } else {
-        console.error('❌ Insurance was not removed from cart!');
-        alert('Failed to remove insurance.');
-        const checkbox = document.getElementById('insuranceCheckbox');
-        if (checkbox) checkbox.checked = true;
-        hideLoader();
-        isProcessing = false;
-      }
-    })
-    .catch(error => {
-      console.error('❌ ERROR removing insurance:', error);
-      console.error('Error details:', error.message);
-      alert('Failed to remove insurance: ' + error.message);
-      const checkbox = document.getElementById('insuranceCheckbox');
-      if (checkbox) checkbox.checked = true;
-      hideLoader();
-      isProcessing = false;
-    });
-  }
-
-  function showLoader() {
-    const loader = document.getElementById('insuranceLoader');
-    if (loader) {
-      loader.classList.remove('hidden');
-      console.log('⏳ Loader shown');
-    }
-  }
-
-  function hideLoader() {
-    const loader = document.getElementById('insuranceLoader');
-    if (loader) {
-      loader.classList.add('hidden');
-      console.log('✅ Loader hidden');
-    }
-  }
-
-  // Test function - you can call this from console
-  window.testInsuranceVariant = function() {
-    console.log('🧪 Testing insurance variant...');
-    fetch(`/products/${INSURANCE_VARIANT_ID}.js`)
-      .then(res => res.json())
-      .then(data => {
-        console.log('✅ Variant exists:', data);
-      })
-      .catch(err => {
-        console.error('❌ Variant does not exist:', err);
+      // Handle checkbox change
+      checkbox.addEventListener('change', function(e) {
+        console.log('🔄 Checkbox changed to:', e.target.checked);
+        
+        if (e.target.checked) {
+          // Add insurance
+          console.log('➕ Adding insurance...');
+          quantityInput.value = 1;
+          
+          const formData = new FormData(form);
+          
+          fetch('/cart/add.js', {
+            method: 'POST',
+            body: formData
+          })
+          .then(res => {
+            console.log('📥 Response status:', res.status);
+            return res.json();
+          })
+          .then(data => {
+            console.log('✅ Insurance added:', data);
+            // Reload to update cart display
+            setTimeout(() => {
+              window.location.reload();
+            }, 300);
+          })
+          .catch(err => {
+            console.error('❌ Error adding insurance:', err);
+            checkbox.checked = false;
+            quantityInput.value = 0;
+            alert('Failed to add insurance. Please try again.');
+          });
+          
+        } else {
+          // Remove insurance
+          console.log('➖ Removing insurance...');
+          
+          const updates = {};
+          updates[INSURANCE_VARIANT_ID] = 0;
+          
+          fetch('/cart/update.js', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ updates: updates })
+          })
+          .then(res => {
+            console.log('📥 Response status:', res.status);
+            return res.json();
+          })
+          .then(data => {
+            console.log('✅ Insurance removed:', data);
+            quantityInput.value = 0;
+            // Reload to update cart display
+            setTimeout(() => {
+              window.location.reload();
+            }, 300);
+          })
+          .catch(err => {
+            console.error('❌ Error removing insurance:', err);
+            checkbox.checked = true;
+            quantityInput.value = 1;
+            alert('Failed to remove insurance. Please try again.');
+          });
+        }
       });
-  };
+      
+      console.log('✅ Insurance system initialized!');
+    }
+    
+    // Start initialization
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
 </script>
 
 <script>
