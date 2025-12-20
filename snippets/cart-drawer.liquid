@@ -863,7 +863,7 @@
  {% endcomment %}
 
 
- 
+
 {{ 'quantity-popover.css' | asset_url | stylesheet_tag: preload: true }}
 {{ 'component-card.css' | asset_url | stylesheet_tag: preload: true }}
 
@@ -1608,7 +1608,7 @@
   </div>
 </cart-drawer>
 
-<script>
+{% comment %} <script>
   const INSURANCE_VARIANT_ID = 47220042989786;
   const INSURANCE_PRICE = 10000; // ₹100 in paise
   const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
@@ -1734,6 +1734,88 @@
     if (viewPriceBreakup) {
       // The click handler is already bound via event delegation below
     }
+  }
+</script> {% endcomment %}
+<script>
+  const INSURANCE_VARIANT_ID = 47220042989786; // Your insurance product variant ID
+  const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
+
+  document.addEventListener('DOMContentLoaded', initInsurance);
+
+  function initInsurance() {
+    const checkbox = document.getElementById('insuranceCheckbox');
+    if (!checkbox) return;
+
+    // Sync checkbox with cart
+    fetch('/cart.js')
+      .then(res => res.json())
+      .then(cart => {
+        checkbox.checked = cart.items.some(
+          item => item.variant_id === INSURANCE_VARIANT_ID
+        );
+      });
+
+    checkbox.addEventListener('change', function () {
+      this.disabled = true; // prevent multiple clicks
+      if (this.checked) {
+        addInsurance().finally(() => { this.disabled = false; });
+      } else {
+        removeInsurance().finally(() => { this.disabled = false; });
+      }
+    });
+  }
+
+  function addInsurance() {
+    return fetch(`/cart/add.js?sections=${SECTIONS.join(',')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        items: [{
+          id: INSURANCE_VARIANT_ID,
+          quantity: 1
+        }]
+      })
+    })
+    .then(res => res.json())
+    .then(updateCartSections)
+    .catch(err => console.error(err));
+  }
+
+  function removeInsurance() {
+    return fetch(`/cart/update.js?sections=${SECTIONS.join(',')}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        updates: {
+          [INSURANCE_VARIANT_ID]: 0
+        }
+      })
+    })
+    .then(res => res.json())
+    .then(updateCartSections)
+    .catch(err => console.error(err));
+  }
+
+  function updateCartSections(data) {
+    if (!data.sections) return;
+
+    SECTIONS.forEach(section => {
+      const container =
+        section === 'cart-drawer'
+          ? document.querySelector('cart-drawer')
+          : document.getElementById(section);
+
+      if (!container || !data.sections[section]) return;
+
+      const html = new DOMParser()
+        .parseFromString(data.sections[section], 'text/html')
+        .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
+
+      if (html) container.innerHTML = html.innerHTML;
+    });
+
+    // Rebind checkbox after DOM update
+    initInsurance();
   }
 </script>
 
