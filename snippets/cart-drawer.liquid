@@ -1518,7 +1518,7 @@
   (function() {
     const INSURANCE_VARIANT_ID = 47220042989786;
     let isUpdating = false;
-    let initalized = false;
+    let initialized = false;
 
     function initInsurance() {
       console.log('🔧 Initializing insurance...');
@@ -1533,12 +1533,26 @@
       console.log('✅ Checkbox found');
 
       // If already initialized, just sync state
-      if (initalized && !isUpdating) {
+      if (initialized && !isUpdating) {
         syncCheckboxState();
         return;
       }
 
       // Sync checkbox with cart
+      syncCheckboxState();
+
+      // Only attach listener once
+      if (!initialized) {
+        checkbox.addEventListener('change', handleInsuranceChange);
+        console.log('✅ Event listener attached to checkbox');
+        initialized = true;
+      }
+    }
+
+    function syncCheckboxState() {
+      const checkbox = document.getElementById('insuranceCheckbox');
+      if (!checkbox) return;
+      
       fetch('/cart.js')
         .then(res => res.json())
         .then(cart => {
@@ -1550,35 +1564,12 @@
           checkbox.checked = hasInsurance;
         })
         .catch(err => console.error('❌ Error syncing insurance:', err));
-
-      // Only attach listener once
-      if (!initalized) {
-        checkbox.addEventListener('change', handleInsuranceChange);
-        console.log('✅ Event listener attached to checkbox');
-        initalized = true;
-      }
-    }
-
-    function syncCheckboxState() {
-      const checkbox = document.getElementById('insuranceCheckbox');
-      if (!checkbox) return;
-      
-      fetch('/cart.js')
-        .then(res => res.json())
-        .then(cart => {
-          const hasInsurance = cart.items.some(
-            item => item.variant_id === INSURANCE_VARIANT_ID
-          );
-          checkbox.checked = hasInsurance;
-          console.log('✅ Checkbox synced, insurance present:', hasInsurance);
-        });
     }
 
     function handleInsuranceChange(e) {
       if (isUpdating) {
         console.log('⏳ Already updating, reverting checkbox...');
         e.preventDefault();
-        // Revert checkbox to previous state
         e.target.checked = !e.target.checked;
         return;
       }
@@ -1734,7 +1725,6 @@
       console.error('❌ Insurance update error:', err);
       alert('Failed to update insurance. Please try again.');
       
-      // Revert checkbox
       if (checkbox) {
         checkbox.checked = revertTo;
       }
@@ -1767,7 +1757,7 @@
         mutations.forEach(function(mutation) {
           if (mutation.target.classList && mutation.target.classList.contains('drawer__cart-items-wrapper')) {
             console.log('🔄 Cart items changed, syncing insurance checkbox');
-            syncCheckboxState();
+            setTimeout(syncCheckboxState, 100);
           }
         });
       });
