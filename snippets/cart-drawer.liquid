@@ -862,8 +862,7 @@
 </script>
  {% endcomment %}
 
- 
-{{ 'quantity-popover.css' | asset_url | stylesheet_tag: preload: true }}
+ {{ 'quantity-popover.css' | asset_url | stylesheet_tag: preload: true }}
 {{ 'component-card.css' | asset_url | stylesheet_tag: preload: true }}
 
 <script src="{{ 'cart.js' | asset_url }}" defer="defer"></script>
@@ -1005,9 +1004,10 @@
                     {%- for item in cart.items -%}
                       <tr
                         id="CartDrawer-Item-{{ item.index | plus: 1 }}"
-                        class="cart-item {% if item.product.title contains 'Jewelry Insurance' %} insurance-item-cart-item{% endif %}"
+                        class="cart-item"
                         role="row"
                         data-cart-item
+                        data-variant-id="{{ item.variant.id }}"
                       >
                         <td class="cart-item__media" role="cell" headers="CartDrawer-ColumnProductImage">
                           {% if item.image %}
@@ -1105,21 +1105,6 @@
 
                             <p class="product-option">{{ item.selling_plan_allocation.selling_plan.name }}</p>
                           {%- endif -%}
-
-                          {% comment %}
-                            <ul
-                              class="discounts list-unstyled"
-                              role="list"
-                              aria-label="{{ 'customer.order.discount' | t }}"
-                            >
-                              {%- for discount in item.line_level_discount_allocations -%}
-                                <li class="discounts__discount">
-                                  {{- 'icon-discount.svg' | inline_asset_content -}}
-                                  {{ discount.discount_application.title }}
-                                </li>
-                              {%- endfor -%}
-                            </ul>
-                          {% endcomment %}
                         </td>
 
                         <td class="cart-item__totals right" role="cell" headers="CartDrawer-ColumnTotal">
@@ -1148,38 +1133,7 @@
                                 {{ item.variant.compare_at_price | times: item.quantity | money }}
                               </span>
                             {%- endif -%}
-                            {% assign total_compare_price = item.variant.compare_at_price | times: item.quantity %}
-                            {% assign total_actual_price = item.final_line_price %}
-                            {% assign savings = total_compare_price | minus: total_actual_price %}
-
-                            {%- if item.variant.available and item.unit_price_measurement -%}
-                              <div class="unit-price caption">
-                                <span class="visually-hidden">{{ 'products.product.price.unit_price' | t }}</span>
-                                {{ item.unit_price | money }}
-                                <span aria-hidden="true">/</span>
-                                <span class="visually-hidden"
-                                  >&nbsp;{{ 'accessibility.unit_price_separator' | t }}&nbsp;</span
-                                >
-                                {%- if item.unit_price_measurement.reference_value != 1 -%}
-                                  {{- item.unit_price_measurement.reference_value -}}
-                                {%- endif -%}
-                                {{ item.unit_price_measurement.reference_unit }}
-                              </div>
-                            {%- endif -%}
                           </div>
-                          {% comment %}
-                            {% if savings > 0 %}
-                              <div class="savings-label">
-                                <span class="label-text"
-                                  >YOU<br>
-                                  SAVE</span
-                                >
-                                <span class="label-amount">
-                                  {{ savings | money }}
-                                </span>
-                              </div>
-                            {% endif %}
-                          {% endcomment %}
                         </td>
 
                         {%- liquid
@@ -1221,7 +1175,6 @@
                                     data-quantity-variant-id="{{ item.variant.id }}"
                                     name="updates[]"
                                     value="{{ item.quantity }}"
-                                    {% # theme-check-disable %}
                                     data-cart-quantity="{{ cart | item_count_for_variant: item.variant.id }}"
                                     min="0"
                                     data-min="{{ item.variant.quantity_rule.min }}"
@@ -1229,7 +1182,6 @@
                                       max="{{ item.variant.quantity_rule.max }}"
                                     {% endif %}
                                     step="{{ item.variant.quantity_rule.increment }}"
-                                    {% # theme-check-enable %}
                                     aria-label="{{ 'products.product.quantity.input_label' | t: product: item.product.title | escape }}"
                                     id="Drawer-quantity-{{ item.index | plus: 1 }}"
                                     data-index="{{ item.index | plus: 1 }}"
@@ -1262,121 +1214,7 @@
                                 </button>
                               </cart-remove-button>
                             </div>
-                            {%- if has_qty_rules or has_vol_pricing -%}
-                              <button
-                                type="button"
-                                class="quantity-popover__info-button quantity-popover__info-button--icon-with-label button button--tertiary"
-                                aria-expanded="false"
-                              >
-                                <span class="svg-wrapper">
-                                  {{- 'icon-info.svg' | inline_asset_content -}}
-                                </span>
-                                <span>
-                                  {%- if has_vol_pricing -%}
-                                    {{ 'products.product.volume_pricing.note' | t }}
-                                  {%- elsif has_qty_rules -%}
-                                    {{ 'products.product.quantity.note' | t }}
-                                  {%- endif -%}
-                                </span>
-                              </button>
-                            {%- endif -%}
-                            {%- if has_vol_pricing or has_qty_rules -%}
-                              <div
-                                class="cart-items__info global-settings-popup quantity-popover__info"
-                                tabindex="-1"
-                                hidden
-                              >
-                                {%- if has_qty_rules == false -%}
-                                  <span class="volume-pricing-label caption">
-                                    {{- 'products.product.volume_pricing.title' | t -}}
-                                  </span>
-                                {%- endif -%}
-                                <div class="quantity__rules caption">
-                                  {%- if item.variant.quantity_rule.increment > 1 -%}
-                                    <span class="divider">
-                                      {{-
-                                        'products.product.quantity.multiples_of'
-                                        | t: quantity: item.variant.quantity_rule.increment
-                                      -}}
-                                    </span>
-                                  {%- endif -%}
-                                  {%- if item.variant.quantity_rule.min > 1 -%}
-                                    <span class="divider">
-                                      {{-
-                                        'products.product.quantity.min_of'
-                                        | t: quantity: item.variant.quantity_rule.min
-                                      -}}
-                                    </span>
-                                  {%- endif -%}
-                                  {%- if item.variant.quantity_rule.max != null -%}
-                                    <span class="divider">
-                                      {{-
-                                        'products.product.quantity.max_of'
-                                        | t: quantity: item.variant.quantity_rule.max
-                                      -}}
-                                    </span>
-                                  {%- endif -%}
-                                </div>
-                                <button
-                                  class="button-close button button--tertiary"
-                                  type="button"
-                                  aria-label="{{ 'accessibility.close' | t }}"
-                                >
-                                  <span class="svg-wrapper">
-                                    {{- 'icon-close.svg' | inline_asset_content -}}
-                                  </span>
-                                </button>
-                                {%- if item.variant.quantity_price_breaks.size > 0 -%}
-                                  <volume-pricing class="parent-display">
-                                    <ul class="list-unstyled">
-                                      <li>
-                                        <span>{{ item.variant.quantity_rule.min }}+</span>
-                                        <span>{{ item.variant.price | money_with_currency }}/ea</span>
-                                      </li>
-                                      {%- for price_break in item.variant.quantity_price_breaks -%}
-                                        <li>
-                                          <span>
-                                            {{- price_break.minimum_quantity -}}
-                                            <span aria-hidden="true">+</span></span
-                                          >
-                                          <span>{{ price_break.price | money_with_currency }}/ea</span>
-                                        </li>
-                                      {%- endfor -%}
-                                    </ul>
-                                  </volume-pricing>
-                                {%- endif -%}
-                              </div>
-                            {%- endif -%}
-                            <div
-                              id="CartDrawer-LineItemError-{{ item.index | plus: 1 }}"
-                              class="cart-item__error"
-                              role="alert"
-                            >
-                              <small class="cart-item__error-text"></small>
-                              <span class="svg-wrapper">
-                                {{- 'icon-error.svg' | inline_asset_content -}}
-                              </span>
-                            </div>
                           </quantity-popover>
-                        </td>
-
-                        <td class="td-cart">
-                          <!--
-                            <div class="cart-container">
-                              {% if item.properties['EngravingText'] != "" %}
-                              <div class="cart-engrav" onclick="toggleEngravingInput(this)">
-                                <img src="{{ 'mini_cart_engraved.svg' | asset_url }}" width="auto" height="auto" />
-                                <p class="cart-engrav-p">Engraved: {{ item.properties['EngravingText'] }}</p>
-                              </div>
-                              {% endif %}
-                              {% if item.properties['GiftText'] != "" %}
-                              <div class="cart-engrav">
-                                <img src="{{ 'mini_cart_gift.svg' | asset_url }}" width="auto" height="auto" />
-                                <p class="cart-engrav-p">Gift Message Added</p>
-                              </div>
-                              {% endif %}
-                            </div>
-                          -->
                         </td>
                       </tr>
                     {%- endfor -%}
@@ -1408,7 +1246,6 @@
           <div id="CartDrawer-CartErrors" role="alert"></div>
         </form>
       </cart-drawer-items>
-{% comment %} insurance in cart {% endcomment %}
 
       <div style="
           display: flex;
@@ -1418,23 +1255,18 @@
           padding-left:12px;
           font-weight:400;"
       >
-      <svg class="icon" width="24" height="24" >
-       <use xlink:href="#Safe"></use>
-      </svg>
-      APPLY INSURANCE 
+        <svg class="icon" width="24" height="24">
+          <use xlink:href="#Safe"></use>
+        </svg>
+        APPLY INSURANCE 
       </div>
+      
       <div class="insurance-box">
-
         <label class="insurance-label">
-          <input
-            type="checkbox"
-            id="insuranceCheckbox"
-          >
-
+          <input type="checkbox" id="insuranceCheckbox">
           <span class="insurance-text">
             <h3>Include Insurance For Your Jewellery</h3>
           </span>
-
           <span class="insurance-price">₹100</span>
         </label>
 
@@ -1445,13 +1277,12 @@
         </ul>
       </div>
 
-
       <div id="insuranceLoader" class="insurance-loader hidden">
         <span class="loader-spinner"></span>
         <span class="loader-text">Updating insurance…</span>
       </div>
 
-      <div class="checkout-button" style="display : {% if cart.item_count == 0 %} none {% else %} block {% endif %}">
+      <div class="checkout-button" style="display: {% if cart.item_count == 0 %} none {% else %} block {% endif %};">
         <div class="drawer__footer">
           {%- if settings.show_cart_note -%}
             <details id="Details-CartDrawer">
@@ -1473,10 +1304,7 @@
             </details>
           {%- endif -%}
 
-          <!-- Start blocks -->
-          <!-- Subtotals -->
-
-          <div class="cart-drawer__footer" {{ block.shopify_attributes }}>
+          <div class="cart-drawer__footer">
             <div>
               {%- if cart.cart_level_discount_applications.size > 0 -%}
                 <ul class="discounts list-unstyled" role="list" aria-label="{{ 'customer.order.discount' | t }}">
@@ -1492,8 +1320,8 @@
             </div>
 
             <div class="totals">
-              <p class="totals__total">Items ({{ cart.item_count }})</p>
-              <p class="totals__total-value" style="color:#1A1A1A;">{{ cart.total_price | money_with_currency }}</p>
+              <p class="totals__total">Items (<span id="cart-item-count">{{ cart.item_count }}</span>)</p>
+              <p class="totals__total-value" style="color:#1A1A1A;" id="cart-subtotal">{{ cart.total_price | money_with_currency }}</p>
             </div>
 
             <div class="totals">
@@ -1501,26 +1329,14 @@
               <p class="totals__total-value_delivery"><span style="text-decoration:line-through">₹500</span> Free</p>
             </div>
 
-            {%- assign insurance_price = 10000 -%}
-            {%- assign has_insurance = false -%}
-            {%- for item in cart.items -%}
-              {%- if item.variant.id == 47220042989786 -%}
-                {%- assign has_insurance = true -%}
-                {%- break -%}
-              {%- endif -%}
-            {%- endfor -%}
-
-            {%- if has_insurance -%}
-              <div class="totals" id="insurance-line-item">
-                <p class="totals__total">Insurance</p>
-                <p class="totals__total-value">{{ insurance_price | money_with_currency }}</p>
-              </div>
-            {%- endif -%}
+            <div class="totals" id="insurance-line-item" style="display: none;">
+              <p class="totals__total">Insurance</p>
+              <p class="totals__total-value" id="insurance-amount">₹100</p>
+            </div>
 
             <div class="totals" role="status">
-              <!-- <h2 class="totals__total">{{ 'sections.cart.estimated_total' | t }}</h2> -->
               <p class="totals__total">GRAND TOTAL</p>
-              <p class="totals__total-value" style="font-weight: 600; color:#1A1A1A;">
+              <p class="totals__total-value" style="font-weight: 600; color:#1A1A1A;" id="cart-grand-total">
                 {{ cart.total_price | money_with_currency }}
               </p>
             </div>
@@ -1565,41 +1381,26 @@
               {%- endif -%}
             </small>
           </div>
+        </div>
 
-          <!-- CTAs -->
-        </div>
-        <div>
-          {% comment %} {% render 'insurance-cart-item' %} {% endcomment %}
-        </div>
-        <div class="cart__ctas" {{ block.shopify_attributes }} style="width:100%;">
+        <div class="cart__ctas" style="width:100%;">
           <div class="checkout-info" style="display: {% if cart == empty %} none {% else %} flex {% endif %};">
             <p class="grand-total">
-              Grand Total: <strong style="font-weight:600;">{{ cart.total_price | money_with_currency }}</strong>
+              Grand Total: <strong style="font-weight:600;" id="checkout-grand-total">{{ cart.total_price | money_with_currency }}</strong>
             </p>
             <p class="price-breakup" id="ViewPriceBreakup">
               View Price Breakup
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <mask id="mask0_10852_4530" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"> <rect x="24" y="1.04907e-06" width="24" height="24" transform="rotate(90 24 1.04907e-06)" fill="#D9D9D9"/> </mask> <g mask="url(#mask0_10852_4530)"> <path d="M12 12.9463L16.073 8.87301C16.2115 8.73468 16.3856 8.66385 16.5952 8.66051C16.8047 8.65735 16.982 8.72818 17.127 8.87301C17.2718 9.01801 17.3442 9.19368 17.3442 9.40001C17.3442 9.60635 17.2718 9.78201 17.127 9.92701L12.6327 14.4213C12.5391 14.5148 12.4403 14.5808 12.3365 14.6193C12.2327 14.6578 12.1205 14.677 12 14.677C11.8795 14.677 11.7673 14.6578 11.6635 14.6193C11.5597 14.5808 11.4609 14.5148 11.3672 14.4213L6.87299 9.92701C6.73465 9.78851 6.66382 9.61443 6.66049 9.40476C6.65732 9.19526 6.72815 9.01801 6.87299 8.87301C7.01799 8.72818 7.19366 8.65576 7.39999 8.65576C7.60632 8.65576 7.78199 8.72818 7.92699 8.87301L12 12.9463Z" fill="#666666"/> </g>
+                <mask id="mask0_10852_4530" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                  <rect x="24" y="1.04907e-06" width="24" height="24" transform="rotate(90 24 1.04907e-06)" fill="#D9D9D9"/>
+                </mask>
+                <g mask="url(#mask0_10852_4530)">
+                  <path d="M12 12.9463L16.073 8.87301C16.2115 8.73468 16.3856 8.66385 16.5952 8.66051C16.8047 8.65735 16.982 8.72818 17.127 8.87301C17.2718 9.01801 17.3442 9.19368 17.3442 9.40001C17.3442 9.60635 17.2718 9.78201 17.127 9.92701L12.6327 14.4213C12.5391 14.5148 12.4403 14.5808 12.3365 14.6193C12.2327 14.6578 12.1205 14.677 12 14.677C11.8795 14.677 11.7673 14.6578 11.6635 14.6193C11.5597 14.5808 11.4609 14.5148 11.3672 14.4213L6.87299 9.92701C6.73465 9.78851 6.66382 9.61443 6.66049 9.40476C6.65732 9.19526 6.72815 9.01801 6.87299 8.87301C7.01799 8.72818 7.19366 8.65576 7.39999 8.65576C7.60632 8.65576 7.78199 8.72818 7.92699 8.87301L12 12.9463Z" fill="#666666"/>
+                </g>
               </svg>
             </p>
           </div>
 
-          {% comment %}
-            <div class="cart__ctas" {{ block.shopify_attributes }}>
-              <button
-                type="submit"
-                id="CartDrawer-Checkout"
-                class="cart__checkout-button button"
-                name="checkout"
-                form="CartDrawer-Form"
-                {% if cart == empty %}
-                  disabled
-                {% endif %}
-              >
-                {{ 'sections.cart.checkout' | t }}
-              </button>
-            </div>
-          {% endcomment %}
           {% render 'gokwik-checkout' %}
         </div>
       </div>
@@ -1608,136 +1409,229 @@
 </cart-drawer>
 
 <script>
-  const INSURANCE_VARIANT_ID = 47220042989786;
-  const INSURANCE_PRICE = 10000; // ₹100 in paise
-  const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
+  const INSURANCE_CONFIG = {
+    VARIANT_ID: 47220042989786,
+    PRICE: 10000, // ₹100 in paise
+    SECTIONS: ['cart-drawer', 'cart-icon-bubble']
+  };
+
   let isUpdating = false;
 
-  document.addEventListener('DOMContentLoaded', initInsurance);
+  // Initialize on page load
+  document.addEventListener('DOMContentLoaded', () => {
+    initInsuranceManager();
+  });
 
-  function initInsurance() {
+  // Reinitialize after cart updates
+  document.addEventListener('cart:updated', () => {
+    initInsuranceManager();
+  });
+
+  function initInsuranceManager() {
     const checkbox = document.getElementById('insuranceCheckbox');
     if (!checkbox) return;
 
-    // Sync checkbox with cart state
-    fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        const hasInsurance = cart.items.some(
-          item => item.variant_id === INSURANCE_VARIANT_ID
-        );
-        checkbox.checked = hasInsurance;
-      })
-      .catch(err => console.error('Error fetching cart:', err));
-
-    // Handle checkbox change
-    checkbox.addEventListener('change', function () {
-      if (isUpdating) return; // Prevent multiple simultaneous requests
+    // Fetch cart and sync checkbox state
+    fetchCart().then(cart => {
+      if (!cart) return;
       
-      if (this.checked) {
-        addInsurance();
-      } else {
-        removeInsurance();
-      }
+      const hasInsurance = checkIfInsuranceInCart(cart);
+      checkbox.checked = hasInsurance;
+      updateInsuranceUI(cart, hasInsurance);
     });
+
+    // Remove old listeners and add new one
+    const newCheckbox = checkbox.cloneNode(true);
+    checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+    
+    newCheckbox.addEventListener('change', handleInsuranceToggle);
   }
 
-  function showLoader() {
-    const loader = document.getElementById('insuranceLoader');
-    if (loader) loader.classList.remove('hidden');
-    isUpdating = true;
+  function checkIfInsuranceInCart(cart) {
+    return cart.items.some(item => item.variant_id === INSURANCE_CONFIG.VARIANT_ID);
   }
 
-  function hideLoader() {
-    const loader = document.getElementById('insuranceLoader');
-    if (loader) loader.classList.add('hidden');
-    isUpdating = false;
+  function handleInsuranceToggle(e) {
+    if (isUpdating) {
+      e.preventDefault();
+      return;
+    }
+
+    if (e.target.checked) {
+      addInsurance();
+    } else {
+      removeInsurance();
+    }
   }
 
   function addInsurance() {
     showLoader();
-    
-    fetch(`/cart/add.js?sections=${SECTIONS.join(',')}`, {
+
+    fetch(`/cart/add.js?sections=${INSURANCE_CONFIG.SECTIONS.join(',')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         items: [{
-          id: INSURANCE_VARIANT_ID,
+          id: INSURANCE_CONFIG.VARIANT_ID,
           quantity: 1
         }]
       })
     })
     .then(res => res.json())
     .then(data => {
-      updateCartSections(data);
+      if (data.sections) {
+        updateCartSections(data.sections);
+      }
+      return fetchCart();
+    })
+    .then(cart => {
+      if (cart) {
+        const hasInsurance = checkIfInsuranceInCart(cart);
+        updateInsuranceUI(cart, hasInsurance);
+      }
       hideLoader();
     })
     .catch(err => {
       console.error('Error adding insurance:', err);
-      hideLoader();
-      // Uncheck the checkbox if there was an error
       const checkbox = document.getElementById('insuranceCheckbox');
       if (checkbox) checkbox.checked = false;
+      hideLoader();
     });
   }
 
   function removeInsurance() {
     showLoader();
-    
-    fetch(`/cart/update.js?sections=${SECTIONS.join(',')}`, {
+
+    fetch(`/cart/update.js?sections=${INSURANCE_CONFIG.SECTIONS.join(',')}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         updates: {
-          [INSURANCE_VARIANT_ID]: 0
+          [INSURANCE_CONFIG.VARIANT_ID]: 0
         }
       })
     })
     .then(res => res.json())
     .then(data => {
-      updateCartSections(data);
+      if (data.sections) {
+        updateCartSections(data.sections);
+      }
+      return fetchCart();
+    })
+    .then(cart => {
+      if (cart) {
+        const hasInsurance = checkIfInsuranceInCart(cart);
+        updateInsuranceUI(cart, hasInsurance);
+      }
       hideLoader();
     })
     .catch(err => {
       console.error('Error removing insurance:', err);
-      hideLoader();
-      // Re-check the checkbox if there was an error
       const checkbox = document.getElementById('insuranceCheckbox');
       if (checkbox) checkbox.checked = true;
+      hideLoader();
     });
   }
 
-  function updateCartSections(data) {
-    if (!data.sections) return;
-
-    SECTIONS.forEach(section => {
-      const container =
-        section === 'cart-drawer'
-          ? document.querySelector('cart-drawer')
-          : document.getElementById(section);
-
-      if (!container || !data.sections[section]) return;
-
-      const html = new DOMParser()
-        .parseFromString(data.sections[section], 'text/html')
-        .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
-
-      if (html) container.innerHTML = html.innerHTML;
-    });
-
-    // Rebind checkbox and other event listeners after DOM update
-    initInsurance();
+  function updateInsuranceUI(cart, hasInsurance) {
+    // Hide insurance items from cart display
+    hideInsuranceItems();
     
-    // Re-initialize the price breakup toggle if needed
-    const viewPriceBreakup = document.getElementById('ViewPriceBreakup');
-    if (viewPriceBreakup) {
-      // The click handler is already bound via event delegation below
+    // Show/hide insurance line item in totals
+    const insuranceLineItem = document.getElementById('insurance-line-item');
+    if (insuranceLineItem) {
+      insuranceLineItem.style.display = hasInsurance ? 'flex' : 'none';
+    }
+    
+    // Update cart item count (excluding insurance)
+    const itemCountEl = document.getElementById('cart-item-count');
+    if (itemCountEl) {
+      const nonInsuranceCount = cart.items
+        .filter(item => item.variant_id !== INSURANCE_CONFIG.VARIANT_ID)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      itemCountEl.textContent = nonInsuranceCount;
+    }
+    
+    // Update totals
+    updateCartTotals(cart);
+  }
+
+  function hideInsuranceItems() {
+    const cartItems = document.querySelectorAll('[data-cart-item]');
+    cartItems.forEach(item => {
+      const variantId = parseInt(item.getAttribute('data-variant-id'));
+      if (variantId === INSURANCE_CONFIG.VARIANT_ID) {
+        item.style.display = 'none';
+      }
+    });
+  }
+
+  function updateCartTotals(cart) {
+    const formatMoney = (cents) => {
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      }).format(cents / 100);
+    };
+
+    // Update subtotal
+    const subtotalEl = document.getElementById('cart-subtotal');
+    if (subtotalEl) {
+      subtotalEl.textContent = formatMoney(cart.total_price);
+    }
+
+    // Update grand total
+    const grandTotalEl = document.getElementById('cart-grand-total');
+    if (grandTotalEl) {
+      grandTotalEl.textContent = formatMoney(cart.total_price);
+    }
+
+    const checkoutGrandTotalEl = document.getElementById('checkout-grand-total');
+    if (checkoutGrandTotalEl) {
+      checkoutGrandTotalEl.textContent = formatMoney(cart.total_price);
     }
   }
+
+  function fetchCart() {
+    return fetch('/cart.js')
+      .then(res => res.json())
+      .catch(err => {
+        console.error('Error fetching cart:', err);
+        return null;
+      });
+  }
+
+  function updateCartSections(sections) {
+    if (!sections) return;
+
+    INSURANCE_CONFIG.SECTIONS.forEach(sectionId => {
+      const container = sectionId === 'cart-drawer'
+        ? document.querySelector('cart-drawer')
+        : document.getElementById(sectionId);
+
+      if (!container || !sections[sectionId]) return;
+
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(sections[sectionId], 'text/html');
+      const newContent = doc.querySelector(
+        sectionId === 'cart-drawer' ? 'cart-drawer' : `#${sectionId}`
+      );
+
+      if (newContent) {
+        container.innerHTML = newContent.innerHTML;
+      }
+    });
+
+    // Reinitialize after DOM update
+    initInsuranceManager();
+  }
+
 </script>
 
-
 <script>
+  // Price Breakup Toggle
   document.addEventListener('click', function (e) {
     const viewPriceBreakupEl = e.target.closest('#ViewPriceBreakup');
     if (viewPriceBreakupEl) {
@@ -1768,6 +1662,7 @@
 </script>
 
 <script>
+  // Begin Checkout Analytics
   document.addEventListener('DOMContentLoaded', function () {
     const checkoutBtn = document.getElementById('CartDrawer-Checkout');
 
