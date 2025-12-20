@@ -1518,7 +1518,7 @@
   (function() {
     const INSURANCE_VARIANT_ID = 47220042989786;
     let isUpdating = false;
-    let initalized = false;
+    let initialized = false;
 
     function initInsurance() {
       console.log('🔧 Initializing insurance...');
@@ -1532,13 +1532,21 @@
       
       console.log('✅ Checkbox found');
 
-      // If already initialized, just sync state
-      if (initalized && !isUpdating) {
-        syncCheckboxState();
-        return;
-      }
+      // Sync checkbox with cart state
+      syncCheckboxState();
 
-      // Sync checkbox with cart
+      // Only attach listener once
+      if (!initialized) {
+        checkbox.addEventListener('change', handleInsuranceChange);
+        console.log('✅ Event listener attached to checkbox');
+        initialized = true;
+      }
+    }
+
+    function syncCheckboxState() {
+      const checkbox = document.getElementById('insuranceCheckbox');
+      if (!checkbox || isUpdating) return;
+      
       fetch('/cart.js')
         .then(res => res.json())
         .then(cart => {
@@ -1550,36 +1558,12 @@
           checkbox.checked = hasInsurance;
         })
         .catch(err => console.error('❌ Error syncing insurance:', err));
-
-      // Only attach listener once
-      if (!initalized) {
-        checkbox.addEventListener('change', handleInsuranceChange);
-        console.log('✅ Event listener attached to checkbox');
-        initalized = true;
-      }
-    }
-
-    function syncCheckboxState() {
-      const checkbox = document.getElementById('insuranceCheckbox');
-      if (!checkbox) return;
-      
-      fetch('/cart.js')
-        .then(res => res.json())
-        .then(cart => {
-          const hasInsurance = cart.items.some(
-            item => item.variant_id === INSURANCE_VARIANT_ID
-          );
-          checkbox.checked = hasInsurance;
-          console.log('✅ Checkbox synced, insurance present:', hasInsurance);
-        });
     }
 
     function handleInsuranceChange(e) {
       if (isUpdating) {
-        console.log('⏳ Already updating, reverting checkbox...');
+        console.log('⏳ Already updating, preventing change...');
         e.preventDefault();
-        // Revert checkbox to previous state
-        e.target.checked = !e.target.checked;
         return;
       }
       
@@ -1719,7 +1703,6 @@
 
     function finishUpdate(shouldBeChecked) {
       console.log('✅ Finishing update...');
-      isUpdating = false;
       const checkbox = document.getElementById('insuranceCheckbox');
       const loader = document.getElementById('insuranceLoader');
       
@@ -1728,6 +1711,8 @@
         checkbox.checked = shouldBeChecked;
       }
       if (loader) loader.classList.add('hidden');
+      
+      isUpdating = false;
     }
 
     function handleError(err, checkbox, revertTo) {
@@ -1739,10 +1724,11 @@
         checkbox.checked = revertTo;
       }
       
-      isUpdating = false;
       const loader = document.getElementById('insuranceLoader');
       if (checkbox) checkbox.disabled = false;
       if (loader) loader.classList.add('hidden');
+      
+      isUpdating = false;
     }
 
     // Initialize when DOM is ready
@@ -1761,13 +1747,13 @@
       }
     });
 
-    // Re-initialize on cart updates (from quantity changes, etc.)
+    // Re-sync on cart updates (from quantity changes, etc.)
     if (typeof MutationObserver !== 'undefined') {
       const observer = new MutationObserver(function(mutations) {
         mutations.forEach(function(mutation) {
           if (mutation.target.classList && mutation.target.classList.contains('drawer__cart-items-wrapper')) {
             console.log('🔄 Cart items changed, syncing insurance checkbox');
-            syncCheckboxState();
+            setTimeout(syncCheckboxState, 100);
           }
         });
       });
