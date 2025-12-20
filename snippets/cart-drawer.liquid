@@ -1515,185 +1515,213 @@
 </cart-drawer>
 
 <script>
-  const INSURANCE_VARIANT_ID = 47220042989786;
-  const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
-  let isUpdating = false;
+  (function() {
+    const INSURANCE_VARIANT_ID = 47220042989786;
+    const SECTIONS = ['cart-drawer', 'cart-icon-bubble'];
+    let isUpdating = false;
 
-  document.addEventListener('DOMContentLoaded', initInsurance);
+    function initInsurance() {
+      console.log('🔧 Initializing insurance...');
+      const checkbox = document.getElementById('insuranceCheckbox');
+      
+      if (!checkbox) {
+        console.error('❌ Insurance checkbox not found!');
+        // Try again after a delay
+        setTimeout(initInsurance, 500);
+        return;
+      }
+      
+      console.log('✅ Checkbox found');
 
-  function initInsurance() {
-    console.log('🔧 Initializing insurance...');
-    const checkbox = document.getElementById('insuranceCheckbox');
-    
-    if (!checkbox) {
-      console.error('❌ Insurance checkbox not found!');
-      return;
-    }
-    
-    console.log('✅ Checkbox found');
-
-    // Sync checkbox with cart
-    fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        console.log('📦 Current cart:', cart);
-        const hasInsurance = cart.items.some(
-          item => item.variant_id === INSURANCE_VARIANT_ID
-        );
-        console.log('Insurance in cart?', hasInsurance);
-        checkbox.checked = hasInsurance;
-      })
-      .catch(err => console.error('❌ Error syncing insurance:', err));
-
-    // Remove old listener if exists
-    const newCheckbox = checkbox.cloneNode(true);
-    checkbox.parentNode.replaceChild(newCheckbox, checkbox);
-
-    newCheckbox.addEventListener('change', handleInsuranceChange);
-    console.log('✅ Event listener attached');
-  }
-
-  function handleInsuranceChange(e) {
-    if (isUpdating) {
-      console.log('⏳ Already updating, skipping...');
-      return;
-    }
-    
-    const checkbox = e.target;
-    const loader = document.getElementById('insuranceLoader');
-    
-    console.log('🔄 Insurance checkbox changed:', checkbox.checked);
-    
-    isUpdating = true;
-    checkbox.disabled = true;
-    if (loader) loader.classList.remove('hidden');
-
-    if (checkbox.checked) {
-      console.log('➕ Adding insurance...');
-      addInsurance();
-    } else {
-      console.log('➖ Removing insurance...');
-      removeInsurance();
-    }
-  }
-
-  function addInsurance() {
-    // First check if insurance already exists
-    fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        console.log('📦 Cart before adding:', cart);
-        const hasInsurance = cart.items.some(
-          item => item.variant_id === INSURANCE_VARIANT_ID
-        );
-        
-        if (hasInsurance) {
-          console.log('ℹ️ Insurance already in cart');
-          finishUpdate();
-          return;
-        }
-
-        console.log('➕ Calling add API with variant ID:', INSURANCE_VARIANT_ID);
-        
-        // Add insurance
-        return fetch(`/cart/add.js?sections=${SECTIONS.join(',')}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            items: [{
-              id: INSURANCE_VARIANT_ID,
-              quantity: 1
-            }]
-          })
-        })
-        .then(res => {
-          console.log('📡 Add API response status:', res.status);
-          return res.json();
-        })
-        .then(data => {
-          console.log('✅ Add API response data:', data);
-          updateCartSections(data);
-        });
-      })
-      .catch(handleError);
-  }
-
-  function removeInsurance() {
-    console.log('➖ Calling update API to remove insurance');
-    fetch(`/cart/update.js?sections=${SECTIONS.join(',')}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        updates: {
-          [INSURANCE_VARIANT_ID]: 0
-        }
-      })
-    })
-    .then(res => {
-      console.log('📡 Update API response status:', res.status);
-      return res.json();
-    })
-    .then(data => {
-      console.log('✅ Update API response data:', data);
-      updateCartSections(data);
-    })
-    .catch(handleError);
-  }
-
-  function updateCartSections(data) {
-    if (!data.sections) {
-      finishUpdate();
-      return;
-    }
-
-    SECTIONS.forEach(section => {
-      const container =
-        section === 'cart-drawer'
-          ? document.querySelector('cart-drawer')
-          : document.getElementById(section);
-
-      if (!container || !data.sections[section]) return;
-
-      const html = new DOMParser()
-        .parseFromString(data.sections[section], 'text/html')
-        .querySelector(section === 'cart-drawer' ? 'cart-drawer' : `#${section}`);
-
-      if (html) container.innerHTML = html.innerHTML;
-    });
-
-    // Rebind after DOM update
-    setTimeout(() => {
-      initInsurance();
-      finishUpdate();
-    }, 100);
-  }
-
-  function finishUpdate() {
-    isUpdating = false;
-    const checkbox = document.getElementById('insuranceCheckbox');
-    const loader = document.getElementById('insuranceLoader');
-    
-    if (checkbox) checkbox.disabled = false;
-    if (loader) loader.classList.add('hidden');
-  }
-
-  function handleError(err) {
-    console.error('❌ Insurance update error:', err);
-    alert('Failed to update insurance. Please try again. Check console for details.');
-    finishUpdate();
-    
-    // Reset checkbox to correct state
-    fetch('/cart.js')
-      .then(res => res.json())
-      .then(cart => {
-        const checkbox = document.getElementById('insuranceCheckbox');
-        if (checkbox) {
-          checkbox.checked = cart.items.some(
+      // Sync checkbox with cart
+      fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          console.log('📦 Current cart items:', cart.items.map(i => ({id: i.variant_id, title: i.product_title})));
+          const hasInsurance = cart.items.some(
             item => item.variant_id === INSURANCE_VARIANT_ID
           );
+          console.log('Insurance in cart?', hasInsurance);
+          checkbox.checked = hasInsurance;
+        })
+        .catch(err => console.error('❌ Error syncing insurance:', err));
+
+      // Remove existing event listeners
+      const newCheckbox = checkbox.cloneNode(true);
+      checkbox.parentNode.replaceChild(newCheckbox, checkbox);
+
+      newCheckbox.addEventListener('change', handleInsuranceChange);
+      console.log('✅ Event listener attached to checkbox');
+    }
+
+    function handleInsuranceChange(e) {
+      if (isUpdating) {
+        console.log('⏳ Already updating, skipping...');
+        return;
+      }
+      
+      const checkbox = e.target;
+      const loader = document.getElementById('insuranceLoader');
+      
+      console.log('🔄 Insurance checkbox changed to:', checkbox.checked);
+      
+      isUpdating = true;
+      checkbox.disabled = true;
+      if (loader) loader.classList.remove('hidden');
+
+      if (checkbox.checked) {
+        console.log('➕ Adding insurance...');
+        addInsurance();
+      } else {
+        console.log('➖ Removing insurance...');
+        removeInsurance();
+      }
+    }
+
+    function addInsurance() {
+      console.log('➕ Starting add insurance process...');
+      
+      fetch('/cart/add.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          items: [{
+            id: INSURANCE_VARIANT_ID,
+            quantity: 1
+          }]
+        })
+      })
+      .then(res => {
+        console.log('📡 Add API response status:', res.status);
+        if (!res.ok) {
+          throw new Error('Failed to add insurance: ' + res.status);
         }
-      });
-  }
+        return res.json();
+      })
+      .then(data => {
+        console.log('✅ Insurance added successfully:', data);
+        return refreshCartSections();
+      })
+      .then(() => {
+        console.log('✅ Cart sections refreshed');
+        finishUpdate();
+      })
+      .catch(handleError);
+    }
+
+    function removeInsurance() {
+      console.log('➖ Starting remove insurance process...');
+      
+      fetch('/cart/update.js', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: {
+            [INSURANCE_VARIANT_ID]: 0
+          }
+        })
+      })
+      .then(res => {
+        console.log('📡 Remove API response status:', res.status);
+        if (!res.ok) {
+          throw new Error('Failed to remove insurance: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(data => {
+        console.log('✅ Insurance removed successfully:', data);
+        return refreshCartSections();
+      })
+      .then(() => {
+        console.log('✅ Cart sections refreshed');
+        finishUpdate();
+      })
+      .catch(handleError);
+    }
+
+    function refreshCartSections() {
+      console.log('🔄 Refreshing cart sections...');
+      
+      return fetch(`/cart.js`)
+        .then(res => res.json())
+        .then(cart => {
+          console.log('📦 Updated cart:', cart);
+          
+          // Update cart icon bubble count
+          const cartBubble = document.querySelector('.cart-count-bubble span');
+          if (cartBubble) {
+            // Exclude insurance from count
+            const itemCount = cart.items.reduce((count, item) => {
+              return item.variant_id === INSURANCE_VARIANT_ID ? count : count + item.quantity;
+            }, 0);
+            cartBubble.textContent = itemCount;
+            console.log('Updated cart count to:', itemCount);
+          }
+          
+          // Trigger cart drawer refresh
+          if (typeof window.dispatchEvent === 'function') {
+            window.dispatchEvent(new CustomEvent('cart:refresh'));
+          }
+          
+          // Force reload cart drawer sections
+          return fetch(`/?sections=cart-drawer,cart-icon-bubble`)
+            .then(res => res.text())
+            .then(html => {
+              console.log('✅ Got updated sections HTML');
+              // Parse and update sections if needed
+              location.reload(); // Temporary: reload to show changes
+            });
+        });
+    }
+
+    function finishUpdate() {
+      console.log('✅ Finishing update...');
+      isUpdating = false;
+      const checkbox = document.getElementById('insuranceCheckbox');
+      const loader = document.getElementById('insuranceLoader');
+      
+      if (checkbox) checkbox.disabled = false;
+      if (loader) loader.classList.add('hidden');
+      
+      // Re-sync checkbox state
+      fetch('/cart.js')
+        .then(res => res.json())
+        .then(cart => {
+          const hasInsurance = cart.items.some(
+            item => item.variant_id === INSURANCE_VARIANT_ID
+          );
+          if (checkbox) checkbox.checked = hasInsurance;
+          console.log('✅ Checkbox synced, insurance present:', hasInsurance);
+        });
+    }
+
+    function handleError(err) {
+      console.error('❌ Insurance update error:', err);
+      alert('Failed to update insurance: ' + err.message + '\n\nCheck console for details.');
+      finishUpdate();
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initInsurance);
+    } else {
+      initInsurance();
+    }
+
+    // Also initialize when cart drawer opens
+    document.addEventListener('click', function(e) {
+      if (e.target.closest('[data-cart-drawer-toggle]') || 
+          e.target.closest('.cart-icon-wrapper') ||
+          e.target.closest('.header__icon--cart')) {
+        setTimeout(initInsurance, 300);
+      }
+    });
+
+    // Re-initialize on cart updates
+    window.addEventListener('cart:refresh', initInsurance);
+    
+    console.log('🚀 Insurance script loaded');
+  })();
 </script>
 
 <script>
