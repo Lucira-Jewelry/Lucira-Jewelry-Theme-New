@@ -131,23 +131,25 @@
         {%- form 'customer_address', customer.new_address, return_to: routes.account_url -%}
           <div class="address-form-row">
             <div class="address-form-group">
-              <label for="AddressFirstNameNew">First Name</label>
+              <label for="AddressFirstNameNew">First Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="AddressFirstNameNew"
                 name="address[first_name]"
                 placeholder="First name"
                 autocomplete="given-name"
+                required
               >
             </div>
             <div class="address-form-group">
-              <label for="AddressLastNameNew">Last Name</label>
+              <label for="AddressLastNameNew">Last Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="AddressLastNameNew"
                 name="address[last_name]"
                 placeholder="Last name"
                 autocomplete="family-name"
+                required
               >
             </div>
           </div>
@@ -181,14 +183,15 @@
                 type="text"
                 id="AddressCityNew"
                 name="address[city]"
-                placeholder="Enter your Locality"
+                placeholder="Enter your City"
                 autocomplete="address-level2"
+                required
               >
             </div>
           </div>
 
           <div class="address-form-group">
-            <label for="AddressAddress1New">Address</label>
+            <label for="AddressAddress1New">Address <span style="color: red;">*</span></label>
             <input
               type="text"
               id="AddressAddress1New"
@@ -291,19 +294,21 @@
           
           <div class="address-form-row">
             <div class="address-form-group">
-              <label for="EditAddressFirstName">First Name</label>
+              <label for="EditAddressFirstName">First Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="EditAddressFirstName"
                 placeholder="First name"
+                required
               >
             </div>
             <div class="address-form-group">
-              <label for="EditAddressLastName">Last Name</label>
+              <label for="EditAddressLastName">Last Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="EditAddressLastName"
                 placeholder="Last name"
+                required
               >
             </div>
           </div>
@@ -332,12 +337,13 @@
                 type="text"
                 id="EditAddressCity"
                 placeholder="Enter your Locality"
+                required
               >
             </div>
           </div>
 
           <div class="address-form-group">
-            <label for="EditAddressAddress1">Address</label>
+            <label for="EditAddressAddress1">Address <span style="color: red;">*</span></label>
             <input
               type="text"
               id="EditAddressAddress1"
@@ -498,6 +504,8 @@
       country: document.getElementById('EditAddressCountry').value,
       zip: editPin
     };
+
+    // ... rest of your existing code here (fetch PUT etc.)
   });
 
 
@@ -520,12 +528,9 @@
     const editBtn = document.getElementById("edit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     const saveBtn = document.getElementById("save-button");
-    const inputs = document.querySelectorAll("#first_name, #last_name, #email");
-    const phoneInput = document.getElementById("phone");
+    const inputs = document.querySelectorAll("#first_name, #last_name, #email, #phone");
     const emailError = document.querySelector(".email-error");
     const originalValues = {};
-
-    phoneInput.setAttribute("disabled", "true");
   
     // Store original values
     inputs.forEach(input => {
@@ -621,7 +626,6 @@
     const addPinInput = document.getElementById('AddressZipNew');
 
     if (addAddressForm && addPinInput) {
-      // Only numbers and max 6 chars while typing
       addPinInput.addEventListener('input', function (e) {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 6) v = v.slice(0, 6);
@@ -629,7 +633,24 @@
       });
 
       addAddressForm.addEventListener('submit', function (e) {
+        const first = document.getElementById('AddressFirstNameNew').value.trim();
+        const last = document.getElementById('AddressLastNameNew').value.trim();
+        const address = document.getElementById('AddressAddress1New').value.trim();\\
+        const phone = document.getElementById('AddressPhoneNew').value.trim();
         const pin = addPinInput.value.trim();
+
+        if (!first || !last || !address) {
+          e.preventDefault();
+          alert('* Indicated Fields are Required.');
+          return;
+        }
+
+        if (phone && !/^[6-9]\d{9}$/.test(phone)) {
+          e.preventDefault();
+          alert('Please enter a valid 10-digit mobile number.');
+          return;
+        }
+
         if (!/^\d{6}$/.test(pin)) {
           e.preventDefault();
           alert('Please enter a valid 6-digit pincode.');
@@ -656,8 +677,27 @@
     const addStateSelect = document.getElementById('AddressProvinceNew');
 
     const editPinInput = document.getElementById('EditAddressZip');
-    const editCityDisplayInput = document.getElementById('EditAddressAddress2'); // City/ District/ Town
+    const editCityDisplayInput = document.getElementById('EditAddressAddress2');
     const editStateSelect = document.getElementById('EditAddressProvince');
+
+    ['AddressPhoneNew', 'EditAddressPhone'].forEach(id => {
+      const input = document.getElementById(id);
+      if (!input) return;
+
+      input.addEventListener('input', function () {
+        let value = this.value;
+
+        // remove non-digits
+        value = value.replace(/\D/g, '');
+
+        // limit to 10 digits
+        if (value.length > 10) {
+          value = value.slice(0, 10);
+        }
+
+        this.value = value;
+      });
+    });
 
     async function fetchLocationFromPincode(pin) {
       if (!/^\d{6}$/.test(pin)) return null;
