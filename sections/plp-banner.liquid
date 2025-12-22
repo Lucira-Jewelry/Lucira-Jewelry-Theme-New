@@ -1,5 +1,4 @@
 {% assign show_banner = true %}
-{{ 'facet-filters-loading.js' | asset_url  }}
 
 {% if section.settings.exclude_from_collections %}
   {% for collection_item in section.settings.excluded_collections %}
@@ -25,8 +24,7 @@
             <nav
               class="plp-collection-banner__breadcrumbs"
               itemscope
-              itemtype="https://schema.org/BreadcrumbList"
-            >
+              itemtype="https://schema.org/BreadcrumbList">
               <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
                 <a href="{{ shop.url }}" itemprop="item" class="plp-collection-banner__breadcrumb-link">
                   <span itemprop="name">Home</span>
@@ -97,11 +95,11 @@
         </div>
         <!-- ✅ SORT (FACET-COMPATIBLE) -->
         <div class="plp-collection-banner__right">
-          <facet-filters-form>
           <form
             method="get"
             action="{{ collection.url }}"
-            class="plp-sort-form">
+            class="plp-sort-form"
+          >
             {% if search.terms %}
               <input type="hidden" name="q" value="{{ search.terms | escape }}">
               <input type="hidden" name="options[prefix]" value="last">
@@ -121,7 +119,6 @@
               name="sort_by"
               id="SortBy"
               class="plp-sort-select"
-              aria-describedby="a11y-refresh-page-message"
             >
               {% for option in collection.sort_options %}
                 <option
@@ -135,7 +132,6 @@
               {% endfor %}
             </select>
           </form>
-      </facet-filters-form>
         </div>
       </div>
     </div>
@@ -206,62 +202,78 @@
     </div>
   </div>
 </div>
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const openBtns = document.querySelectorAll('.open-drawer-btn');
-    const wrapper = document.getElementById('plp-drawer-wrapper');
-    const overlay = wrapper?.querySelector('.drawer-overlay');
-    const closeBtn = wrapper?.querySelector('.drawer-close');
-    const continueBtn = wrapper?.querySelector('.continue-button');
+  <script>
 
-    const openDrawer = () => {
-      wrapper.classList.remove('hidden');
-      document.body.classList.add('drawer-open');
-    };
-
-    const closeDrawer = () => {
-      wrapper.classList.add('hidden');
-      document.body.classList.remove('drawer-open');
-    };
-
-    openBtns.forEach((btn) => {
-      btn.addEventListener('click', openDrawer);
-    });
-
-    closeBtn?.addEventListener('click', closeDrawer);
-    overlay?.addEventListener('click', closeDrawer);
-    continueBtn?.addEventListener('click', function (e) {
-      e.preventDefault();
-      closeDrawer();
-    });
+  
+    document.addEventListener("DOMContentLoaded", function () {
+      const openBtns = document.querySelectorAll(".open-drawer-btn");
+      const wrapper = document.getElementById("plp-drawer-wrapper");
+      const overlay = wrapper?.querySelector(".drawer-overlay");
+      const closeBtn = wrapper?.querySelector(".drawer-close");
+      const continueBtn = wrapper?.querySelector(".continue-button");
+  
+      const openDrawer = () => {
+        wrapper.classList.remove("hidden");
+        document.body.classList.add("drawer-open");
+      };
+  
+      const closeDrawer = () => {
+        wrapper.classList.add("hidden");
+        document.body.classList.remove("drawer-open");
+      };
+  
+      openBtns.forEach(btn => {
+        btn.addEventListener("click", openDrawer);
+      });
+  
+      closeBtn?.addEventListener("click", closeDrawer);
+      overlay?.addEventListener("click", closeDrawer);
+      continueBtn?.addEventListener("click", function (e) {
+        e.preventDefault();
+        closeDrawer();
+      });
   });
-</script>
+  </script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const sortSelect = document.getElementById('SortBy');
-    if (!sortSelect) return;
+    const productGrid = document.getElementById('ProductGridContainer');
+
+    if (!sortSelect || !productGrid) return;
 
     sortSelect.addEventListener('change', function () {
-      const facetForm = document.querySelector('facet-filters-form');
-      if (!facetForm) return;
+      const url = new URL(window.location.href);
 
-      // Ensure hidden sort input exists
-      let sortInput = facetForm.querySelector('input[name="sort_by"]');
-      if (!sortInput) {
-        sortInput = document.createElement('input');
-        sortInput.type = 'hidden';
-        sortInput.name = 'sort_by';
-        facetForm.querySelector('form').appendChild(sortInput);
-      }
+      // Update sort value
+      url.searchParams.set('sort_by', this.value);
 
-      sortInput.value = this.value;
+      // Remove pagination on sort
+      url.searchParams.delete('page');
 
-      // Trigger Dawn loader + AJAX render
-      facetForm.onSubmitHandler({
-        target: sortInput,
-        srcElement: sortInput,
-        preventDefault: () => {},
-      });
+      fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then((response) => response.text())
+        .then((html) => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+
+          const newGrid = doc.getElementById('ProductGridContainer');
+
+          if (!newGrid) return;
+
+          // Replace product grid only
+          productGrid.innerHTML = newGrid.innerHTML;
+
+          // Update URL without reload
+          window.history.pushState({}, '', url.toString());
+        })
+        .catch((err) => {
+          console.error('Sort failed', err);
+        });
     });
   });
 </script>
