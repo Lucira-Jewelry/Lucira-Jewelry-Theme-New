@@ -567,11 +567,8 @@
   }
   
   function formatMoney(cents) {
-    const rupees = cents / 100;
-    return '₹' + rupees.toLocaleString('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    const rupees = Math.round(cents / 100); // Round to remove decimals
+    return '₹' + rupees.toLocaleString('en-IN');
   }
   
   function getElements() {
@@ -715,7 +712,7 @@
     log('👁️', 'Products in cart (excluding insurance):', nonInsuranceCount);
     log('👁️', 'Insurance in cart:', hasInsuranceInCart);
     
-    // Find insurance section wrapper (the parent div with APPLY INSURANCE text)
+    // Find insurance section wrapper
     const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
     const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
     
@@ -733,12 +730,11 @@
         }
         log('🚫', 'Insurance section hidden - no products in cart');
         
-        // If insurance exists in cart but no products, remove it automatically
+        // If insurance exists but no products, remove it
         if (hasInsuranceInCart) {
           log('⚠️', 'Removing insurance - no products in cart');
           try {
             await removeInsuranceFromCart();
-            // Trigger cart refresh after removing insurance
             await wait(200);
             triggerCartUpdate();
           } catch (error) {
@@ -746,7 +742,6 @@
           }
         }
         
-        // Uncheck the checkbox silently
         const elements = getElements();
         if (elements.checkbox && elements.checkbox.checked) {
           setCheckbox(false, true);
@@ -762,15 +757,14 @@
     
     // Update all grand total displays
     const grandTotalSelectors = [
-      '.totals__total-value', // In price breakup
-      '.grand-total strong', // In checkout info
+      '.totals__total-value',
+      '.grand-total strong',
       '.checkout-info .grand-total strong'
     ];
     
     grandTotalSelectors.forEach(selector => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => {
-        // Check if this is a grand total element
         const parent = el.closest('.totals, .grand-total, .checkout-info');
         if (parent && (
           parent.textContent.includes('GRAND TOTAL') || 
@@ -791,33 +785,29 @@
       }
     });
     
-    // Show/hide insurance line item in price breakup
+    // Show/hide insurance line item
     const insuranceLine = document.getElementById('insurance-line-item');
     if (insuranceLine) {
       insuranceLine.style.display = hasInsurance(cartData) ? 'flex' : 'none';
     }
     
-    // Update insurance section visibility (this may auto-remove insurance)
+    // Update insurance section visibility
     await updateInsuranceSectionVisibility(cartData);
   }
   
   function triggerCartUpdate() {
     log('🔄', 'Triggering cart refresh...');
     
-    // Get fresh cart data first
     getCart().then(cartData => {
       if (cartData) {
-        // Update UI immediately
         updateGrandTotalUI(cartData);
       }
       
-      // Then trigger full cart refresh
       const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
       
       if (cartItems && typeof cartItems.onCartUpdate === 'function') {
         cartItems.onCartUpdate().then(() => {
           log('✅', 'Cart updated via onCartUpdate');
-          // Update UI again after refresh
           getCart().then(freshCart => {
             if (freshCart) {
               updateGrandTotalUI(freshCart);
@@ -826,14 +816,12 @@
           });
         });
       } else {
-        // Fallback: Fetch and replace cart sections
         fetch(window.location.pathname + '?section_id=cart-drawer')
           .then(response => response.text())
           .then(html => {
             const parser = new DOMParser();
             const doc = parser.parseFromString(html, 'text/html');
             
-            // Replace cart items
             const newCartItems = doc.querySelector('cart-drawer-items');
             const currentCartItems = document.querySelector('cart-drawer-items');
             
@@ -841,7 +829,6 @@
               currentCartItems.replaceWith(newCartItems);
             }
             
-            // Replace footer
             const newFooter = doc.querySelector('.cart-drawer__footer');
             const currentFooter = document.querySelector('.cart-drawer__footer');
             
@@ -851,7 +838,6 @@
             
             log('✅', 'Cart updated via section fetch');
             
-            // Update UI after section replacement
             getCart().then(freshCart => {
               if (freshCart) {
                 updateGrandTotalUI(freshCart);
@@ -878,7 +864,6 @@
     showLoader(true);
     
     try {
-      // Check if already in cart
       const cartData = await getCart();
       if (hasInsurance(cartData)) {
         log('ℹ️', 'Insurance already in cart');
@@ -887,21 +872,14 @@
         return;
       }
       
-      // Add to cart
       const result = await addInsuranceToCart();
-      
-      // Get fresh cart data
       const freshCart = await getCart();
       
-      // Update UI immediately with new total
       if (freshCart) {
         updateGrandTotalUI(freshCart);
       }
       
-      // Wait a bit before triggering full refresh
       await wait(200);
-      
-      // Trigger full cart update
       triggerCartUpdate();
       
     } catch (error) {
@@ -924,21 +902,14 @@
     showLoader(true);
     
     try {
-      // Remove from cart
       const result = await removeInsuranceFromCart();
-      
-      // Get fresh cart data
       const freshCart = await getCart();
       
-      // Update UI immediately with new total
       if (freshCart) {
         updateGrandTotalUI(freshCart);
       }
       
-      // Wait a bit before triggering full refresh
       await wait(200);
-      
-      // Trigger full cart update
       triggerCartUpdate();
       
     } catch (error) {
@@ -960,7 +931,6 @@
       log('🔄', 'Syncing checkbox state:', has);
       setCheckbox(has, true);
       
-      // Also update UI
       await updateGrandTotalUI(cartData);
     } catch (error) {
       log('❌', 'Sync error:', error);
@@ -993,10 +963,7 @@
       return false;
     }
     
-    // Remove any existing listener
     elements.checkbox.removeEventListener('change', handleCheckboxChange);
-    
-    // Attach new listener
     elements.checkbox.addEventListener('change', handleCheckboxChange);
     
     log('✅', 'Event listeners attached');
@@ -1004,10 +971,8 @@
   }
   
   function observeCartChanges() {
-    // Watch for cart drawer mutations
     const observer = new MutationObserver((mutations) => {
       for (const mutation of mutations) {
-        // Check if cart items were updated
         if (mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) {
@@ -1022,7 +987,6 @@
           });
         }
         
-        // Check if cart drawer was opened
         if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
           const target = mutation.target;
           if (target.tagName === 'CART-DRAWER' && target.hasAttribute('open')) {
@@ -1045,7 +1009,6 @@
   }
   
   function listenToCartEvents() {
-    // Listen for custom cart events
     document.addEventListener('cart:refresh', () => {
       log('🔄', 'Cart refresh event');
       setTimeout(() => {
@@ -1054,7 +1017,6 @@
       }, 100);
     });
     
-    // Listen for PUB_SUB events if available
     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
       subscribe(PUB_SUB_EVENTS.cartUpdate, (event) => {
         log('🔄', 'PUB_SUB cartUpdate event');
@@ -1068,16 +1030,9 @@
   function init() {
     log('🚀', 'Initializing Insurance Manager...');
     
-    // Attach event listeners
     attachEventListeners();
-    
-    // Sync initial state
     syncCheckboxState();
-    
-    // Start observing cart changes
     observeCartChanges();
-    
-    // Listen to cart events
     listenToCartEvents();
     
     state.initialized = true;
@@ -1092,7 +1047,6 @@
     setTimeout(init, 100);
   }
   
-  // Expose functions for debugging
   window.InsuranceManager = {
     getCart,
     hasInsurance,
