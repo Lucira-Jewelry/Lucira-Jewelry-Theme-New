@@ -1067,22 +1067,22 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v6.0 Starting...');
+  console.log('🎯 Insurance Manager v7.0 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
     PRICE_PER_UNIT: 10000, // ₹100 per product in cents
-    CHECKBOX_ID: 'insuranceCheckbox',
-    LOADER_ID: 'insuranceLoader',
-    BOX_ID: 'insuranceBox'
+    BOX_ID: 'insuranceBox',
+    INSURANCE_SELECTOR: '[data-insurance-section]' // Update this selector based on your HTML
   };
   
   // ==================== STATE ====================
   let state = {
     processing: false,
     initialized: false,
-    currentCart: null
+    currentCart: null,
+    isInsuranceSelected: false
   };
   
   // ==================== UTILITIES ====================
@@ -1101,34 +1101,55 @@
   }
   
   function getElements() {
+    // Try to find the insurance section
+    const insuranceBox = document.getElementById(CONFIG.BOX_ID) || 
+                        document.querySelector(CONFIG.INSURANCE_SELECTOR);
+    
     return {
-      checkbox: document.getElementById(CONFIG.CHECKBOX_ID),
-      loader: document.getElementById(CONFIG.LOADER_ID),
-      box: document.getElementById(CONFIG.BOX_ID)
+      box: insuranceBox,
+      label: insuranceBox ? insuranceBox.querySelector('.insurance-label') : null,
+      toggle: insuranceBox ? insuranceBox.querySelector('.insurance-toggle') : null
     };
   }
   
   function showLoader(show) {
     const elements = getElements();
-    if (elements.loader) {
-      elements.loader.classList.toggle('active', show);
-    }
     if (elements.box) {
       elements.box.classList.toggle('updating', show);
     }
   }
   
-  function setCheckbox(checked, silent = false) {
+  function setToggleState(selected) {
     const elements = getElements();
-    if (elements.checkbox && elements.checkbox.checked !== checked) {
-      if (silent) {
-        elements.checkbox.removeEventListener('change', handleCheckboxChange);
-        elements.checkbox.checked = checked;
-        setTimeout(() => {
-          elements.checkbox.addEventListener('change', handleCheckboxChange);
-        }, 0);
-      } else {
-        elements.checkbox.checked = checked;
+    if (elements.box) {
+      elements.box.classList.toggle('selected', selected);
+      state.isInsuranceSelected = selected;
+      
+      // Update the display text
+      if (elements.label) {
+        const cartData = state.currentCart;
+        if (cartData && selected) {
+          const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
+          const totalPrice = totalNonInsuranceQuantity * (CONFIG.PRICE_PER_UNIT / 100);
+          elements.label.innerHTML = `
+            Insurance <span style="font-weight: bold; color: #000;">(${totalNonInsuranceQuantity})</span>
+            <span style="font-weight: bold; color: #000; margin-left: 10px;">₹${totalPrice}</span>
+            <div style="font-size: 12px; color: #666; margin-top: 4px;">
+              ✓ Full Year Jewelry Guard<br>
+              ✓ Trusted Partner<br>
+              ✓ Hassle Free Claim
+            </div>
+          `;
+        } else {
+          elements.label.innerHTML = `
+            Insurance <span style="color: #666;">+ ₹100 per product</span>
+            <div style="font-size: 12px; color: #666; margin-top: 4px;">
+              ✓ Full Year Jewelry Guard<br>
+              ✓ Trusted Partner<br>
+              ✓ Hassle Free Claim
+            </div>
+          `;
+        }
       }
     }
   }
@@ -1279,68 +1300,74 @@
   
   // ==================== UI UPDATES ====================
   
-  function updateCheckboxLabel(cartData) {
+  function createToggleElement() {
     const elements = getElements();
-    if (!elements.checkbox) return;
+    if (!elements.box) return null;
     
-    const hasInsuranceInCart = hasInsurance(cartData);
-    const insuranceQuantity = getInsuranceQuantity(cartData);
-    
-    // Find and update the label text
-    const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
-    if (!label) return;
-    
-    // Update the label text to show quantity and price
-    const totalInsurancePrice = insuranceQuantity * (CONFIG.PRICE_PER_UNIT / 100); // Convert to rupees
-    const insurancePriceText = `₹${totalInsurancePrice}`;
-    
-    // Create or update the label with quantity and price
-    const originalLabelText = label.getAttribute('data-original-text') || 'Insurance';
-    if (!label.hasAttribute('data-original-text')) {
-      label.setAttribute('data-original-text', originalLabelText);
+    // Remove any existing toggle
+    const existingToggle = elements.box.querySelector('.insurance-toggle');
+    if (existingToggle) {
+      existingToggle.remove();
     }
     
-    if (hasInsuranceInCart && insuranceQuantity > 0) {
-      label.innerHTML = `
-        ${originalLabelText} <span style="font-weight: bold; margin-left: 4px;">(${insuranceQuantity})</span>
-        <span style="font-weight: bold; margin-left: 8px;">${insurancePriceText}</span>
-      `;
-    } else {
-      label.innerHTML = `
-        ${originalLabelText} <span style="color: #666; margin-left: 4px;">+ ₹100 per product</span>
-      `;
-    }
+    // Create toggle element
+    const toggle = document.createElement('div');
+    toggle.className = 'insurance-toggle';
+    toggle.style.cssText = `
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      cursor: pointer;
+      z-index: 10;
+    `;
+    
+    elements.box.style.position = 'relative';
+    elements.box.appendChild(toggle);
+    
+    return toggle;
   }
   
-  function updateCartDisplay(cartData) {
+  async function updateInsuranceDisplay(cartData) {
     if (!cartData) return;
     
     const hasInsuranceInCart = hasInsurance(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
     const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
     
-    // Update insurance line item in cart if it exists
-    const insuranceLineItem = document.querySelector('[data-variant-id="' + CONFIG.VARIANT_ID + '"]') ||
-                              document.querySelector('[data-product-id="' + CONFIG.VARIANT_ID + '"]');
+    log('👁️', 'Insurance in cart:', hasInsuranceInCart, 'Quantity:', insuranceQuantity);
     
-    if (insuranceLineItem) {
-      // Update quantity display
-      const quantityElement = insuranceLineItem.querySelector('.cart-item__quantity .quantity__input') ||
-                              insuranceLineItem.querySelector('input[type="number"]');
-      if (quantityElement) {
-        quantityElement.value = insuranceQuantity;
-      }
-      
-      // Update price display
-      const priceElement = insuranceLineItem.querySelector('.cart-item__price');
-      const totalPriceElement = insuranceLineItem.querySelector('.cart-item__totals');
-      const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
-      
-      if (priceElement) {
-        priceElement.textContent = formatMoney(CONFIG.PRICE_PER_UNIT); // Unit price
-      }
-      if (totalPriceElement) {
-        totalPriceElement.textContent = formatMoney(totalInsurancePrice); // Total price
+    // Update the toggle state
+    setToggleState(hasInsuranceInCart);
+    
+    // Update the display text
+    const elements = getElements();
+    if (elements.label) {
+      if (hasInsuranceInCart && insuranceQuantity > 0) {
+        const totalPrice = insuranceQuantity * (CONFIG.PRICE_PER_UNIT / 100);
+        elements.label.innerHTML = `
+          Insurance <span style="font-weight: bold; color: #000;">(${insuranceQuantity})</span>
+          <span style="font-weight: bold; color: #000; margin-left: 10px;">₹${totalPrice}</span>
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">
+            ✓ Full Year Jewelry Guard<br>
+            ✓ Trusted Partner<br>
+            ✓ Hassle Free Claim
+          </div>
+        `;
+        elements.box.style.border = '2px solid #000';
+        elements.box.style.backgroundColor = '#f9f9f9';
+      } else {
+        elements.label.innerHTML = `
+          Insurance <span style="color: #666;">+ ₹100 per product</span>
+          <div style="font-size: 12px; color: #666; margin-top: 4px;">
+            ✓ Full Year Jewelry Guard<br>
+            ✓ Trusted Partner<br>
+            ✓ Hassle Free Claim
+          </div>
+        `;
+        elements.box.style.border = '1px solid #ddd';
+        elements.box.style.backgroundColor = '#fff';
       }
     }
   }
@@ -1350,41 +1377,34 @@
     
     const nonInsuranceCount = getNonInsuranceCount(cartData);
     const hasProducts = nonInsuranceCount > 0;
-    const hasInsuranceInCart = hasInsurance(cartData);
     
-    // Find insurance section wrapper
-    const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
-    const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
+    const elements = getElements();
+    if (!elements.box) return;
     
-    if (insuranceWrapper) {
-      if (hasProducts) {
-        insuranceWrapper.style.display = '';
-        if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
-          insuranceHeader.style.display = '';
-        }
-        log('✅', 'Insurance section visible');
-      } else {
-        insuranceWrapper.style.display = 'none';
-        if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
-          insuranceHeader.style.display = 'none';
-        }
-        log('🚫', 'Insurance section hidden - no products in cart');
-        
-        // If insurance exists but no products, remove it
-        if (hasInsuranceInCart) {
-          log('⚠️', 'Removing insurance - no products in cart');
-          try {
-            await removeInsuranceFromCart();
-            await wait(200);
-            triggerCartUpdate();
-          } catch (error) {
-            log('❌', 'Failed to auto-remove insurance:', error);
-          }
-        }
-        
-        const elements = getElements();
-        if (elements.checkbox && elements.checkbox.checked) {
-          setCheckbox(false, true);
+    const insuranceHeader = elements.box.previousElementSibling;
+    
+    if (hasProducts) {
+      elements.box.style.display = '';
+      if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+        insuranceHeader.style.display = '';
+      }
+      log('✅', 'Insurance section visible');
+    } else {
+      elements.box.style.display = 'none';
+      if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+        insuranceHeader.style.display = 'none';
+      }
+      log('🚫', 'Insurance section hidden - no products in cart');
+      
+      // If insurance exists but no products, remove it
+      if (hasInsurance(cartData)) {
+        log('⚠️', 'Removing insurance - no products in cart');
+        try {
+          await removeInsuranceFromCart();
+          await wait(200);
+          triggerCartUpdate();
+        } catch (error) {
+          log('❌', 'Failed to auto-remove insurance:', error);
         }
       }
     }
@@ -1416,26 +1436,8 @@
       });
     });
     
-    // Update item count (excluding insurance)
-    const itemCount = getNonInsuranceCount(cartData);
-    const itemCountElements = document.querySelectorAll('.totals__total');
-    itemCountElements.forEach(el => {
-      if (el.textContent.includes('Items')) {
-        el.textContent = `Items (${itemCount})`;
-      }
-    });
-    
-    // Show/hide insurance line item
-    const insuranceLine = document.getElementById('insurance-line-item');
-    if (insuranceLine) {
-      insuranceLine.style.display = hasInsurance(cartData) ? 'flex' : 'none';
-    }
-    
-    // Update checkbox label with quantity and price
-    updateCheckboxLabel(cartData);
-    
-    // Update cart display
-    updateCartDisplay(cartData);
+    // Update insurance display
+    await updateInsuranceDisplay(cartData);
     
     // Update insurance section visibility
     await updateInsuranceSectionVisibility(cartData);
@@ -1457,7 +1459,7 @@
           getCart().then(freshCart => {
             if (freshCart) {
               updateGrandTotalUI(freshCart);
-              syncCheckboxState();
+              syncInsuranceState();
             }
           });
         });
@@ -1487,7 +1489,7 @@
             getCart().then(freshCart => {
               if (freshCart) {
                 updateGrandTotalUI(freshCart);
-                syncCheckboxState();
+                syncInsuranceState();
               }
             });
           })
@@ -1500,7 +1502,7 @@
   
   // ==================== MAIN LOGIC ====================
   
-  async function handleAdd() {
+  async function handleAddInsurance() {
     if (state.processing) {
       log('⏳', 'Already processing...');
       return;
@@ -1519,7 +1521,6 @@
       
       if (totalNonInsuranceQuantity === 0) {
         log('⚠️', 'No products to insure');
-        setCheckbox(false, true);
         alert('Please add products to cart before adding insurance');
         return;
       }
@@ -1533,7 +1534,6 @@
           log('ℹ️', 'Insurance already at correct quantity');
         }
       } else {
-        // Calculate insurance quantity based on current cart
         log('🛒', `Calculating insurance: ${totalNonInsuranceQuantity} products in cart`);
         await addInsuranceToCart(totalNonInsuranceQuantity);
       }
@@ -1549,14 +1549,13 @@
     } catch (error) {
       log('❌', 'Failed to add/update insurance:', error);
       alert('Failed to add insurance: ' + error.message);
-      setCheckbox(false, true);
     } finally {
       state.processing = false;
       showLoader(false);
     }
   }
   
-  async function handleRemove() {
+  async function handleRemoveInsurance() {
     if (state.processing) {
       log('⏳', 'Already processing...');
       return;
@@ -1566,7 +1565,7 @@
     showLoader(true);
     
     try {
-      const result = await removeInsuranceFromCart();
+      await removeInsuranceFromCart();
       const freshCart = await getCart();
       
       if (freshCart) {
@@ -1579,41 +1578,41 @@
     } catch (error) {
       log('❌', 'Failed to remove insurance:', error);
       alert('Failed to remove insurance: ' + error.message);
-      setCheckbox(true, true);
     } finally {
       state.processing = false;
       showLoader(false);
     }
   }
   
-  async function syncCheckboxState() {
+  function handleToggleClick() {
+    if (state.processing) {
+      log('⏳', 'Already processing...');
+      return;
+    }
+    
+    const cartData = state.currentCart;
+    const hasInsuranceInCart = cartData ? hasInsurance(cartData) : false;
+    
+    log('📝', 'Toggle clicked, current state:', hasInsuranceInCart);
+    
+    if (hasInsuranceInCart) {
+      handleRemoveInsurance();
+    } else {
+      handleAddInsurance();
+    }
+  }
+  
+  async function syncInsuranceState() {
     try {
       const cartData = await getCart();
       if (!cartData) return;
       
-      const has = hasInsurance(cartData);
-      log('🔄', 'Syncing checkbox state:', has);
-      setCheckbox(has, true);
+      const hasInsuranceInCart = hasInsurance(cartData);
+      log('🔄', 'Syncing insurance state:', hasInsuranceInCart);
       
-      await updateGrandTotalUI(cartData);
+      await updateInsuranceDisplay(cartData);
     } catch (error) {
       log('❌', 'Sync error:', error);
-    }
-  }
-  
-  function handleCheckboxChange(event) {
-    if (state.processing) {
-      event.preventDefault();
-      return;
-    }
-    
-    const checked = event.target.checked;
-    log('📝', 'Checkbox changed by user:', checked);
-    
-    if (checked) {
-      handleAdd();
-    } else {
-      handleRemove();
     }
   }
   
@@ -1623,10 +1622,10 @@
     // Listen for cart updates
     document.addEventListener('cart:updated', handleCartUpdated);
     
-    // Also listen for product quantity changes
+    // Listen for quantity changes
     document.addEventListener('change', (event) => {
-      if (event.target.matches('.cart-item__quantity input[type="number"]') ||
-          event.target.closest('.cart-item__quantity input[type="number"]')) {
+      if (event.target.matches('input[type="number"]') && 
+          event.target.closest('.cart-item')) {
         log('🔢', 'Product quantity changed');
         setTimeout(() => {
           syncInsuranceWithProducts();
@@ -1634,25 +1633,14 @@
       }
     });
     
-    // Listen for quantity button clicks
-    document.addEventListener('click', (event) => {
-      const button = event.target.closest('button');
-      if (button && button.classList.contains('quantity__button')) {
-        log('🔘', 'Quantity button clicked');
-        setTimeout(() => {
-          syncInsuranceWithProducts();
-        }, 500);
-      }
-    });
-    
-    // Set up mutation observer for cart changes
+    // Set up mutation observer
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === 'childList') {
           mutation.addedNodes.forEach((node) => {
             if (node.nodeType === 1) {
               if (node.classList && node.classList.contains('cart-item')) {
-                log('🛒', 'New cart item added');
+                log('🛒', 'Cart item changed');
                 setTimeout(() => {
                   syncInsuranceWithProducts();
                 }, 500);
@@ -1734,13 +1722,22 @@
   function attachEventListeners() {
     const elements = getElements();
     
-    if (!elements.checkbox) {
-      log('⚠️', 'Checkbox not found');
+    if (!elements.box) {
+      log('⚠️', 'Insurance box not found');
       return false;
     }
     
-    elements.checkbox.removeEventListener('change', handleCheckboxChange);
-    elements.checkbox.addEventListener('change', handleCheckboxChange);
+    // Create clickable overlay
+    const toggle = createToggleElement();
+    if (toggle) {
+      toggle.removeEventListener('click', handleToggleClick);
+      toggle.addEventListener('click', handleToggleClick);
+    }
+    
+    // Make the entire box clickable
+    elements.box.style.cursor = 'pointer';
+    elements.box.removeEventListener('click', handleToggleClick);
+    elements.box.addEventListener('click', handleToggleClick);
     
     log('✅', 'Event listeners attached');
     return true;
@@ -1756,8 +1753,17 @@
                 log('🔄', 'Cart drawer updated, re-initializing...');
                 setTimeout(() => {
                   attachEventListeners();
-                  syncCheckboxState();
+                  syncInsuranceState();
                   setupQuantitySync();
+                }, 100);
+              }
+              
+              // Check if insurance section was added
+              if (node.id === CONFIG.BOX_ID || node.querySelector && (node.querySelector('#' + CONFIG.BOX_ID) || node.querySelector(CONFIG.INSURANCE_SELECTOR))) {
+                log('🔄', 'Insurance section found, attaching events...');
+                setTimeout(() => {
+                  attachEventListeners();
+                  syncInsuranceState();
                 }, 100);
               }
             }
@@ -1770,7 +1776,7 @@
             log('🔄', 'Cart drawer opened');
             setTimeout(() => {
               attachEventListeners();
-              syncCheckboxState();
+              syncInsuranceState();
               setupQuantitySync();
             }, 100);
           }
@@ -1791,12 +1797,11 @@
       log('🔄', 'Cart refresh event');
       setTimeout(() => {
         attachEventListeners();
-        syncCheckboxState();
+        syncInsuranceState();
         syncInsuranceWithProducts();
       }, 100);
     });
     
-    // Custom event for cart updates
     document.addEventListener('cart:updated', () => {
       log('🔄', 'Custom cart:updated event');
       setTimeout(() => {
@@ -1808,7 +1813,7 @@
       subscribe(PUB_SUB_EVENTS.cartUpdate, (event) => {
         log('🔄', 'PUB_SUB cartUpdate event');
         setTimeout(() => {
-          syncCheckboxState();
+          syncInsuranceState();
           syncInsuranceWithProducts();
         }, 100);
       });
@@ -1819,7 +1824,7 @@
     log('🚀', 'Initializing Insurance Manager...');
     
     attachEventListeners();
-    syncCheckboxState();
+    syncInsuranceState();
     observeCartChanges();
     listenToCartEvents();
     setupQuantitySync();
@@ -1844,10 +1849,11 @@
   window.InsuranceManager = {
     getCart,
     hasInsurance,
-    syncCheckboxState,
+    syncInsuranceState,
     updateGrandTotalUI,
     syncInsuranceWithProducts,
-    updateInsuranceQuantity,
+    addInsurance: handleAddInsurance,
+    removeInsurance: handleRemoveInsurance,
     state
   };
   
