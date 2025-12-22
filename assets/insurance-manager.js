@@ -529,6 +529,12 @@
  * Include AFTER cart.js: <script src="{{ 'insurance-manager.js' | asset_url }}" defer></script>
  */
 
+/**
+ * Insurance Manager for Shopify Cart - Complete Solution
+ * Place this in assets/insurance-manager.js
+ * Include AFTER cart.js: <script src="{{ 'insurance-manager.js' | asset_url }}" defer></script>
+ */
+
 (function() {
   'use strict';
   
@@ -699,13 +705,15 @@
   
   // ==================== UI UPDATES ====================
   
-  function updateInsuranceSectionVisibility(cartData) {
+  async function updateInsuranceSectionVisibility(cartData) {
     if (!cartData) return;
     
     const nonInsuranceCount = getNonInsuranceCount(cartData);
     const hasProducts = nonInsuranceCount > 0;
+    const hasInsuranceInCart = hasInsurance(cartData);
     
     log('👁️', 'Products in cart (excluding insurance):', nonInsuranceCount);
+    log('👁️', 'Insurance in cart:', hasInsuranceInCart);
     
     // Find insurance section wrapper (the parent div with APPLY INSURANCE text)
     const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
@@ -725,7 +733,20 @@
         }
         log('🚫', 'Insurance section hidden - no products in cart');
         
-        // If insurance was checked but no products, uncheck it silently
+        // If insurance exists in cart but no products, remove it automatically
+        if (hasInsuranceInCart) {
+          log('⚠️', 'Removing insurance - no products in cart');
+          try {
+            await removeInsuranceFromCart();
+            // Trigger cart refresh after removing insurance
+            await wait(200);
+            triggerCartUpdate();
+          } catch (error) {
+            log('❌', 'Failed to auto-remove insurance:', error);
+          }
+        }
+        
+        // Uncheck the checkbox silently
         const elements = getElements();
         if (elements.checkbox && elements.checkbox.checked) {
           setCheckbox(false, true);
@@ -734,7 +755,7 @@
     }
   }
   
-  function updateGrandTotalUI(cartData) {
+  async function updateGrandTotalUI(cartData) {
     if (!cartData) return;
     
     log('💰', 'Updating grand total UI:', cartData.total_price);
@@ -776,8 +797,8 @@
       insuranceLine.style.display = hasInsurance(cartData) ? 'flex' : 'none';
     }
     
-    // Update insurance section visibility
-    updateInsuranceSectionVisibility(cartData);
+    // Update insurance section visibility (this may auto-remove insurance)
+    await updateInsuranceSectionVisibility(cartData);
   }
   
   function triggerCartUpdate() {
@@ -940,7 +961,7 @@
       setCheckbox(has, true);
       
       // Also update UI
-      updateGrandTotalUI(cartData);
+      await updateGrandTotalUI(cartData);
     } catch (error) {
       log('❌', 'Sync error:', error);
     }
