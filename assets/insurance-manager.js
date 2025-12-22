@@ -1067,7 +1067,7 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v5.0 Starting...');
+  console.log('🎯 Insurance Manager v6.0 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
@@ -1167,16 +1167,6 @@
     return insuranceItem ? insuranceItem.quantity : 0;
   }
   
-  function getNonInsuranceCount(cartData) {
-    if (!cartData || !cartData.items) return 0;
-    return cartData.items.reduce((count, item) => {
-      if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
-        return count + item.quantity;
-      }
-      return count;
-    }, 0);
-  }
-  
   function getTotalNonInsuranceQuantity(cartData) {
     if (!cartData || !cartData.items) return 0;
     return cartData.items.reduce((total, item) => {
@@ -1184,6 +1174,16 @@
         return total + item.quantity;
       }
       return total;
+    }, 0);
+  }
+  
+  function getNonInsuranceCount(cartData) {
+    if (!cartData || !cartData.items) return 0;
+    return cartData.items.reduce((count, item) => {
+      if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
+        return count + 1;
+      }
+      return count;
     }, 0);
   }
   
@@ -1279,52 +1279,70 @@
   
   // ==================== UI UPDATES ====================
   
-  async function updateInsuranceDisplay(cartData) {
-    if (!cartData) return;
+  function updateCheckboxLabel(cartData) {
+    const elements = getElements();
+    if (!elements.checkbox) return;
     
-    const nonInsuranceCount = getNonInsuranceCount(cartData);
-    const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
-    const hasProducts = nonInsuranceCount > 0;
     const hasInsuranceInCart = hasInsurance(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
     
-    log('👁️', 'Products in cart (excluding insurance):', nonInsuranceCount);
-    log('👁️', 'Total product quantity:', totalNonInsuranceQuantity);
-    log('👁️', 'Insurance in cart:', hasInsuranceInCart);
-    log('👁️', 'Insurance quantity:', insuranceQuantity);
+    // Find and update the label text
+    const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
+    if (!label) return;
     
-    // Update the checkbox label to show quantity
-    const elements = getElements();
-    if (elements.checkbox) {
-      const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
-      if (label) {
-        // Remove existing quantity indicator
-        const existingIndicator = label.querySelector('.insurance-quantity');
-        if (existingIndicator) {
-          existingIndicator.remove();
-        }
-        
-        // Add new quantity indicator if insurance is selected
-        if (hasInsuranceInCart && insuranceQuantity > 0) {
-          const quantitySpan = document.createElement('span');
-          quantitySpan.className = 'insurance-quantity';
-          quantitySpan.textContent = ` (${insuranceQuantity})`;
-          quantitySpan.style.fontWeight = 'bold';
-          quantitySpan.style.marginLeft = '4px';
-          label.appendChild(quantitySpan);
-          
-          // Also update the price display if needed
-          const priceElement = label.querySelector('.insurance-price');
-          if (priceElement) {
-            const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
-            priceElement.textContent = formatMoney(totalInsurancePrice);
-          }
-        }
-      }
+    // Update the label text to show quantity and price
+    const totalInsurancePrice = insuranceQuantity * (CONFIG.PRICE_PER_UNIT / 100); // Convert to rupees
+    const insurancePriceText = `₹${totalInsurancePrice}`;
+    
+    // Create or update the label with quantity and price
+    const originalLabelText = label.getAttribute('data-original-text') || 'Insurance';
+    if (!label.hasAttribute('data-original-text')) {
+      label.setAttribute('data-original-text', originalLabelText);
     }
     
-    // Update insurance section visibility
-    await updateInsuranceSectionVisibility(cartData);
+    if (hasInsuranceInCart && insuranceQuantity > 0) {
+      label.innerHTML = `
+        ${originalLabelText} <span style="font-weight: bold; margin-left: 4px;">(${insuranceQuantity})</span>
+        <span style="font-weight: bold; margin-left: 8px;">${insurancePriceText}</span>
+      `;
+    } else {
+      label.innerHTML = `
+        ${originalLabelText} <span style="color: #666; margin-left: 4px;">+ ₹100 per product</span>
+      `;
+    }
+  }
+  
+  function updateCartDisplay(cartData) {
+    if (!cartData) return;
+    
+    const hasInsuranceInCart = hasInsurance(cartData);
+    const insuranceQuantity = getInsuranceQuantity(cartData);
+    const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
+    
+    // Update insurance line item in cart if it exists
+    const insuranceLineItem = document.querySelector('[data-variant-id="' + CONFIG.VARIANT_ID + '"]') ||
+                              document.querySelector('[data-product-id="' + CONFIG.VARIANT_ID + '"]');
+    
+    if (insuranceLineItem) {
+      // Update quantity display
+      const quantityElement = insuranceLineItem.querySelector('.cart-item__quantity .quantity__input') ||
+                              insuranceLineItem.querySelector('input[type="number"]');
+      if (quantityElement) {
+        quantityElement.value = insuranceQuantity;
+      }
+      
+      // Update price display
+      const priceElement = insuranceLineItem.querySelector('.cart-item__price');
+      const totalPriceElement = insuranceLineItem.querySelector('.cart-item__totals');
+      const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
+      
+      if (priceElement) {
+        priceElement.textContent = formatMoney(CONFIG.PRICE_PER_UNIT); // Unit price
+      }
+      if (totalPriceElement) {
+        totalPriceElement.textContent = formatMoney(totalInsurancePrice); // Total price
+      }
+    }
   }
   
   async function updateInsuranceSectionVisibility(cartData) {
@@ -1413,8 +1431,14 @@
       insuranceLine.style.display = hasInsurance(cartData) ? 'flex' : 'none';
     }
     
-    // Update insurance display
-    await updateInsuranceDisplay(cartData);
+    // Update checkbox label with quantity and price
+    updateCheckboxLabel(cartData);
+    
+    // Update cart display
+    updateCartDisplay(cartData);
+    
+    // Update insurance section visibility
+    await updateInsuranceSectionVisibility(cartData);
   }
   
   function triggerCartUpdate() {
@@ -1496,6 +1520,7 @@
       if (totalNonInsuranceQuantity === 0) {
         log('⚠️', 'No products to insure');
         setCheckbox(false, true);
+        alert('Please add products to cart before adding insurance');
         return;
       }
       
@@ -1508,6 +1533,8 @@
           log('ℹ️', 'Insurance already at correct quantity');
         }
       } else {
+        // Calculate insurance quantity based on current cart
+        log('🛒', `Calculating insurance: ${totalNonInsuranceQuantity} products in cart`);
         await addInsuranceToCart(totalNonInsuranceQuantity);
       }
       
@@ -1593,38 +1620,64 @@
   // ==================== QUANTITY SYNC ====================
   
   function setupQuantitySync() {
-    // Monitor cart quantity changes
-    const cartObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        // Check if quantity inputs changed
-        const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
-        quantityInputs.forEach(input => {
-          if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
-            log('🔄', 'Quantity input detected');
-            // Add event listener for changes
-            input.addEventListener('change', debounce(() => {
-              syncInsuranceWithProducts();
-            }, 500));
-          }
-        });
-      }
-    });
+    // Listen for cart updates
+    document.addEventListener('cart:updated', handleCartUpdated);
     
-    cartObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    // Also listen for quantity buttons
-    document.addEventListener('click', (event) => {
-      if (event.target.matches('.cart-item__quantity-wrapper button') || 
-          event.target.closest('.cart-item__quantity-wrapper button')) {
-        log('🔄', 'Quantity button clicked');
+    // Also listen for product quantity changes
+    document.addEventListener('change', (event) => {
+      if (event.target.matches('.cart-item__quantity input[type="number"]') ||
+          event.target.closest('.cart-item__quantity input[type="number"]')) {
+        log('🔢', 'Product quantity changed');
         setTimeout(() => {
           syncInsuranceWithProducts();
-        }, 300);
+        }, 500);
       }
     });
+    
+    // Listen for quantity button clicks
+    document.addEventListener('click', (event) => {
+      const button = event.target.closest('button');
+      if (button && button.classList.contains('quantity__button')) {
+        log('🔘', 'Quantity button clicked');
+        setTimeout(() => {
+          syncInsuranceWithProducts();
+        }, 500);
+      }
+    });
+    
+    // Set up mutation observer for cart changes
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.type === 'childList') {
+          mutation.addedNodes.forEach((node) => {
+            if (node.nodeType === 1) {
+              if (node.classList && node.classList.contains('cart-item')) {
+                log('🛒', 'New cart item added');
+                setTimeout(() => {
+                  syncInsuranceWithProducts();
+                }, 500);
+              }
+            }
+          });
+        }
+      });
+    });
+    
+    const cartContainer = document.querySelector('cart-drawer-items') || 
+                          document.querySelector('cart-items') ||
+                          document.querySelector('.cart-items');
+    
+    if (cartContainer) {
+      observer.observe(cartContainer, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+  
+  async function handleCartUpdated() {
+    log('🔄', 'Cart updated event received');
+    await syncInsuranceWithProducts();
   }
   
   async function syncInsuranceWithProducts() {
@@ -1646,6 +1699,8 @@
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       const currentInsuranceQuantity = getInsuranceQuantity(cartData);
       
+      log('📊', `Sync check: Products=${totalNonInsuranceQuantity}, Insurance=${currentInsuranceQuantity}`);
+      
       if (totalNonInsuranceQuantity === 0) {
         log('⚠️', 'No products left, removing insurance');
         await removeInsuranceFromCart();
@@ -1653,9 +1708,8 @@
       }
       
       if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
-        log('🔄', `Syncing insurance: ${currentInsuranceQuantity} → ${totalNonInsuranceQuantity}`);
+        log('🔄', `Syncing insurance quantity: ${currentInsuranceQuantity} → ${totalNonInsuranceQuantity}`);
         state.processing = true;
-        showLoader(true);
         
         await updateInsuranceQuantity(totalNonInsuranceQuantity);
         
@@ -1668,25 +1722,11 @@
         triggerCartUpdate();
         
         state.processing = false;
-        showLoader(false);
       }
     } catch (error) {
       log('❌', 'Sync error:', error);
       state.processing = false;
-      showLoader(false);
     }
-  }
-  
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
   }
   
   // ==================== INITIALIZATION ====================
@@ -1717,6 +1757,7 @@
                 setTimeout(() => {
                   attachEventListeners();
                   syncCheckboxState();
+                  setupQuantitySync();
                 }, 100);
               }
             }
@@ -1755,6 +1796,14 @@
       }, 100);
     });
     
+    // Custom event for cart updates
+    document.addEventListener('cart:updated', () => {
+      log('🔄', 'Custom cart:updated event');
+      setTimeout(() => {
+        syncInsuranceWithProducts();
+      }, 100);
+    });
+    
     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
       subscribe(PUB_SUB_EVENTS.cartUpdate, (event) => {
         log('🔄', 'PUB_SUB cartUpdate event');
@@ -1775,6 +1824,11 @@
     listenToCartEvents();
     setupQuantitySync();
     
+    // Force initial sync
+    setTimeout(() => {
+      syncInsuranceWithProducts();
+    }, 1000);
+    
     state.initialized = true;
     log('✅', 'Insurance Manager initialized successfully!');
   }
@@ -1793,6 +1847,7 @@
     syncCheckboxState,
     updateGrandTotalUI,
     syncInsuranceWithProducts,
+    updateInsuranceQuantity,
     state
   };
   
