@@ -158,6 +158,35 @@
     }
   }
   
+  function updateGrandTotalDisplay(cartData) {
+    if (!cartData) return;
+    
+    const totalPrice = cartData.total_price;
+    const formattedTotal = formatMoney(totalPrice);
+    
+    // Update grand total in price breakup
+    const grandTotalValue = document.getElementById('grandTotalValue');
+    if (grandTotalValue) {
+      grandTotalValue.textContent = formattedTotal;
+    }
+    
+    // Update grand total in checkout section
+    const grandTotalCheckout = document.querySelector('#grandTotalCheckout strong');
+    if (grandTotalCheckout) {
+      grandTotalCheckout.textContent = formattedTotal;
+    }
+    
+    log('✅', 'Grand total updated:', formattedTotal);
+  }
+  
+  function formatMoney(cents) {
+    const rupees = cents / 100;
+    return '₹' + rupees.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+  }
+  
   function triggerCartUpdate() {
     log('🔄', 'Triggering cart refresh...');
     
@@ -171,6 +200,7 @@
         // Re-initialize after DOM update
         setTimeout(() => {
           syncCheckboxState();
+          getCart().then(cart => updateGrandTotalDisplay(cart));
         }, 100);
       });
     } else {
@@ -205,6 +235,7 @@
           // Re-initialize after DOM update
           setTimeout(() => {
             syncCheckboxState();
+            getCart().then(cart => updateGrandTotalDisplay(cart));
           }, 100);
         })
         .catch(error => {
@@ -290,6 +321,9 @@
       const has = hasInsurance(cartData);
       log('🔄', 'Syncing checkbox state:', has);
       setCheckbox(has, true); // Silent update
+      
+      // Also update the grand total display
+      updateGrandTotalDisplay(cartData);
     } catch (error) {
       log('❌', 'Sync error:', error);
     }
