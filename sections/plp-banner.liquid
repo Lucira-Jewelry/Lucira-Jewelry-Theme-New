@@ -1,167 +1,267 @@
-{% comment %}
-  Dawn-compatible Facets (Filter + Sort)
-{% endcomment %}
+{% assign show_banner = true %}
+{{ 'facet-filters-loading.js' | asset_url | script_tag: defer }}
 
-{{ 'component-show-more.css' | asset_url | stylesheet_tag: preload: true }}
-{{ 'component-swatch-input.css' | asset_url | stylesheet_tag: preload: true }}
-{{ 'component-swatch.css' | asset_url | stylesheet_tag: preload: true }}
+{% if section.settings.exclude_from_collections %}
+  {% for collection_item in section.settings.excluded_collections %}
+    {% if collection_item.handle == collection.handle %}
+      {% assign show_banner = false %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
 
-{%- liquid
-  assign sort_by = results.sort_by | default: results.default_sort_by
-  assign results_url = results.url | default: '?sort_by=' | append: sort_by
--%}
+{% if show_banner %}
+  {{ 'plp-banner.css' | asset_url | stylesheet_tag: preload: true }}
 
-<div class="facets-container">
+  {% assign drawer_content = collection.metafields.custom.plp_banner_content %}
+  {% assign drawer_image = collection.metafields.custom.plp_drawer_image %}
+  {% assign current_sort = collection.sort_by | default: collection.default_sort_by %}
 
-  <!-- ================= DESKTOP FILTERS + SORT ================= -->
-  <facet-filters-form class="facets small-hide">
-    <form id="FacetFiltersForm" class="facets__form">
+  <section class="curved-slider-section">
+    <div class="curve-bg page-width">
+      <div class="plp-collection-banner__content">
+        <div class="plp-strap-wrapper">
+          {% if section.settings.show_breadcrumbs %}
+            <nav
+              class="plp-collection-banner__breadcrumbs"
+              itemscope
+              itemtype="https://schema.org/BreadcrumbList"
+            >
+              <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                <a href="{{ shop.url }}" itemprop="item" class="plp-collection-banner__breadcrumb-link">
+                  <span itemprop="name">Home</span>
+                </a>
+                <meta itemprop="position" content="1">
+              </span>
 
-      {% if results.terms %}
-        <input type="hidden" name="q" value="{{ results.terms | escape }}">
-        <input type="hidden" name="options[prefix]" value="last">
-      {% endif %}
+              <span class="plp-collection-banner__breadcrumb-separator">/</span>
 
-      {% if enable_filtering %}
-        <div id="FacetsWrapperDesktop">
+              <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                <a
+                  href="{{ shop.url }}/collections"
+                  itemprop="item"
+                  class="plp-collection-banner__breadcrumb-link"
+                  style="pointer-events: none;"
+                >
+                  <span itemprop="name">Collections</span>
+                </a>
+                <meta itemprop="position" content="2">
+              </span>
 
-          {% for filter in results.filters %}
-            {% case filter.type %}
+              <span class="plp-collection-banner__breadcrumb-separator">/</span>
 
-              {% when 'list', 'boolean' %}
-                <details class="facets__disclosure js-filter" open>
-                  <summary class="facets__summary">
-                    {{ filter.label | escape }}
-                    {{ 'icon-caret.svg' | inline_asset_content }}
-                  </summary>
+              <span itemprop="itemListElement" itemscope itemtype="https://schema.org/ListItem">
+                {% if collection.handle == 'all' %}
+                  <span itemprop="name" class="plp-collection-banner__breadcrumb-current">All Products</span>
+                  <meta itemprop="item" content="{{ shop.url }}/collections/all">
+                {% else %}
+                  <span itemprop="name" class="plp-collection-banner__breadcrumb-current">
+                    {{ collection.title }}
+                  </span>
+                  <meta itemprop="item" content="{{ shop.url }}{{ collection.url }}">
+                {% endif %}
+                <meta itemprop="position" content="3">
+              </span>
+            </nav>
+          {% endif %}
 
-                  <fieldset class="facets-wrap">
-                    <ul class="facets__list list-unstyled">
-                      {% for value in filter.values %}
-                        <li class="facets__item">
-                          <label class="facets__label">
-                            <input
-                              type="checkbox"
-                              name="{{ value.param_name }}"
-                              value="{{ value.value }}"
-                              {% if value.active %}checked{% endif %}
-                              {% if value.count == 0 and value.active == false %}disabled{% endif %}
-                            >
-                            {{ value.label }} ({{ value.count }})
-                          </label>
-                        </li>
-                      {% endfor %}
-                    </ul>
-                  </fieldset>
-                </details>
+          <div class="plp-collection-banner__header">
+            <h1 class="plp-collection-banner__title">
+              {{ collection.title | default: 'All Products' }}
 
-              {% when 'price_range' %}
-                <details class="facets__disclosure js-filter">
-                  <summary class="facets__summary">
-                    {{ filter.label | escape }}
-                    {{ 'icon-caret.svg' | inline_asset_content }}
-                  </summary>
+              {% if drawer_content != blank and drawer_image != blank %}
+                <span class="plp-banner__cta_btn">
+                  <a
+                    href="javascript:void(0)"
+                    class="plp-banner__cta-button open-drawer-btn"
+                  >
+                    <img
+                      src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Info.svg?v=1751958261"
+                      width="14"
+                      height="14"
+                      loading="lazy"
+                      alt="info"
+                      title="info"
+                    >
+                  </a>
+                </span>
+              {% endif %}
+            </h1>
 
-                  <price-range class="facets__price">
-                    {% render 'price-facet', filter: filter %}
-                  </price-range>
-                </details>
-
-            {% endcase %}
-          {% endfor %}
+            {% if section.settings.show_product_count %}
+              <p class="plp-collection-banner__count">
+                <small>{{ collection.all_products_count | default: 0 }} designs</small>
+              </p>
+            {% endif %}
+          </div>
         </div>
-      {% endif %}
+        <!-- ✅ SORT (FACET-COMPATIBLE) -->
+        <div class="plp-collection-banner__right">
+          <facet-filters-form>
+          <form
+            method="get"
+            action="{{ collection.url }}"
+            class="plp-sort-form">
+            {% if search.terms %}
+              <input type="hidden" name="q" value="{{ search.terms | escape }}">
+              <input type="hidden" name="options[prefix]" value="last">
+            {% endif %}
 
-      {% if enable_sorting %}
-        <div class="facet-filters sorting">
-          <label for="SortBy">Sort by</label>
-          <div class="select">
+            {% if collection.current_vendor %}
+              <input type="hidden" name="q" value="{{ collection.current_vendor }}">
+            {% endif %}
+
+            {% if collection.current_type %}
+              <input type="hidden" name="q" value="{{ collection.current_type }}">
+            {% endif %}
+
+            <label for="SortBy" class="sort-by-label-plp-banner">Sort by:</label>
+
             <select
               name="sort_by"
               id="SortBy"
-              class="select__select"
+              class="plp-sort-select"
               aria-describedby="a11y-refresh-page-message"
             >
-              {% for option in results.sort_options %}
+              {% for option in collection.sort_options %}
                 <option
                   value="{{ option.value }}"
-                  {% if option.value == sort_by %}selected{% endif %}
+                  {% if option.value == current_sort %}
+                    selected
+                  {% endif %}
                 >
                   {{ option.name }}
                 </option>
               {% endfor %}
             </select>
-            {{ 'icon-caret.svg' | inline_asset_content }}
-          </div>
-        </div>
-      {% endif %}
-
-      <div class="product-count" role="status">
-        <span id="ProductCountDesktop">
-          {{ results.products_count }} products
-        </span>
-        {% render 'loading-spinner' %}
-      </div>
-
-    </form>
-  </facet-filters-form>
-
-  <!-- ================= MOBILE FILTERS ================= -->
-  <menu-drawer class="mobile-facets__wrapper medium-hide large-up-hide">
-    <details class="mobile-facets__disclosure">
-      <summary class="mobile-facets__open">
-        {{ 'icon-filter.svg' | inline_asset_content }}
-        Filter & Sort
-      </summary>
-
-      <facet-filters-form>
-        <form id="FacetFiltersFormMobile" class="mobile-facets">
-
-          {% for filter in results.filters %}
-            <details class="mobile-facets__details">
-              <summary class="mobile-facets__summary">
-                {{ filter.label }}
-              </summary>
-
-              {% if filter.type == 'price_range' %}
-                {% render 'price-facet', filter: filter %}
-              {% else %}
-                {% for value in filter.values %}
-                  <label class="mobile-facets__label">
-                    <input
-                      type="checkbox"
-                      name="{{ value.param_name }}"
-                      value="{{ value.value }}"
-                      {% if value.active %}checked{% endif %}
-                    >
-                    {{ value.label }}
-                  </label>
-                {% endfor %}
-              {% endif %}
-            </details>
-          {% endfor %}
-
-          {% if enable_sorting %}
-            <label for="SortBy-mobile">Sort by</label>
-            <select name="sort_by" id="SortBy-mobile">
-              {% for option in results.sort_options %}
-                <option
-                  value="{{ option.value }}"
-                  {% if option.value == sort_by %}selected{% endif %}
-                >
-                  {{ option.name }}
-                </option>
-              {% endfor %}
-            </select>
-          {% endif %}
-
-          <button type="submit" class="button button--primary">
-            Apply
-          </button>
-
-        </form>
+          </form>
       </facet-filters-form>
-    </details>
-  </menu-drawer>
+        </div>
+      </div>
+    </div>
+  </section>
+{% endif %}
 
+{% schema %}
+{
+  "name": "PLP Collection Banner",
+  "tag": "section",
+  "class": "plp-collection-banner",
+  "settings": [
+    { "type": "header", "content": "Banner Settings" },
+    { "type": "image_picker", "id": "banner_image", "label": "Banner Background Image" },
+    {
+      "type": "range",
+      "id": "banner_height",
+      "label": "Banner Height (Desktop)",
+      "min": 300,
+      "max": 800,
+      "step": 50,
+      "default": 500
+    },
+    {
+      "type": "range",
+      "id": "banner_height_mobile",
+      "label": "Banner Height (Mobile)",
+      "min": 200,
+      "max": 500,
+      "step": 50,
+      "default": 300
+    },
+    {
+      "type": "checkbox",
+      "id": "exclude_from_collections",
+      "label": "Exclude from specific collections",
+      "default": false
+    },
+    { "type": "collection_list", "id": "excluded_collections", "label": "Collections to exclude" },
+    { "type": "header", "content": "Content Settings" },
+    { "type": "checkbox", "id": "show_breadcrumbs", "default": true, "label": "Show Breadcrumbs" },
+    { "type": "checkbox", "id": "show_product_count", "default": true, "label": "Show Product Count" }
+  ],
+  "presets": [{ "name": "PLP Collection Banner" }]
+}
+{% endschema %}
+
+<!-- DRAWER -->
+<div id="plp-drawer-wrapper" class="drawer-wrapper hidden">
+  <div class="drawer-overlay"></div>
+  <div class="collection-drawer">
+    <div class="drawer-image-wrapper">
+      <img
+        src="{{ drawer_image | img_url: 'master' }}"
+        loading="lazy"
+        class="drawer-image"
+      >
+      <button class="drawer-close">✕</button>
+    </div>
+    <div class="drawer-body">
+      <p class="drawer-title">{{ collection.title }}</p>
+      <div class="drawer-description">
+        {{ drawer_content }}
+      </div>
+    </div>
+    <div class="shopping_button">
+      <a href="#" class="continue-button">Continue Shopping</a>
+    </div>
+  </div>
 </div>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const openBtns = document.querySelectorAll('.open-drawer-btn');
+    const wrapper = document.getElementById('plp-drawer-wrapper');
+    const overlay = wrapper?.querySelector('.drawer-overlay');
+    const closeBtn = wrapper?.querySelector('.drawer-close');
+    const continueBtn = wrapper?.querySelector('.continue-button');
+
+    const openDrawer = () => {
+      wrapper.classList.remove('hidden');
+      document.body.classList.add('drawer-open');
+    };
+
+    const closeDrawer = () => {
+      wrapper.classList.add('hidden');
+      document.body.classList.remove('drawer-open');
+    };
+
+    openBtns.forEach((btn) => {
+      btn.addEventListener('click', openDrawer);
+    });
+
+    closeBtn?.addEventListener('click', closeDrawer);
+    overlay?.addEventListener('click', closeDrawer);
+    continueBtn?.addEventListener('click', function (e) {
+      e.preventDefault();
+      closeDrawer();
+    });
+  });
+</script>
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const sortSelect = document.getElementById('SortBy');
+    if (!sortSelect) return;
+
+    sortSelect.addEventListener('change', function () {
+      const facetForm = document.querySelector('facet-filters-form');
+      if (!facetForm) return;
+
+      // Ensure hidden sort input exists
+      let sortInput = facetForm.querySelector('input[name="sort_by"]');
+      if (!sortInput) {
+        sortInput = document.createElement('input');
+        sortInput.type = 'hidden';
+        sortInput.name = 'sort_by';
+        facetForm.querySelector('form').appendChild(sortInput);
+      }
+
+      sortInput.value = this.value;
+
+      // Trigger Dawn loader + AJAX render
+      facetForm.onSubmitHandler({
+        target: sortInput,
+        srcElement: sortInput,
+        preventDefault: () => {},
+      });
+    });
+  });
+</script>
