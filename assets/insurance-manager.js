@@ -1067,7 +1067,7 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v5.0 Starting...');
+  console.log('🎯 Insurance Manager v5.1 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
@@ -1313,7 +1313,7 @@
           quantitySpan.style.marginLeft = '4px';
           label.appendChild(quantitySpan);
           
-          // Also update the price display if needed
+          // Also update the price display in checkbox area
           const priceElement = label.querySelector('.insurance-price');
           if (priceElement) {
             const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
@@ -1407,10 +1407,21 @@
       }
     });
     
-    // Show/hide insurance line item
-    const insuranceLine = document.getElementById('insurance-line-item');
-    if (insuranceLine) {
-      insuranceLine.style.display = hasInsurance(cartData) ? 'flex' : 'none';
+    // Update insurance line items in price breakup
+    const hasInsuranceInCart = hasInsurance(cartData);
+    const insuranceQuantity = getInsuranceQuantity(cartData);
+    
+    // Update insurance line item in the drawer footer (price breakup)
+    const insuranceLineItem = document.getElementById('insurance-line-item');
+    if (insuranceLineItem) {
+      const insuranceValueElement = insuranceLineItem.querySelector('.totals__total-value');
+      if (insuranceValueElement && hasInsuranceInCart) {
+        const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
+        insuranceValueElement.textContent = formatMoney(totalInsurancePrice);
+        insuranceLineItem.style.display = 'flex';
+      } else if (!hasInsuranceInCart) {
+        insuranceLineItem.style.display = 'none';
+      }
     }
     
     // Update insurance display
