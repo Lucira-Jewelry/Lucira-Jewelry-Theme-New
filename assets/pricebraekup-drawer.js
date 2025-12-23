@@ -199,47 +199,34 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function sendToCart() {
-  const groupId = `grp_${Date.now()}`;
-
   console.log("clicked");
- function getFinalItemsArray() {
-  const items = [];
-  const charm = JSON.parse(localStorage.getItem("charm_cart_v1") || "{}");
-  const baseObj = JSON.parse(localStorage.getItem("SelectedVariant") || "null");
+  function getFinalItemsArray() {
+    const items = [];
+    const charm = JSON.parse(localStorage.getItem("charm_cart_v1") || "{}");
+    const variantTitle = localStorage.getItem("SelectedVariantTitle") || "";
+    const baseObj = JSON.parse(localStorage.getItem("SelectedVariant") || "null");
+    if (charm.items) {
+      Object.keys(charm.items).forEach((id) => {
+        const qty = parseInt(charm.items[id].qty || 0, 10);
+        if (qty > 0) {
+          items.push({
+            id: Number(id),
+            quantity: qty,
+            parent_id:Number(baseObj),
+          });
+        }
+      });
+    }
+    // console.log("itemsss", items)
+    if (baseObj) {
+      items.push({
+        id: Number(baseObj),
+        quantity: 1,
+      });
+    }
 
-  // ================= CHILD ITEMS (CHARMS) =================
-  if (charm.items) {
-    Object.keys(charm.items).forEach((id) => {
-      const qty = parseInt(charm.items[id].qty || 0, 10);
-
-      if (qty > 0) {
-        items.push({
-          id: Number(id),
-          quantity: qty,
-          properties: {
-            _group_id: groupId,
-            _item_role: "child",
-          },
-        });
-      }
-    });
+    return items;
   }
-
-  // ================= PARENT ITEM (CHAIN) =================
-  if (baseObj) {
-    items.push({
-      id: Number(baseObj),
-      quantity: 1,
-      properties: {
-        _group_id: groupId,
-        _item_role: "parent",
-      },
-    });
-  }
-
-  return items;
-}
-
 
   const items = getFinalItemsArray();
 //   console.log("Final items:", items);
