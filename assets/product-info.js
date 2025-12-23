@@ -173,6 +173,7 @@ if (!customElements.get('product-info')) {
           this.updateSku(html);
           this.updatePriceBreakup(html);
           this.updateComparison?.(html);
+          this.updateStickyATC({ html, variant });
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);
@@ -355,9 +356,6 @@ if (!customElements.get('product-info')) {
         }
       }
 
-      
-
-
       updateURL(url, variantId) {
         this.querySelector('share-button')?.updateUrl(
           `${window.shopUrl}${url}${variantId ? `?variant=${variantId}` : ''}`
@@ -446,6 +444,41 @@ if (!customElements.get('product-info')) {
         const newModalContent = html.querySelector(`product-modal .product-media-modal__content`);
         if (modalContent && newModalContent) modalContent.innerHTML = newModalContent.innerHTML;
       }
+
+      updateStickyATC({ html, variant }) {
+        const stickyATC = document.getElementById('md-sticky-atc');
+        if (!stickyATC || !variant) return;
+
+        const stickyVariantInput = stickyATC.querySelector('input[name="id"]');
+        if (stickyVariantInput) {
+          stickyVariantInput.value = variant.id;
+          stickyVariantInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        const sourcePrice =
+          html.querySelector(`#price-${this.sectionId}`) ||
+          html.querySelector('.price');
+
+        const stickyPrice = stickyATC.querySelector('.price-mirror');
+        if (sourcePrice && stickyPrice) {
+          stickyPrice.innerHTML = sourcePrice.innerHTML;
+          stickyPrice.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        }
+
+        const stickyImg = stickyATC.querySelector('.product-content img');
+        if (!stickyImg || !variant.featured_media?.id) return;
+
+        const variantMediaId = `${this.sectionId}-${variant.featured_media.id}`;
+        const sourceImg = html.querySelector(
+          `li[data-media-id="${variantMediaId}"] img`
+        );
+
+        if (sourceImg) {
+          stickyImg.src = sourceImg.src;
+          stickyImg.srcset = sourceImg.srcset || sourceImg.src;
+        }
+      }
+
 
       setQuantityBoundries() {
         const data = {
