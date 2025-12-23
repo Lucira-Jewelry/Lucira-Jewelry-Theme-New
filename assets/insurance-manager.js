@@ -1657,62 +1657,11 @@
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       const currentInsuranceQuantity = getInsuranceQuantity(cartData);
       
-      // if (totalNonInsuranceQuantity === 0) {
-      //   log('⚠️', 'No products left, removing insurance');
-      //   await removeInsuranceFromCart();
-      //   return;
-      // }
-
       if (totalNonInsuranceQuantity === 0) {
-      log('⚠️', 'No products left, removing insurance');
-
-      if (!state.processing) {
-        state.processing = true;
-        showLoader(true);
-
-        try {
-          await removeInsuranceFromCart();
-          await wait(200);
-
-          // Force a full page fragment refresh for the cart drawer
-          fetch(window.location.pathname + '?section_id=cart-drawer')
-            .then(res => res.text())
-            .then(html => {
-              const parser = new DOMParser();
-              const doc = parser.parseFromString(html, 'text/html');
-
-              // Replace cart items
-              const newCartItems = doc.querySelector('cart-drawer-items');
-              const currentCartItems = document.querySelector('cart-drawer-items');
-              if (newCartItems && currentCartItems) {
-                currentCartItems.replaceWith(newCartItems);
-              }
-
-              // Replace cart footer
-              const newFooter = doc.querySelector('.cart-drawer__footer');
-              const currentFooter = document.querySelector('.cart-drawer__footer');
-              if (newFooter && currentFooter) {
-                currentFooter.replaceWith(newFooter);
-              }
-
-              // Remove checkbox if no items
-              setCheckbox(false, true);
-
-              // Update grand total UI
-              getCart().then(freshCart => updateGrandTotalUI(freshCart));
-
-              log('✅', 'Empty cart refreshed successfully');
-            })
-            .catch(err => log('❌', 'Empty cart refresh failed', err));
-        } finally {
-          state.processing = false;
-          showLoader(false);
-        }
+        log('⚠️', 'No products left, removing insurance');
+        await removeInsuranceFromCart();
+        return;
       }
-
-      return;
-    }
-
       
       if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
         log('🔄', `Syncing insurance: ${currentInsuranceQuantity} → ${totalNonInsuranceQuantity}`);
