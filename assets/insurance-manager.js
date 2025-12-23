@@ -1327,53 +1327,6 @@
     await updateInsuranceSectionVisibility(cartData);
   }
   
-  // async function updateInsuranceSectionVisibility(cartData) {
-  //   if (!cartData) return;
-    
-  //   const nonInsuranceCount = getNonInsuranceCount(cartData);
-  //   const hasProducts = nonInsuranceCount > 0;
-  //   const hasInsuranceInCart = hasInsurance(cartData);
-    
-  //   // Find insurance section wrapper
-  //   const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
-  //   const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
-    
-  //   if (insuranceWrapper) {
-  //     if (hasProducts) {
-  //       insuranceWrapper.style.display = '';
-  //       if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
-  //         insuranceHeader.style.display = '';
-  //       }
-  //       log('✅', 'Insurance section visible');
-  //     } else {
-  //       insuranceWrapper.style.display = 'none';
-  //       if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
-  //         insuranceHeader.style.display = 'none';
-  //       }
-  //       log('🚫', 'Insurance section hidden - no products in cart');
-        
-  //       // If insurance exists but no products, remove it
-  //       if (hasInsuranceInCart) {
-  //         log('⚠️', 'Removing insurance - no products in cart');
-  //         try {
-  //           await removeInsuranceFromCart();
-  //           await wait(200);
-  //           triggerCartUpdate();
-  //         } catch (error) {
-  //           log('❌', 'Failed to auto-remove insurance:', error);
-  //         }
-  //       }
-        
-  //       const elements = getElements();
-  //       if (elements.checkbox && elements.checkbox.checked) {
-  //         setCheckbox(false, true);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // Replace the updateInsuranceSectionVisibility function with this fixed version:
-
   async function updateInsuranceSectionVisibility(cartData) {
     if (!cartData) return;
     
@@ -1403,38 +1356,11 @@
         if (hasInsuranceInCart) {
           log('⚠️', 'Removing insurance - no products in cart');
           try {
-            state.processing = true;
-            showLoader(true);
-            
             await removeInsuranceFromCart();
-            await wait(300);
-            
-            // Force a complete cart refresh to show empty state
-            const freshCart = await getCart();
-            if (freshCart) {
-              updateGrandTotalUI(freshCart);
-            }
-            
-            // Trigger multiple refresh methods to ensure empty cart displays
+            await wait(200);
             triggerCartUpdate();
-            
-            // Also dispatch a custom event that the theme might listen to
-            document.dispatchEvent(new CustomEvent('cart:refresh'));
-            
-            // Force reload the cart drawer section
-            const cartDrawer = document.querySelector('cart-drawer');
-            if (cartDrawer && typeof cartDrawer.renderContents === 'function') {
-              cartDrawer.renderContents(freshCart);
-            }
-            
-            state.processing = false;
-            showLoader(false);
-            
-            log('✅', 'Insurance removed and cart refreshed for empty state');
           } catch (error) {
             log('❌', 'Failed to auto-remove insurance:', error);
-            state.processing = false;
-            showLoader(false);
           }
         }
         
