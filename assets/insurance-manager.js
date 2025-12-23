@@ -2349,107 +2349,41 @@
   
   // ==================== QUANTITY SYNC ====================
   
-  // function setupQuantitySync() {
-  //   // Monitor cart quantity changes
-  //   const cartObserver = new MutationObserver((mutations) => {
-  //     for (const mutation of mutations) {
-  //       // Check if quantity inputs changed
-  //       const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
-  //       quantityInputs.forEach(input => {
-  //         if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
-  //           log('🔄', 'Quantity input detected');
-  //           // Add event listener for changes
-  //           input.addEventListener('change', debounce(() => {
-  //             syncInsuranceWithProducts();
-  //           }, 500));
-  //         }
-  //       });
-  //     }
-  //   });
-    
-  //   cartObserver.observe(document.body, {
-  //     childList: true,
-  //     subtree: true
-  //   });
-    
-  //   // Also listen for quantity buttons
-  //   document.addEventListener('click', (event) => {
-  //     if (event.target.matches('.cart-item__quantity-wrapper button') || 
-  //         event.target.closest('.cart-item__quantity-wrapper button')) {
-  //       log('🔄', 'Quantity button clicked');
-  //       // setTimeout(() => {
-  //       //   syncInsuranceWithProducts();
-  //       // }, 300);
-  //       setTimeout(async () => {
-  //         await removeInsuranceBeforeLastProduct();
-  //         syncInsuranceWithProducts();
-  //       }, 300);
-  //     }
-  //   });
-  // }
-
   function setupQuantitySync() {
-  const cartObserver = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      const quantityInputs = document.querySelectorAll(
-        '.cart-item__quantity input[type="number"]'
-      );
-
-      quantityInputs.forEach(input => {
-        if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
-          log('🔄', 'Quantity input detected');
-
-          input.addEventListener(
-            'change',
-            debounce(async () => {
-              await removeInsuranceBeforeLastProduct(); // ✅ STEP 3
+    // Monitor cart quantity changes
+    const cartObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        // Check if quantity inputs changed
+        const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
+        quantityInputs.forEach(input => {
+          if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
+            log('🔄', 'Quantity input detected');
+            // Add event listener for changes
+            input.addEventListener('change', debounce(() => {
               syncInsuranceWithProducts();
-            }, 500)
-          );
-        }
-      });
-    }
-  });
-
-  cartObserver.observe(document.body, {
-    childList: true,
-    subtree: true
-  });
-
-  // Quantity + / - buttons
-  document.addEventListener('click', (event) => {
-    if (
-      event.target.matches('.cart-item__quantity-wrapper button') ||
-      event.target.closest('.cart-item__quantity-wrapper button')
-    ) {
-      log('🔄', 'Quantity button clicked');
-
-      setTimeout(async () => {
-        await removeInsuranceBeforeLastProduct(); // ✅ STEP 2
-        syncInsuranceWithProducts();
-      }, 300);
-    }
-  });
-}
-
-  
-    async function removeInsuranceBeforeLastProduct() {
-    const cartData = await getCart();
-    if (!cartData) return;
-
-    const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
-    const hasInsuranceInCart = hasInsurance(cartData);
-
-    // If only 1 product left and insurance exists
-    if (totalNonInsuranceQuantity === 1 && hasInsuranceInCart) {
-      log('⚠️', 'Last product detected — removing insurance FIRST');
-      await removeInsuranceFromCart();
-      await wait(200);
-    }
+            }, 500));
+          }
+        });
+      }
+    });
+    
+    cartObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Also listen for quantity buttons
+    document.addEventListener('click', (event) => {
+      if (event.target.matches('.cart-item__quantity-wrapper button') || 
+          event.target.closest('.cart-item__quantity-wrapper button')) {
+        log('🔄', 'Quantity button clicked');
+        setTimeout(() => {
+          syncInsuranceWithProducts();
+        }, 300);
+      }
+    });
   }
-
-
-
+  
   async function syncInsuranceWithProducts() {
     if (state.processing) {
       log('⏳', 'Already processing, skipping sync');
