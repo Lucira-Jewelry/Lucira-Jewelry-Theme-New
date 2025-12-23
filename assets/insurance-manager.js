@@ -2016,6 +2016,27 @@
       
       const result = await response.json();
       log('✅', 'Insurance removed successfully:', result);
+      
+      // Update cart icon immediately
+      if (result.item_count === 0) {
+        const cartIconBubble = document.querySelector('cart-icon-bubble span');
+        if (cartIconBubble) {
+          cartIconBubble.textContent = '0';
+        }
+        
+        // Trigger native Shopify cart update to refresh icon
+        fetch('/cart.js')
+          .then(res => res.json())
+          .then(cart => {
+            if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
+              publish(PUB_SUB_EVENTS.cartUpdate, {
+                source: 'insurance-manager',
+                cartData: cart
+              });
+            }
+          });
+      }
+      
       return result;
     } catch (error) {
       log('❌', 'Remove error:', error);
@@ -2179,7 +2200,65 @@
     log('🔄', 'Force refreshing cart UI...');
     
     try {
-      // Fetch the cart drawer section
+      // Get fresh cart first
+      const freshCart = await getCart();
+      log('📊', 'Fresh cart item count:', freshCart ? freshCart.item_count : 'null');
+      
+      // If cart is empty, do complete reload
+      if (freshCart && freshCart.item_count === 0) {
+        log('🔄', 'Cart is empty - performing COMPLETE reload');
+        
+        // Fetch fresh cart drawer HTML
+        const response = await fetch(window.location.pathname + '?section_id=cart-drawer');
+        const html = await response.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        
+        // Replace the ENTIRE cart drawer inner content
+        const newCartDrawerInner = doc.querySelector('.cart-drawer');
+        const currentCartDrawerInner = document.querySelector('.cart-drawer');
+        
+        if (newCartDrawerInner && currentCartDrawerInner) {
+          currentCartDrawerInner.innerHTML = newCartDrawerInner.innerHTML;
+          log('✅', 'Complete cart drawer replaced');
+        }
+        
+        // Update cart-drawer element class
+        const cartDrawerElement = document.querySelector('cart-drawer');
+        if (cartDrawerElement) {
+          cartDrawerElement.classList.add('is-empty');
+          log('✅', 'Cart drawer marked as empty');
+        }
+        
+        // Update cart icon
+        const cartIconBubble = document.querySelector('cart-icon-bubble');
+        if (cartIconBubble) {
+          const bubble = cartIconBubble.querySelector('.cart-count-bubble span');
+          if (bubble) {
+            bubble.textContent = '0';
+          }
+        }
+        
+        // Force update cart icon via section
+        try {
+          const iconResponse = await fetch('/?section_id=cart-icon-bubble');
+          const iconHtml = await iconResponse.text();
+          const iconDoc = parser.parseFromString(iconHtml, 'text/html');
+          const newIcon = iconDoc.querySelector('.shopify-section');
+          const currentIcon = document.querySelector('#shopify-section-cart-icon-bubble');
+          
+          if (newIcon && currentIcon) {
+            currentIcon.innerHTML = newIcon.innerHTML;
+            log('✅', 'Cart icon updated');
+          }
+        } catch (e) {
+          log('⚠️', 'Could not update cart icon:', e);
+        }
+        
+        return;
+      }
+      
+      // Normal refresh for non-empty cart
       const response = await fetch(window.location.pathname + '?section_id=cart-drawer');
       const html = await response.text();
       
@@ -2215,7 +2294,6 @@
       
       // Update cart drawer empty state
       const cartDrawer = document.querySelector('cart-drawer');
-      const freshCart = await getCart();
       
       if (cartDrawer && freshCart) {
         if (freshCart.item_count === 0) {
@@ -2239,7 +2317,36 @@
     }
   }
   
-  function triggerCartUpdate() {
+  async function updateCartIconCount(count) {
+    log('🔢', 'Updating cart icon count to:', count);
+    
+    // Update all possible cart count elements
+    const selectors = [
+      'cart-icon-bubble .cart-count-bubble span',
+      '#cart-icon-bubble span',
+      '.header__icon--cart .cart-count-bubble span',
+      '[data-cart-count]'
+    ];
+    
+    selectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        el.textContent = count;
+        if (count === 0) {
+          const bubble = el.closest('.cart-count-bubble');
+          if (bubble) {
+            bubble.classList.add('hidden');
+          }
+        }
+      });
+    });
+    
+    // Update cart-icon-bubble element
+    const cartIconBubble = document.querySelector('cart-icon-bubble');
+    if (cartIconBubble) {
+      cartIconBubble.setAttribute('data-cart-items', count);
+    }
+  }
     log('🔄', 'Triggering cart refresh...');
     
     getCart().then(cartData => {
@@ -2458,7 +2565,7 @@
     }
     
     try {
-      await wait(200); // Wait for cart to update after removal
+      await wait(300); // Wait for cart to update after removal
       const cartData = await getCart();
       if (!cartData) return;
       
@@ -2474,14 +2581,34 @@
         showLoader(true);
         
         // Remove insurance
-        await removeInsuranceFromCart();
+        const removeResult = await removeInsuranceFromCart();
         
         // Uncheck checkbox
         setCheckbox(false, true);
         
-        // Wait and force complete refresh
-        await wait(500);
-        await forceCartRefresh();
+        // Wait for removal to complete
+        await wait(700);
+        
+        // Get updated cart
+        const updatedCart = await getCart();
+        log('📊', 'Updated cart after insurance removal:', updatedCart ? updatedCart.item_count : 'null');
+        
+        if (updatedCart && updatedCart.item_count === 0) {
+          log('🔄', 'Cart is now completely empty - triggering full refresh');
+          
+          // Update cart icon immediately
+          await updateCartIconCount(0);
+          
+          // Manually trigger Shopify's cart drawer update
+          const cartDrawerItems = document.querySelector('cart-drawer-items');
+          if (cartDrawerItems && typeof cartDrawerItems.onCartUpdate === 'function') {
+            await cartDrawerItems.onCartUpdate();
+            log('✅', 'Triggered native cart drawer update');
+          }
+          
+          await wait(300);
+          await forceCartRefresh();
+        }
         
         state.processing = false;
         showLoader(false);
@@ -2641,7 +2768,7 @@
         log('🔄', 'PUB_SUB cartUpdate event', event);
         
         // Wait for cart to be fully updated
-        await wait(300);
+        await wait(500);
         
         const cartData = await getCart();
         if (!cartData) return;
@@ -2653,18 +2780,57 @@
         
         // If no products but insurance exists, remove it
         if (totalNonInsuranceQuantity === 0 && hasInsuranceInCart) {
-          log('⚠️', 'No products but insurance exists - removing insurance');
+          log('⚠️', 'No products but insurance exists - removing insurance NOW');
           state.processing = true;
-          showLoader(true);
           
-          await removeInsuranceFromCart();
-          setCheckbox(false, true);
-          
-          await wait(300);
-          await forceCartRefresh();
-          
-          state.processing = false;
-          showLoader(false);
+          try {
+            await removeInsuranceFromCart();
+            setCheckbox(false, true);
+            
+            // Wait and get updated cart
+            await wait(500);
+            const updatedCart = await getCart();
+            
+            // Force reload the entire cart drawer from server
+                          if (updatedCart && updatedCart.item_count === 0) {
+              log('🔄', 'Cart is now empty, reloading entire cart drawer...');
+              
+              // Update cart icon count immediately
+              await updateCartIconCount(0);
+              
+              const response = await fetch(window.location.pathname + '?section_id=cart-drawer');
+              const html = await response.text();
+              const parser = new DOMParser();
+              const doc = parser.parseFromString(html, 'text/html');
+              
+              // Get the entire cart drawer
+              const newCartDrawer = doc.querySelector('cart-drawer .cart-drawer');
+              const currentCartDrawerInner = document.querySelector('cart-drawer .cart-drawer');
+              
+              if (newCartDrawer && currentCartDrawerInner) {
+                currentCartDrawerInner.innerHTML = newCartDrawer.innerHTML;
+                log('✅', 'Entire cart drawer content replaced');
+              }
+              
+              // Update cart drawer classes
+              const cartDrawer = document.querySelector('cart-drawer');
+              if (cartDrawer) {
+                cartDrawer.classList.add('is-empty');
+              }
+              
+              // Force update cart icon via native method
+              if (typeof window.dispatchEvent === 'function') {
+                window.dispatchEvent(new CustomEvent('cart:refresh'));
+              }
+            }
+            
+            state.processing = false;
+            showLoader(false);
+          } catch (error) {
+            log('❌', 'Error removing insurance:', error);
+            state.processing = false;
+            showLoader(false);
+          }
         } else {
           // Normal sync
           syncCheckboxState();
