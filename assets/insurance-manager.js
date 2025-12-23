@@ -2349,44 +2349,89 @@
   
   // ==================== QUANTITY SYNC ====================
   
+  // function setupQuantitySync() {
+  //   // Monitor cart quantity changes
+  //   const cartObserver = new MutationObserver((mutations) => {
+  //     for (const mutation of mutations) {
+  //       // Check if quantity inputs changed
+  //       const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
+  //       quantityInputs.forEach(input => {
+  //         if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
+  //           log('🔄', 'Quantity input detected');
+  //           // Add event listener for changes
+  //           input.addEventListener('change', debounce(() => {
+  //             syncInsuranceWithProducts();
+  //           }, 500));
+  //         }
+  //       });
+  //     }
+  //   });
+    
+  //   cartObserver.observe(document.body, {
+  //     childList: true,
+  //     subtree: true
+  //   });
+    
+  //   // Also listen for quantity buttons
+  //   document.addEventListener('click', (event) => {
+  //     if (event.target.matches('.cart-item__quantity-wrapper button') || 
+  //         event.target.closest('.cart-item__quantity-wrapper button')) {
+  //       log('🔄', 'Quantity button clicked');
+  //       // setTimeout(() => {
+  //       //   syncInsuranceWithProducts();
+  //       // }, 300);
+  //       setTimeout(async () => {
+  //         await removeInsuranceBeforeLastProduct();
+  //         syncInsuranceWithProducts();
+  //       }, 300);
+  //     }
+  //   });
+  // }
+
   function setupQuantitySync() {
-    // Monitor cart quantity changes
-    const cartObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        // Check if quantity inputs changed
-        const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
-        quantityInputs.forEach(input => {
-          if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
-            log('🔄', 'Quantity input detected');
-            // Add event listener for changes
-            input.addEventListener('change', debounce(() => {
+  const cartObserver = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      const quantityInputs = document.querySelectorAll(
+        '.cart-item__quantity input[type="number"]'
+      );
+
+      quantityInputs.forEach(input => {
+        if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
+          log('🔄', 'Quantity input detected');
+
+          input.addEventListener(
+            'change',
+            debounce(async () => {
+              await removeInsuranceBeforeLastProduct(); // ✅ STEP 3
               syncInsuranceWithProducts();
-            }, 500));
-          }
-        });
-      }
-    });
-    
-    cartObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    // Also listen for quantity buttons
-    document.addEventListener('click', (event) => {
-      if (event.target.matches('.cart-item__quantity-wrapper button') || 
-          event.target.closest('.cart-item__quantity-wrapper button')) {
-        log('🔄', 'Quantity button clicked');
-        // setTimeout(() => {
-        //   syncInsuranceWithProducts();
-        // }, 300);
-        setTimeout(async () => {
-          await removeInsuranceBeforeLastProduct();
-          syncInsuranceWithProducts();
-        }, 300);
-      }
-    });
-  }
+            }, 500)
+          );
+        }
+      });
+    }
+  });
+
+  cartObserver.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  // Quantity + / - buttons
+  document.addEventListener('click', (event) => {
+    if (
+      event.target.matches('.cart-item__quantity-wrapper button') ||
+      event.target.closest('.cart-item__quantity-wrapper button')
+    ) {
+      log('🔄', 'Quantity button clicked');
+
+      setTimeout(async () => {
+        await removeInsuranceBeforeLastProduct(); // ✅ STEP 2
+        syncInsuranceWithProducts();
+      }, 300);
+    }
+  });
+}
+
   
     async function removeInsuranceBeforeLastProduct() {
     const cartData = await getCart();
