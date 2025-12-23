@@ -1657,11 +1657,33 @@
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       const currentInsuranceQuantity = getInsuranceQuantity(cartData);
       
+      // if (totalNonInsuranceQuantity === 0) {
+      //   log('⚠️', 'No products left, removing insurance');
+      //   await removeInsuranceFromCart();
+      //   return;
+      // }
       if (totalNonInsuranceQuantity === 0) {
-        log('⚠️', 'No products left, removing insurance');
-        await removeInsuranceFromCart();
-        return;
-      }
+      log('⚠️', 'No products left, removing insurance');
+
+      state.processing = true;
+      showLoader(true);
+
+      await removeInsuranceFromCart();
+
+      await wait(200);
+
+      // 🔥 FORCE FULL CART REFRESH AFTER EMPTY
+      triggerCartUpdate();
+
+      // 🔥 Sync checkbox & UI immediately
+      setCheckbox(false, true);
+
+      state.processing = false;
+      showLoader(false);
+
+      return;
+    }
+
       
       if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
         log('🔄', `Syncing insurance: ${currentInsuranceQuantity} → ${totalNonInsuranceQuantity}`);
