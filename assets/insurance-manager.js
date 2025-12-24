@@ -3468,10 +3468,11 @@
   //   return '₹' + rupees.toLocaleString('en-IN');
   // }
 
-  function formatMoney(cents) {
-    // No division - Shopify shows 10000, we want ₹10,000
-    return '₹' + cents.toLocaleString('en-IN');
-  }
+function formatMoney(cents) {
+  // Divide by 100 - Shopify shows 10000, we want ₹100
+  const rupees = cents / 100;
+  return '₹' + rupees.toLocaleString('en-IN');
+}
   
   function getElements() {
     return {
