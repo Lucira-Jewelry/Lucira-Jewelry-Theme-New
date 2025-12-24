@@ -3228,76 +3228,108 @@
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
-    // Override the CartItems updateQuantity method to intercept removals
-    const originalDefine = customElements.define;
-    
-    customElements.define = function(name, constructor, options) {
-      if (name === 'cart-items') {
-        const OriginalCartItems = constructor;
-        
-        class InterceptedCartItems extends OriginalCartItems {
-          async updateQuantity(line, quantity, event, name, variantId) {
-            log('🔍', 'Intercepted updateQuantity:', { line, quantity, variantId });
-            
-            // Check if this is a removal (quantity = 0) and if it's the last product
-            if (quantity === 0) {
-              const cartData = await getCart();
-              if (cartData) {
-                const nonInsuranceCount = getNonInsuranceCount(cartData);
-                const hasInsuranceInCart = hasInsurance(cartData);
-                const removingItemQuantity = cartData.items[line - 1]?.quantity || 0;
-                
-                log('📊', 'Removal check:', {
-                  nonInsuranceCount,
-                  removingItemQuantity,
-                  hasInsuranceInCart,
-                  willBeLastProduct: nonInsuranceCount === removingItemQuantity
-                });
-                
-                // If this removal will make cart empty AND insurance exists
-                if (nonInsuranceCount === removingItemQuantity && hasInsuranceInCart && !state.removalInProgress) {
-                  log('🚨', 'Last product being removed! Removing insurance first...');
-                  
-                  // Show loader
-                  showLoader(true);
-                  state.removalInProgress = true;
-                  
-                  try {
-                    // Remove insurance FIRST
-                    await removeInsuranceFromCart();
-                    
-                    // Wait to ensure removal is complete
-                    await wait(500);
-                    
-                    // Verify insurance is gone
-                    const verifyCart = await getCart();
-                    if (verifyCart && hasInsurance(verifyCart)) {
-                      log('⚠️', 'Insurance still present, retrying...');
-                      await removeInsuranceFromCart();
-                      await wait(300);
-                    }
-                    
-                    log('✅', 'Insurance removed, now proceeding with product removal');
-                  } catch (error) {
-                    log('❌', 'Failed to remove insurance before product:', error);
-                  } finally {
-                    state.removalInProgress = false;
-                    showLoader(false);
-                  }
-                }
-              }
-            }
-            
-            // Now call the original updateQuantity
-            return super.updateQuantity(line, quantity, event, name, variantId);
-          }
-        }
-        
-        return originalDefine.call(this, name, InterceptedCartItems, options);
+    // Intercept CartRemoveButton clicks
+    document.addEventListener('click', async function(event) {
+      const removeButton = event.target.closest('cart-remove-button');
+      if (!removeButton) return;
+      
+      log('🔍', 'Remove button clicked');
+      
+      // Prevent default removal temporarily
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      const lineIndex = removeButton.dataset.index;
+      const variantId = removeButton.querySelector('button')?.dataset?.variantId;
+      
+      log('📊', 'Remove details:', { lineIndex, variantId });
+      
+      // Check if this would be the last product
+      const cartData = await getCart();
+      if (!cartData) {
+        log('❌', 'Could not fetch cart');
+        return;
       }
       
-      return originalDefine.call(this, name, constructor, options);
-    };
+      const nonInsuranceCount = getNonInsuranceCount(cartData);
+      const hasInsuranceInCart = hasInsurance(cartData);
+      const removingItem = cartData.items[lineIndex - 1];
+      const removingQuantity = removingItem?.quantity || 0;
+      
+      log('📊', 'Cart analysis:', {
+        nonInsuranceCount,
+        removingQuantity,
+        hasInsuranceInCart,
+        willBeEmpty: nonInsuranceCount === removingQuantity
+      });
+      
+      // If removing this will empty the cart AND insurance exists
+      if (nonInsuranceCount === removingQuantity && hasInsuranceInCart && !state.removalInProgress) {
+        log('🚨', 'This is the last product! Removing insurance first...');
+        
+        showLoader(true);
+        state.removalInProgress = true;
+        
+        try {
+          // Remove insurance first
+          await removeInsuranceFromCart();
+          await wait(500);
+          
+          // Verify insurance removal
+          let verifyCart = await getCart();
+          let retries = 0;
+          while (verifyCart && hasInsurance(verifyCart) && retries < 3) {
+            log('⚠️', `Insurance still present, retry ${retries + 1}/3`);
+            await wait(300);
+            await removeInsuranceFromCart();
+            await wait(500);
+            verifyCart = await getCart();
+            retries++;
+          }
+          
+          if (verifyCart && !hasInsurance(verifyCart)) {
+            log('✅', 'Insurance successfully removed');
+          } else {
+            log('❌', 'Failed to remove insurance after retries');
+          }
+          
+        } catch (error) {
+          log('❌', 'Error removing insurance:', error);
+        } finally {
+          state.removalInProgress = false;
+          showLoader(false);
+        }
+      }
+      
+      // Now proceed with the actual product removal
+      log('🗑️', 'Proceeding with product removal');
+      const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
+      
+      if (cartItems) {
+        // Push remove event to dataLayer if needed
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'removeFromCart',
+          'products': {
+            ...removeButton.dataset,
+          }
+        });
+        
+        // Call updateQuantity with 0 to remove
+        await cartItems.updateQuantity(lineIndex, 0, event);
+        
+        // Force a full page reload after removal if cart becomes empty
+        setTimeout(async () => {
+          const finalCart = await getCart();
+          if (finalCart && finalCart.item_count === 0) {
+            log('🔄', 'Cart is empty, forcing full refresh');
+            window.location.reload();
+          }
+        }, 1000);
+      }
+      
+    }, true); // Use capture phase to intercept before other handlers
   }
   
   // ==================== INITIALIZATION ====================
