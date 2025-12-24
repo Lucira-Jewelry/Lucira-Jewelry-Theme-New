@@ -237,32 +237,43 @@
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const sortSelect = document.getElementById('SortBy');
-    if (!sortSelect) return;
+    const productGrid = document.getElementById('ProductGridContainer');
+
+    if (!sortSelect || !productGrid) return;
 
     sortSelect.addEventListener('change', function () {
-      const facetFormEl = document.querySelector('facet-filters-form');
-      if (!facetFormEl) return;
+      const url = new URL(window.location.href);
 
-      // Find or create sort input inside Dawn form
-      let sortInput =
-        facetFormEl.querySelector('input[name="sort_by"]') ||
-        facetFormEl.querySelector('select[name="sort_by"]');
+      // Update sort value
+      url.searchParams.set('sort_by', this.value);
 
-      if (!sortInput) {
-        sortInput = document.createElement('input');
-        sortInput.type = 'hidden';
-        sortInput.name = 'sort_by';
-        facetFormEl.querySelector('form')?.appendChild(sortInput);
-      }
+      // Remove pagination on sort
+      url.searchParams.delete('page');
 
-      sortInput.value = this.value;
+      fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then((response) => response.text())
+        .then((html) => {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
 
-      // 🔥 THIS is the key line — triggers Dawn pipeline
-      facetFormEl.onSubmitHandler({
-        target: sortInput,
-        preventDefault: () => {},
-      });
+          const newGrid = doc.getElementById('ProductGridContainer');
+
+          if (!newGrid) return;
+
+          // Replace product grid only
+          productGrid.innerHTML = newGrid.innerHTML;
+
+          // Update URL without reload
+          window.history.pushState({}, '', url.toString());
+        })
+        .catch((err) => {
+          console.error('Sort failed', err);
+        });
     });
   });
 </script>
-
