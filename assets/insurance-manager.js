@@ -2976,7 +2976,7 @@
           quantitySpan.className = 'insurance-quantity';
           quantitySpan.textContent = ` (${insuranceQuantity})`;
           quantitySpan.style.fontWeight = 'bold';
-          quantitySpan.style.marginLeft = '4px';
+          quantitySpan.style.marginLeft = '2px';
           quantitySpan.style.color = '#1a1a1a';
           label.appendChild(quantitySpan);
           
