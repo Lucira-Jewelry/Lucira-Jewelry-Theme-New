@@ -3228,20 +3228,33 @@
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
+    // Track if we're handling a removal
+    let isHandlingRemoval = false;
+    
     // Intercept CartRemoveButton clicks
     document.addEventListener('click', async function(event) {
       const removeButton = event.target.closest('cart-remove-button');
       if (!removeButton) return;
       
-      log('🔍', 'Remove button clicked');
+      // Prevent multiple simultaneous removals
+      if (isHandlingRemoval) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        log('⏳', 'Already handling a removal, please wait');
+        return;
+      }
       
-      // Prevent default removal temporarily
-      event.preventDefault();
-      event.stopPropagation();
-      event.stopImmediatePropagation();
+      log('🔍', 'Remove button clicked');
       
       const lineIndex = removeButton.dataset.index;
       const variantId = removeButton.querySelector('button')?.dataset?.variantId;
+      
+      // Don't intercept if this is the insurance product itself
+      if (variantId === CONFIG.VARIANT_ID) {
+        log('ℹ️', 'Insurance product removal, allowing default behavior');
+        return;
+      }
       
       log('📊', 'Remove details:', { lineIndex, variantId });
       
@@ -3258,25 +3271,33 @@
       const removingQuantity = removingItem?.quantity || 0;
       
       log('📊', 'Cart analysis:', {
+        totalItems: cartData.items.length,
         nonInsuranceCount,
         removingQuantity,
         hasInsuranceInCart,
         willBeEmpty: nonInsuranceCount === removingQuantity
       });
       
-      // If removing this will empty the cart AND insurance exists
+      // ONLY intercept if this is the LAST product and insurance exists
       if (nonInsuranceCount === removingQuantity && hasInsuranceInCart && !state.removalInProgress) {
-        log('🚨', 'This is the last product! Removing insurance first...');
+        log('🚨', 'This is the LAST product! Intercepting to remove insurance first...');
         
+        // Prevent default removal
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        
+        isHandlingRemoval = true;
         showLoader(true);
         state.removalInProgress = true;
         
         try {
           // Remove insurance first
+          log('🗑️', 'Step 1: Removing insurance...');
           await removeInsuranceFromCart();
           await wait(500);
           
-          // Verify insurance removal
+          // Verify insurance removal with retries
           let verifyCart = await getCart();
           let retries = 0;
           while (verifyCart && hasInsurance(verifyCart) && retries < 3) {
@@ -3294,39 +3315,50 @@
             log('❌', 'Failed to remove insurance after retries');
           }
           
+          // Now proceed with the actual product removal
+          log('🗑️', 'Step 2: Removing product...');
+          const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
+          
+          if (cartItems) {
+            // Push remove event to dataLayer
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: 'removeFromCart',
+              'products': {
+                ...removeButton.dataset,
+              }
+            });
+            
+            // Call updateQuantity with 0 to remove
+            await cartItems.updateQuantity(lineIndex, 0, event);
+            
+            // Force a full page reload after removal since cart should be empty
+            setTimeout(async () => {
+              const finalCart = await getCart();
+              if (finalCart && finalCart.item_count === 0) {
+                log('🔄', 'Cart is empty, forcing full refresh');
+                window.location.reload();
+              }
+            }, 1000);
+          }
+          
         } catch (error) {
-          log('❌', 'Error removing insurance:', error);
+          log('❌', 'Error in removal process:', error);
         } finally {
           state.removalInProgress = false;
           showLoader(false);
+          isHandlingRemoval = false;
         }
-      }
-      
-      // Now proceed with the actual product removal
-      log('🗑️', 'Proceeding with product removal');
-      const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
-      
-      if (cartItems) {
-        // Push remove event to dataLayer if needed
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'removeFromCart',
-          'products': {
-            ...removeButton.dataset,
-          }
-        });
+      } else {
+        // NOT the last product - allow normal removal and just sync insurance quantity
+        log('ℹ️', 'Not the last product, allowing normal removal');
+        // Don't prevent default - let the normal cart removal work
         
-        // Call updateQuantity with 0 to remove
-        await cartItems.updateQuantity(lineIndex, 0, event);
-        
-        // Force a full page reload after removal if cart becomes empty
+        // After the removal completes, sync insurance quantity
         setTimeout(async () => {
-          const finalCart = await getCart();
-          if (finalCart && finalCart.item_count === 0) {
-            log('🔄', 'Cart is empty, forcing full refresh');
-            window.location.reload();
-          }
-        }, 1000);
+          await wait(500); // Wait for cart to update
+          await syncInsuranceWithProducts();
+        }, 100);
       }
       
     }, true); // Use capture phase to intercept before other handlers
