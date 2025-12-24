@@ -1,1 +1,64 @@
-class InfiniteScroll extends HTMLElement{constructor(){if(super(),this.anchor=this.querySelector("a"),!this.anchor)return this.showEndMessage(),void this.remove();this.observer=new IntersectionObserver((e=>{e.forEach((e=>{e.isIntersecting&&this.loadNextPage()}))})),this.observer.observe(this)}async loadNextPage(){this.observer.disconnect(),this.anchor.classList.add("infinite-scroll-anchor"),this.anchor.innerHTML='\n      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">\n        <div style="display: flex; align-items: center; justify-content: center;">\n          <span class="luxury-dots">\n            <span class="dot"></span>\n            <span class="dot"></span>\n            <span class="dot"></span>\n          </span>\n        </div>\n        <div style="font-family: inherit; text-align: center; margin-top: 10px;">\n          Discovering more exquisite pieces\n        </div>\n      </div>\n    ';const e=this.anchor.getAttribute("href");if(e){try{const n=await fetch(e),t=await n.text(),i=(new DOMParser).parseFromString(t,"text/html"),s=i.querySelector("[data-product-grid]"),o=document.querySelector("[data-product-grid]");s&&o&&(Array.from(s.children).forEach((e=>o.appendChild(e))),this.initWishlist());const a=i.querySelector("infinite-scroll");a?this.replaceWith(a):(this.showEndMessage(),this.remove())}catch(e){}this.anchor.style.display="none",this.anchor.innerHTML=""}}showEndMessage(){requestAnimationFrame((()=>{let e=document.getElementById("infinite-scroll-end");if(!e){e=document.createElement("div"),e.id="infinite-scroll-end",e.className="infinite-scroll-end",e.innerHTML='\n          <div class="end-content">\n            <div class="end-decoration">\n              <div class="luxury-line"><span style="display: none">.</span></div>\n              <div class="end-diamond"><span style="display: none">.</span>◆</div>\n              <div class="luxury-line"><span style="display: none">.</span></div>\n            </div>\n            <p class="end-text">You\'ve explored our complete collection</p>\n            <p class="end-subtitle">Every piece tells a story of elegance</p>\n          </div>\n        ';const n=document.querySelector("[data-product-grid]");n?n.after(e):document.body.appendChild(e)}e.style.display="block",e.style.opacity="0",e.style.transition="opacity 0.8s ease-in-out",setTimeout((()=>e.style.opacity="1"),50)}))}initWishlist(){try{"undefined"!=typeof iWish&&"function"==typeof iWish.init&&iWish.init(),document.dispatchEvent(new CustomEvent("iwish:reload")),document.dispatchEvent(new CustomEvent("wishlist:init")),"function"==typeof iWishCounter&&iWishCounter()}catch(e){}}}customElements.define("infinite-scroll",InfiniteScroll);
+class InfiniteScroll extends HTMLElement {
+  constructor() {
+    if ((super(), (this.anchor = this.querySelector("a")), !this.anchor))
+      return this.showEndMessage(), void this.remove();
+    (this.observer = new IntersectionObserver((e) => {
+      e.forEach((e) => {
+        e.isIntersecting && this.loadNextPage();
+      });
+    })),
+      this.observer.observe(this);
+  }
+  async loadNextPage() {
+    this.observer.disconnect(),
+      this.anchor.classList.add("infinite-scroll-anchor"),
+      (this.anchor.innerHTML =
+        '\n      <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;">\n        <div style="display: flex; align-items: center; justify-content: center;">\n          <span class="luxury-dots">\n            <span class="dot"></span>\n            <span class="dot"></span>\n            <span class="dot"></span>\n          </span>\n        </div>\n        <div style="font-family: inherit; text-align: center; margin-top: 10px;">\n          Discovering more exquisite pieces\n        </div>\n      </div>\n    ');
+    const e = this.anchor.getAttribute("href");
+    if (e) {
+      try {
+        const n = await fetch(e),
+          t = await n.text(),
+          i = new DOMParser().parseFromString(t, "text/html"),
+          s = i.querySelector("[data-product-grid]"),
+          o = document.querySelector("[data-product-grid]");
+        s &&
+          o &&
+          (Array.from(s.children).forEach((e) => o.appendChild(e)),
+          this.initWishlist());
+        const a = i.querySelector("infinite-scroll");
+        a ? this.replaceWith(a) : (this.showEndMessage(), this.remove());
+      } catch (e) {}
+      (this.anchor.style.display = "none"), (this.anchor.innerHTML = "");
+    }
+  }
+  showEndMessage() {
+    requestAnimationFrame(() => {
+      let e = document.getElementById("infinite-scroll-end");
+      if (!e) {
+        (e = document.createElement("div")),
+          (e.id = "infinite-scroll-end"),
+          (e.className = "infinite-scroll-end"),
+          (e.innerHTML =
+            '\n          <div class="end-content">\n            <div class="end-decoration">\n              <div class="luxury-line"><span style="display: none">.</span></div>\n              <div class="end-diamond"><span style="display: none">.</span>◆</div>\n              <div class="luxury-line"><span style="display: none">.</span></div>\n            </div>\n            <p class="end-text">You\'ve explored our complete collection</p>\n            <p class="end-subtitle">Every piece tells a story of elegance</p>\n          </div>\n        ');
+        const n = document.querySelector("[data-product-grid]");
+        n ? n.after(e) : document.body.appendChild(e);
+      }
+      (e.style.display = "block"),
+        (e.style.opacity = "0"),
+        (e.style.transition = "opacity 0.8s ease-in-out"),
+        setTimeout(() => (e.style.opacity = "1"), 50);
+    });
+  }
+  initWishlist() {
+    try {
+      "undefined" != typeof iWish &&
+        "function" == typeof iWish.init &&
+        iWish.init(),
+        document.dispatchEvent(new CustomEvent("iwish:reload")),
+        document.dispatchEvent(new CustomEvent("wishlist:init")),
+        "function" == typeof iWishCounter && iWishCounter();
+    } catch (e) {}
+  }
+}
+customElements.define("infinite-scroll", InfiniteScroll);
