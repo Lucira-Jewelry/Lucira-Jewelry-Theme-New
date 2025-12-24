@@ -53,16 +53,25 @@ class InfiniteScroll extends HTMLElement {
 
       if (incomingGrid && currentGrid) {
         Array.from(incomingGrid.children).forEach((card) => {
-          const handle = card.getAttribute("data-product-handle");
+            const handle =
+                card.getAttribute("data-product-handle") ||
+                card.querySelector('a[href*="/products/"]')?.getAttribute("href");
 
-          // Prevent duplicates (important for search pages)
-          if (
-            !handle ||
-            !currentGrid.querySelector(`[data-product-handle="${handle}"]`)
-          ) {
-            currentGrid.appendChild(card);
-          }
-        });
+            if (!handle) return;
+
+            const exists = Array.from(currentGrid.children).some((existing) => {
+                const existingHandle =
+                existing.getAttribute("data-product-handle") ||
+                existing.querySelector('a[href*="/products/"]')?.getAttribute("href");
+
+                return existingHandle === handle;
+            });
+
+            if (!exists) {
+                currentGrid.appendChild(card);
+            }
+            });
+
 
         this.initWishlist();
       }
