@@ -16,17 +16,13 @@ class FacetFiltersForm extends HTMLElement {
     const facetWrapper = this.querySelector('#FacetsWrapperDesktop');
     if (facetWrapper) facetWrapper.addEventListener('keyup', onKeyUpEscape);
 
-    /* --- ADDED FIX FOR CUSTOM SORT SELECT --- */
     const sortSelect = document.getElementById('SortBy');
     if (sortSelect) {
       sortSelect.addEventListener('change', (event) => {
-        // Trigger the instant loader (same as filters)
         FacetFiltersForm.showImmediateFilterLoader();
-        // Trigger the fetch immediately (no debounce needed for sort)
         this.onSubmitHandler(event);
       });
     }
-    /* ---------------------------------------- */
   }
 
   static setListeners() {
@@ -63,9 +59,6 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
-  /* =========================
-     🔥 EXTERNAL SORT LOADER
-     ========================= */
   static triggerExternalLoading() {
     const gridContainer = document.getElementById('ProductGridContainer');
     const collectionEl = gridContainer?.querySelector('.collection');
@@ -78,11 +71,10 @@ class FacetFiltersForm extends HTMLElement {
 
     if (collectionEl) {
       collectionEl.classList.remove('loading');
-      void collectionEl.offsetHeight; // force repaint
+      void collectionEl.offsetHeight;
       collectionEl.classList.add('loading');
     }
 
-    // auto-clear once grid updates
     setTimeout(() => {
       loadingSpinners.forEach((spinner) => spinner.classList.add('hidden'));
       collectionEl?.classList.remove('loading');
@@ -279,9 +271,6 @@ FacetFiltersForm.searchParamsPrev = window.location.search.slice(1);
 customElements.define('facet-filters-form', FacetFiltersForm);
 FacetFiltersForm.setListeners();
 
-/* ============================
-   🔥 SORT → LOADER BRIDGE
-   ============================ */
 (function () {
   const originalPushState = history.pushState;
 
@@ -300,9 +289,6 @@ FacetFiltersForm.setListeners();
   };
 })();
 
-/* ============================
-   PRICE RANGE
-   ============================ */
 class PriceRange extends HTMLElement {
   constructor() {
     super();
@@ -342,9 +328,6 @@ class PriceRange extends HTMLElement {
 
 customElements.define('price-range', PriceRange);
 
-/* ============================
-   FACET REMOVE
-   ============================ */
 class FacetRemove extends HTMLElement {
   constructor() {
     super();
