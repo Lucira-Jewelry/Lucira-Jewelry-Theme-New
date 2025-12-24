@@ -3623,6 +3623,33 @@
     }
   }
   
+
+  function renderInitialInsurancePrice() {
+  const elements = getElements();
+  if (!elements.checkbox) return;
+
+  const label =
+    elements.checkbox.closest('label') || elements.checkbox.parentElement;
+
+  if (!label) return;
+
+  let priceEl = label.querySelector('.insurance-price');
+
+  // Create price element if it doesn't exist
+  if (!priceEl) {
+    priceEl = document.createElement('span');
+    priceEl.className = 'insurance-price';
+    priceEl.style.marginLeft = '8px';
+    priceEl.style.fontWeight = '600';
+    label.appendChild(priceEl);
+  }
+
+  if (state.insurancePrice) {
+    priceEl.textContent = formatMoney(state.insurancePrice);
+  }
+}
+
+
   // ==================== CART OPERATIONS ====================
   
   async function getCart() {
@@ -3855,10 +3882,18 @@
           label.appendChild(quantitySpan);
           
           const priceElement = label.querySelector('.insurance-price');
+
           if (priceElement) {
-            const totalInsurancePrice = insuranceQuantity * insurancePrice;
-            priceElement.textContent = formatMoney(totalInsurancePrice);
+            if (hasInsuranceInCart && insuranceQuantity > 0) {
+              priceElement.textContent = formatMoney(
+                insuranceQuantity * insurancePrice
+              );
+            } else {
+              // SHOW BASE PRICE EVEN WHEN NOT ADDED
+              priceElement.textContent = formatMoney(insurancePrice);
+            }
           }
+
         }
       }
     }
@@ -4267,26 +4302,31 @@
   async function init() {
   log('🚀', 'Initializing Insurance Manager v7.0...');
 
-  const price = await fetchInsurancePrice();
+  // 1. Fetch price ASAP
+  await fetchInsurancePrice();
 
-  // 👇 NEW: render base insurance price even when unchecked
-  const elements = getElements();
-  if (elements.box) {
-    const priceEl = elements.box.querySelector('.insurance-price');
-    if (priceEl && price) {
-      priceEl.textContent = formatMoney(price);
+  // 2. Wait for cart DOM to exist
+  const waitForCart = setInterval(() => {
+    const box = document.getElementById(CONFIG.BOX_ID);
+    if (box) {
+      clearInterval(waitForCart);
+
+      // 3. Render price even before insurance is added
+      renderInitialInsurancePrice();
+
+      // 4. Normal flow
+      interceptCartItemRemoval();
+      attachEventListeners();
+      syncCheckboxState();
+      observeCartChanges();
+      listenToCartEvents();
+
+      state.initialized = true;
+      log('✅', 'Insurance Manager initialized!');
     }
-  }
-
-  interceptCartItemRemoval();
-  attachEventListeners();
-  syncCheckboxState();
-  observeCartChanges();
-  listenToCartEvents();
-
-  state.initialized = true;
-  log('✅', 'Insurance Manager initialized!');
+  }, 100);
 }
+
 
   // ==================== START ====================
   
