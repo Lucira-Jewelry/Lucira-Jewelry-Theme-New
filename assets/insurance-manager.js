@@ -3463,16 +3463,10 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
-  // function formatMoney(cents) {
-  //   const rupees = Math.round(cents / 100);
-  //   return '₹' + rupees.toLocaleString('en-IN');
-  // }
-
-function formatMoney(cents) {
-  // Divide by 100 - Shopify shows 10000, we want ₹100
-  const rupees = cents / 100;
-  return '₹' + rupees.toLocaleString('en-IN');
-}
+  function formatMoney(cents) {
+    const rupees = Math.round(cents / 100);
+    return '₹' + rupees.toLocaleString('en-IN');
+  }
   
   function getElements() {
     return {
