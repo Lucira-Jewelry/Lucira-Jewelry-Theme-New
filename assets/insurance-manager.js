@@ -2558,15 +2558,17 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v5.2 Starting...');
+  console.log('🎯 Insurance Manager v6.0 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
-    PRICE_PER_UNIT: 10000, // ₹100 per product in cents
+    PRICE_PER_UNIT: 10000,
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
-    BOX_ID: 'insuranceBox'
+    BOX_ID: 'insuranceBox',
+    MAX_RETRIES: 5,
+    RETRY_DELAY: 400
   };
   
   // ==================== STATE ====================
@@ -2574,7 +2576,8 @@
     processing: false,
     initialized: false,
     currentCart: null,
-    removalInProgress: false
+    removalInProgress: false,
+    handlingLastProductRemoval: false
   };
   
   // ==================== UTILITIES ====================
@@ -2598,6 +2601,67 @@
       loader: document.getElementById(CONFIG.LOADER_ID),
       box: document.getElementById(CONFIG.BOX_ID)
     };
+  }
+  
+  // ==================== OVERLAY SYSTEM ====================
+  
+  function createOverlay() {
+    let overlay = document.getElementById('insurance-removal-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'insurance-removal-overlay';
+      overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 99999;
+        display: none;
+        align-items: center;
+        justify-content: center;
+      `;
+      
+      const spinner = document.createElement('div');
+      spinner.style.cssText = `
+        width: 60px;
+        height: 60px;
+        border: 5px solid #f3f3f3;
+        border-top: 5px solid #666;
+        border-radius: 50%;
+        animation: insurance-spin 1s linear infinite;
+      `;
+      
+      const style = document.createElement('style');
+      style.textContent = `
+        @keyframes insurance-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      overlay.appendChild(spinner);
+      document.body.appendChild(overlay);
+    }
+    return overlay;
+  }
+  
+  function showOverlay() {
+    const overlay = createOverlay();
+    overlay.style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    document.body.style.pointerEvents = 'none';
+  }
+  
+  function hideOverlay() {
+    const overlay = document.getElementById('insurance-removal-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
   }
   
   function showLoader(show) {
@@ -2630,7 +2694,8 @@
   async function getCart() {
     try {
       const response = await fetch('/cart.js', {
-        headers: { 'Accept': 'application/json' }
+        headers: { 'Accept': 'application/json' },
+        cache: 'no-store'
       });
       if (!response.ok) throw new Error('Failed to fetch cart');
       const cart = await response.json();
@@ -2703,7 +2768,7 @@
       }
       
       const result = await response.json();
-      log('✅', 'Insurance added successfully:', result);
+      log('✅', 'Insurance added successfully');
       return result;
     } catch (error) {
       log('❌', 'Add error:', error);
@@ -2732,7 +2797,7 @@
       }
       
       const result = await response.json();
-      log('✅', 'Insurance quantity updated successfully:', result);
+      log('✅', 'Insurance quantity updated successfully');
       return result;
     } catch (error) {
       log('❌', 'Update error:', error);
@@ -2740,7 +2805,7 @@
     }
   }
   
-  async function removeInsuranceFromCart() {
+  async function removeInsuranceFromCart(withRetry = true) {
     log('➖', 'Removing insurance from cart...');
     state.removalInProgress = true;
     
@@ -2762,17 +2827,44 @@
       }
       
       const result = await response.json();
-      log('✅', 'Insurance removed successfully:', result);
       
-      // Wait for cart to update
-      await wait(100);
-      
-      // Verify removal
-      const verifyCart = await getCart();
-      if (verifyCart && hasInsurance(verifyCart)) {
-        log('⚠️', 'Insurance still in cart after removal, retrying...');
-        await wait(200);
-        return await removeInsuranceFromCart();
+      if (withRetry) {
+        // Aggressive verification with retries
+        let retries = 0;
+        let verified = false;
+        
+        while (retries < CONFIG.MAX_RETRIES && !verified) {
+          await wait(CONFIG.RETRY_DELAY);
+          const verifyCart = await getCart();
+          
+          if (verifyCart && !hasInsurance(verifyCart)) {
+            log('✅', `Insurance verified removed (attempt ${retries + 1})`);
+            verified = true;
+            break;
+          }
+          
+          if (retries < CONFIG.MAX_RETRIES - 1) {
+            log('⚠️', `Insurance still present, retry ${retries + 1}/${CONFIG.MAX_RETRIES}`);
+            // Try removing again
+            await fetch('/cart/change.js', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                id: CONFIG.VARIANT_ID,
+                quantity: 0
+              })
+            });
+          }
+          
+          retries++;
+        }
+        
+        if (!verified) {
+          log('❌', 'Insurance removal verification failed after max retries');
+        }
       }
       
       state.removalInProgress = false;
@@ -2795,23 +2887,15 @@
     const hasInsuranceInCart = hasInsurance(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
     
-    log('👁️', 'Products in cart (excluding insurance):', nonInsuranceCount);
-    log('👁️', 'Total product quantity:', totalNonInsuranceQuantity);
-    log('👁️', 'Insurance in cart:', hasInsuranceInCart);
-    log('👁️', 'Insurance quantity:', insuranceQuantity);
-    
-    // Update the checkbox label to show quantity
     const elements = getElements();
     if (elements.checkbox) {
       const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
       if (label) {
-        // Remove existing quantity indicator
         const existingIndicator = label.querySelector('.insurance-quantity');
         if (existingIndicator) {
           existingIndicator.remove();
         }
         
-        // Add new quantity indicator if insurance is selected
         if (hasInsuranceInCart && insuranceQuantity > 0) {
           const quantitySpan = document.createElement('span');
           quantitySpan.className = 'insurance-quantity';
@@ -2820,7 +2904,6 @@
           quantitySpan.style.marginLeft = '4px';
           label.appendChild(quantitySpan);
           
-          // Also update the price display in checkbox area
           const priceElement = label.querySelector('.insurance-price');
           if (priceElement) {
             const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
@@ -2830,7 +2913,6 @@
       }
     }
     
-    // Update insurance section visibility
     await updateInsuranceSectionVisibility(cartData);
   }
   
@@ -2841,7 +2923,6 @@
     const hasProducts = nonInsuranceCount > 0;
     const hasInsuranceInCart = hasInsurance(cartData);
     
-    // Find insurance section wrapper
     const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
     const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
     
@@ -2851,21 +2932,16 @@
         if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
           insuranceHeader.style.display = '';
         }
-        log('✅', 'Insurance section visible');
       } else {
         insuranceWrapper.style.display = 'none';
         if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
           insuranceHeader.style.display = 'none';
         }
-        log('🚫', 'Insurance section hidden - no products in cart');
         
-        // If insurance exists but no products, remove it
         if (hasInsuranceInCart && !state.removalInProgress) {
-          log('⚠️', 'Removing insurance - no products in cart');
+          log('⚠️', 'Removing orphaned insurance');
           try {
-            await removeInsuranceFromCart();
-            await wait(300);
-            triggerCartUpdate();
+            await removeInsuranceFromCart(false);
           } catch (error) {
             log('❌', 'Failed to auto-remove insurance:', error);
           }
@@ -2882,9 +2958,6 @@
   async function updateGrandTotalUI(cartData) {
     if (!cartData) return;
     
-    log('💰', 'Updating grand total UI:', cartData.total_price);
-    
-    // Update all grand total displays
     const grandTotalSelectors = [
       '.totals__total-value',
       '.grand-total strong',
@@ -2900,12 +2973,10 @@
           parent.textContent.includes('Grand Total')
         )) {
           el.textContent = formatMoney(cartData.total_price);
-          log('✅', 'Updated grand total element:', el);
         }
       });
     });
     
-    // Update item count (excluding insurance)
     const itemCount = getNonInsuranceCount(cartData);
     const itemCountElements = document.querySelectorAll('.totals__total');
     itemCountElements.forEach(el => {
@@ -2914,11 +2985,9 @@
       }
     });
     
-    // Update insurance line items in price breakup
     const hasInsuranceInCart = hasInsurance(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
     
-    // Update insurance line item in the drawer footer (price breakup)
     const insuranceLineItem = document.getElementById('insurance-line-item');
     if (insuranceLineItem) {
       const insuranceValueElement = insuranceLineItem.querySelector('.totals__total-value');
@@ -2931,88 +3000,41 @@
       }
     }
     
-    // Update insurance display
     await updateInsuranceDisplay(cartData);
   }
   
   function triggerCartUpdate() {
     log('🔄', 'Triggering cart refresh...');
     
-    getCart().then(cartData => {
-      if (cartData) {
-        updateGrandTotalUI(cartData);
-      }
-      
-      const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
-      
-      if (cartItems && typeof cartItems.onCartUpdate === 'function') {
-        cartItems.onCartUpdate().then(() => {
-          log('✅', 'Cart updated via onCartUpdate');
-          getCart().then(freshCart => {
-            if (freshCart) {
-              updateGrandTotalUI(freshCart);
-              syncCheckboxState();
-            }
-          });
+    const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
+    
+    if (cartItems && typeof cartItems.onCartUpdate === 'function') {
+      cartItems.onCartUpdate().then(() => {
+        getCart().then(freshCart => {
+          if (freshCart) {
+            updateGrandTotalUI(freshCart);
+            syncCheckboxState();
+          }
         });
-      } else {
-        fetch(window.location.pathname + '?section_id=cart-drawer')
-          .then(response => response.text())
-          .then(html => {
-            const parser = new DOMParser();
-            const doc = parser.parseFromString(html, 'text/html');
-            
-            const newCartItems = doc.querySelector('cart-drawer-items');
-            const currentCartItems = document.querySelector('cart-drawer-items');
-            
-            if (newCartItems && currentCartItems) {
-              currentCartItems.replaceWith(newCartItems);
-            }
-            
-            const newFooter = doc.querySelector('.cart-drawer__footer');
-            const currentFooter = document.querySelector('.cart-drawer__footer');
-            
-            if (newFooter && currentFooter) {
-              currentFooter.replaceWith(newFooter);
-            }
-            
-            log('✅', 'Cart updated via section fetch');
-            
-            getCart().then(freshCart => {
-              if (freshCart) {
-                updateGrandTotalUI(freshCart);
-                syncCheckboxState();
-              }
-            });
-          })
-          .catch(error => {
-            log('❌', 'Section fetch failed:', error);
-          });
-      }
-    });
+      });
+    }
   }
   
   // ==================== MAIN LOGIC ====================
   
   async function handleAdd() {
-    if (state.processing) {
-      log('⏳', 'Already processing...');
-      return;
-    }
+    if (state.processing) return;
     
     state.processing = true;
     showLoader(true);
     
     try {
       const cartData = await getCart();
-      if (!cartData) {
-        throw new Error('Unable to fetch cart data');
-      }
+      if (!cartData) throw new Error('Unable to fetch cart data');
       
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       
       if (totalNonInsuranceQuantity === 0) {
-        log('⚠️', 'No products to insure');
         setCheckbox(false, true);
         return;
       }
@@ -3020,26 +3042,22 @@
       if (hasInsurance(cartData)) {
         const currentInsuranceQuantity = getInsuranceQuantity(cartData);
         if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
-          log('ℹ️', `Updating insurance quantity from ${currentInsuranceQuantity} to ${totalNonInsuranceQuantity}`);
           await updateInsuranceQuantity(totalNonInsuranceQuantity);
-        } else {
-          log('ℹ️', 'Insurance already at correct quantity');
         }
       } else {
         await addInsuranceToCart(totalNonInsuranceQuantity);
       }
       
+      await wait(200);
       const freshCart = await getCart();
       if (freshCart) {
         updateGrandTotalUI(freshCart);
       }
       
-      await wait(200);
       triggerCartUpdate();
       
     } catch (error) {
       log('❌', 'Failed to add/update insurance:', error);
-      alert('Failed to add insurance: ' + error.message);
       setCheckbox(false, true);
     } finally {
       state.processing = false;
@@ -3048,28 +3066,24 @@
   }
   
   async function handleRemove() {
-    if (state.processing) {
-      log('⏳', 'Already processing...');
-      return;
-    }
+    if (state.processing) return;
     
     state.processing = true;
     showLoader(true);
     
     try {
       await removeInsuranceFromCart();
-      const freshCart = await getCart();
       
+      await wait(200);
+      const freshCart = await getCart();
       if (freshCart) {
         updateGrandTotalUI(freshCart);
       }
       
-      await wait(200);
       triggerCartUpdate();
       
     } catch (error) {
       log('❌', 'Failed to remove insurance:', error);
-      alert('Failed to remove insurance: ' + error.message);
       setCheckbox(true, true);
     } finally {
       state.processing = false;
@@ -3083,9 +3097,7 @@
       if (!cartData) return;
       
       const has = hasInsurance(cartData);
-      log('🔄', 'Syncing checkbox state:', has);
       setCheckbox(has, true);
-      
       await updateGrandTotalUI(cartData);
     } catch (error) {
       log('❌', 'Sync error:', error);
@@ -3099,7 +3111,6 @@
     }
     
     const checked = event.target.checked;
-    log('📝', 'Checkbox changed by user:', checked);
     
     if (checked) {
       handleAdd();
@@ -3110,46 +3121,8 @@
   
   // ==================== QUANTITY SYNC ====================
   
-  function setupQuantitySync() {
-    // Monitor cart quantity changes
-    const cartObserver = new MutationObserver((mutations) => {
-      for (const mutation of mutations) {
-        // Check if quantity inputs changed
-        const quantityInputs = document.querySelectorAll('.cart-item__quantity input[type="number"]');
-        quantityInputs.forEach(input => {
-          if (mutation.target === input || mutation.addedNodes.contains?.(input)) {
-            log('🔄', 'Quantity input detected');
-            // Add event listener for changes
-            input.addEventListener('change', debounce(() => {
-              syncInsuranceWithProducts();
-            }, 500));
-          }
-        });
-      }
-    });
-    
-    cartObserver.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
-    
-    // Also listen for quantity buttons
-    document.addEventListener('click', (event) => {
-      if (event.target.matches('.cart-item__quantity-wrapper button') || 
-          event.target.closest('.cart-item__quantity-wrapper button')) {
-        log('🔄', 'Quantity button clicked');
-        setTimeout(() => {
-          syncInsuranceWithProducts();
-        }, 300);
-      }
-    });
-  }
-  
   async function syncInsuranceWithProducts() {
-    if (state.processing || state.removalInProgress) {
-      log('⏳', 'Already processing, skipping sync');
-      return;
-    }
+    if (state.processing || state.removalInProgress || state.handlingLastProductRemoval) return;
     
     try {
       const cartData = await getCart();
@@ -3159,49 +3132,26 @@
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       const currentInsuranceQuantity = getInsuranceQuantity(cartData);
       
-      // Critical: Check if cart is empty (no products)
-      if (totalNonInsuranceQuantity === 0) {
-        if (hasInsuranceInCart) {
-          log('⚠️', 'No products left, removing insurance before cart empties');
-          state.processing = true;
-          showLoader(true);
-          
-          await removeInsuranceFromCart();
-          
-          // Wait longer to ensure removal completes
-          await wait(400);
-          
-          const verifyCart = await getCart();
-          if (verifyCart && !hasInsurance(verifyCart)) {
-            log('✅', 'Insurance successfully removed, cart is now empty');
-            triggerCartUpdate();
-          }
-          
-          state.processing = false;
-          showLoader(false);
-        }
+      if (totalNonInsuranceQuantity === 0 && hasInsuranceInCart) {
+        state.processing = true;
+        await removeInsuranceFromCart(false);
+        state.processing = false;
         return;
       }
       
-      if (!hasInsuranceInCart) {
-        log('ℹ️', 'No insurance in cart, no sync needed');
-        return;
-      }
+      if (!hasInsuranceInCart) return;
       
       if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
-        log('🔄', `Syncing insurance: ${currentInsuranceQuantity} → ${totalNonInsuranceQuantity}`);
         state.processing = true;
         showLoader(true);
         
         await updateInsuranceQuantity(totalNonInsuranceQuantity);
+        await wait(200);
         
         const freshCart = await getCart();
         if (freshCart) {
           updateGrandTotalUI(freshCart);
         }
-        
-        await wait(200);
-        triggerCartUpdate();
         
         state.processing = false;
         showLoader(false);
@@ -3216,168 +3166,111 @@
   function debounce(func, wait) {
     let timeout;
     return function executedFunction(...args) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
       clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
+      timeout = setTimeout(() => func(...args), wait);
     };
   }
   
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
-    // Track if we're handling a removal
-    let isHandlingRemoval = false;
-    
-    // Intercept CartRemoveButton clicks
     document.addEventListener('click', async function(event) {
       const removeButton = event.target.closest('cart-remove-button');
-      if (!removeButton) return;
-      
-      // Prevent multiple simultaneous removals
-      if (isHandlingRemoval) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        log('⏳', 'Already handling a removal, please wait');
-        return;
-      }
-      
-      log('🔍', 'Remove button clicked');
+      if (!removeButton || state.handlingLastProductRemoval) return;
       
       const lineIndex = removeButton.dataset.index;
       const variantId = removeButton.querySelector('button')?.dataset?.variantId;
       
-      // Don't intercept if this is the insurance product itself
-      if (variantId === CONFIG.VARIANT_ID) {
-        log('ℹ️', 'Insurance product removal, allowing default behavior');
-        return;
-      }
+      if (variantId === CONFIG.VARIANT_ID) return;
       
-      log('📊', 'Remove details:', { lineIndex, variantId });
-      
-      // Check if this would be the last product
       const cartData = await getCart();
-      if (!cartData) {
-        log('❌', 'Could not fetch cart');
-        return;
-      }
+      if (!cartData) return;
       
       const nonInsuranceCount = getNonInsuranceCount(cartData);
       const hasInsuranceInCart = hasInsurance(cartData);
       const removingItem = cartData.items[lineIndex - 1];
       const removingQuantity = removingItem?.quantity || 0;
       
-      log('📊', 'Cart analysis:', {
-        totalItems: cartData.items.length,
-        nonInsuranceCount,
-        removingQuantity,
-        hasInsuranceInCart,
-        willBeEmpty: nonInsuranceCount === removingQuantity
-      });
-      
-      // ONLY intercept if this is the LAST product and insurance exists
-      if (nonInsuranceCount === removingQuantity && hasInsuranceInCart && !state.removalInProgress) {
-        log('🚨', 'This is the LAST product! Intercepting to remove insurance first...');
+      // ONLY intercept if this is the LAST product
+      if (nonInsuranceCount === removingQuantity && hasInsuranceInCart) {
+        log('🚨', 'Last product removal - intercepting');
         
-        // Prevent default removal
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
         
-        isHandlingRemoval = true;
-        showLoader(true);
-        state.removalInProgress = true;
+        state.handlingLastProductRemoval = true;
+        showOverlay();
         
         try {
-          // Remove insurance first
-          log('🗑️', 'Step 1: Removing insurance...');
-          await removeInsuranceFromCart();
-          await wait(500);
+          // Remove insurance with aggressive retry
+          log('🗑️', 'Removing insurance first...');
+          await removeInsuranceFromCart(true);
           
-          // Verify insurance removal with retries
-          let verifyCart = await getCart();
-          let retries = 0;
-          while (verifyCart && hasInsurance(verifyCart) && retries < 3) {
-            log('⚠️', `Insurance still present, retry ${retries + 1}/3`);
-            await wait(300);
-            await removeInsuranceFromCart();
+          // Extra wait to ensure backend is ready
+          await wait(600);
+          
+          // Verify one more time
+          const verifyCart = await getCart();
+          if (verifyCart && hasInsurance(verifyCart)) {
+            log('❌', 'Insurance still exists after all retries');
+            // Force one final removal
+            await fetch('/cart/change.js', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+              },
+              body: JSON.stringify({
+                id: CONFIG.VARIANT_ID,
+                quantity: 0
+              })
+            });
             await wait(500);
-            verifyCart = await getCart();
-            retries++;
           }
           
-          if (verifyCart && !hasInsurance(verifyCart)) {
-            log('✅', 'Insurance successfully removed');
-          } else {
-            log('❌', 'Failed to remove insurance after retries');
-          }
+          log('✅', 'Insurance removed, removing product...');
           
-          // Now proceed with the actual product removal
-          log('🗑️', 'Step 2: Removing product...');
+          // Remove the product
           const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
-          
           if (cartItems) {
-            // Push remove event to dataLayer
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push({
               event: 'removeFromCart',
-              'products': {
-                ...removeButton.dataset,
-              }
+              'products': { ...removeButton.dataset }
             });
             
-            // Call updateQuantity with 0 to remove
             await cartItems.updateQuantity(lineIndex, 0, event);
-            
-            // Force a full page reload after removal since cart should be empty
-            setTimeout(async () => {
-              const finalCart = await getCart();
-              if (finalCart && finalCart.item_count === 0) {
-                log('🔄', 'Cart is empty, forcing full refresh');
-                window.location.reload();
-              }
-            }, 1000);
           }
+          
+          // Force reload after short delay
+          setTimeout(() => {
+            log('🔄', 'Forcing reload for empty cart');
+            window.location.reload();
+          }, 800);
           
         } catch (error) {
           log('❌', 'Error in removal process:', error);
-        } finally {
-          state.removalInProgress = false;
-          showLoader(false);
-          isHandlingRemoval = false;
+          hideOverlay();
+          state.handlingLastProductRemoval = false;
         }
       } else {
-        // NOT the last product - allow normal removal and just sync insurance quantity
-        log('ℹ️', 'Not the last product, allowing normal removal');
-        // Don't prevent default - let the normal cart removal work
-        
-        // After the removal completes, sync insurance quantity
-        setTimeout(async () => {
-          await wait(500); // Wait for cart to update
-          await syncInsuranceWithProducts();
-        }, 100);
+        // Normal removal - sync insurance after
+        setTimeout(() => syncInsuranceWithProducts(), 600);
       }
       
-    }, true); // Use capture phase to intercept before other handlers
+    }, true);
   }
   
   // ==================== INITIALIZATION ====================
   
   function attachEventListeners() {
     const elements = getElements();
-    
-    if (!elements.checkbox) {
-      log('⚠️', 'Checkbox not found');
-      return false;
-    }
+    if (!elements.checkbox) return false;
     
     elements.checkbox.removeEventListener('change', handleCheckboxChange);
     elements.checkbox.addEventListener('change', handleCheckboxChange);
     
-    log('✅', 'Event listeners attached');
     return true;
   }
   
@@ -3388,7 +3281,6 @@
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) {
               if (node.matches && (node.matches('cart-drawer-items') || node.querySelector && node.querySelector('cart-drawer-items'))) {
-                log('🔄', 'Cart drawer updated, re-initializing...');
                 setTimeout(() => {
                   attachEventListeners();
                   syncCheckboxState();
@@ -3401,11 +3293,9 @@
         if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
           const target = mutation.target;
           if (target.tagName === 'CART-DRAWER' && target.hasAttribute('open')) {
-            log('🔄', 'Cart drawer opened');
             setTimeout(() => {
               attachEventListeners();
               syncCheckboxState();
-              setupQuantitySync();
             }, 100);
           }
         }
@@ -3421,40 +3311,27 @@
   }
   
   function listenToCartEvents() {
-    document.addEventListener('cart:refresh', () => {
-      log('🔄', 'Cart refresh event');
-      setTimeout(() => {
-        attachEventListeners();
-        syncCheckboxState();
-        syncInsuranceWithProducts();
-      }, 100);
-    });
-    
     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
-      subscribe(PUB_SUB_EVENTS.cartUpdate, (event) => {
-        log('🔄', 'PUB_SUB cartUpdate event');
-        setTimeout(async () => {
-          await syncCheckboxState();
-          await syncInsuranceWithProducts();
+      subscribe(PUB_SUB_EVENTS.cartUpdate, () => {
+        setTimeout(() => {
+          syncCheckboxState();
+          syncInsuranceWithProducts();
         }, 100);
       });
     }
   }
   
   function init() {
-    log('🚀', 'Initializing Insurance Manager...');
+    log('🚀', 'Initializing Insurance Manager v6.0...');
     
-    // CRITICAL: Intercept cart item removal BEFORE customElements are defined
     interceptCartItemRemoval();
-    
     attachEventListeners();
     syncCheckboxState();
     observeCartChanges();
     listenToCartEvents();
-    setupQuantitySync();
     
     state.initialized = true;
-    log('✅', 'Insurance Manager initialized successfully!');
+    log('✅', 'Insurance Manager initialized!');
   }
   
   // ==================== START ====================
