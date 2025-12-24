@@ -80,17 +80,20 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderProductGridContainer(html) {
-    document.getElementById('ProductGridContainer').innerHTML = new DOMParser()
-      .parseFromString(html, 'text/html')
-      .getElementById('ProductGridContainer').innerHTML;
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const newGrid = parsed.getElementById('ProductGridContainer');
 
-    document
-      .getElementById('ProductGridContainer')
-      .querySelectorAll('.scroll-trigger')
-      .forEach((element) => {
-        element.classList.add('scroll-trigger--cancel');
-      });
+  const container = document.getElementById('ProductGridContainer');
+  container.innerHTML = newGrid.innerHTML;
+
+  // ✅ THIS IS WHAT WAS MISSING (Dawn does this)
+  container.querySelector('.collection')?.classList.remove('loading');
+
+  container.querySelectorAll('.scroll-trigger').forEach((element) => {
+      element.classList.add('scroll-trigger--cancel');
+    });
   }
+
 
   static renderProductCount(html) {
     const count = new DOMParser().parseFromString(html, 'text/html').getElementById('ProductCount').innerHTML;
