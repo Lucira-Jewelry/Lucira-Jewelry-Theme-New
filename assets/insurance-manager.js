@@ -3227,36 +3227,77 @@
   
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
-  function interceptCartRemoval() {
-    // Listen for cart update events
-    const originalPublish = window.publish;
-    if (typeof originalPublish === 'function') {
-      window.publish = function(eventName, data) {
-        if (eventName === 'cart:update' || eventName.includes('cartUpdate')) {
-          log('🔔', 'Cart update event intercepted:', data);
-          
-          // Check if this is a product removal
-          setTimeout(async () => {
-            const cartData = await getCart();
-            if (cartData) {
-              const nonInsuranceCount = getNonInsuranceCount(cartData);
-              const hasInsuranceInCart = hasInsurance(cartData);
-              
-              if (nonInsuranceCount === 0 && hasInsuranceInCart && !state.removalInProgress) {
-                log('🚨', 'Last product removed, cleaning up insurance...');
-                await removeInsuranceFromCart();
-                await wait(300);
+  function interceptCartItemRemoval() {
+    // Override the CartItems updateQuantity method to intercept removals
+    const originalDefine = customElements.define;
+    
+    customElements.define = function(name, constructor, options) {
+      if (name === 'cart-items') {
+        const OriginalCartItems = constructor;
+        
+        class InterceptedCartItems extends OriginalCartItems {
+          async updateQuantity(line, quantity, event, name, variantId) {
+            log('🔍', 'Intercepted updateQuantity:', { line, quantity, variantId });
+            
+            // Check if this is a removal (quantity = 0) and if it's the last product
+            if (quantity === 0) {
+              const cartData = await getCart();
+              if (cartData) {
+                const nonInsuranceCount = getNonInsuranceCount(cartData);
+                const hasInsuranceInCart = hasInsurance(cartData);
+                const removingItemQuantity = cartData.items[line - 1]?.quantity || 0;
                 
-                // Force cart UI update
-                originalPublish.call(this, eventName, data);
+                log('📊', 'Removal check:', {
+                  nonInsuranceCount,
+                  removingItemQuantity,
+                  hasInsuranceInCart,
+                  willBeLastProduct: nonInsuranceCount === removingItemQuantity
+                });
+                
+                // If this removal will make cart empty AND insurance exists
+                if (nonInsuranceCount === removingItemQuantity && hasInsuranceInCart && !state.removalInProgress) {
+                  log('🚨', 'Last product being removed! Removing insurance first...');
+                  
+                  // Show loader
+                  showLoader(true);
+                  state.removalInProgress = true;
+                  
+                  try {
+                    // Remove insurance FIRST
+                    await removeInsuranceFromCart();
+                    
+                    // Wait to ensure removal is complete
+                    await wait(500);
+                    
+                    // Verify insurance is gone
+                    const verifyCart = await getCart();
+                    if (verifyCart && hasInsurance(verifyCart)) {
+                      log('⚠️', 'Insurance still present, retrying...');
+                      await removeInsuranceFromCart();
+                      await wait(300);
+                    }
+                    
+                    log('✅', 'Insurance removed, now proceeding with product removal');
+                  } catch (error) {
+                    log('❌', 'Failed to remove insurance before product:', error);
+                  } finally {
+                    state.removalInProgress = false;
+                    showLoader(false);
+                  }
+                }
               }
             }
-          }, 100);
+            
+            // Now call the original updateQuantity
+            return super.updateQuantity(line, quantity, event, name, variantId);
+          }
         }
         
-        return originalPublish.call(this, eventName, data);
-      };
-    }
+        return originalDefine.call(this, name, InterceptedCartItems, options);
+      }
+      
+      return originalDefine.call(this, name, constructor, options);
+    };
   }
   
   // ==================== INITIALIZATION ====================
@@ -3339,12 +3380,14 @@
   function init() {
     log('🚀', 'Initializing Insurance Manager...');
     
+    // CRITICAL: Intercept cart item removal BEFORE customElements are defined
+    interceptCartItemRemoval();
+    
     attachEventListeners();
     syncCheckboxState();
     observeCartChanges();
     listenToCartEvents();
     setupQuantitySync();
-    interceptCartRemoval();
     
     state.initialized = true;
     log('✅', 'Insurance Manager initialized successfully!');
