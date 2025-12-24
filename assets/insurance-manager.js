@@ -3430,12 +3430,11 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v7.0 Starting...');
+  console.log('🎯 Insurance Manager Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
-    PRICE_PER_UNIT: null, // Will be fetched from variant
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
@@ -3464,8 +3463,18 @@
   }
   
   function formatMoney(cents) {
-    const rupees = Math.round(cents / 100);
-    return '₹' + rupees.toLocaleString('en-IN');
+    // Convert cents to rupees (Shopify stores prices in cents)
+    // Example: If price in admin is "10,000.00" (₹10,000)
+    // Shopify API returns: 1000000 (1,000,000 cents)
+    const rupees = cents / 100;
+    
+    // Format exactly like Shopify admin shows
+    const formatted = rupees.toLocaleString('en-IN', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    
+    return '₹' + formatted;
   }
   
   function getElements() {
@@ -3484,70 +3493,37 @@
     }
     
     try {
-      log('💰', 'Fetching insurance price from backend...');
+      log('💰', 'Fetching insurance price...');
       
-      // Method 1: Try to get from the page data attribute
+      // Check if price is already displayed on page
       const priceDisplay = document.getElementById('insurancePriceDisplay');
-      if (priceDisplay && priceDisplay.dataset.insurancePrice) {
-        state.insurancePrice = parseInt(priceDisplay.dataset.insurancePrice);
-        log('✅', 'Price fetched from data attribute:', formatMoney(state.insurancePrice));
-        return state.insurancePrice;
+      if (priceDisplay && priceDisplay.textContent) {
+        // Try to extract from displayed text
+        const priceMatch = priceDisplay.textContent.match(/₹([\d,]+\.?\d*)/);
+        if (priceMatch) {
+          const priceText = priceMatch[1].replace(/,/g, '');
+          const rupees = parseFloat(priceText);
+          if (!isNaN(rupees)) {
+            state.insurancePrice = rupees * 100; // Convert to cents
+            log('✅', 'Price extracted from display:', formatMoney(state.insurancePrice));
+            return state.insurancePrice;
+          }
+        }
       }
       
-      // Method 2: Fetch from Shopify Variant API
+      // Fetch from Shopify API
       const response = await fetch(`/variants/${CONFIG.VARIANT_ID}.js`);
       
       if (response.ok) {
         const variantData = await response.json();
         state.insurancePrice = variantData.price;
-        log('✅', 'Price fetched from variant API:', formatMoney(state.insurancePrice));
-      } else {
-        // Method 3: Try product endpoint
-        const productResponse = await fetch('/products.json?limit=250');
-        if (productResponse.ok) {
-          const productsData = await productResponse.json();
-          // Find insurance product
-          for (const product of productsData.products) {
-            const variant = product.variants.find(v => 
-              v.id === parseInt(CONFIG.VARIANT_ID) || 
-              v.id.toString() === CONFIG.VARIANT_ID
-            );
-            if (variant) {
-              state.insurancePrice = variant.price;
-              log('✅', 'Price fetched from products API:', formatMoney(state.insurancePrice));
-              break;
-            }
-          }
-        }
-      }
-      
-      // If still not found, use the actual price from your backend
-      if (state.insurancePrice === null) {
-        // This should match what's in your Shopify admin
-        state.insurancePrice = 10000; // ₹100
-        log('⚠️', 'Using configured backend price:', formatMoney(state.insurancePrice));
-      }
-      
-      // Update the display with the actual price
-      if (priceDisplay) {
-        priceDisplay.textContent = formatMoney(state.insurancePrice);
-        priceDisplay.dataset.insurancePrice = state.insurancePrice;
+        log('✅', 'Price fetched:', formatMoney(state.insurancePrice));
       }
       
       return state.insurancePrice;
     } catch (error) {
       log('❌', 'Price fetch error:', error);
-      // Don't set dummy price - try to get from existing display
-      const priceDisplay = document.getElementById('insurancePriceDisplay');
-      if (priceDisplay && priceDisplay.textContent) {
-        // Extract price from displayed text
-        const priceText = priceDisplay.textContent.replace('₹', '').replace(/,/g, '').trim();
-        const rupees = parseFloat(priceText);
-        if (!isNaN(rupees)) {
-          state.insurancePrice = rupees * 100;
-        }
-      }
-      return state.insurancePrice;
+      return null;
     }
   }
   
@@ -3600,7 +3576,6 @@
     const overlay = createOverlay();
     overlay.style.display = 'flex';
     
-    // Find cart drawer and set its z-index lower
     const cartDrawer = document.querySelector('cart-drawer');
     if (cartDrawer) {
       cartDrawer.style.zIndex = '999998';
@@ -3617,7 +3592,6 @@
       overlay.style.display = 'none';
     }
     
-    // Restore cart drawer z-index
     const cartDrawer = document.querySelector('cart-drawer');
     if (cartDrawer) {
       cartDrawer.style.zIndex = '';
@@ -4244,46 +4218,6 @@
     }, true);
   }
   
-  // ==================== PRICE INITIALIZATION ====================
-  
-  async function initializePriceDisplay() {
-    try {
-      const priceDisplay = document.getElementById('insurancePriceDisplay');
-      
-      if (!priceDisplay) {
-        log('⚠️', 'Price display element not found');
-        return;
-      }
-      
-      // Check if price is already displayed (from Liquid)
-      const currentText = priceDisplay.textContent.trim();
-      if (currentText && currentText.includes('₹')) {
-        // Extract price from displayed text
-        const priceText = currentText.replace('₹', '').replace(/,/g, '').trim();
-        const rupees = parseFloat(priceText);
-        if (!isNaN(rupees)) {
-          state.insurancePrice = rupees * 100; // Convert to cents
-          log('✅', 'Price extracted from display:', formatMoney(state.insurancePrice));
-        }
-      } else if (priceDisplay.dataset.insurancePrice) {
-        // Get price from data attribute
-        state.insurancePrice = parseInt(priceDisplay.dataset.insurancePrice);
-        log('✅', 'Price loaded from data attribute:', formatMoney(state.insurancePrice));
-      } else {
-        // Fetch price from backend
-        await fetchInsurancePrice();
-      }
-      
-      // Ensure display is updated
-      if (state.insurancePrice && (!currentText || currentText === '')) {
-        priceDisplay.textContent = formatMoney(state.insurancePrice);
-      }
-      
-    } catch (error) {
-      log('❌', 'Price display init error:', error);
-    }
-  }
-  
   // ==================== INITIALIZATION ====================
   
   function attachEventListeners() {
@@ -4344,10 +4278,25 @@
   }
   
   async function init() {
-    log('🚀', 'Initializing Insurance Manager v7.0...');
+    log('🚀', 'Initializing Insurance Manager...');
     
-    // Initialize price display first (this will show the actual backend price)
-    await initializePriceDisplay();
+    // First, try to extract price from Liquid-rendered content
+    const priceDisplay = document.getElementById('insurancePriceDisplay');
+    if (priceDisplay && priceDisplay.textContent && priceDisplay.textContent.includes('₹')) {
+      // Price is already displayed by Liquid - extract it
+      const priceMatch = priceDisplay.textContent.match(/₹([\d,]+\.?\d*)/);
+      if (priceMatch) {
+        const priceText = priceMatch[1].replace(/,/g, '');
+        const rupees = parseFloat(priceText);
+        if (!isNaN(rupees)) {
+          state.insurancePrice = rupees * 100; // Convert to cents for internal use
+          log('✅', 'Price loaded from Liquid:', formatMoney(state.insurancePrice));
+        }
+      }
+    } else {
+      // If not in Liquid, fetch from API
+      await fetchInsurancePrice();
+    }
     
     // Then fetch cart data
     const cartData = await getCart();
