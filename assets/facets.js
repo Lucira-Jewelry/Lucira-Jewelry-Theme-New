@@ -117,7 +117,6 @@ class FacetFiltersForm extends HTMLElement {
       '#FacetFiltersForm .js-filter, #FacetFiltersFormMobile .js-filter, #FacetFiltersPillsForm .js-filter'
     );
 
-    // Remove facets that are no longer returned from the server
     Array.from(facetDetailsElementsFromDom).forEach((currentElement) => {
       if (!Array.from(facetDetailsElementsFromFetch).some(({ id }) => currentElement.id === id)) {
         currentElement.remove();
@@ -134,13 +133,11 @@ class FacetFiltersForm extends HTMLElement {
 
     facetsToRender.forEach((elementToRender, index) => {
       const currentElement = document.getElementById(elementToRender.id);
-      // Element already rendered in the DOM so just update the innerHTML
       if (currentElement) {
         document.getElementById(elementToRender.id).innerHTML = elementToRender.innerHTML;
       } else {
         if (index > 0) {
           const { className: previousElementClassName, id: previousElementId } = facetsToRender[index - 1];
-          // Same facet type (eg horizontal/vertical or drawer/mobile)
           if (elementToRender.className === previousElementClassName) {
             document.getElementById(previousElementId).after(elementToRender);
             return;
@@ -167,8 +164,8 @@ class FacetFiltersForm extends HTMLElement {
         const newElementSelector = newFacetDetailsElement.classList.contains('mobile-facets__details')
           ? `.mobile-facets__close-button`
           : `.facets__summary`;
-        const newElementToActivate = newFacetDetailsElement.querySelector(newElementSelector);
 
+        const newElementToActivate = newFacetDetailsElement.querySelector(newElementSelector);
         const isTextInput = event.target.getAttribute('type') === 'text';
 
         if (newElementToActivate && !isTextInput) newElementToActivate.focus();
@@ -366,7 +363,6 @@ customElements.define('facet-remove', FacetRemove);
 
 document.getElementById('SortBy-mobile').addEventListener('change', function () {
   const mobileForm = document.getElementById('FacetFiltersFormMobile');
-  // Update hidden input in mobile form
   let hiddenInput = mobileForm.querySelector('input[name="sort_by"]');
   if (!hiddenInput) {
     hiddenInput = document.createElement('input');
@@ -376,7 +372,6 @@ document.getElementById('SortBy-mobile').addEventListener('change', function () 
   }
   hiddenInput.value = this.value;
 
-  // Trigger the FacetFiltersForm submit handler
   const facetFormElement = mobileForm.closest('facet-filters-form');
   if (facetFormElement && facetFormElement.onSubmitHandler) {
     facetFormElement.onSubmitHandler({ target: hiddenInput, srcElement: hiddenInput, preventDefault: () => {} });
