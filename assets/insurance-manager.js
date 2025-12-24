@@ -3622,7 +3622,17 @@
       }
     }
   }
-  
+
+    function applyInsurancePriceToDOM() {
+    const priceEl = document.querySelector('[data-insurance-price]');
+    if (!priceEl) return;
+
+    if (!state.insurancePrice) return;
+
+    priceEl.textContent = formatMoney(state.insurancePrice);
+    log('💡', 'Insurance price applied to DOM:', priceEl.textContent);
+  }
+
 
   function renderInitialInsurancePrice() {
   const elements = getElements();
@@ -4272,10 +4282,12 @@
           const target = mutation.target;
           if (target.tagName === 'CART-DRAWER' && target.hasAttribute('open')) {
             setTimeout(() => {
+              applyInsurancePriceToDOM();   // 👈 THIS IS THE FIX
               attachEventListeners();
               syncCheckboxState();
-            }, 100);
+            }, 50);
           }
+
         }
       }
     });
