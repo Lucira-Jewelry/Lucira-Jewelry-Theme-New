@@ -2566,7 +2566,7 @@
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
-    PRICE_PER_UNIT: null, // Will be fetched from variant
+    // PRICE_PER_UNIT: null, 
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
