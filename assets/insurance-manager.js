@@ -3496,35 +3496,30 @@
     log('💰', 'Fetching insurance price from variant endpoint...');
 
     const response = await fetch(`/variants/${CONFIG.VARIANT_ID}.js`, {
-      cache: 'no-store'
+      headers: { 'Accept': 'application/json' }
     });
 
     if (!response.ok) {
-      throw new Error('Variant fetch failed');
+      throw new Error('Variant endpoint failed');
     }
 
-    const data = await response.json();
+    const variant = await response.json();
 
-    // price is in cents
-    state.insurancePrice = data.price;
+    // Shopify returns price in cents
+    state.insurancePrice = variant.price;
 
     log('✅', 'Insurance price fetched on init:', formatMoney(state.insurancePrice));
-
-    // OPTIONAL: update UI immediately if price placeholder exists
-    updateInsurancePriceUI(state.insurancePrice);
-
     return state.insurancePrice;
 
   } catch (error) {
-    log('❌', 'Variant price fetch error:', error);
+    log('❌', 'Variant price fetch failed:', error);
 
-    // last-resort fallback
+    // FINAL fallback (only if everything fails)
     state.insurancePrice = 10000;
-    updateInsurancePriceUI(state.insurancePrice);
-
     return state.insurancePrice;
   }
 }
+
 
   
   // ==================== OVERLAY SYSTEM ====================
@@ -4270,21 +4265,29 @@
   }
   
   async function init() {
-    log('🚀', 'Initializing Insurance Manager v7.0...');
-    
-    // Fetch insurance price on init
-    await fetchInsurancePrice();
-    
-    interceptCartItemRemoval();
-    attachEventListeners();
-    syncCheckboxState();
-    observeCartChanges();
-    listenToCartEvents();
-    
-    state.initialized = true;
-    log('✅', 'Insurance Manager initialized!');
+  log('🚀', 'Initializing Insurance Manager v7.0...');
+
+  const price = await fetchInsurancePrice();
+
+  // 👇 NEW: render base insurance price even when unchecked
+  const elements = getElements();
+  if (elements.box) {
+    const priceEl = elements.box.querySelector('.insurance-price');
+    if (priceEl && price) {
+      priceEl.textContent = formatMoney(price);
+    }
   }
-  
+
+  interceptCartItemRemoval();
+  attachEventListeners();
+  syncCheckboxState();
+  observeCartChanges();
+  listenToCartEvents();
+
+  state.initialized = true;
+  log('✅', 'Insurance Manager initialized!');
+}
+
   // ==================== START ====================
   
   if (document.readyState === 'loading') {
