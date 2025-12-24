@@ -2977,6 +2977,7 @@
           quantitySpan.textContent = ` (${insuranceQuantity})`;
           quantitySpan.style.fontWeight = 'bold';
           quantitySpan.style.marginLeft = '4px';
+          quantitySpan.style.color = '#1a1a1a';
           label.appendChild(quantitySpan);
           
           const priceElement = label.querySelector('.insurance-price');
