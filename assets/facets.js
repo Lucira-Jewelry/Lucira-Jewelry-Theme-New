@@ -36,6 +36,21 @@ class FacetFiltersForm extends HTMLElement {
     });
   }
 
+  static showImmediateFilterLoader() {
+    const gridContainer = document.getElementById('ProductGridContainer');
+    const collectionEl = gridContainer?.querySelector('.collection');
+
+    const loadingSpinners = document.querySelectorAll(
+      '.facets-container .loading__spinner, facet-filters-form .loading__spinner'
+    );
+
+    loadingSpinners.forEach((spinner) => spinner.classList.remove('hidden'));
+
+    if (collectionEl && !collectionEl.classList.contains('loading')) {
+      collectionEl.classList.add('loading');
+    }
+  }
+
   /* =========================
      🔥 EXTERNAL SORT LOADER
      ========================= */
