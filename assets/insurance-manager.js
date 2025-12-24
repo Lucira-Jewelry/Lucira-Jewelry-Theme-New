@@ -2558,12 +2558,12 @@
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v6.0 Starting...');
+  console.log('🎯 Insurance Manager v7.0 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
-    PRICE_PER_UNIT: 10000,
+    PRICE_PER_UNIT: null, // Will be fetched from variant
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
@@ -2577,7 +2577,8 @@
     initialized: false,
     currentCart: null,
     removalInProgress: false,
-    handlingLastProductRemoval: false
+    handlingLastProductRemoval: false,
+    insurancePrice: null
   };
   
   // ==================== UTILITIES ====================
@@ -2603,6 +2604,47 @@
     };
   }
   
+  // ==================== PRICE FETCHING ====================
+  
+  async function fetchInsurancePrice() {
+    if (state.insurancePrice !== null) {
+      return state.insurancePrice;
+    }
+    
+    try {
+      log('💰', 'Fetching insurance price from variant...');
+      const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
+      
+      if (!response.ok) {
+        // Try alternative endpoint
+        const cartResponse = await fetch('/cart.js');
+        const cart = await cartResponse.json();
+        const insuranceItem = cart.items.find(item => 
+          String(item.variant_id) === CONFIG.VARIANT_ID || 
+          String(item.id) === CONFIG.VARIANT_ID
+        );
+        
+        if (insuranceItem) {
+          state.insurancePrice = insuranceItem.price;
+          log('✅', 'Price fetched from cart:', formatMoney(state.insurancePrice));
+          return state.insurancePrice;
+        }
+        
+        throw new Error('Unable to fetch insurance price');
+      }
+      
+      const data = await response.json();
+      state.insurancePrice = data.price;
+      log('✅', 'Price fetched from variant:', formatMoney(state.insurancePrice));
+      return state.insurancePrice;
+    } catch (error) {
+      log('❌', 'Price fetch error:', error);
+      // Fallback to 10000 if unable to fetch
+      state.insurancePrice = 10000;
+      return state.insurancePrice;
+    }
+  }
+  
   // ==================== OVERLAY SYSTEM ====================
   
   function createOverlay() {
@@ -2616,8 +2658,8 @@
         left: 0;
         width: 100%;
         height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 99999;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 999999;
         display: none;
         align-items: center;
         justify-content: center;
@@ -2651,8 +2693,16 @@
   function showOverlay() {
     const overlay = createOverlay();
     overlay.style.display = 'flex';
+    
+    // Find cart drawer and set its z-index lower
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) {
+      cartDrawer.style.zIndex = '999998';
+    }
+    
     document.body.style.overflow = 'hidden';
     document.body.style.pointerEvents = 'none';
+    overlay.style.pointerEvents = 'auto';
   }
   
   function hideOverlay() {
@@ -2660,6 +2710,13 @@
     if (overlay) {
       overlay.style.display = 'none';
     }
+    
+    // Restore cart drawer z-index
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) {
+      cartDrawer.style.zIndex = '';
+    }
+    
     document.body.style.overflow = '';
     document.body.style.pointerEvents = '';
   }
@@ -2724,6 +2781,15 @@
     return insuranceItem ? insuranceItem.quantity : 0;
   }
   
+  function getInsurancePrice(cartData) {
+    if (!cartData || !cartData.items) return state.insurancePrice || 10000;
+    const insuranceItem = cartData.items.find(item => 
+      String(item.variant_id) === CONFIG.VARIANT_ID || 
+      String(item.id) === CONFIG.VARIANT_ID
+    );
+    return insuranceItem ? insuranceItem.price : (state.insurancePrice || 10000);
+  }
+  
   function getNonInsuranceCount(cartData) {
     if (!cartData || !cartData.items) return 0;
     return cartData.items.reduce((count, item) => {
@@ -2769,6 +2835,17 @@
       
       const result = await response.json();
       log('✅', 'Insurance added successfully');
+      
+      // Update price from response
+      if (result.items && result.items.length > 0) {
+        const insuranceItem = result.items.find(item => 
+          String(item.variant_id) === CONFIG.VARIANT_ID
+        );
+        if (insuranceItem && insuranceItem.price) {
+          state.insurancePrice = insuranceItem.price;
+        }
+      }
+      
       return result;
     } catch (error) {
       log('❌', 'Add error:', error);
@@ -2829,7 +2906,6 @@
       const result = await response.json();
       
       if (withRetry) {
-        // Aggressive verification with retries
         let retries = 0;
         let verified = false;
         
@@ -2845,7 +2921,6 @@
           
           if (retries < CONFIG.MAX_RETRIES - 1) {
             log('⚠️', `Insurance still present, retry ${retries + 1}/${CONFIG.MAX_RETRIES}`);
-            // Try removing again
             await fetch('/cart/change.js', {
               method: 'POST',
               headers: {
@@ -2881,11 +2956,9 @@
   async function updateInsuranceDisplay(cartData) {
     if (!cartData) return;
     
-    const nonInsuranceCount = getNonInsuranceCount(cartData);
-    const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
-    const hasProducts = nonInsuranceCount > 0;
-    const hasInsuranceInCart = hasInsurance(cartData);
+    const insurancePrice = getInsurancePrice(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
+    const hasInsuranceInCart = hasInsurance(cartData);
     
     const elements = getElements();
     if (elements.checkbox) {
@@ -2906,7 +2979,7 @@
           
           const priceElement = label.querySelector('.insurance-price');
           if (priceElement) {
-            const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
+            const totalInsurancePrice = insuranceQuantity * insurancePrice;
             priceElement.textContent = formatMoney(totalInsurancePrice);
           }
         }
@@ -2987,12 +3060,13 @@
     
     const hasInsuranceInCart = hasInsurance(cartData);
     const insuranceQuantity = getInsuranceQuantity(cartData);
+    const insurancePrice = getInsurancePrice(cartData);
     
     const insuranceLineItem = document.getElementById('insurance-line-item');
     if (insuranceLineItem) {
       const insuranceValueElement = insuranceLineItem.querySelector('.totals__total-value');
       if (insuranceValueElement && hasInsuranceInCart) {
-        const totalInsurancePrice = insuranceQuantity * CONFIG.PRICE_PER_UNIT;
+        const totalInsurancePrice = insuranceQuantity * insurancePrice;
         insuranceValueElement.textContent = formatMoney(totalInsurancePrice);
         insuranceLineItem.style.display = 'flex';
       } else if (!hasInsuranceInCart) {
@@ -3163,14 +3237,6 @@
     }
   }
   
-  function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(...args), wait);
-    };
-  }
-  
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
@@ -3207,14 +3273,12 @@
           log('🗑️', 'Removing insurance first...');
           await removeInsuranceFromCart(true);
           
-          // Extra wait to ensure backend is ready
           await wait(600);
           
           // Verify one more time
           const verifyCart = await getCart();
           if (verifyCart && hasInsurance(verifyCart)) {
             log('❌', 'Insurance still exists after all retries');
-            // Force one final removal
             await fetch('/cart/change.js', {
               method: 'POST',
               headers: {
@@ -3243,11 +3307,13 @@
             await cartItems.updateQuantity(lineIndex, 0, event);
           }
           
-          // Force reload after short delay
-          setTimeout(() => {
-            log('🔄', 'Forcing reload for empty cart');
-            window.location.reload();
-          }, 800);
+          // NO RELOAD - just hide overlay and reset state
+          await wait(400);
+          hideOverlay();
+          state.handlingLastProductRemoval = false;
+          
+          // Trigger natural cart update
+          triggerCartUpdate();
           
         } catch (error) {
           log('❌', 'Error in removal process:', error);
@@ -3321,8 +3387,11 @@
     }
   }
   
-  function init() {
-    log('🚀', 'Initializing Insurance Manager v6.0...');
+  async function init() {
+    log('🚀', 'Initializing Insurance Manager v7.0...');
+    
+    // Fetch insurance price on init
+    await fetchInsurancePrice();
     
     interceptCartItemRemoval();
     attachEventListeners();
@@ -3349,6 +3418,7 @@
     updateGrandTotalUI,
     syncInsuranceWithProducts,
     removeInsuranceFromCart,
+    fetchInsurancePrice,
     state
   };
   
