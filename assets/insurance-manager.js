@@ -3463,9 +3463,14 @@
     return new Promise(resolve => setTimeout(resolve, ms));
   }
   
+  // function formatMoney(cents) {
+  //   const rupees = Math.round(cents / 100);
+  //   return '₹' + rupees.toLocaleString('en-IN');
+  // }
+
   function formatMoney(cents) {
-    const rupees = Math.round(cents / 100);
-    return '₹' + rupees.toLocaleString('en-IN');
+    // No division - Shopify shows 10000, we want ₹10,000
+    return '₹' + cents.toLocaleString('en-IN');
   }
   
   function getElements() {
