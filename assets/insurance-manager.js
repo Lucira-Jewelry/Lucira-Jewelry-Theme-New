@@ -3503,142 +3503,147 @@
 
 // ==================== OVERLAY SYSTEM ====================
 
-  function createOverlay() {
-    let overlay = document.getElementById('insurance-removal-overlay');
-    if (!overlay) {
-      overlay = document.createElement('div');
-      overlay.id = 'insurance-removal-overlay';
-      overlay.innerHTML = `
-        <div class="insurance-overlay-content">
-          <div class="insurance-spinner">
-            <div class="spinner-ring"></div>
-            <div class="spinner-ring"></div>
-            <div class="spinner-ring"></div>
-          </div>
-          <p class="insurance-overlay-text">Removing insurance...</p>
+  // ==================== OVERLAY SYSTEM ====================
+
+function createOverlay() {
+  let overlay = document.getElementById('insurance-removal-overlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'insurance-removal-overlay';
+    overlay.innerHTML = `
+      <div class="insurance-overlay-content">
+        <div class="insurance-spinner">
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
+          <div class="spinner-ring"></div>
         </div>
-      `;
-      
-      const style = document.createElement('style');
-      style.textContent = `
-        #insurance-removal-overlay {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.75);
-          backdrop-filter: blur(4px);
-          z-index: 10000;
-          display: none;
-          align-items: center;
-          justify-content: center;
-        }
-        
-        .insurance-overlay-content {
-          background: white;
-          padding: 24px 32px;
-          border-radius: 16px;
-          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
-          text-align: center;
-          min-width: 280px;
-        }
-        
-        .insurance-spinner {
-          position: relative;
-          width: 50px;
-          height: 50px;
-          margin: 0 auto 16px;
-        }
-        
-        .spinner-ring {
-          position: absolute;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          border: 4px solid #f3f3f3;
-          border-top: 4px solid #1a1a1a;
-          border-radius: 50%;
-          animation: insurance-spin 1s linear infinite;
-          box-sizing: border-box;
-        }
-        
-        .spinner-ring:nth-child(1) {
-          border-top-color: #1a1a1a;
-          animation-delay: 0s;
-        }
-        
-        .spinner-ring:nth-child(2) {
-          border-top-color: #666;
-          animation-delay: -0.33s;
-          opacity: 0.8;
-        }
-        
-        .spinner-ring:nth-child(3) {
-          border-top-color: #999;
-          animation-delay: -0.66s;
-          opacity: 0.6;
-        }
-        
-        .insurance-overlay-text {
-          margin: 0;
-          font-size: 16px;
-          font-weight: 500;
-          color: #1a1a1a;
-        }
-        
-        @keyframes insurance-spin {
-          0% { 
-            transform: rotate(0deg); 
-          }
-          100% { 
-            transform: rotate(360deg); 
-          }
-        }
-      `;
-      document.head.appendChild(style);
-      
-      // Append to drawer__inner instead of body
-      const drawerInner = document.querySelector('.drawer__inner');
-      if (drawerInner) {
-        // Make sure drawer__inner has position relative
-        if (getComputedStyle(drawerInner).position === 'static') {
-          drawerInner.style.position = 'relative';
-        }
-        drawerInner.appendChild(overlay);
-      } else {
-        // Fallback to body if drawer__inner not found
-        document.body.appendChild(overlay);
+        <p class="insurance-overlay-text">Removing insurance...</p>
+      </div>
+    `;
+    
+    const style = document.createElement('style');
+    style.textContent = `
+      #insurance-removal-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(4px);
+        z-index: 10000;
+        display: none;
+        align-items: center;
+        justify-content: center;
       }
-    }
-    return overlay;
-  }
-
-  function showOverlay() {
-    const overlay = createOverlay();
-    overlay.style.display = 'flex';
+      
+      .insurance-overlay-content {
+        background: white;
+        padding: 24px 32px;
+        border-radius: 16px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        text-align: center;
+        min-width: 280px;
+      }
+      
+      .insurance-spinner {
+        position: relative;
+        width: 50px;
+        height: 50px;
+        margin: 0 auto 16px;
+        display: block;
+      }
+      
+      .spinner-ring {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        border: 4px solid #e5e5e5;
+        border-top: 4px solid #1a1a1a;
+        border-radius: 50%;
+        animation: insurance-spin 0.8s linear infinite;
+        box-sizing: border-box;
+        display: block;
+      }
+      
+      .spinner-ring:nth-child(1) {
+        border-top-color: #1a1a1a;
+        animation-delay: 0s;
+        opacity: 1;
+      }
+      
+      .spinner-ring:nth-child(2) {
+        border-top-color: #555;
+        animation-delay: -0.27s;
+        opacity: 0.75;
+      }
+      
+      .spinner-ring:nth-child(3) {
+        border-top-color: #888;
+        animation-delay: -0.53s;
+        opacity: 0.5;
+      }
+      
+      .insurance-overlay-text {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 500;
+        color: #1a1a1a;
+      }
+      
+      @keyframes insurance-spin {
+        0% { 
+          transform: rotate(0deg); 
+        }
+        100% { 
+          transform: rotate(360deg); 
+        }
+      }
+    `;
+    document.head.appendChild(style);
     
-    // Prevent interactions with drawer content
+    // Append to drawer__inner instead of body
     const drawerInner = document.querySelector('.drawer__inner');
     if (drawerInner) {
-      drawerInner.style.pointerEvents = 'none';
-      overlay.style.pointerEvents = 'auto';
+      // Make sure drawer__inner has position relative
+      if (getComputedStyle(drawerInner).position === 'static') {
+        drawerInner.style.position = 'relative';
+      }
+      drawerInner.appendChild(overlay);
+    } else {
+      // Fallback to body if drawer__inner not found
+      document.body.appendChild(overlay);
     }
   }
+  return overlay;
+}
 
-  function hideOverlay() {
-    const overlay = document.getElementById('insurance-removal-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-    }
-    
-    // Re-enable interactions
-    const drawerInner = document.querySelector('.drawer__inner');
-    if (drawerInner) {
-      drawerInner.style.pointerEvents = '';
-    }
+function showOverlay() {
+  const overlay = createOverlay();
+  overlay.style.display = 'flex';
+  
+  // Prevent interactions with drawer content
+  const drawerInner = document.querySelector('.drawer__inner');
+  if (drawerInner) {
+    drawerInner.style.pointerEvents = 'none';
+    overlay.style.pointerEvents = 'auto';
   }
+}
+
+function hideOverlay() {
+  const overlay = document.getElementById('insurance-removal-overlay');
+  if (overlay) {
+    overlay.style.display = 'none';
+  }
+  
+  // Re-enable interactions
+  const drawerInner = document.querySelector('.drawer__inner');
+  if (drawerInner) {
+    drawerInner.style.pointerEvents = '';
+  }
+}
 
   function showLoader(show) {
     const { loader, box } = getElements();
