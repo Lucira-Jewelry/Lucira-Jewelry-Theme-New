@@ -2556,16 +2556,886 @@
 // })();
 
 
+// latest
+// (function() {
+//   'use strict';
+  
+//   console.log('🎯 Insurance Manager v7.0 Starting...');
+  
+//   // ==================== CONFIGURATION ====================
+//   const CONFIG = {
+//     VARIANT_ID: '47220042989786',
+//     PRICE_PER_UNIT: null, // Will be fetched from variant
+//     CHECKBOX_ID: 'insuranceCheckbox',
+//     LOADER_ID: 'insuranceLoader',
+//     BOX_ID: 'insuranceBox',
+//     MAX_RETRIES: 5,
+//     RETRY_DELAY: 400
+//   };
+  
+//   // ==================== STATE ====================
+//   let state = {
+//     processing: false,
+//     initialized: false,
+//     currentCart: null,
+//     removalInProgress: false,
+//     handlingLastProductRemoval: false,
+//     insurancePrice: null
+//   };
+  
+//   // ==================== UTILITIES ====================
+  
+//   function log(emoji, ...args) {
+//     console.log(emoji, '[Insurance]', ...args);
+//   }
+  
+//   function wait(ms) {
+//     return new Promise(resolve => setTimeout(resolve, ms));
+//   }
+  
+//   function formatMoney(cents) {
+//     const rupees = Math.round(cents / 100);
+//     return '₹' + rupees.toLocaleString('en-IN');
+//   }
+  
+//   function getElements() {
+//     return {
+//       checkbox: document.getElementById(CONFIG.CHECKBOX_ID),
+//       loader: document.getElementById(CONFIG.LOADER_ID),
+//       box: document.getElementById(CONFIG.BOX_ID)
+//     };
+//   }
+  
+//   // ==================== PRICE FETCHING ====================
+  
+//   async function fetchInsurancePrice() {
+//     if (state.insurancePrice !== null) {
+//       return state.insurancePrice;
+//     }
+    
+//     try {
+//       log('💰', 'Fetching insurance price from variant...');
+//       const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
+      
+//       if (!response.ok) {
+//         // Try alternative endpoint
+//         const cartResponse = await fetch('/cart.js');
+//         const cart = await cartResponse.json();
+//         const insuranceItem = cart.items.find(item => 
+//           String(item.variant_id) === CONFIG.VARIANT_ID || 
+//           String(item.id) === CONFIG.VARIANT_ID
+//         );
+        
+//         if (insuranceItem) {
+//           state.insurancePrice = insuranceItem.price;
+//           log('✅', 'Price fetched from cart:', formatMoney(state.insurancePrice));
+//           return state.insurancePrice;
+//         }
+        
+//         throw new Error('Unable to fetch insurance price');
+//       }
+      
+//       const data = await response.json();
+//       state.insurancePrice = data.price;
+//       log('✅', 'Price fetched from variant:', formatMoney(state.insurancePrice));
+//       return state.insurancePrice;
+//     } catch (error) {
+//       log('❌', 'Price fetch error:', error);
+//       // Fallback to 10000 if unable to fetch
+//       state.insurancePrice = 10000;
+//       return state.insurancePrice;
+//     }
+//   }
+  
+//   // ==================== OVERLAY SYSTEM ====================
+  
+//   function createOverlay() {
+//     let overlay = document.getElementById('insurance-removal-overlay');
+//     if (!overlay) {
+//       overlay = document.createElement('div');
+//       overlay.id = 'insurance-removal-overlay';
+//       overlay.style.cssText = `
+//         position: fixed;
+//         top: 0;
+//         left: 0;
+//         width: 100%;
+//         height: 100%;
+//         background: rgba(0, 0, 0, 0.7);
+//         z-index: 999999;
+//         display: none;
+//         align-items: center;
+//         justify-content: center;
+//       `;
+      
+//       const spinner = document.createElement('div');
+//       spinner.style.cssText = `
+//         width: 60px;
+//         height: 60px;
+//         border: 5px solid #f3f3f3;
+//         border-top: 5px solid #666;
+//         border-radius: 50%;
+//         animation: insurance-spin 1s linear infinite;
+//       `;
+      
+//       const style = document.createElement('style');
+//       style.textContent = `
+//         @keyframes insurance-spin {
+//           0% { transform: rotate(0deg); }
+//           100% { transform: rotate(360deg); }
+//         }
+//       `;
+//       document.head.appendChild(style);
+      
+//       overlay.appendChild(spinner);
+//       document.body.appendChild(overlay);
+//     }
+//     return overlay;
+//   }
+  
+//   function showOverlay() {
+//     const overlay = createOverlay();
+//     overlay.style.display = 'flex';
+    
+//     // Find cart drawer and set its z-index lower
+//     const cartDrawer = document.querySelector('cart-drawer');
+//     if (cartDrawer) {
+//       cartDrawer.style.zIndex = '999998';
+//     }
+    
+//     document.body.style.overflow = 'hidden';
+//     document.body.style.pointerEvents = 'none';
+//     overlay.style.pointerEvents = 'auto';
+//   }
+  
+//   function hideOverlay() {
+//     const overlay = document.getElementById('insurance-removal-overlay');
+//     if (overlay) {
+//       overlay.style.display = 'none';
+//     }
+    
+//     // Restore cart drawer z-index
+//     const cartDrawer = document.querySelector('cart-drawer');
+//     if (cartDrawer) {
+//       cartDrawer.style.zIndex = '';
+//     }
+    
+//     document.body.style.overflow = '';
+//     document.body.style.pointerEvents = '';
+//   }
+  
+//   function showLoader(show) {
+//     const elements = getElements();
+//     if (elements.loader) {
+//       elements.loader.classList.toggle('active', show);
+//     }
+//     if (elements.box) {
+//       elements.box.classList.toggle('updating', show);
+//     }
+//   }
+  
+//   function setCheckbox(checked, silent = false) {
+//     const elements = getElements();
+//     if (elements.checkbox && elements.checkbox.checked !== checked) {
+//       if (silent) {
+//         elements.checkbox.removeEventListener('change', handleCheckboxChange);
+//         elements.checkbox.checked = checked;
+//         setTimeout(() => {
+//           elements.checkbox.addEventListener('change', handleCheckboxChange);
+//         }, 0);
+//       } else {
+//         elements.checkbox.checked = checked;
+//       }
+//     }
+//   }
+  
+//   // ==================== CART OPERATIONS ====================
+  
+//   async function getCart() {
+//     try {
+//       const response = await fetch('/cart.js', {
+//         headers: { 'Accept': 'application/json' },
+//         cache: 'no-store'
+//       });
+//       if (!response.ok) throw new Error('Failed to fetch cart');
+//       const cart = await response.json();
+//       state.currentCart = cart;
+//       return cart;
+//     } catch (error) {
+//       log('❌', 'Cart fetch error:', error);
+//       return null;
+//     }
+//   }
+  
+//   function hasInsurance(cartData) {
+//     if (!cartData || !cartData.items) return false;
+//     return cartData.items.some(item => 
+//       String(item.variant_id) === CONFIG.VARIANT_ID || 
+//       String(item.id) === CONFIG.VARIANT_ID
+//     );
+//   }
+  
+//   function getInsuranceQuantity(cartData) {
+//     if (!cartData || !cartData.items) return 0;
+//     const insuranceItem = cartData.items.find(item => 
+//       String(item.variant_id) === CONFIG.VARIANT_ID || 
+//       String(item.id) === CONFIG.VARIANT_ID
+//     );
+//     return insuranceItem ? insuranceItem.quantity : 0;
+//   }
+  
+//   function getInsurancePrice(cartData) {
+//     if (!cartData || !cartData.items) return state.insurancePrice || 10000;
+//     const insuranceItem = cartData.items.find(item => 
+//       String(item.variant_id) === CONFIG.VARIANT_ID || 
+//       String(item.id) === CONFIG.VARIANT_ID
+//     );
+//     return insuranceItem ? insuranceItem.price : (state.insurancePrice || 10000);
+//   }
+  
+//   function getNonInsuranceCount(cartData) {
+//     if (!cartData || !cartData.items) return 0;
+//     return cartData.items.reduce((count, item) => {
+//       if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
+//         return count + item.quantity;
+//       }
+//       return count;
+//     }, 0);
+//   }
+  
+//   function getTotalNonInsuranceQuantity(cartData) {
+//     if (!cartData || !cartData.items) return 0;
+//     return cartData.items.reduce((total, item) => {
+//       if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
+//         return total + item.quantity;
+//       }
+//       return total;
+//     }, 0);
+//   }
+  
+//   async function addInsuranceToCart(quantity) {
+//     log('➕', `Adding ${quantity} insurance item(s) to cart...`);
+    
+//     try {
+//       const response = await fetch('/cart/add.js', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Accept': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           items: [{
+//             id: CONFIG.VARIANT_ID,
+//             quantity: quantity
+//           }]
+//         })
+//       });
+      
+//       if (!response.ok) {
+//         const errorData = await response.json();
+//         throw new Error(errorData.description || errorData.message || 'Failed to add insurance');
+//       }
+      
+//       const result = await response.json();
+//       log('✅', 'Insurance added successfully');
+      
+//       // Update price from response
+//       if (result.items && result.items.length > 0) {
+//         const insuranceItem = result.items.find(item => 
+//           String(item.variant_id) === CONFIG.VARIANT_ID
+//         );
+//         if (insuranceItem && insuranceItem.price) {
+//           state.insurancePrice = insuranceItem.price;
+//         }
+//       }
+      
+//       return result;
+//     } catch (error) {
+//       log('❌', 'Add error:', error);
+//       throw error;
+//     }
+//   }
+  
+//   async function updateInsuranceQuantity(quantity) {
+//     log('🔄', `Updating insurance quantity to ${quantity}...`);
+    
+//     try {
+//       const response = await fetch('/cart/change.js', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Accept': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           id: CONFIG.VARIANT_ID,
+//           quantity: quantity
+//         })
+//       });
+      
+//       if (!response.ok) {
+//         throw new Error('Failed to update insurance quantity');
+//       }
+      
+//       const result = await response.json();
+//       log('✅', 'Insurance quantity updated successfully');
+//       return result;
+//     } catch (error) {
+//       log('❌', 'Update error:', error);
+//       throw error;
+//     }
+//   }
+  
+//   async function removeInsuranceFromCart(withRetry = true) {
+//     log('➖', 'Removing insurance from cart...');
+//     state.removalInProgress = true;
+    
+//     try {
+//       const response = await fetch('/cart/change.js', {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           'Accept': 'application/json'
+//         },
+//         body: JSON.stringify({
+//           id: CONFIG.VARIANT_ID,
+//           quantity: 0
+//         })
+//       });
+      
+//       if (!response.ok) {
+//         throw new Error('Failed to remove insurance');
+//       }
+      
+//       const result = await response.json();
+      
+//       if (withRetry) {
+//         let retries = 0;
+//         let verified = false;
+        
+//         while (retries < CONFIG.MAX_RETRIES && !verified) {
+//           await wait(CONFIG.RETRY_DELAY);
+//           const verifyCart = await getCart();
+          
+//           if (verifyCart && !hasInsurance(verifyCart)) {
+//             log('✅', `Insurance verified removed (attempt ${retries + 1})`);
+//             verified = true;
+//             break;
+//           }
+          
+//           if (retries < CONFIG.MAX_RETRIES - 1) {
+//             log('⚠️', `Insurance still present, retry ${retries + 1}/${CONFIG.MAX_RETRIES}`);
+//             await fetch('/cart/change.js', {
+//               method: 'POST',
+//               headers: {
+//                 'Content-Type': 'application/json',
+//                 'Accept': 'application/json'
+//               },
+//               body: JSON.stringify({
+//                 id: CONFIG.VARIANT_ID,
+//                 quantity: 0
+//               })
+//             });
+//           }
+          
+//           retries++;
+//         }
+        
+//         if (!verified) {
+//           log('❌', 'Insurance removal verification failed after max retries');
+//         }
+//       }
+      
+//       state.removalInProgress = false;
+//       return result;
+//     } catch (error) {
+//       log('❌', 'Remove error:', error);
+//       state.removalInProgress = false;
+//       throw error;
+//     }
+//   }
+  
+//   // ==================== UI UPDATES ====================
+  
+//   async function updateInsuranceDisplay(cartData) {
+//     if (!cartData) return;
+    
+//     const insurancePrice = getInsurancePrice(cartData);
+//     const insuranceQuantity = getInsuranceQuantity(cartData);
+//     const hasInsuranceInCart = hasInsurance(cartData);
+    
+//     const elements = getElements();
+//     if (elements.checkbox) {
+//       const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
+//       if (label) {
+//         const existingIndicator = label.querySelector('.insurance-quantity');
+//         if (existingIndicator) {
+//           existingIndicator.remove();
+//         }
+        
+//         if (hasInsuranceInCart && insuranceQuantity > 0) {
+//           const quantitySpan = document.createElement('span');
+//           quantitySpan.className = 'insurance-quantity';
+//           quantitySpan.textContent = ` (${insuranceQuantity})`;
+//           quantitySpan.style.fontWeight = 'bold';
+//           quantitySpan.style.marginLeft = '2px';
+//           quantitySpan.style.color = '#1a1a1a';
+//           label.appendChild(quantitySpan);
+          
+//           const priceElement = label.querySelector('.insurance-price');
+//           if (priceElement) {
+//             const totalInsurancePrice = insuranceQuantity * insurancePrice;
+//             priceElement.textContent = formatMoney(totalInsurancePrice);
+//           }
+//         }
+//       }
+//     }
+    
+//     await updateInsuranceSectionVisibility(cartData);
+//   }
+  
+//   async function updateInsuranceSectionVisibility(cartData) {
+//     if (!cartData) return;
+    
+//     const nonInsuranceCount = getNonInsuranceCount(cartData);
+//     const hasProducts = nonInsuranceCount > 0;
+//     const hasInsuranceInCart = hasInsurance(cartData);
+    
+//     const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
+//     const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
+    
+//     if (insuranceWrapper) {
+//       if (hasProducts) {
+//         insuranceWrapper.style.display = '';
+//         if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+//           insuranceHeader.style.display = '';
+//         }
+//       } else {
+//         insuranceWrapper.style.display = 'none';
+//         if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+//           insuranceHeader.style.display = 'none';
+//         }
+        
+//         if (hasInsuranceInCart && !state.removalInProgress) {
+//           log('⚠️', 'Removing orphaned insurance');
+//           try {
+//             await removeInsuranceFromCart(false);
+//           } catch (error) {
+//             log('❌', 'Failed to auto-remove insurance:', error);
+//           }
+//         }
+        
+//         const elements = getElements();
+//         if (elements.checkbox && elements.checkbox.checked) {
+//           setCheckbox(false, true);
+//         }
+//       }
+//     }
+//   }
+  
+//   async function updateGrandTotalUI(cartData) {
+//     if (!cartData) return;
+    
+//     const grandTotalSelectors = [
+//       '.totals__total-value',
+//       '.grand-total strong',
+//       '.checkout-info .grand-total strong'
+//     ];
+    
+//     grandTotalSelectors.forEach(selector => {
+//       const elements = document.querySelectorAll(selector);
+//       elements.forEach(el => {
+//         const parent = el.closest('.totals, .grand-total, .checkout-info');
+//         if (parent && (
+//           parent.textContent.includes('GRAND TOTAL') || 
+//           parent.textContent.includes('Grand Total')
+//         )) {
+//           el.textContent = formatMoney(cartData.total_price);
+//         }
+//       });
+//     });
+    
+//     const itemCount = getNonInsuranceCount(cartData);
+//     const itemCountElements = document.querySelectorAll('.totals__total');
+//     itemCountElements.forEach(el => {
+//       if (el.textContent.includes('Items')) {
+//         el.textContent = `Items (${itemCount})`;
+//       }
+//     });
+    
+//     const hasInsuranceInCart = hasInsurance(cartData);
+//     const insuranceQuantity = getInsuranceQuantity(cartData);
+//     const insurancePrice = getInsurancePrice(cartData);
+    
+//     const insuranceLineItem = document.getElementById('insurance-line-item');
+//     if (insuranceLineItem) {
+//       const insuranceValueElement = insuranceLineItem.querySelector('.totals__total-value');
+//       if (insuranceValueElement && hasInsuranceInCart) {
+//         const totalInsurancePrice = insuranceQuantity * insurancePrice;
+//         insuranceValueElement.textContent = formatMoney(totalInsurancePrice);
+//         insuranceLineItem.style.display = 'flex';
+//       } else if (!hasInsuranceInCart) {
+//         insuranceLineItem.style.display = 'none';
+//       }
+//     }
+    
+//     await updateInsuranceDisplay(cartData);
+//   }
+  
+//   function triggerCartUpdate() {
+//     log('🔄', 'Triggering cart refresh...');
+    
+//     const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
+    
+//     if (cartItems && typeof cartItems.onCartUpdate === 'function') {
+//       cartItems.onCartUpdate().then(() => {
+//         getCart().then(freshCart => {
+//           if (freshCart) {
+//             updateGrandTotalUI(freshCart);
+//             syncCheckboxState();
+//           }
+//         });
+//       });
+//     }
+//   }
+  
+//   // ==================== MAIN LOGIC ====================
+  
+//   async function handleAdd() {
+//     if (state.processing) return;
+    
+//     state.processing = true;
+//     showLoader(true);
+    
+//     try {
+//       const cartData = await getCart();
+//       if (!cartData) throw new Error('Unable to fetch cart data');
+      
+//       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
+      
+//       if (totalNonInsuranceQuantity === 0) {
+//         setCheckbox(false, true);
+//         return;
+//       }
+      
+//       if (hasInsurance(cartData)) {
+//         const currentInsuranceQuantity = getInsuranceQuantity(cartData);
+//         if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
+//           await updateInsuranceQuantity(totalNonInsuranceQuantity);
+//         }
+//       } else {
+//         await addInsuranceToCart(totalNonInsuranceQuantity);
+//       }
+      
+//       await wait(200);
+//       const freshCart = await getCart();
+//       if (freshCart) {
+//         updateGrandTotalUI(freshCart);
+//       }
+      
+//       triggerCartUpdate();
+      
+//     } catch (error) {
+//       log('❌', 'Failed to add/update insurance:', error);
+//       setCheckbox(false, true);
+//     } finally {
+//       state.processing = false;
+//       showLoader(false);
+//     }
+//   }
+  
+//   async function handleRemove() {
+//     if (state.processing) return;
+    
+//     state.processing = true;
+//     showLoader(true);
+    
+//     try {
+//       await removeInsuranceFromCart();
+      
+//       await wait(200);
+//       const freshCart = await getCart();
+//       if (freshCart) {
+//         updateGrandTotalUI(freshCart);
+//       }
+      
+//       triggerCartUpdate();
+      
+//     } catch (error) {
+//       log('❌', 'Failed to remove insurance:', error);
+//       setCheckbox(true, true);
+//     } finally {
+//       state.processing = false;
+//       showLoader(false);
+//     }
+//   }
+  
+//   async function syncCheckboxState() {
+//     try {
+//       const cartData = await getCart();
+//       if (!cartData) return;
+      
+//       const has = hasInsurance(cartData);
+//       setCheckbox(has, true);
+//       await updateGrandTotalUI(cartData);
+//     } catch (error) {
+//       log('❌', 'Sync error:', error);
+//     }
+//   }
+  
+//   function handleCheckboxChange(event) {
+//     if (state.processing) {
+//       event.preventDefault();
+//       return;
+//     }
+    
+//     const checked = event.target.checked;
+    
+//     if (checked) {
+//       handleAdd();
+//     } else {
+//       handleRemove();
+//     }
+//   }
+  
+//   // ==================== QUANTITY SYNC ====================
+  
+//   async function syncInsuranceWithProducts() {
+//     if (state.processing || state.removalInProgress || state.handlingLastProductRemoval) return;
+    
+//     try {
+//       const cartData = await getCart();
+//       if (!cartData) return;
+      
+//       const hasInsuranceInCart = hasInsurance(cartData);
+//       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
+//       const currentInsuranceQuantity = getInsuranceQuantity(cartData);
+      
+//       if (totalNonInsuranceQuantity === 0 && hasInsuranceInCart) {
+//         state.processing = true;
+//         await removeInsuranceFromCart(false);
+//         state.processing = false;
+//         return;
+//       }
+      
+//       if (!hasInsuranceInCart) return;
+      
+//       if (currentInsuranceQuantity !== totalNonInsuranceQuantity) {
+//         state.processing = true;
+//         showLoader(true);
+        
+//         await updateInsuranceQuantity(totalNonInsuranceQuantity);
+//         await wait(200);
+        
+//         const freshCart = await getCart();
+//         if (freshCart) {
+//           updateGrandTotalUI(freshCart);
+//         }
+        
+//         state.processing = false;
+//         showLoader(false);
+//       }
+//     } catch (error) {
+//       log('❌', 'Sync error:', error);
+//       state.processing = false;
+//       showLoader(false);
+//     }
+//   }
+  
+//   // ==================== CART REMOVAL INTERCEPTOR ====================
+  
+//   function interceptCartItemRemoval() {
+//     document.addEventListener('click', async function(event) {
+//       const removeButton = event.target.closest('cart-remove-button');
+//       if (!removeButton || state.handlingLastProductRemoval) return;
+      
+//       const lineIndex = removeButton.dataset.index;
+//       const variantId = removeButton.querySelector('button')?.dataset?.variantId;
+      
+//       if (variantId === CONFIG.VARIANT_ID) return;
+      
+//       const cartData = await getCart();
+//       if (!cartData) return;
+      
+//       const nonInsuranceCount = getNonInsuranceCount(cartData);
+//       const hasInsuranceInCart = hasInsurance(cartData);
+//       const removingItem = cartData.items[lineIndex - 1];
+//       const removingQuantity = removingItem?.quantity || 0;
+      
+//       // ONLY intercept if this is the LAST product
+//       if (nonInsuranceCount === removingQuantity && hasInsuranceInCart) {
+//         log('🚨', 'Last product removal - intercepting');
+        
+//         event.preventDefault();
+//         event.stopPropagation();
+//         event.stopImmediatePropagation();
+        
+//         state.handlingLastProductRemoval = true;
+//         showOverlay();
+        
+//         try {
+//           // Remove insurance with aggressive retry
+//           log('🗑️', 'Removing insurance first...');
+//           await removeInsuranceFromCart(true);
+          
+//           await wait(600);
+          
+//           // Verify one more time
+//           const verifyCart = await getCart();
+//           if (verifyCart && hasInsurance(verifyCart)) {
+//             log('❌', 'Insurance still exists after all retries');
+//             await fetch('/cart/change.js', {
+//               method: 'POST',
+//               headers: {
+//                 'Content-Type': 'application/json',
+//                 'Accept': 'application/json'
+//               },
+//               body: JSON.stringify({
+//                 id: CONFIG.VARIANT_ID,
+//                 quantity: 0
+//               })
+//             });
+//             await wait(500);
+//           }
+          
+//           log('✅', 'Insurance removed, removing product...');
+          
+//           // Remove the product
+//           const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
+//           if (cartItems) {
+//             window.dataLayer = window.dataLayer || [];
+//             window.dataLayer.push({
+//               event: 'removeFromCart',
+//               'products': { ...removeButton.dataset }
+//             });
+            
+//             await cartItems.updateQuantity(lineIndex, 0, event);
+//           }
+          
+//           // NO RELOAD - just hide overlay and reset state
+//           await wait(400);
+//           hideOverlay();
+//           state.handlingLastProductRemoval = false;
+          
+//           // Trigger natural cart update
+//           triggerCartUpdate();
+          
+//         } catch (error) {
+//           log('❌', 'Error in removal process:', error);
+//           hideOverlay();
+//           state.handlingLastProductRemoval = false;
+//         }
+//       } else {
+//         // Normal removal - sync insurance after
+//         setTimeout(() => syncInsuranceWithProducts(), 600);
+//       }
+      
+//     }, true);
+//   }
+  
+//   // ==================== INITIALIZATION ====================
+  
+//   function attachEventListeners() {
+//     const elements = getElements();
+//     if (!elements.checkbox) return false;
+    
+//     elements.checkbox.removeEventListener('change', handleCheckboxChange);
+//     elements.checkbox.addEventListener('change', handleCheckboxChange);
+    
+//     return true;
+//   }
+  
+//   function observeCartChanges() {
+//     const observer = new MutationObserver((mutations) => {
+//       for (const mutation of mutations) {
+//         if (mutation.addedNodes.length > 0) {
+//           mutation.addedNodes.forEach(node => {
+//             if (node.nodeType === 1) {
+//               if (node.matches && (node.matches('cart-drawer-items') || node.querySelector && node.querySelector('cart-drawer-items'))) {
+//                 setTimeout(() => {
+//                   attachEventListeners();
+//                   syncCheckboxState();
+//                 }, 100);
+//               }
+//             }
+//           });
+//         }
+        
+//         if (mutation.type === 'attributes' && mutation.attributeName === 'open') {
+//           const target = mutation.target;
+//           if (target.tagName === 'CART-DRAWER' && target.hasAttribute('open')) {
+//             setTimeout(() => {
+//               attachEventListeners();
+//               syncCheckboxState();
+//             }, 100);
+//           }
+//         }
+//       }
+//     });
+    
+//     observer.observe(document.body, {
+//       childList: true,
+//       subtree: true,
+//       attributes: true,
+//       attributeFilter: ['open']
+//     });
+//   }
+  
+//   function listenToCartEvents() {
+//     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
+//       subscribe(PUB_SUB_EVENTS.cartUpdate, () => {
+//         setTimeout(() => {
+//           syncCheckboxState();
+//           syncInsuranceWithProducts();
+//         }, 100);
+//       });
+//     }
+//   }
+  
+//   async function init() {
+//     log('🚀', 'Initializing Insurance Manager v7.0...');
+    
+//     // Fetch insurance price on init
+//     await fetchInsurancePrice();
+    
+//     interceptCartItemRemoval();
+//     attachEventListeners();
+//     syncCheckboxState();
+//     observeCartChanges();
+//     listenToCartEvents();
+    
+//     state.initialized = true;
+//     log('✅', 'Insurance Manager initialized!');
+//   }
+  
+//   // ==================== START ====================
+  
+//   if (document.readyState === 'loading') {
+//     document.addEventListener('DOMContentLoaded', init);
+//   } else {
+//     setTimeout(init, 100);
+//   }
+  
+//   window.InsuranceManager = {
+//     getCart,
+//     hasInsurance,
+//     syncCheckboxState,
+//     updateGrandTotalUI,
+//     syncInsuranceWithProducts,
+//     removeInsuranceFromCart,
+//     fetchInsurancePrice,
+//     state
+//   };
+  
+// })();
+
 
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v7.0 Starting...');
+  console.log('🎯 Insurance Manager v7.1 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
     VARIANT_ID: '47220042989786',
-    PRICE_PER_UNIT: null, // Will be fetched from variant
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
@@ -2574,7 +3444,7 @@
   };
   
   // ==================== STATE ====================
-  let state = {
+  const state = {
     processing: false,
     initialized: false,
     currentCart: null,
@@ -2585,63 +3455,45 @@
   
   // ==================== UTILITIES ====================
   
-  function log(emoji, ...args) {
-    console.log(emoji, '[Insurance]', ...args);
-  }
+  const log = (emoji, ...args) => console.log(emoji, '[Insurance]', ...args);
+  const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  const formatMoney = (cents) => '₹' + Math.round(cents / 100).toLocaleString('en-IN');
   
-  function wait(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-  
-  function formatMoney(cents) {
-    const rupees = Math.round(cents / 100);
-    return '₹' + rupees.toLocaleString('en-IN');
-  }
-  
-  function getElements() {
-    return {
-      checkbox: document.getElementById(CONFIG.CHECKBOX_ID),
-      loader: document.getElementById(CONFIG.LOADER_ID),
-      box: document.getElementById(CONFIG.BOX_ID)
-    };
-  }
+  const getElements = () => ({
+    checkbox: document.getElementById(CONFIG.CHECKBOX_ID),
+    loader: document.getElementById(CONFIG.LOADER_ID),
+    box: document.getElementById(CONFIG.BOX_ID)
+  });
   
   // ==================== PRICE FETCHING ====================
   
   async function fetchInsurancePrice() {
-    if (state.insurancePrice !== null) {
-      return state.insurancePrice;
-    }
+    if (state.insurancePrice !== null) return state.insurancePrice;
     
     try {
-      log('💰', 'Fetching insurance price from variant...');
+      log('💰', 'Fetching insurance price...');
       const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
       
       if (!response.ok) {
-        // Try alternative endpoint
-        const cartResponse = await fetch('/cart.js');
-        const cart = await cartResponse.json();
+        const cart = await fetch('/cart.js').then(r => r.json());
         const insuranceItem = cart.items.find(item => 
-          String(item.variant_id) === CONFIG.VARIANT_ID || 
-          String(item.id) === CONFIG.VARIANT_ID
+          String(item.variant_id) === CONFIG.VARIANT_ID
         );
         
         if (insuranceItem) {
           state.insurancePrice = insuranceItem.price;
-          log('✅', 'Price fetched from cart:', formatMoney(state.insurancePrice));
+          log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
           return state.insurancePrice;
         }
-        
-        throw new Error('Unable to fetch insurance price');
+        throw new Error('Unable to fetch price');
       }
       
       const data = await response.json();
       state.insurancePrice = data.price;
-      log('✅', 'Price fetched from variant:', formatMoney(state.insurancePrice));
+      log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
       return state.insurancePrice;
     } catch (error) {
       log('❌', 'Price fetch error:', error);
-      // Fallback to 10000 if unable to fetch
       state.insurancePrice = 10000;
       return state.insurancePrice;
     }
@@ -2654,39 +3506,87 @@
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'insurance-removal-overlay';
-      overlay.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.7);
-        z-index: 999999;
-        display: none;
-        align-items: center;
-        justify-content: center;
-      `;
-      
-      const spinner = document.createElement('div');
-      spinner.style.cssText = `
-        width: 60px;
-        height: 60px;
-        border: 5px solid #f3f3f3;
-        border-top: 5px solid #666;
-        border-radius: 50%;
-        animation: insurance-spin 1s linear infinite;
+      overlay.innerHTML = `
+        <div class="insurance-overlay-content">
+          <div class="insurance-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+          </div>
+          <p class="insurance-overlay-text">Removing insurance...</p>
+        </div>
       `;
       
       const style = document.createElement('style');
       style.textContent = `
+        #insurance-removal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(4px);
+          z-index: 999999;
+          display: none;
+          align-items: center;
+          justify-content: center;
+        }
+        
+        .insurance-overlay-content {
+          background: white;
+          padding: 32px 40px;
+          border-radius: 16px;
+          box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+          text-align: center;
+          min-width: 280px;
+        }
+        
+        .insurance-spinner {
+          position: relative;
+          width: 60px;
+          height: 60px;
+          margin: 0 auto 20px;
+        }
+        
+        .spinner-ring {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          border: 3px solid transparent;
+          border-top-color: #1a1a1a;
+          border-radius: 50%;
+          animation: insurance-spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+        }
+        
+        .spinner-ring:nth-child(1) {
+          animation-delay: -0.45s;
+          border-top-color: #1a1a1a;
+        }
+        
+        .spinner-ring:nth-child(2) {
+          animation-delay: -0.3s;
+          border-top-color: #666;
+        }
+        
+        .spinner-ring:nth-child(3) {
+          animation-delay: -0.15s;
+          border-top-color: #999;
+        }
+        
+        .insurance-overlay-text {
+          margin: 0;
+          font-size: 16px;
+          font-weight: 500;
+          color: #1a1a1a;
+        }
+        
         @keyframes insurance-spin {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
       `;
       document.head.appendChild(style);
-      
-      overlay.appendChild(spinner);
       document.body.appendChild(overlay);
     }
     return overlay;
@@ -2696,11 +3596,8 @@
     const overlay = createOverlay();
     overlay.style.display = 'flex';
     
-    // Find cart drawer and set its z-index lower
     const cartDrawer = document.querySelector('cart-drawer');
-    if (cartDrawer) {
-      cartDrawer.style.zIndex = '999998';
-    }
+    if (cartDrawer) cartDrawer.style.zIndex = '999998';
     
     document.body.style.overflow = 'hidden';
     document.body.style.pointerEvents = 'none';
@@ -2709,41 +3606,30 @@
   
   function hideOverlay() {
     const overlay = document.getElementById('insurance-removal-overlay');
-    if (overlay) {
-      overlay.style.display = 'none';
-    }
+    if (overlay) overlay.style.display = 'none';
     
-    // Restore cart drawer z-index
     const cartDrawer = document.querySelector('cart-drawer');
-    if (cartDrawer) {
-      cartDrawer.style.zIndex = '';
-    }
+    if (cartDrawer) cartDrawer.style.zIndex = '';
     
     document.body.style.overflow = '';
     document.body.style.pointerEvents = '';
   }
   
   function showLoader(show) {
-    const elements = getElements();
-    if (elements.loader) {
-      elements.loader.classList.toggle('active', show);
-    }
-    if (elements.box) {
-      elements.box.classList.toggle('updating', show);
-    }
+    const { loader, box } = getElements();
+    if (loader) loader.classList.toggle('active', show);
+    if (box) box.classList.toggle('updating', show);
   }
   
   function setCheckbox(checked, silent = false) {
-    const elements = getElements();
-    if (elements.checkbox && elements.checkbox.checked !== checked) {
+    const { checkbox } = getElements();
+    if (checkbox && checkbox.checked !== checked) {
       if (silent) {
-        elements.checkbox.removeEventListener('change', handleCheckboxChange);
-        elements.checkbox.checked = checked;
-        setTimeout(() => {
-          elements.checkbox.addEventListener('change', handleCheckboxChange);
-        }, 0);
+        checkbox.removeEventListener('change', handleCheckboxChange);
+        checkbox.checked = checked;
+        setTimeout(() => checkbox.addEventListener('change', handleCheckboxChange), 0);
       } else {
-        elements.checkbox.checked = checked;
+        checkbox.checked = checked;
       }
     }
   }
@@ -2766,54 +3652,24 @@
     }
   }
   
-  function hasInsurance(cartData) {
-    if (!cartData || !cartData.items) return false;
-    return cartData.items.some(item => 
-      String(item.variant_id) === CONFIG.VARIANT_ID || 
-      String(item.id) === CONFIG.VARIANT_ID
-    );
-  }
+  const hasInsurance = (cartData) => 
+    cartData?.items?.some(item => String(item.variant_id) === CONFIG.VARIANT_ID) || false;
   
-  function getInsuranceQuantity(cartData) {
-    if (!cartData || !cartData.items) return 0;
-    const insuranceItem = cartData.items.find(item => 
-      String(item.variant_id) === CONFIG.VARIANT_ID || 
-      String(item.id) === CONFIG.VARIANT_ID
-    );
-    return insuranceItem ? insuranceItem.quantity : 0;
-  }
+  const getInsuranceQuantity = (cartData) => 
+    cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID)?.quantity || 0;
   
-  function getInsurancePrice(cartData) {
-    if (!cartData || !cartData.items) return state.insurancePrice || 10000;
-    const insuranceItem = cartData.items.find(item => 
-      String(item.variant_id) === CONFIG.VARIANT_ID || 
-      String(item.id) === CONFIG.VARIANT_ID
-    );
-    return insuranceItem ? insuranceItem.price : (state.insurancePrice || 10000);
-  }
+  const getInsurancePrice = (cartData) => 
+    cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID)?.price 
+    || state.insurancePrice || 10000;
   
-  function getNonInsuranceCount(cartData) {
-    if (!cartData || !cartData.items) return 0;
-    return cartData.items.reduce((count, item) => {
-      if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
-        return count + item.quantity;
-      }
-      return count;
-    }, 0);
-  }
+  const getNonInsuranceCount = (cartData) => 
+    cartData?.items?.reduce((count, item) => 
+      String(item.variant_id) !== CONFIG.VARIANT_ID ? count + item.quantity : count, 0) || 0;
   
-  function getTotalNonInsuranceQuantity(cartData) {
-    if (!cartData || !cartData.items) return 0;
-    return cartData.items.reduce((total, item) => {
-      if (String(item.variant_id) !== CONFIG.VARIANT_ID && String(item.id) !== CONFIG.VARIANT_ID) {
-        return total + item.quantity;
-      }
-      return total;
-    }, 0);
-  }
+  const getTotalNonInsuranceQuantity = (cartData) => getNonInsuranceCount(cartData);
   
   async function addInsuranceToCart(quantity) {
-    log('➕', `Adding ${quantity} insurance item(s) to cart...`);
+    log('➕', `Adding ${quantity} insurance item(s)...`);
     
     try {
       const response = await fetch('/cart/add.js', {
@@ -2823,10 +3679,7 @@
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          items: [{
-            id: CONFIG.VARIANT_ID,
-            quantity: quantity
-          }]
+          items: [{ id: CONFIG.VARIANT_ID, quantity }]
         })
       });
       
@@ -2836,17 +3689,10 @@
       }
       
       const result = await response.json();
-      log('✅', 'Insurance added successfully');
+      log('✅', 'Insurance added');
       
-      // Update price from response
-      if (result.items && result.items.length > 0) {
-        const insuranceItem = result.items.find(item => 
-          String(item.variant_id) === CONFIG.VARIANT_ID
-        );
-        if (insuranceItem && insuranceItem.price) {
-          state.insurancePrice = insuranceItem.price;
-        }
-      }
+      const insuranceItem = result.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID);
+      if (insuranceItem?.price) state.insurancePrice = insuranceItem.price;
       
       return result;
     } catch (error) {
@@ -2856,7 +3702,7 @@
   }
   
   async function updateInsuranceQuantity(quantity) {
-    log('🔄', `Updating insurance quantity to ${quantity}...`);
+    log('🔄', `Updating insurance to ${quantity}...`);
     
     try {
       const response = await fetch('/cart/change.js', {
@@ -2867,16 +3713,14 @@
         },
         body: JSON.stringify({
           id: CONFIG.VARIANT_ID,
-          quantity: quantity
+          quantity
         })
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to update insurance quantity');
-      }
+      if (!response.ok) throw new Error('Failed to update quantity');
       
       const result = await response.json();
-      log('✅', 'Insurance quantity updated successfully');
+      log('✅', 'Quantity updated');
       return result;
     } catch (error) {
       log('❌', 'Update error:', error);
@@ -2885,7 +3729,7 @@
   }
   
   async function removeInsuranceFromCart(withRetry = true) {
-    log('➖', 'Removing insurance from cart...');
+    log('➖', 'Removing insurance...');
     state.removalInProgress = true;
     
     try {
@@ -2901,46 +3745,28 @@
         })
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to remove insurance');
-      }
+      if (!response.ok) throw new Error('Failed to remove insurance');
       
       const result = await response.json();
       
       if (withRetry) {
-        let retries = 0;
-        let verified = false;
-        
-        while (retries < CONFIG.MAX_RETRIES && !verified) {
+        for (let i = 0; i < CONFIG.MAX_RETRIES; i++) {
           await wait(CONFIG.RETRY_DELAY);
           const verifyCart = await getCart();
           
           if (verifyCart && !hasInsurance(verifyCart)) {
-            log('✅', `Insurance verified removed (attempt ${retries + 1})`);
-            verified = true;
+            log('✅', `Verified removed (attempt ${i + 1})`);
             break;
           }
           
-          if (retries < CONFIG.MAX_RETRIES - 1) {
-            log('⚠️', `Insurance still present, retry ${retries + 1}/${CONFIG.MAX_RETRIES}`);
+          if (i < CONFIG.MAX_RETRIES - 1) {
+            log('⚠️', `Retry ${i + 1}/${CONFIG.MAX_RETRIES}`);
             await fetch('/cart/change.js', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({
-                id: CONFIG.VARIANT_ID,
-                quantity: 0
-              })
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: CONFIG.VARIANT_ID, quantity: 0 })
             });
           }
-          
-          retries++;
-        }
-        
-        if (!verified) {
-          log('❌', 'Insurance removal verification failed after max retries');
         }
       }
       
@@ -2962,28 +3788,23 @@
     const insuranceQuantity = getInsuranceQuantity(cartData);
     const hasInsuranceInCart = hasInsurance(cartData);
     
-    const elements = getElements();
-    if (elements.checkbox) {
-      const label = elements.checkbox.closest('label') || elements.checkbox.parentElement;
+    const { checkbox } = getElements();
+    if (checkbox) {
+      const label = checkbox.closest('label') || checkbox.parentElement;
       if (label) {
         const existingIndicator = label.querySelector('.insurance-quantity');
-        if (existingIndicator) {
-          existingIndicator.remove();
-        }
+        if (existingIndicator) existingIndicator.remove();
         
         if (hasInsuranceInCart && insuranceQuantity > 0) {
           const quantitySpan = document.createElement('span');
           quantitySpan.className = 'insurance-quantity';
           quantitySpan.textContent = ` (${insuranceQuantity})`;
-          quantitySpan.style.fontWeight = 'bold';
-          quantitySpan.style.marginLeft = '2px';
-          quantitySpan.style.color = '#1a1a1a';
+          quantitySpan.style.cssText = 'font-weight:bold;margin-left:2px;color:#1a1a1a;';
           label.appendChild(quantitySpan);
           
           const priceElement = label.querySelector('.insurance-price');
           if (priceElement) {
-            const totalInsurancePrice = insuranceQuantity * insurancePrice;
-            priceElement.textContent = formatMoney(totalInsurancePrice);
+            priceElement.textContent = formatMoney(insuranceQuantity * insurancePrice);
           }
         }
       }
@@ -3000,17 +3821,17 @@
     const hasInsuranceInCart = hasInsurance(cartData);
     
     const insuranceWrapper = document.getElementById(CONFIG.BOX_ID);
-    const insuranceHeader = insuranceWrapper ? insuranceWrapper.previousElementSibling : null;
+    const insuranceHeader = insuranceWrapper?.previousElementSibling;
     
     if (insuranceWrapper) {
       if (hasProducts) {
         insuranceWrapper.style.display = '';
-        if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+        if (insuranceHeader?.textContent.includes('APPLY INSURANCE')) {
           insuranceHeader.style.display = '';
         }
       } else {
         insuranceWrapper.style.display = 'none';
-        if (insuranceHeader && insuranceHeader.textContent.includes('APPLY INSURANCE')) {
+        if (insuranceHeader?.textContent.includes('APPLY INSURANCE')) {
           insuranceHeader.style.display = 'none';
         }
         
@@ -3019,14 +3840,12 @@
           try {
             await removeInsuranceFromCart(false);
           } catch (error) {
-            log('❌', 'Failed to auto-remove insurance:', error);
+            log('❌', 'Auto-remove failed:', error);
           }
         }
         
-        const elements = getElements();
-        if (elements.checkbox && elements.checkbox.checked) {
-          setCheckbox(false, true);
-        }
+        const { checkbox } = getElements();
+        if (checkbox?.checked) setCheckbox(false, true);
       }
     }
   }
@@ -3041,21 +3860,16 @@
     ];
     
     grandTotalSelectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(el => {
+      document.querySelectorAll(selector).forEach(el => {
         const parent = el.closest('.totals, .grand-total, .checkout-info');
-        if (parent && (
-          parent.textContent.includes('GRAND TOTAL') || 
-          parent.textContent.includes('Grand Total')
-        )) {
+        if (parent && (parent.textContent.includes('GRAND TOTAL') || parent.textContent.includes('Grand Total'))) {
           el.textContent = formatMoney(cartData.total_price);
         }
       });
     });
     
     const itemCount = getNonInsuranceCount(cartData);
-    const itemCountElements = document.querySelectorAll('.totals__total');
-    itemCountElements.forEach(el => {
+    document.querySelectorAll('.totals__total').forEach(el => {
       if (el.textContent.includes('Items')) {
         el.textContent = `Items (${itemCount})`;
       }
@@ -3069,8 +3883,7 @@
     if (insuranceLineItem) {
       const insuranceValueElement = insuranceLineItem.querySelector('.totals__total-value');
       if (insuranceValueElement && hasInsuranceInCart) {
-        const totalInsurancePrice = insuranceQuantity * insurancePrice;
-        insuranceValueElement.textContent = formatMoney(totalInsurancePrice);
+        insuranceValueElement.textContent = formatMoney(insuranceQuantity * insurancePrice);
         insuranceLineItem.style.display = 'flex';
       } else if (!hasInsuranceInCart) {
         insuranceLineItem.style.display = 'none';
@@ -3085,7 +3898,7 @@
     
     const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
     
-    if (cartItems && typeof cartItems.onCartUpdate === 'function') {
+    if (cartItems?.onCartUpdate) {
       cartItems.onCartUpdate().then(() => {
         getCart().then(freshCart => {
           if (freshCart) {
@@ -3107,7 +3920,7 @@
     
     try {
       const cartData = await getCart();
-      if (!cartData) throw new Error('Unable to fetch cart data');
+      if (!cartData) throw new Error('Unable to fetch cart');
       
       const totalNonInsuranceQuantity = getTotalNonInsuranceQuantity(cartData);
       
@@ -3127,14 +3940,12 @@
       
       await wait(200);
       const freshCart = await getCart();
-      if (freshCart) {
-        updateGrandTotalUI(freshCart);
-      }
+      if (freshCart) updateGrandTotalUI(freshCart);
       
       triggerCartUpdate();
       
     } catch (error) {
-      log('❌', 'Failed to add/update insurance:', error);
+      log('❌', 'Failed to add/update:', error);
       setCheckbox(false, true);
     } finally {
       state.processing = false;
@@ -3153,14 +3964,12 @@
       
       await wait(200);
       const freshCart = await getCart();
-      if (freshCart) {
-        updateGrandTotalUI(freshCart);
-      }
+      if (freshCart) updateGrandTotalUI(freshCart);
       
       triggerCartUpdate();
       
     } catch (error) {
-      log('❌', 'Failed to remove insurance:', error);
+      log('❌', 'Failed to remove:', error);
       setCheckbox(true, true);
     } finally {
       state.processing = false;
@@ -3187,13 +3996,7 @@
       return;
     }
     
-    const checked = event.target.checked;
-    
-    if (checked) {
-      handleAdd();
-    } else {
-      handleRemove();
-    }
+    event.target.checked ? handleAdd() : handleRemove();
   }
   
   // ==================== QUANTITY SYNC ====================
@@ -3226,9 +4029,7 @@
         await wait(200);
         
         const freshCart = await getCart();
-        if (freshCart) {
-          updateGrandTotalUI(freshCart);
-        }
+        if (freshCart) updateGrandTotalUI(freshCart);
         
         state.processing = false;
         showLoader(false);
@@ -3260,9 +4061,8 @@
       const removingItem = cartData.items[lineIndex - 1];
       const removingQuantity = removingItem?.quantity || 0;
       
-      // ONLY intercept if this is the LAST product
       if (nonInsuranceCount === removingQuantity && hasInsuranceInCart) {
-        log('🚨', 'Last product removal - intercepting');
+        log('🚨', 'Last product - intercepting');
         
         event.preventDefault();
         event.stopPropagation();
@@ -3272,59 +4072,45 @@
         showOverlay();
         
         try {
-          // Remove insurance with aggressive retry
           log('🗑️', 'Removing insurance first...');
           await removeInsuranceFromCart(true);
-          
           await wait(600);
           
-          // Verify one more time
           const verifyCart = await getCart();
           if (verifyCart && hasInsurance(verifyCart)) {
-            log('❌', 'Insurance still exists after all retries');
+            log('❌', 'Insurance still exists, forcing removal');
             await fetch('/cart/change.js', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-              },
-              body: JSON.stringify({
-                id: CONFIG.VARIANT_ID,
-                quantity: 0
-              })
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ id: CONFIG.VARIANT_ID, quantity: 0 })
             });
             await wait(500);
           }
           
           log('✅', 'Insurance removed, removing product...');
           
-          // Remove the product
           const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
           if (cartItems) {
             window.dataLayer = window.dataLayer || [];
             window.dataLayer.push({
               event: 'removeFromCart',
-              'products': { ...removeButton.dataset }
+              products: { ...removeButton.dataset }
             });
             
             await cartItems.updateQuantity(lineIndex, 0, event);
           }
           
-          // NO RELOAD - just hide overlay and reset state
           await wait(400);
           hideOverlay();
           state.handlingLastProductRemoval = false;
-          
-          // Trigger natural cart update
           triggerCartUpdate();
           
         } catch (error) {
-          log('❌', 'Error in removal process:', error);
+          log('❌', 'Removal error:', error);
           hideOverlay();
           state.handlingLastProductRemoval = false;
         }
       } else {
-        // Normal removal - sync insurance after
         setTimeout(() => syncInsuranceWithProducts(), 600);
       }
       
@@ -3334,12 +4120,11 @@
   // ==================== INITIALIZATION ====================
   
   function attachEventListeners() {
-    const elements = getElements();
-    if (!elements.checkbox) return false;
+    const { checkbox } = getElements();
+    if (!checkbox) return false;
     
-    elements.checkbox.removeEventListener('change', handleCheckboxChange);
-    elements.checkbox.addEventListener('change', handleCheckboxChange);
-    
+    checkbox.removeEventListener('change', handleCheckboxChange);
+    checkbox.addEventListener('change', handleCheckboxChange);
     return true;
   }
   
@@ -3349,7 +4134,7 @@
         if (mutation.addedNodes.length > 0) {
           mutation.addedNodes.forEach(node => {
             if (node.nodeType === 1) {
-              if (node.matches && (node.matches('cart-drawer-items') || node.querySelector && node.querySelector('cart-drawer-items'))) {
+              if (node.matches?.('cart-drawer-items') || node.querySelector?.('cart-drawer-items')) {
                 setTimeout(() => {
                   attachEventListeners();
                   syncCheckboxState();
@@ -3391,11 +4176,9 @@
   }
   
   async function init() {
-    log('🚀', 'Initializing Insurance Manager v7.0...');
+    log('🚀', 'Initializing v7.1...');
     
-    // Fetch insurance price on init
     await fetchInsurancePrice();
-    
     interceptCartItemRemoval();
     attachEventListeners();
     syncCheckboxState();
@@ -3403,7 +4186,7 @@
     listenToCartEvents();
     
     state.initialized = true;
-    log('✅', 'Insurance Manager initialized!');
+    log('✅', 'Initialized!');
   }
   
   // ==================== START ====================
@@ -3426,5 +4209,3 @@
   };
   
 })();
-
-
