@@ -3502,7 +3502,10 @@
   // ==================== OVERLAY SYSTEM ====================
   
   function createOverlay() {
-    let overlay = document.getElementById('insurance-removal-overlay');
+    const cartDrawer = document.getElementById('CartDrawer');
+    if (!cartDrawer) return null;
+    
+    let overlay = cartDrawer.querySelector('#insurance-removal-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'insurance-removal-overlay';
@@ -3519,15 +3522,19 @@
       
       const style = document.createElement('style');
       style.textContent = `
+        #CartDrawer {
+          position: relative;
+        }
+        
         #insurance-removal-overlay {
-          position: fixed;
+          position: absolute;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          background: rgba(0, 0, 0, 0.75);
-          backdrop-filter: blur(4px);
-          z-index: 999999;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(3px);
+          z-index: 1000;
           display: none;
           align-items: center;
           justify-content: center;
@@ -3540,6 +3547,7 @@
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
           min-width: 280px;
+          max-width: 90%;
         }
         
         .insurance-spinner {
@@ -3587,32 +3595,24 @@
         }
       `;
       document.head.appendChild(style);
-      document.body.appendChild(overlay);
+      cartDrawer.appendChild(overlay);
     }
     return overlay;
   }
   
   function showOverlay() {
     const overlay = createOverlay();
-    overlay.style.display = 'flex';
-    
-    const cartDrawer = document.querySelector('cart-drawer');
-    if (cartDrawer) cartDrawer.style.zIndex = '999998';
-    
-    document.body.style.overflow = 'hidden';
-    document.body.style.pointerEvents = 'none';
-    overlay.style.pointerEvents = 'auto';
+    if (overlay) {
+      overlay.style.display = 'flex';
+    }
   }
   
   function hideOverlay() {
-    const overlay = document.getElementById('insurance-removal-overlay');
-    if (overlay) overlay.style.display = 'none';
-    
-    const cartDrawer = document.querySelector('cart-drawer');
-    if (cartDrawer) cartDrawer.style.zIndex = '';
-    
-    document.body.style.overflow = '';
-    document.body.style.pointerEvents = '';
+    const cartDrawer = document.getElementById('CartDrawer');
+    if (cartDrawer) {
+      const overlay = cartDrawer.querySelector('#insurance-removal-overlay');
+      if (overlay) overlay.style.display = 'none';
+    }
   }
   
   function showLoader(show) {
@@ -4087,22 +4087,44 @@
             await wait(500);
           }
           
-          log('✅', 'Insurance removed, removing product...');
+          log('✅', 'Insurance removed, now removing product...');
           
-          const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
-          if (cartItems) {
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push({
-              event: 'removeFromCart',
-              products: { ...removeButton.dataset }
-            });
-            
-            await cartItems.updateQuantity(lineIndex, 0, event);
-          }
+          // Now remove the product using native Shopify cart update
+          await fetch('/cart/change.js', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+              line: lineIndex,
+              quantity: 0
+            })
+          });
+          
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: 'removeFromCart',
+            products: { ...removeButton.dataset }
+          });
           
           await wait(400);
           hideOverlay();
           state.handlingLastProductRemoval = false;
+          
+          // Trigger the cart to refresh
+          const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
+          if (cartItems && typeof cartItems.getSectionsToRender === 'function') {
+            cartItems.getSectionsToRender().forEach((section) => {
+              const sectionElement = document.getElementById(section.id);
+              if (sectionElement) {
+                sectionElement.innerHTML = section.selector 
+                  ? document.querySelector(section.selector).innerHTML 
+                  : '';
+              }
+            });
+          }
+          
           triggerCartUpdate();
           
         } catch (error) {
