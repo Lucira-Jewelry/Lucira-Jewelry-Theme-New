@@ -1229,6 +1229,47 @@
       throw error;
     }
   }
+
+  // Add this function to update price display in cart unnecessary function
+    function updateInsurancePriceDisplay() {
+      const cartItems = document.querySelectorAll('.cart-item');
+      
+      cartItems.forEach(item => {
+        const variantIdElement = item.querySelector('[name="id"]') || item.querySelector('[data-variant-id]');
+        if (!variantIdElement) return;
+        
+        const variantId = variantIdElement.value || variantIdElement.dataset.variantId;
+        
+        if (variantId === CONFIG.VARIANT_ID) {
+          const quantityElement = item.querySelector('.quantity__input');
+          const priceElement = item.querySelector('.cart-item__price');
+          
+          if (quantityElement && priceElement) {
+            const quantity = parseInt(quantityElement.value);
+            const unitPrice = state.insurancePrice || 10000;
+            const totalPrice = unitPrice * quantity;
+            
+            // Update price display
+            priceElement.innerHTML = `<div class="cart-item__price-wrapper">
+              <span class="visually-hidden">Regular price</span>
+              <span class="cart-item__price">${formatMoney(totalPrice)}</span>
+            </div>`;
+          }
+        }
+      });
+    }
+
+    // Then call this in your updateGrandTotalUI function:
+    async function updateGrandTotalUI(cartData) {
+      if (!cartData) return;
+      
+      // ... existing code ...
+      
+      // Add this line:
+      setTimeout(updateInsurancePriceDisplay, 100);
+      
+      await updateInsuranceDisplay(cartData);
+    }
   
   // ==================== UI UPDATES ====================
   
