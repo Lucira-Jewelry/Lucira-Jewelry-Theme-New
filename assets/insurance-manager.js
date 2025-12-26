@@ -3537,7 +3537,7 @@
         
         .insurance-overlay-content {
           background: white;
-          padding: 24px 32px;
+          padding: 10px 32px;
           border-radius: 16px;
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
