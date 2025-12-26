@@ -936,7 +936,8 @@
       return state.insurancePrice;
     } catch (error) {
       log('❌', 'Price fetch error:', error);
-      state.insurancePrice = 10000;
+      // state.insurancePrice = 10000;
+      state.insurancePrice = 0;
       return state.insurancePrice;
     }
   }
