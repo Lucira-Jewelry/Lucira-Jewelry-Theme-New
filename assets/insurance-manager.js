@@ -3501,128 +3501,128 @@
 
  // ==================== OVERLAY SYSTEM ====================
 
-function createOverlay() {
-  let overlay = document.getElementById('insurance-removal-overlay');
-  if (!overlay) {
-    overlay = document.createElement('div');
-    overlay.id = 'insurance-removal-overlay';
-    overlay.innerHTML = `
-      <div class="insurance-overlay-content">
-        <div class="insurance-loader-animation">
-          <div class="insurance-dot"></div>
-          <div class="insurance-dot"></div>
-          <div class="insurance-dot"></div>
+  function createOverlay() {
+    let overlay = document.getElementById('insurance-removal-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'insurance-removal-overlay';
+      overlay.innerHTML = `
+        <div class="insurance-overlay-content">
+          <div class="insurance-loader-animation">
+            <div class="insurance-dot"></div>
+            <div class="insurance-dot"></div>
+            <div class="insurance-dot"></div>
+          </div>
+          <p class="insurance-overlay-text">Removing insurance...</p>
         </div>
-        <p class="insurance-overlay-text">Removing insurance...</p>
-      </div>
-    `;
-    
-    const style = document.createElement('style');
-    style.textContent = `
-      #insurance-removal-overlay {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(255, 255, 255, 0.98);
-        backdrop-filter: blur(8px);
-        z-index: 10000;
-        display: none;
-        align-items: center;
-        justify-content: center;
-      }
+      `;
       
-      .insurance-overlay-content {
-        text-align: center;
-        padding: 0;
-      }
-      
-      .insurance-loader-animation {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 8px;
-        margin-bottom: 20px;
-      }
-      
-      .insurance-dot {
-        width: 12px;
-        height: 12px;
-        background: #1a1a1a;
-        border-radius: 50%;
-        animation: insurance-bounce 1.4s infinite ease-in-out both;
-      }
-      
-      .insurance-dot:nth-child(1) {
-        animation-delay: -0.32s;
-      }
-      
-      .insurance-dot:nth-child(2) {
-        animation-delay: -0.16s;
-      }
-      
-      .insurance-overlay-text {
-        margin: 0;
-        font-size: 18px;
-        font-weight: 500;
-        color: #1a1a1a;
-        letter-spacing: 0.3px;
-      }
-      
-      @keyframes insurance-bounce {
-        0%, 80%, 100% { 
-          transform: scale(0.8);
-          opacity: 0.5;
+      const style = document.createElement('style');
+      style.textContent = `
+        #insurance-removal-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(255, 255, 255, 0.98);
+          backdrop-filter: blur(8px);
+          z-index: 10000;
+          display: none;
+          align-items: center;
+          justify-content: center;
         }
-        40% { 
-          transform: scale(1.2);
-          opacity: 1;
+        
+        .insurance-overlay-content {
+          text-align: center;
+          padding: 0;
         }
+        
+        .insurance-loader-animation {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+        
+        .insurance-dot {
+          width: 12px;
+          height: 12px;
+          background: #1a1a1a;
+          border-radius: 50%;
+          animation: insurance-bounce 1.4s infinite ease-in-out both;
+        }
+        
+        .insurance-dot:nth-child(1) {
+          animation-delay: -0.32s;
+        }
+        
+        .insurance-dot:nth-child(2) {
+          animation-delay: -0.16s;
+        }
+        
+        .insurance-overlay-text {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 500;
+          color: #1a1a1a;
+          letter-spacing: 0.3px;
+        }
+        
+        @keyframes insurance-bounce {
+          0%, 80%, 100% { 
+            transform: scale(0.8);
+            opacity: 0.5;
+          }
+          40% { 
+            transform: scale(1.2);
+            opacity: 1;
+          }
+        }
+      `;
+      document.head.appendChild(style);
+      
+      // Append to drawer__inner instead of body
+      const drawerInner = document.querySelector('.drawer__inner');
+      if (drawerInner) {
+        // Make sure drawer__inner has position relative
+        if (getComputedStyle(drawerInner).position === 'static') {
+          drawerInner.style.position = 'relative';
+        }
+        drawerInner.appendChild(overlay);
+      } else {
+        // Fallback to body if drawer__inner not found
+        document.body.appendChild(overlay);
       }
-    `;
-    document.head.appendChild(style);
+    }
+    return overlay;
+  }
+
+  function showOverlay() {
+    const overlay = createOverlay();
+    overlay.style.display = 'flex';
     
-    // Append to drawer__inner instead of body
+    // Prevent interactions with drawer content
     const drawerInner = document.querySelector('.drawer__inner');
     if (drawerInner) {
-      // Make sure drawer__inner has position relative
-      if (getComputedStyle(drawerInner).position === 'static') {
-        drawerInner.style.position = 'relative';
-      }
-      drawerInner.appendChild(overlay);
-    } else {
-      // Fallback to body if drawer__inner not found
-      document.body.appendChild(overlay);
+      drawerInner.style.pointerEvents = 'none';
+      overlay.style.pointerEvents = 'auto';
     }
   }
-  return overlay;
-}
 
-function showOverlay() {
-  const overlay = createOverlay();
-  overlay.style.display = 'flex';
-  
-  // Prevent interactions with drawer content
-  const drawerInner = document.querySelector('.drawer__inner');
-  if (drawerInner) {
-    drawerInner.style.pointerEvents = 'none';
-    overlay.style.pointerEvents = 'auto';
+  function hideOverlay() {
+    const overlay = document.getElementById('insurance-removal-overlay');
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    
+    // Re-enable interactions
+    const drawerInner = document.querySelector('.drawer__inner');
+    if (drawerInner) {
+      drawerInner.style.pointerEvents = '';
+    }
   }
-}
-
-function hideOverlay() {
-  const overlay = document.getElementById('insurance-removal-overlay');
-  if (overlay) {
-    overlay.style.display = 'none';
-  }
-  
-  // Re-enable interactions
-  const drawerInner = document.querySelector('.drawer__inner');
-  if (drawerInner) {
-    drawerInner.style.pointerEvents = '';
-  }
-}
 
   function showLoader(show) {
     const { loader, box } = getElements();
