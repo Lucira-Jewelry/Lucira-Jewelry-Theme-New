@@ -3563,7 +3563,7 @@ function createOverlay() {
         border: 4px solid #e5e5e5;
         border-top: 4px solid #1a1a1a;
         border-radius: 50%;
-        animation: insurance-spin 0.1s linear infinite;
+        animation: insurance-spin 0s linear infinite;
         box-sizing: border-box;
         display: block;
       }
