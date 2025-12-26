@@ -3555,18 +3555,17 @@ function createOverlay() {
       }
       
       .spinner-ring {
-        position: relative;
+        position: absolute;
         top: 0;
         left: 0;
         width: 100%;
         height: 100%;
-        border: 4px solid #1a1a1a;
+        border: 4px solid #e5e5e5;
         border-top: 4px solid #1a1a1a;
         border-radius: 50%;
-        animation: insurance-spin 0.9s linear infinite;
+        animation: insurance-spin 0.8s linear infinite;
         box-sizing: border-box;
         display: block;
-        z-index:9999999;
       }
       
       .spinner-ring:nth-child(1) {
