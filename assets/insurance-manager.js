@@ -3523,14 +3523,15 @@
       const style = document.createElement('style');
       style.textContent = `
         #insurance-removal-overlay {
-          position: absolute;
+          position: fixed;
           top: 0;
-          left: 0;
+          right: 0;
           width: 100%;
-          height: 100%;
-          background: rgba(0, 0, 0, 0.75);
-          backdrop-filter: blur(4px);
-          z-index: 1000;
+          max-width: 450px;
+          height: 100vh;
+          background: rgba(0, 0, 0, 0.5);
+          backdrop-filter: blur(3px);
+          z-index: 10000;
           display: none;
           align-items: center;
           justify-content: center;
@@ -3543,6 +3544,7 @@
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
           min-width: 280px;
+          max-width: 90%;
         }
         
         .insurance-spinner {
@@ -3589,12 +3591,14 @@
           100% { transform: rotate(360deg); }
         }
         
-        #CartDrawer .drawer__inner {
-          position: relative;
+        @media screen and (max-width: 749px) {
+          #insurance-removal-overlay {
+            max-width: 100%;
+          }
         }
       `;
       document.head.appendChild(style);
-      cartDrawer.appendChild(overlay);
+      document.body.appendChild(overlay);
     }
     return overlay;
   }
@@ -3607,16 +3611,17 @@
       const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner');
       if (cartDrawerInner) {
         cartDrawerInner.style.pointerEvents = 'none';
-        overlay.style.pointerEvents = 'auto';
       }
+      overlay.style.pointerEvents = 'auto';
     }
   }
   
   function hideOverlay() {
+    const overlay = document.body.querySelector('#insurance-removal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    
     const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner');
     if (cartDrawerInner) {
-      const overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
-      if (overlay) overlay.style.display = 'none';
       cartDrawerInner.style.pointerEvents = '';
     }
   }
