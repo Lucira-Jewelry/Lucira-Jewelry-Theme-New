@@ -3502,12 +3502,7 @@
   // ==================== OVERLAY SYSTEM ====================
   
   function createOverlay() {
-    const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner') || 
-                           document.querySelector('.cart-drawer .drawer__inner') ||
-                           document.getElementById('CartDrawer');
-    if (!cartDrawerInner) return null;
-    
-    let overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
+    let overlay = document.getElementById('insurance-removal-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'insurance-removal-overlay';
@@ -3524,24 +3519,18 @@
       
       const style = document.createElement('style');
       style.textContent = `
-        #CartDrawer .drawer__inner,
-        .cart-drawer .drawer__inner {
-          position: relative;
-        }
-        
         #insurance-removal-overlay {
-          position: absolute;
+          position: fixed;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
-          background: rgba(0, 0, 0, 0.5);
-          backdrop-filter: blur(3px);
-          z-index: 1000;
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(4px);
+          z-index: 999999;
           display: none;
           align-items: center;
           justify-content: center;
-          pointer-events: all;
         }
         
         .insurance-overlay-content {
@@ -3551,7 +3540,6 @@
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
           min-width: 280px;
-          max-width: 90%;
         }
         
         .insurance-spinner {
@@ -3599,26 +3587,32 @@
         }
       `;
       document.head.appendChild(style);
-      cartDrawerInner.appendChild(overlay);
+      document.body.appendChild(overlay);
     }
     return overlay;
   }
   
   function showOverlay() {
     const overlay = createOverlay();
-    if (overlay) {
-      overlay.style.display = 'flex';
-    }
+    overlay.style.display = 'flex';
+    
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) cartDrawer.style.zIndex = '999998';
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.pointerEvents = 'none';
+    overlay.style.pointerEvents = 'auto';
   }
   
   function hideOverlay() {
-    const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner') || 
-                            document.querySelector('.cart-drawer .drawer__inner') ||
-                            document.getElementById('CartDrawer');
-    if (cartDrawerInner) {
-      const overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
-      if (overlay) overlay.style.display = 'none';
-    }
+    const overlay = document.getElementById('insurance-removal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) cartDrawer.style.zIndex = '';
+    
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
   }
   
   function showLoader(show) {
@@ -4093,44 +4087,22 @@
             await wait(500);
           }
           
-          log('✅', 'Insurance removed, now removing product...');
+          log('✅', 'Insurance removed, removing product...');
           
-          // Now remove the product using native Shopify cart update
-          await fetch('/cart/change.js', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-              line: lineIndex,
-              quantity: 0
-            })
-          });
-          
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: 'removeFromCart',
-            products: { ...removeButton.dataset }
-          });
+          const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
+          if (cartItems) {
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: 'removeFromCart',
+              products: { ...removeButton.dataset }
+            });
+            
+            await cartItems.updateQuantity(lineIndex, 0, event);
+          }
           
           await wait(400);
           hideOverlay();
           state.handlingLastProductRemoval = false;
-          
-          // Trigger the cart to refresh
-          const cartItems = removeButton.closest('cart-items') || removeButton.closest('cart-drawer-items');
-          if (cartItems && typeof cartItems.getSectionsToRender === 'function') {
-            cartItems.getSectionsToRender().forEach((section) => {
-              const sectionElement = document.getElementById(section.id);
-              if (sectionElement) {
-                sectionElement.innerHTML = section.selector 
-                  ? document.querySelector(section.selector).innerHTML 
-                  : '';
-              }
-            });
-          }
-          
           triggerCartUpdate();
           
         } catch (error) {
