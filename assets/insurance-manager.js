@@ -3502,10 +3502,7 @@
   // ==================== OVERLAY SYSTEM ====================
   
   function createOverlay() {
-    const cartDrawer = document.querySelector('#CartDrawer .drawer__inner');
-    if (!cartDrawer) return null;
-    
-    let overlay = cartDrawer.querySelector('#insurance-removal-overlay');
+    let overlay = document.getElementById('insurance-removal-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'insurance-removal-overlay';
@@ -3523,14 +3520,14 @@
       const style = document.createElement('style');
       style.textContent = `
         #insurance-removal-overlay {
-          position: absolute;
+          position: fixed;
           top: 0;
           left: 0;
           width: 100%;
           height: 100%;
           background: rgba(0, 0, 0, 0.75);
           backdrop-filter: blur(4px);
-          z-index: 1000;
+          z-index: 999999;
           display: none;
           align-items: center;
           justify-content: center;
@@ -3588,37 +3585,34 @@
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }
         }
-        
-        #CartDrawer .drawer__inner {
-          position: relative;
-        }
       `;
       document.head.appendChild(style);
-      cartDrawer.appendChild(overlay);
+      document.body.appendChild(overlay);
     }
     return overlay;
   }
   
   function showOverlay() {
     const overlay = createOverlay();
-    if (overlay) {
-      overlay.style.display = 'flex';
-      
-      const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner');
-      if (cartDrawerInner) {
-        cartDrawerInner.style.pointerEvents = 'none';
-        overlay.style.pointerEvents = 'auto';
-      }
-    }
+    overlay.style.display = 'flex';
+    
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) cartDrawer.style.zIndex = '999998';
+    
+    document.body.style.overflow = 'hidden';
+    document.body.style.pointerEvents = 'none';
+    overlay.style.pointerEvents = 'auto';
   }
   
   function hideOverlay() {
-    const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner');
-    if (cartDrawerInner) {
-      const overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
-      if (overlay) overlay.style.display = 'none';
-      cartDrawerInner.style.pointerEvents = '';
-    }
+    const overlay = document.getElementById('insurance-removal-overlay');
+    if (overlay) overlay.style.display = 'none';
+    
+    const cartDrawer = document.querySelector('cart-drawer');
+    if (cartDrawer) cartDrawer.style.zIndex = '';
+    
+    document.body.style.overflow = '';
+    document.body.style.pointerEvents = '';
   }
   
   function showLoader(show) {
