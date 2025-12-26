@@ -3565,7 +3565,7 @@ function createOverlay() {
         border-radius: 50%;
         animation: insurance-spin 0.8s linear infinite;
         box-sizing: border-box;
-        display: block;
+        display: relative;
         z-index:9999999;
       }
       
