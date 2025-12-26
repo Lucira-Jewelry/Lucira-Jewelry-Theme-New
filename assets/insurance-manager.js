@@ -955,7 +955,7 @@
             <div class="insurance-dot"></div>
             <div class="insurance-dot"></div>
           </div>
-          <p class="insurance-overlay-text">Removing Product's From the cart...</p>
+          <p class="insurance-overlay-text">Removing Product's From your cart...</p>
         </div>
       `;
       
