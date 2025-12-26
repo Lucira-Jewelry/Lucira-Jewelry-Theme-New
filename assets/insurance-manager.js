@@ -3537,11 +3537,11 @@
         
         .insurance-overlay-content {
           background: white;
-          padding: 0px 32px;
+          padding: 24px 32px;
           border-radius: 16px;
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
-          min-width: 280px;
+          min-width: 180px;
         }
         
         .insurance-spinner {
