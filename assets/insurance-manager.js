@@ -3676,7 +3676,6 @@ function createOverlay() {
         border-radius: 50%;
         animation: insurance-spin 1s linear infinite;
         box-sizing: border-box;
-        color:#1a1a1a
       }
       
       .spinner-ring:nth-child(1) {
