@@ -3542,7 +3542,6 @@
           box-shadow: 0 8px 32px rgba(0,0,0,0.2);
           text-align: center;
           min-width: 280px;
-          height:100px;
         }
         
         .insurance-spinner {
