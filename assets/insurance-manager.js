@@ -909,37 +909,78 @@
   
   // ==================== PRICE FETCHING ====================
   
-  async function fetchInsurancePrice() {
-    if (state.insurancePrice !== null) return state.insurancePrice;
+  // async function fetchInsurancePrice() {
+  //   if (state.insurancePrice !== null) return state.insurancePrice;
     
-    try {
-      log('💰', 'Fetching insurance price...');
-      const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
+  //   try {
+  //     log('💰', 'Fetching insurance price...');
+  //     const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
       
-      if (!response.ok) {
-        const cart = await fetch('/cart.js').then(r => r.json());
-        const insuranceItem = cart.items.find(item => 
-          String(item.variant_id) === CONFIG.VARIANT_ID
-        );
+  //     if (!response.ok) {
+  //       const cart = await fetch('/cart.js').then(r => r.json());
+  //       const insuranceItem = cart.items.find(item => 
+  //         String(item.variant_id) === CONFIG.VARIANT_ID
+  //       );
         
-        if (insuranceItem) {
-          state.insurancePrice = insuranceItem.price;
-          log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
-          return state.insurancePrice;
-        }
-        throw new Error('Unable to fetch price');
-      }
+  //       if (insuranceItem) {
+  //         state.insurancePrice = insuranceItem.price;
+  //         log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
+  //         return state.insurancePrice;
+  //       }
+  //       throw new Error('Unable to fetch price');
+  //     }
       
-      const data = await response.json();
-      state.insurancePrice = data.price;
-      log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
-      return state.insurancePrice;
-    } catch (error) {
-      log('❌', 'Price fetch error:', error);
-      state.insurancePrice = 100;
-      return state.insurancePrice;
+  //     const data = await response.json();
+  //     state.insurancePrice = data.price;
+  //     log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
+  //     return state.insurancePrice;
+  //   } catch (error) {
+  //     log('❌', 'Price fetch error:', error);
+  //     state.insurancePrice = 100;
+  //     return state.insurancePrice;
+  //   }
+  // }
+
+
+  // ==================== PRICE FETCHING ====================
+
+    async function fetchInsurancePrice() {
+      if (state.insurancePrice !== null) return state.insurancePrice;
+      
+      try {
+        log('💰', 'Fetching insurance price...');
+        const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
+        
+        if (!response.ok) {
+          const cart = await fetch('/cart.js').then(r => r.json());
+          const insuranceItem = cart.items.find(item => 
+            String(item.variant_id) === CONFIG.VARIANT_ID
+          );
+          
+          if (insuranceItem) {
+            // FIX: Check if price exists (even if 0)
+            state.insurancePrice = insuranceItem.price !== undefined ? insuranceItem.price : null;
+            if (state.insurancePrice !== null) {
+              log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
+              return state.insurancePrice;
+            }
+          }
+          throw new Error('Unable to fetch price');
+        }
+        
+        const data = await response.json();
+        // FIX: Allow 0 as valid price
+        state.insurancePrice = data.price !== undefined ? data.price : 100;
+        log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
+        return state.insurancePrice;
+      } catch (error) {
+        log('❌', 'Price fetch error:', error);
+        // FIX: Only set fallback if we couldn't fetch at all
+        state.insurancePrice = 0; // Changed from 100 to 0 for free insurance
+        return state.insurancePrice;
+      }
     }
-  }
+
 
  // ==================== OVERLAY SYSTEM ====================
 
