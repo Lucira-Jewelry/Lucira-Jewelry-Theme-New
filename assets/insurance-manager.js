@@ -1750,7 +1750,7 @@
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
-    setTimeout(init, 0);
+    setTimeout(init, 100);
   }
   
   window.InsuranceManager = {
