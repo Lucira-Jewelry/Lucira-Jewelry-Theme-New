@@ -1291,7 +1291,7 @@
           const quantitySpan = document.createElement('span');
           quantitySpan.className = 'insurance-quantity';
           quantitySpan.textContent = ` (${insuranceQuantity})`;
-          quantitySpan.style.cssText = 'font-weight:400;margin-left:1px;color:#1a1a1a;';
+          quantitySpan.style.cssText = 'font-weight:400;margin-left:0px;color:#1a1a1a;';
           label.appendChild(quantitySpan);
           
           const priceElement = label.querySelector('.insurance-price');
