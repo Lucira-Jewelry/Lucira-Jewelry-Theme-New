@@ -3555,7 +3555,7 @@ function createOverlay() {
       }
       
       .spinner-ring {
-        position: absolute;
+        position: relative;
         top: 0;
         left: 0;
         width: 100%;
@@ -3565,7 +3565,7 @@ function createOverlay() {
         border-radius: 50%;
         animation: insurance-spin 0.9s linear infinite;
         box-sizing: border-box;
-        display: relative;
+        display: block;
         z-index:9999999;
       }
       
