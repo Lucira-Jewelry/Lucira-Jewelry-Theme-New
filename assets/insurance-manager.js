@@ -945,49 +945,91 @@
   // ==================== PRICE FETCHING ====================
 
 async function fetchInsurancePrice() {
-  if (state.insurancePrice !== null) return state.insurancePrice;
+  if (state.insurancePrice !== null) {
+    log('💰', 'Using cached price:', state.insurancePrice);
+    return state.insurancePrice;
+  }
   
   try {
     log('💰', 'Fetching insurance price...');
     const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
     
     if (!response.ok) {
+      log('⚠️', 'Product fetch failed, trying cart...');
       const cart = await fetch('/cart.js').then(r => r.json());
       const insuranceItem = cart.items.find(item => 
         String(item.variant_id) === CONFIG.VARIANT_ID
       );
       
-      if (insuranceItem && insuranceItem.price !== undefined) {
-        state.insurancePrice = insuranceItem.price;
-        log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
+      if (insuranceItem !== undefined) {
+        state.insurancePrice = typeof insuranceItem.price === 'number' ? insuranceItem.price : 0;
+        log('✅', 'Price from cart:', state.insurancePrice, formatMoney(state.insurancePrice));
         return state.insurancePrice;
       }
       throw new Error('Unable to fetch price');
     }
     
     const data = await response.json();
-    state.insurancePrice = data.price;
-    log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
+    state.insurancePrice = typeof data.price === 'number' ? data.price : 0;
+    log('✅', 'Price from variant:', state.insurancePrice, formatMoney(state.insurancePrice));
     return state.insurancePrice;
   } catch (error) {
     log('❌', 'Price fetch error:', error);
     state.insurancePrice = 0;
+    log('⚠️', 'Using fallback price: 0');
     return state.insurancePrice;
   }
 }
 
 // ==================== CART OPERATIONS ====================
 
-// ... existing getCart, hasInsurance, getInsuranceQuantity functions ...
+async function getCart() {
+  try {
+    const response = await fetch('/cart.js', {
+      headers: { 'Accept': 'application/json' },
+      cache: 'no-store'
+    });
+    if (!response.ok) throw new Error('Failed to fetch cart');
+    const cart = await response.json();
+    state.currentCart = cart;
+    return cart;
+  } catch (error) {
+    log('❌', 'Cart fetch error:', error);
+    return null;
+  }
+}
+
+const hasInsurance = (cartData) => 
+  cartData?.items?.some(item => String(item.variant_id) === CONFIG.VARIANT_ID) || false;
+
+const getInsuranceQuantity = (cartData) => 
+  cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID)?.quantity || 0;
 
 const getInsurancePrice = (cartData) => {
   const insuranceItem = cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID);
-  if (insuranceItem && insuranceItem.price !== undefined) {
+  
+  // First try to get price from cart item
+  if (insuranceItem !== undefined && typeof insuranceItem.price === 'number') {
+    log('💰', 'Price from cart item:', insuranceItem.price);
     return insuranceItem.price;
   }
-  // Return cached price or 0
-  return state.insurancePrice !== null ? state.insurancePrice : 0;
+  
+  // Fallback to cached state price
+  if (state.insurancePrice !== null && typeof state.insurancePrice === 'number') {
+    log('💰', 'Price from state:', state.insurancePrice);
+    return state.insurancePrice;
+  }
+  
+  // Last resort fallback
+  log('⚠️', 'Using default price: 0');
+  return 0;
 };
+
+const getNonInsuranceCount = (cartData) => 
+  cartData?.items?.reduce((count, item) => 
+    String(item.variant_id) !== CONFIG.VARIANT_ID ? count + item.quantity : count, 0) || 0;
+
+const getTotalNonInsuranceQuantity = (cartData) => getNonInsuranceCount(cartData);
 
 
  // ==================== OVERLAY SYSTEM ====================
