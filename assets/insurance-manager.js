@@ -3502,10 +3502,12 @@
   // ==================== OVERLAY SYSTEM ====================
   
   function createOverlay() {
-    const cartDrawer = document.getElementById('CartDrawer');
-    if (!cartDrawer) return null;
+    const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner') || 
+                           document.querySelector('.cart-drawer .drawer__inner') ||
+                           document.getElementById('CartDrawer');
+    if (!cartDrawerInner) return null;
     
-    let overlay = cartDrawer.querySelector('#insurance-removal-overlay');
+    let overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.id = 'insurance-removal-overlay';
@@ -3522,7 +3524,8 @@
       
       const style = document.createElement('style');
       style.textContent = `
-        #CartDrawer {
+        #CartDrawer .drawer__inner,
+        .cart-drawer .drawer__inner {
           position: relative;
         }
         
@@ -3538,6 +3541,7 @@
           display: none;
           align-items: center;
           justify-content: center;
+          pointer-events: all;
         }
         
         .insurance-overlay-content {
@@ -3595,7 +3599,7 @@
         }
       `;
       document.head.appendChild(style);
-      cartDrawer.appendChild(overlay);
+      cartDrawerInner.appendChild(overlay);
     }
     return overlay;
   }
@@ -3608,9 +3612,11 @@
   }
   
   function hideOverlay() {
-    const cartDrawer = document.getElementById('CartDrawer');
-    if (cartDrawer) {
-      const overlay = cartDrawer.querySelector('#insurance-removal-overlay');
+    const cartDrawerInner = document.querySelector('#CartDrawer .drawer__inner') || 
+                            document.querySelector('.cart-drawer .drawer__inner') ||
+                            document.getElementById('CartDrawer');
+    if (cartDrawerInner) {
+      const overlay = cartDrawerInner.querySelector('#insurance-removal-overlay');
       if (overlay) overlay.style.display = 'none';
     }
   }
