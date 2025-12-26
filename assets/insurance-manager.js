@@ -3566,6 +3566,7 @@ function createOverlay() {
         animation: insurance-spin 0.8s linear infinite;
         box-sizing: border-box;
         display: block;
+        z-index:9999999;
       }
       
       .spinner-ring:nth-child(1) {
