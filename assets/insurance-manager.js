@@ -1694,6 +1694,7 @@
     
     await fetchInsurancePrice();
     interceptCartItemRemoval();
+    interceptMinusWhenLastItem();
     attachEventListeners();
     syncCheckboxState();
     observeCartChanges();
