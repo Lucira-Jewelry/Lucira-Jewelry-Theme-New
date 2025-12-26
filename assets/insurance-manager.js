@@ -1492,6 +1492,69 @@
     }
   }
   
+  // additional function for removing the product from - sign
+
+  function interceptMinusWhenLastItem() {
+    document.addEventListener('click', async function (event) {
+      const minusBtn = event.target.closest('button[name="minus"]');
+      if (!minusBtn) return;
+
+      const quantityInput = minusBtn
+        .closest('quantity-input')
+        ?.querySelector('.quantity__input');
+
+      if (!quantityInput) return;
+
+      const currentQty = parseInt(quantityInput.value, 10);
+      if (currentQty !== 1) return; // Only care about 1 → 0
+
+      const variantId = quantityInput.dataset.quantityVariantId;
+      if (variantId === CONFIG.VARIANT_ID) return;
+
+      const cartData = await getCart();
+      if (!cartData) return;
+
+      const nonInsuranceCount = getNonInsuranceCount(cartData);
+      const hasInsuranceInCart = hasInsurance(cartData);
+
+      // If this is the LAST product + insurance exists → intercept
+      if (nonInsuranceCount === 1 && hasInsuranceInCart) {
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+
+        log('🚨', 'Minus on last item detected — routing via insurance-safe removal');
+
+        state.handlingLastProductRemoval = true;
+        showOverlay();
+
+        try {
+          await removeInsuranceFromCart(true);
+          await wait(600);
+
+          // Now remove product safely
+          const lineIndex = quantityInput.dataset.index;
+          const cartItems =
+            quantityInput.closest('cart-items') ||
+            quantityInput.closest('cart-drawer-items');
+
+          if (cartItems && lineIndex) {
+            await cartItems.updateQuantity(lineIndex, 0, event);
+          }
+
+          await wait(400);
+          triggerCartUpdate();
+        } catch (err) {
+          log('❌', 'Minus intercept failed:', err);
+        } finally {
+          hideOverlay();
+          state.handlingLastProductRemoval = false;
+        }
+      }
+    }, true);
+  }
+
+
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
