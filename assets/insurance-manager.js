@@ -3560,10 +3560,10 @@ function createOverlay() {
         left: 0;
         width: 100%;
         height: 100%;
-        border: 4px solid #e5e5e5;
+        border: 4px solid #1a1a1a;
         border-top: 4px solid #1a1a1a;
         border-radius: 50%;
-        animation: insurance-spin 0.8s linear infinite;
+        animation: insurance-spin 0.9s linear infinite;
         box-sizing: border-box;
         display: relative;
         z-index:9999999;
