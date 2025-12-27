@@ -495,38 +495,65 @@
 {% endjavascript %}
 
 <script type="application/ld+json">
-  {
-    "@context": "http://schema.org",
-    "@type": "Organization",
-    "name": {{ shop.name | json }},
-    {% if settings.logo %}
-      "logo": {{ settings.logo | image_url: width: 500 | prepend: "https:" | json }},
-    {% endif %}
-    "sameAs": [
-      {{ settings.social_twitter_link | json }},
-      {{ settings.social_facebook_link | json }},
-      {{ settings.social_pinterest_link | json }},
-      {{ settings.social_instagram_link | json }},
-      {{ settings.social_tiktok_link | json }},
-      {{ settings.social_tumblr_link | json }},
-      {{ settings.social_snapchat_link | json }},
-      {{ settings.social_youtube_link | json }},
-      {{ settings.social_vimeo_link | json }}
-    ],
-    "url": {{ request.origin | append: page.url | json }}
-  }
-</script>
-
-<script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@graph": [
+
+    {
+      "@type": "Organization",
+      "@id": "{{ shop.url }}#organization",
+      "name": {{ shop.name | json }},
+      "url": {{ shop.url | json }},
+      {% if settings.logo %}
+      "logo": {
+        "@type": "ImageObject",
+        "url": {{ settings.logo | image_url: width: 500 | prepend: "https:" | json }}
+      },
+      {% endif %}
+      "sameAs": [
+        {% if settings.social_facebook_link != blank %}{{ settings.social_facebook_link | json }}{% endif %}
+        {% if settings.social_instagram_link != blank %},{{ settings.social_instagram_link | json }}{% endif %}
+        {% if settings.social_youtube_link != blank %},{{ settings.social_youtube_link | json }}{% endif %}
+      ]
+    },
+
+    {
+      "@type": "WebSite",
+      "@id": "{{ shop.url }}#website",
+      "url": {{ shop.url | json }},
+      "name": {{ shop.name | json }},
+      "publisher": {
+        "@id": "{{ shop.url }}#organization"
+      },
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "{{ shop.url }}/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    },
+
+    {
+      "@type": "WebPage",
+      "@id": "{{ shop.url }}{{ page.url }}#webpage",
+      "url": {{ request.origin | append: page.url | json }},
+      "name": {{ page.title | json }},
+      "isPartOf": {
+        "@id": "{{ shop.url }}#website"
+      },
+      "about": {
+        "@id": "{{ shop.url }}#organization"
+      }
+    },
+
     {
       "@type": "Store",
       "@id": "{{ shop.url }}#chembur-store",
       "name": "Chembur Lucira Store",
       "url": {{ shop.url | json }},
       "image": {{ settings.logo | image_url: width: 800 | prepend: "https:" | json }},
+      "parentOrganization": {
+        "@id": "{{ shop.url }}#organization"
+      },
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Shop No. 3, Ground Floor, 487, Geraldine CHS LTD, Central Ave Rd",
@@ -541,12 +568,16 @@
         "reviewCount": "58"
       }
     },
+
     {
       "@type": "Store",
       "@id": "{{ shop.url }}#pune-store",
       "name": "Pune Lucira Store",
       "url": {{ shop.url | json }},
       "image": {{ settings.logo | image_url: width: 800 | prepend: "https:" | json }},
+      "parentOrganization": {
+        "@id": "{{ shop.url }}#organization"
+      },
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "Shop No. 3, 4, Balgandharv Chowk, Sai Square, 5 & 6, Jangali Maharaj Rd",
@@ -561,9 +592,11 @@
         "reviewCount": "19"
       }
     }
+
   ]
 }
 </script>
+
 
 
 {%- if request.page_type == 'index' -%}
