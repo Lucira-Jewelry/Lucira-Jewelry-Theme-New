@@ -40,6 +40,28 @@
         <input type="email" id="email" value="{{ customer.email }}" disabled>
         <div class="email-error" style="color: red; display: none;"></div>
       </div>
+
+      <div class="customer-form-row">
+        <div class="customer-form-group">
+          <label>Date of Birth</label>
+          <input
+            type="date"
+            id="dob"
+            value="{{ customer.metafields.custom.date_of_birth.value | default: '' }}"
+            disabled
+          >
+        </div>
+
+        <div class="customer-form-group">
+          <label>Date of Anniversary</label>
+          <input
+            type="date"
+            id="doa"
+            value="{{ customer.metafields.custom.date_of_anniversary.value | default: '' }}"
+            disabled
+          >
+        </div>
+      </div>
     
       <button class="save-button" id="save-button" type="submit" disabled>SAVE</button>
     </form>
@@ -528,24 +550,29 @@
     const editBtn = document.getElementById("edit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     const saveBtn = document.getElementById("save-button");
-    const inputs = document.querySelectorAll("#first_name, #last_name, #email");
+
+    /* 🔹 ADDED dob & doa here */
+    const inputs = document.querySelectorAll(
+      "#first_name, #last_name, #email, #dob, #doa"
+    );
+
     const phoneInput = document.getElementById("phone");
     const emailError = document.querySelector(".email-error");
     const originalValues = {};
 
     phoneInput.setAttribute("disabled", "true");
-  
+
     inputs.forEach(input => {
       originalValues[input.id] = input.value;
     });
-  
+
     editBtn.addEventListener("click", () => {
       inputs.forEach((input) => input.removeAttribute("disabled"));
       saveBtn.removeAttribute("disabled");
       cancelBtn.style.display = "inline-flex";
       editBtn.style.display = "none";
     });
-  
+
     cancelBtn.addEventListener("click", () => {
       inputs.forEach(input => {
         input.value = originalValues[input.id];
@@ -556,37 +583,39 @@
       editBtn.style.display = "inline-flex";
       emailError.style.display = "none";
     });
-  
+
     document.getElementById("customer-info-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       emailError.style.display = "none";
-  
+
       const email = document.getElementById("email").value;
       if (!validateEmail(email)) {
         emailError.textContent = "Please enter a valid email address";
         emailError.style.display = "block";
         return;
       }
-  
+
       const data = {
         id: document.getElementById("customer_id").value,
         first_name: document.getElementById("first_name").value,
         last_name: document.getElementById("last_name").value,
         email: email,
-        phone: document.getElementById("phone").value
+        phone: document.getElementById("phone").value,
+
+        note: `dob:${document.getElementById("dob").value || ''};doa:${document.getElementById("doa").value || ''}`
       };
-  
+
       try {
-        const res = await fetch("https://user-edit-385594025448.asia-south1.run.app/", {
+        const res = await fetch("https://personal-information-api-385594025448.asia-south1.run.app/", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify(data)
         });
-  
+
         const result = await res.json();
-  
+
         if (res.ok) {
           alert("✅ Customer information updated successfully.");
           inputs.forEach(input => {
@@ -610,13 +639,14 @@
         console.error("Network error:", err);
       }
     });
-  
+
     function validateEmail(email) {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return re.test(email);
     }
   });
 </script>
+
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
@@ -722,8 +752,6 @@
 
     function setupPincodeAutoFill(pinInput, cityInput, stateSelect) {
       if (!pinInput) return;
-
-      // already added input mask in previous script, but safe to keep here if you prefer it here instead
       pinInput.addEventListener('blur', async function (e) {
         const pin = e.target.value.trim();
         if (!/^\d{6}$/.test(pin)) return;
@@ -735,8 +763,6 @@
         if (cityInput && !cityInput.value) {
           cityInput.value = loc.city;
         }
-
-        // Auto-select state option if it matches
         if (stateSelect && loc.state) {
           const stateOption = Array.from(stateSelect.options).find(function (opt) {
             return opt.value.toLowerCase() === loc.state.toLowerCase();
@@ -747,11 +773,7 @@
         }
       });
     }
-
-    // Add address modal: auto-fill City + State
     setupPincodeAutoFill(addPinInput, addCityInput, addStateSelect);
-
-    // Edit address modal: auto-fill City/ District/ Town + State
     setupPincodeAutoFill(editPinInput, editCityDisplayInput, editStateSelect);
   });
 </script>
