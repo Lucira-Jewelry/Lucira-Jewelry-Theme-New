@@ -526,103 +526,115 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const mobileBreadcrumb = document.getElementById('mobileBreadcrumbLink');
-  const breadcrumbText = document.getElementById('mobileBreadcrumbText');
-  const drawerOverlay = document.getElementById('drawerOverlay');
-  const accountDrawer = document.getElementById('accountDrawer');
-  const drawerClose = document.getElementById('drawerClose');
-  const tabLabels = document.querySelectorAll('.customer_tab');
-  const html = document.documentElement;
+  document.addEventListener('DOMContentLoaded', function () {
+    const mobileBreadcrumb = document.getElementById('mobileBreadcrumbLink');
+    const breadcrumbText = document.getElementById('mobileBreadcrumbText');
+    const drawerOverlay = document.getElementById('drawerOverlay');
+    const accountDrawer = document.getElementById('accountDrawer');
+    const drawerClose = document.getElementById('drawerClose');
+    const tabLabels = document.querySelectorAll('.customer_tab');
 
-  let currentActiveTab = 'My Orders';
+    let currentActiveTab = 'My Orders';
 
-  function lockScroll() {
-    html.style.overflow = 'hidden';
-  }
-
-  function unlockScroll() {
-    html.style.overflow = '';
-  }
-
-  function openDrawer() {
-    accountDrawer.classList.add('drawer-open');
-    drawerOverlay.classList.add('active');
-    lockScroll();
-  }
-
-  function closeDrawer() {
-    accountDrawer.classList.remove('drawer-open');
-    drawerOverlay.classList.remove('active');
-    unlockScroll();
-  }
-
-  if (mobileBreadcrumb) {
-    mobileBreadcrumb.addEventListener('click', function (e) {
-      e.preventDefault();
-      openDrawer();
-    });
-  }
-
-  if (drawerClose) {
-    drawerClose.addEventListener('click', closeDrawer);
-  }
-
-  if (drawerOverlay) {
-    drawerOverlay.addEventListener('click', closeDrawer);
-  }
-
-  tabLabels.forEach((label) => {
-    label.addEventListener('click', function () {
-      const tabText = label.querySelector('.customer_tab_option span');
-      if (tabText && breadcrumbText) {
-        breadcrumbText.textContent = tabText.textContent.trim();
-      }
-
-      if (window.innerWidth < 750) {
-        setTimeout(closeDrawer, 300);
-      }
-    });
-  });
-
-  const contents = {
-    tab_my_orders: document.getElementById('tab_my_orders_content'),
-    tab_personal_info: document.getElementById('tab_personal_info_content'),
-    tab_wishlist: document.getElementById('tab_wishlist_content'),
-    tab_refer_earn: document.getElementById('tab_refer_earn_content'),
-    tab_offers: document.getElementById('tab_offers_content'),
-  };
-
-  function activateTabById(tabId) {
-    const radio = document.getElementById(tabId);
-    if (radio) radio.checked = true;
-
-    tabLabels.forEach((l) => {
-      l.classList.toggle('active', l.getAttribute('for') === tabId);
-    });
-
-    Object.values(contents).forEach((c) => c && c.classList.remove('active'));
-    const matched = document.getElementById(tabId + '_content');
-    if (matched) matched.classList.add('active');
-
-    unlockScroll();
-  }
-
-  const checked = document.querySelector('.customer_tab_input:checked');
-  activateTabById(checked ? checked.id : 'tab_my_orders');
-
-  document.querySelectorAll('.customer_tab_input').forEach((r) => {
-    r.addEventListener('change', () => activateTabById(r.id));
-  });
-
-  window.addEventListener('resize', () => {
-    if (window.innerWidth >= 750) {
-      closeDrawer();
+    function openDrawer() {
+      accountDrawer.classList.add('drawer-open');
+      drawerOverlay.classList.add('active');
+      document.body.style.overflow = 'hidden';
     }
-  });
-});
-</script>
 
+    function closeDrawer() {
+      accountDrawer.classList.remove('drawer-open');
+      drawerOverlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    if (mobileBreadcrumb) {
+      mobileBreadcrumb.addEventListener('click', function (e) {
+        e.preventDefault();
+        openDrawer();
+      });
+    }
+
+    if (drawerClose) {
+      drawerClose.addEventListener('click', closeDrawer);
+    }
+
+    if (drawerOverlay) {
+      drawerOverlay.addEventListener('click', closeDrawer);
+    }
+
+    tabLabels.forEach((label) => {
+      label.addEventListener('click', function () {
+        const tabText = label.querySelector('.customer_tab_option span');
+        if (tabText) {
+          currentActiveTab = tabText.textContent.trim();
+          if (breadcrumbText) {
+            breadcrumbText.textContent = currentActiveTab;
+          }
+        }
+
+        if (window.innerWidth < 750) {
+          setTimeout(closeDrawer, 300);
+        }
+      });
+    });
+
+    const contents = {
+      tab_my_orders: document.getElementById('tab_my_orders_content'),
+      tab_personal_info: document.getElementById('tab_personal_info_content'),
+      tab_my_wishlists: document.getElementById('tab_wishlist_content'),
+      tab_refer_earn: document.getElementById('tab_refer_earn_content'),
+      tab_offers: document.getElementById('tab_offers_content'),
+    };
+
+    function activateTabById(tabId) {
+      const radio = document.getElementById(tabId);
+      if (radio) radio.checked = true;
+
+      tabLabels.forEach((l) => {
+        const target = l.getAttribute('for');
+        if (target === tabId) l.classList.add('active');
+        else l.classList.remove('active');
+      });
+
+      Object.values(contents).forEach((c) => c && c.classList.remove('active'));
+      const contentId = tabId + '_content';
+      const matched = document.getElementById(contentId);
+      if (matched) matched.classList.add('active');
+    }
+
+    (function init() {
+      const checked = document.querySelector('.customer_tab_input:checked');
+      if (checked) activateTabById(checked.id);
+      else activateTabById('tab_my_orders');
+    })();
+
+    tabLabels.forEach((label) => {
+      label.addEventListener('click', function (e) {
+        const target = label.getAttribute('for');
+        if (!target) return;
+        setTimeout(() => activateTabById(target), 0);
+      });
+    });
+
+    const radios = document.querySelectorAll('.customer_tab_input');
+    radios.forEach((r) => r.addEventListener('change', () => activateTabById(r.id)));
+
+    document.body.addEventListener('click', function (e) {
+      const el = e.target.closest('[data-open-tab]');
+      if (!el) return;
+      e.preventDefault();
+      const tabToOpen = el.getAttribute('data-open-tab');
+      if (!tabToOpen) return;
+      activateTabById(tabToOpen);
+      const targetContent = document.getElementById(tabToOpen + '_content');
+      if (targetContent) {
+        const firstFocusable = targetContent.querySelector('input, button, a, [tabindex]:not([tabindex="-1"])');
+        if (firstFocusable) firstFocusable.focus();
+      }
+    });
+  });
+</script>
 
 <script>
   (function () {
