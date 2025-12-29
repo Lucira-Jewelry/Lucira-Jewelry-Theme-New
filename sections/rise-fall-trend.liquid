@@ -1,0 +1,140 @@
+{% comment %}
+  Gold Rate Trend Section
+  Shows ONE block: Rise / Fall / Stable based on T-1 logic
+{% endcomment %}
+
+{% if section.blocks.size > 0 %}
+<div class="gold-rate-rise-and-fall">
+  <div class="page-width">
+    <div class="information-content-wrapper">
+
+      <h2>
+        Gold Rate Today in {{ page.metafields.custom.city_name }} – [current_date]
+      </h2>
+
+      {% for block in section.blocks %}
+        {% case block.type %}
+
+          {% when 'gold_rate_rise' %}
+            <div id="gold-rise" style="display:none" {{ block.shopify_attributes }}>
+              {{ block.settings.content }}
+            </div>
+
+          {% when 'gold_rate_fall' %}
+            <div id="gold-fall" style="display:none" {{ block.shopify_attributes }}>
+              {{ block.settings.content }}
+            </div>
+
+          {% when 'gold_rate_stable' %}
+            <div id="gold-stable" style="display:none" {{ block.shopify_attributes }}>
+              {{ block.settings.content }}
+            </div>
+
+        {% endcase %}
+      {% endfor %}
+
+    </div>
+  </div>
+</div>
+{% endif %}
+
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const baseEl = document.querySelector('[data-base]');
+    if (!baseEl) return;
+
+    const todayRate = parseFloat(baseEl.getAttribute('data-base'));
+    const yesterdayRate = parseFloat(
+      "{{ section.settings.rate_yesterday | remove: '₹' | remove: ',' | strip }}"
+    );
+
+    if (!todayRate || !yesterdayRate) return;
+
+    const THRESHOLD = 1000;
+
+    const riseEl = document.getElementById('gold-rise');
+    const fallEl = document.getElementById('gold-fall');
+    const stableEl = document.getElementById('gold-stable');
+
+    [riseEl, fallEl, stableEl].forEach(el => el && (el.style.display = 'none'));
+
+    const diff = todayRate - yesterdayRate;
+
+    if (diff > THRESHOLD && riseEl) {
+      riseEl.style.display = 'block';
+    } else if (diff < -THRESHOLD && fallEl) {
+      fallEl.style.display = 'block';
+    } else if (stableEl) {
+      stableEl.style.display = 'block';
+    }
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Gold Rate Trend",
+  "tag": "section",
+  "class": "gold-rate-trend-section",
+  "settings": [
+    {
+      "type": "text",
+      "id": "rate_yesterday",
+      "label": "Gold Rate Yesterday (24 KT)",
+      "default": "₹ 98,320",
+      "info": "Yesterday's 24KT gold price per 10 grams (T-1)"
+    },
+    {
+      "type": "text",
+      "id": "rate_yesterday_22kt",
+      "label": "Gold Rate Yesterday (22 KT)",
+      "default": "₹ 90,080",
+      "info": "Yesterday's 22KT gold price per 10 grams (T-1)"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "gold_rate_rise",
+      "name": "Gold Rate Rises",
+      "settings": [
+        {
+          "type": "html",
+          "id": "content",
+          "label": "Rise Content",
+          "default": "<h3>Gold Rate Rises</h3><p>In {{ page.metafields.custom.city_name }} on [current_date], 24-carat gold is priced at [gold_rate_24kt_10gm] per 10 grams, while 22-carat gold stands at [gold_rate_22kt_10gm] per 10 grams.</p>"
+        }
+      ]
+    },
+    {
+      "type": "gold_rate_fall",
+      "name": "Gold Rate Falls",
+      "settings": [
+        {
+          "type": "html",
+          "id": "content",
+          "label": "Fall Content",
+          "default": "<h3>Gold Rate Falls</h3><p>In {{ page.metafields.custom.city_name }} on [current_date], 24-carat gold is available at [gold_rate_24kt_10gm] per 10 grams, with 22-carat gold priced at [gold_rate_22kt_10gm] per 10 grams.</p>"
+        }
+      ]
+    },
+    {
+      "type": "gold_rate_stable",
+      "name": "Gold Rate Stable",
+      "settings": [
+        {
+          "type": "html",
+          "id": "content",
+          "label": "Stable Content",
+          "default": "<h3>Gold Rate Remains Stable</h3><p>In {{ page.metafields.custom.city_name }} on [current_date], gold prices remain steady with 24-carat gold at [gold_rate_24kt_10gm] per 10 grams and 22-carat gold at [gold_rate_22kt_10gm] per 10 grams.</p>"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Gold Rate Trend",
+      "category": "Custom"
+    }
+  ]
+}
+{% endschema %}
