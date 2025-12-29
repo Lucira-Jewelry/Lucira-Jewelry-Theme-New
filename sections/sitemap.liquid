@@ -557,6 +557,14 @@
     <h1 class="sitemap-page-title">{{ section.settings.page_title }}</h1>
   </div>
 
+  {% comment %}
+  ==========================================
+  ADVANCED URL GENERATION LOGIC
+  ==========================================
+  This uses Shopify's native URL properties first,
+  then constructs URLs from handles as fallback
+  {% endcomment %}
+
   {% comment %} ===== AUTOMATED COLLECTIONS SECTION ===== {% endcomment %}
   {% if section.settings.show_collections %}
     <div class="sitemap-main-section">
@@ -566,18 +574,33 @@
         </h2>
       </div>
       <div class="sitemap-subsections-grid">
-        {% assign collections_per_column = section.settings.collections_per_column | default: 10 %}
+        {% assign collections_per_column = section.settings.collections_per_column %}
         {% assign collection_count = 0 %}
         {% assign column_open = false %}
         
-        {% for collection in collections %}
+        {% comment %} Sort collections alphabetically {% endcomment %}
+        {% assign sorted_collections = collections | sort: 'title' %}
+        
+        {% for collection in sorted_collections %}
+          {% comment %} Skip empty collections if setting is enabled {% endcomment %}
+          {% if section.settings.hide_empty_collections and collection.all_products_count == 0 %}
+            {% continue %}
+          {% endif %}
+          
           {% if collection_count == 0 %}
             <div class="sitemap-column">
               <ul class="sitemap-links-list">
             {% assign column_open = true %}
           {% endif %}
           
-          <li><a href="{{ collection.url | default: '/collections/' | append: collection.handle }}">{{ collection.title }}</a></li>
+          {% comment %} Generate proper collection URL {% endcomment %}
+          {% if collection.url and collection.url != blank %}
+            {% assign collection_link = collection.url %}
+          {% else %}
+            {% assign collection_link = '/collections/' | append: collection.handle %}
+          {% endif %}
+          
+          <li><a href="{{ collection_link }}">{{ collection.title }}</a></li>
           
           {% assign collection_count = collection_count | plus: 1 %}
           
@@ -604,18 +627,28 @@
         <h2 class="sitemap-section-title">Pages</h2>
       </div>
       <div class="sitemap-subsections-grid">
-        {% assign pages_per_column = section.settings.pages_per_column | default: 10 %}
+        {% assign pages_per_column = section.settings.pages_per_column %}
         {% assign page_count = 0 %}
         {% assign column_open = false %}
         
-        {% for page in pages %}
+        {% comment %} Create sorted pages array {% endcomment %}
+        {% assign sorted_pages = pages | sort: 'title' %}
+        
+        {% for page in sorted_pages %}
           {% if page_count == 0 %}
             <div class="sitemap-column">
               <ul class="sitemap-links-list">
             {% assign column_open = true %}
           {% endif %}
           
-          <li><a href="{{ page.url | default: '/pages/' | append: page.handle }}">{{ page.title }}</a></li>
+          {% comment %} Generate proper page URL {% endcomment %}
+          {% if page.url and page.url != blank %}
+            {% assign page_link = page.url %}
+          {% else %}
+            {% assign page_link = '/pages/' | append: page.handle %}
+          {% endif %}
+          
+          <li><a href="{{ page_link }}">{{ page.title }}</a></li>
           
           {% assign page_count = page_count | plus: 1 %}
           
@@ -642,22 +675,40 @@
         <div class="sitemap-main-section">
           <div class="sitemap-section-header">
             <h2 class="sitemap-section-title">
-              <a href="{{ blog.url | default: '/blogs/' | append: blog.handle }}">{{ blog.title }}</a>
+              {% if blog.url and blog.url != blank %}
+                <a href="{{ blog.url }}">{{ blog.title }}</a>
+              {% else %}
+                <a href="/blogs/{{ blog.handle }}">{{ blog.title }}</a>
+              {% endif %}
             </h2>
           </div>
           <div class="sitemap-subsections-grid">
-            {% assign posts_per_column = section.settings.posts_per_column | default: 10 %}
+            {% assign posts_per_column = section.settings.posts_per_column %}
             {% assign post_count = 0 %}
             {% assign column_open = false %}
             
-            {% for article in blog.articles limit: section.settings.max_blog_posts %}
+            {% comment %} Sort articles by published date (newest first) {% endcomment %}
+            {% assign sorted_articles = blog.articles | sort: 'published_at' | reverse %}
+            
+            {% for article in sorted_articles limit: section.settings.max_blog_posts %}
               {% if post_count == 0 %}
                 <div class="sitemap-column">
                   <ul class="sitemap-links-list">
                 {% assign column_open = true %}
               {% endif %}
               
-              <li><a href="{{ article.url | default: blog.url | append: '/' | append: article.handle }}">{{ article.title }}</a></li>
+              {% comment %} Generate proper article URL {% endcomment %}
+              {% if article.url and article.url != blank %}
+                {% assign article_link = article.url %}
+              {% else %}
+                {% if blog.url and blog.url != blank %}
+                  {% assign article_link = blog.url | append: '/' | append: article.handle %}
+                {% else %}
+                  {% assign article_link = '/blogs/' | append: blog.handle | append: '/' | append: article.handle %}
+                {% endif %}
+              {% endif %}
+              
+              <li><a href="{{ article_link }}">{{ article.title }}</a></li>
               
               {% assign post_count = post_count | plus: 1 %}
               
@@ -688,18 +739,28 @@
         </h2>
       </div>
       <div class="sitemap-subsections-grid">
-        {% assign products_per_column = section.settings.products_per_column | default: 10 %}
+        {% assign products_per_column = section.settings.products_per_column %}
         {% assign product_count = 0 %}
         {% assign column_open = false %}
         
-        {% for product in collections.all.products limit: section.settings.max_products %}
+        {% comment %} Sort products alphabetically {% endcomment %}
+        {% assign sorted_products = collections.all.products | sort: 'title' %}
+        
+        {% for product in sorted_products limit: section.settings.max_products %}
           {% if product_count == 0 %}
             <div class="sitemap-column">
               <ul class="sitemap-links-list">
             {% assign column_open = true %}
           {% endif %}
           
-          <li><a href="{{ product.url | default: '/products/' | append: product.handle }}">{{ product.title }}</a></li>
+          {% comment %} Generate proper product URL {% endcomment %}
+          {% if product.url and product.url != blank %}
+            {% assign product_link = product.url %}
+          {% else %}
+            {% assign product_link = '/products/' | append: product.handle %}
+          {% endif %}
+          
+          <li><a href="{{ product_link }}">{{ product.title }}</a></li>
           
           {% assign product_count = product_count | plus: 1 %}
           
@@ -719,7 +780,7 @@
     </div>
   {% endif %}
 
-  {% comment %} ===== MANUAL SECTIONS (Your original code) ===== {% endcomment %}
+  {% comment %} ===== MANUAL SECTIONS ===== {% endcomment %}
   {% assign in_section = false %}
   {% assign section_title = '' %}
   {% assign section_url = '' %}
@@ -796,7 +857,7 @@
 
 {% schema %}
 {
-  "name": "Automated Sitemap",
+  "name": "Advanced Sitemap",
   "settings": [
     {
       "type": "text",
@@ -810,13 +871,20 @@
     },
     {
       "type": "paragraph",
-      "content": "Toggle automated sections on/off. URLs are generated automatically from Shopify handles."
+      "content": "✅ URLs are auto-generated using Shopify's native URL properties with intelligent fallbacks"
     },
     {
       "type": "checkbox",
       "id": "show_collections",
-      "label": "Show Collections Section",
+      "label": "Show Collections",
       "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "hide_empty_collections",
+      "label": "Hide empty collections",
+      "default": true,
+      "info": "Don't show collections with 0 products"
     },
     {
       "type": "range",
@@ -830,7 +898,7 @@
     {
       "type": "checkbox",
       "id": "show_pages",
-      "label": "Show Pages Section",
+      "label": "Show Pages",
       "default": true
     },
     {
@@ -845,7 +913,7 @@
     {
       "type": "checkbox",
       "id": "show_blogs",
-      "label": "Show Blog Posts Section",
+      "label": "Show Blog Posts",
       "default": true
     },
     {
@@ -854,7 +922,7 @@
       "min": 10,
       "max": 100,
       "step": 10,
-      "label": "Maximum posts per blog",
+      "label": "Max posts per blog",
       "default": 50
     },
     {
@@ -863,15 +931,15 @@
       "min": 5,
       "max": 20,
       "step": 1,
-      "label": "Blog posts per column",
+      "label": "Posts per column",
       "default": 10
     },
     {
       "type": "checkbox",
       "id": "show_products",
-      "label": "Show Products Section",
+      "label": "Show Products",
       "default": false,
-      "info": "⚠️ May slow page load with many products"
+      "info": "⚠️ May impact page load speed"
     },
     {
       "type": "range",
@@ -879,7 +947,7 @@
       "min": 50,
       "max": 500,
       "step": 50,
-      "label": "Maximum products to display",
+      "label": "Max products",
       "default": 100
     },
     {
@@ -897,7 +965,7 @@
     },
     {
       "type": "paragraph",
-      "content": "Add custom sections below using blocks. These appear after automated sections."
+      "content": "Add custom curated sections using blocks below"
     }
   ],
   "blocks": [
@@ -906,14 +974,10 @@
       "name": "🔵 Section Start",
       "settings": [
         {
-          "type": "paragraph",
-          "content": "⭐ Starts a new main section. All subsection blocks after this belong here."
-        },
-        {
           "type": "text",
           "id": "section_title",
           "label": "Section Title",
-          "default": "CUSTOM SECTION"
+          "default": "FEATURED"
         },
         {
           "type": "url",
@@ -936,25 +1000,19 @@
           "type": "textarea",
           "id": "links",
           "label": "Links (one per line)",
-          "placeholder": "Link Text|/path/to/page\nAnother Link|/collections/example",
-          "info": "Format: 'Link Text|/url' - One link per line"
+          "placeholder": "Engagement Rings|/collections/engagement-rings\nSolitaire Rings|/collections/solitaire-rings",
+          "info": "Format: 'Link Text|/url'"
         }
       ]
     },
     {
       "type": "divider",
-      "name": "➖ Divider",
-      "settings": [
-        {
-          "type": "paragraph",
-          "content": "Visual separator for organizing blocks in editor only"
-        }
-      ]
+      "name": "➖ Divider"
     }
   ],
   "presets": [
     {
-      "name": "Automated Sitemap"
+      "name": "Advanced Automated Sitemap"
     }
   ]
 }
