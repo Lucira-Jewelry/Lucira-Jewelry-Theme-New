@@ -74,6 +74,8 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endfor %}
   ];
 
+  var currentStores = [...allStores];
+
   var input = document.getElementById('store-search-input');
   var searchBtn = document.getElementById('store-search-btn');
   var geoBtn = document.getElementById('use-location-btn');
@@ -107,26 +109,34 @@ document.addEventListener('DOMContentLoaded', function() {
   function handleSearch() {
     var query = input.value.toLowerCase().trim();
     if (!query) {
-      renderStores(allStores);
+      currentStores = [...allStores];
+      renderStores(currentStores);
       return;
     }
-    var filtered = allStores.filter(function(store) {
+
+    currentStores = allStores.filter(function(store) {
       var txt = (store.city + " " + store.pincode + " " + store.address + " " + store.name).toLowerCase();
       return txt.includes(query);
     });
-    renderStores(filtered);
+
+    renderStores(currentStores);
   }
 
   function filterByRadius(userLat, userLng, radiusKm) {
-    var nearby = allStores.filter(function(store) {
-      if (!store.lat || !store.lng) return false;
-      store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
-      return store.distance <= radiusKm;
-    });
-    nearby.sort(function(a, b) {
-      return a.distance - b.distance;
-    });
-    renderStores(nearby);
+    currentStores = allStores
+      .map(function(store) {
+        if (!store.lat || !store.lng) return null;
+        store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
+        return store;
+      })
+      .filter(function(store) {
+        return store && store.distance <= radiusKm;
+      })
+      .sort(function(a, b) {
+        return a.distance - b.distance;
+      });
+
+    renderStores(currentStores);
   }
 
   function handleGeoLocation() {
@@ -185,7 +195,10 @@ document.addEventListener('DOMContentLoaded', function() {
   searchBtn.addEventListener('click', handleSearch);
   input.addEventListener('keyup', function(e) {
     if (e.key === 'Enter') handleSearch();
-    if (!this.value) renderStores(allStores);
+    if (!this.value) {
+      currentStores = [...allStores];
+      renderStores(currentStores);
+    }
   });
   geoBtn.addEventListener('click', handleGeoLocation);
 
