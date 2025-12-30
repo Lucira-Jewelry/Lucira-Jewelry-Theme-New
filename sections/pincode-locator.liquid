@@ -65,176 +65,167 @@
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
+  document.addEventListener('DOMContentLoaded', function () {
 
-  var allStores = [
-    {% for block in section.blocks %}
-      {
-        name: {{ block.settings.store_name | json }},
-        city: {{ block.settings.city | json }},
-        pincode: {{ block.settings.pincode | json }},
-        address: {{ block.settings.address | json }},
-        phone: {{ block.settings.phone | json }},
-        lat: {{ block.settings.latitude | default: 0 }},
-        lng: {{ block.settings.longitude | default: 0 }},
-        distance: null
-      }{% unless forloop.last %},{% endunless %}
-    {% endfor %}
-  ];
+    var allStores = [
+      {% for block in section.blocks %}
+        {
+          name: {{ block.settings.store_name | json }},
+          city: {{ block.settings.city | json }},
+          pincode: {{ block.settings.pincode | json }},
+          address: {{ block.settings.address | json }},
+          phone: {{ block.settings.phone | json }},
+          lat: {{ block.settings.latitude | default: 0 }},
+          lng: {{ block.settings.longitude | default: 0 }},
+          distance: null
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ];
 
-  var currentStores = [...allStores];
-  var userLocation = null;
+    var userLocation = null;
 
-  var input = document.getElementById('store-search-input');
-  var searchBtn = document.getElementById('store-search-btn');
-  var geoBtn = document.getElementById('use-location-btn');
-  var container = document.getElementById('store-results');
-  var statusMsg = document.getElementById('geo-status');
+    var input = document.getElementById('store-search-input');
+    var searchBtn = document.getElementById('store-search-btn');
+    var geoBtn = document.getElementById('use-location-btn');
+    var container = document.getElementById('store-results');
+    var statusMsg = document.getElementById('geo-status');
 
-  function renderStores(list) {
-    container.innerHTML = '';
-    if (!list.length) {
-      container.innerHTML = '<p style="grid-column:1/-1;text-align:center;">No stores found.</p>';
-      return;
-    }
-    list.forEach(function(store) {
-      var card = document.createElement('div');
-      card.className = 'store-card';
-      var distHtml = store.distance !== null
-        ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
-        : '';
-      card.innerHTML = `
-        ${distHtml}
-        <span class="city-tag">${store.city}</span>
-        <h3>${store.name}</h3>
-        <p>${store.address}</p>
-        <p><strong>Pincode:</strong> ${store.pincode}</p>
-        <p>Phone: ${store.phone}</p>
-      `;
-      container.appendChild(card);
-    });
-  }
-
-  function applyFilters(query) {
-    query = query.toLowerCase().trim();
-    var isPincodeSearch = /^\d{4,6}$/.test(query);
-
-    var baseList = allStores;
-
-    if (!isPincodeSearch) {
-      baseList = allStores.filter(function(store) {
-        var text = (
-          store.name + " " +
-          store.city + " " +
-          store.address
-        ).toLowerCase();
-        return text.includes(query);
+    function renderStores(list) {
+      container.innerHTML = '';
+      if (!list.length) {
+        container.innerHTML = '<p style="grid-column:1/-1;text-align:center;">No stores found.</p>';
+        return;
+      }
+      list.forEach(function (store) {
+        var card = document.createElement('div');
+        card.className = 'store-card';
+        var dist = store.distance != null
+          ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
+          : '';
+        card.innerHTML = `
+          ${dist}
+          <span class="city-tag">${store.city}</span>
+          <h3>${store.name}</h3>
+          <p>${store.address}</p>
+          <p><strong>Pincode:</strong> ${store.pincode}</p>
+          <p>Phone: ${store.phone}</p>
+        `;
+        container.appendChild(card);
       });
     }
 
-    if (userLocation) {
-      baseList = baseList
-        .map(function(store) {
-          if (!store.lat || !store.lng) return null;
-          store.distance = getDistanceFromLatLonInKm(
-            userLocation.lat,
-            userLocation.lng,
-            store.lat,
-            store.lng
-          );
-          return store;
-        })
-        .filter(function(store) {
-          return store && store.distance <= 25;
-        })
-        .sort(function(a, b) {
-          return a.distance - b.distance;
+    function applyFilters(query) {
+      query = query.toLowerCase().trim();
+      var isPincode = /^\d{4,6}$/.test(query);
+
+      var list = allStores;
+
+      if (!isPincode && query) {
+        list = list.filter(function (store) {
+          var text = (
+            store.name + ' ' +
+            store.city + ' ' +
+            store.address
+          ).toLowerCase();
+          return text.includes(query);
         });
       }
 
-      renderStores(baseList);
-    }
-
-
-
-  function handleSearch() {
-    var query = input.value.trim();
-    if (!query) {
       if (userLocation) {
-        applyFilters('');
-      } else {
-        currentStores = [...allStores];
-        renderStores(currentStores);
+        list = list
+          .map(function (store) {
+            if (!store.lat || !store.lng) return null;
+            store.distance = getDistance(
+              userLocation.lat,
+              userLocation.lng,
+              store.lat,
+              store.lng
+            );
+            return store;
+          })
+          .filter(function (store) {
+            return store && store.distance <= 25;
+          })
+          .sort(function (a, b) {
+            return a.distance - b.distance;
+          });
       }
-      return;
-    }
-    applyFilters(query);
-  }
 
-  function handleGeoLocation() {
-    if (!navigator.geolocation) {
-      statusMsg.innerText = "Geolocation is not supported by your browser.";
-      return;
+      renderStores(list);
     }
 
-    statusMsg.innerText = "Locating you...";
+    function handleSearch() {
+      var query = input.value.trim();
 
-    navigator.geolocation.getCurrentPosition(function(position) {
-      userLocation = {
-        lat: position.coords.latitude,
-        lng: position.coords.longitude
-      };
+      if (/^\d{4,6}$/.test(query)) {
+        fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
+          .then(r => r.json())
+          .then(d => {
+            if (d[0]) {
+              userLocation = {
+                lat: parseFloat(d[0].lat),
+                lng: parseFloat(d[0].lon)
+              };
+              statusMsg.innerText = 'Showing stores near ' + query;
+              applyFilters('');
+            }
+          });
+        return;
+      }
 
-      statusMsg.innerText = "Detecting pincode...";
+      applyFilters(query);
+    }
 
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
-        .then(res => res.json())
-        .then(data => {
-          if (data?.address?.postcode) {
-            input.value = data.address.postcode;
-            statusMsg.innerText = "Detected Pincode: " + data.address.postcode;
-          } else {
-            statusMsg.innerText = "Showing nearby stores.";
-          }
-          applyFilters('');
-        })
-        .catch(() => {
-          statusMsg.innerText = "Showing nearby stores.";
-          applyFilters('');
-        });
+    function handleLocateMe() {
+      if (!navigator.geolocation) return;
 
-    }, function() {
-      statusMsg.innerText = "Unable to retrieve location.";
+      statusMsg.innerText = 'Locating you...';
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        userLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
+
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
+          .then(r => r.json())
+          .then(d => {
+            if (d?.address?.postcode) {
+              input.value = d.address.postcode;
+              statusMsg.innerText = 'Detected Pincode: ' + d.address.postcode;
+            } else {
+              statusMsg.innerText = 'Showing nearby stores';
+            }
+            applyFilters('');
+          });
+      });
+    }
+
+    function getDistance(lat1, lon1, lat2, lon2) {
+      var R = 6371;
+      var dLat = (lat2 - lat1) * Math.PI / 180;
+      var dLon = (lon2 - lon1) * Math.PI / 180;
+      var a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(lat1 * Math.PI / 180) *
+        Math.cos(lat2 * Math.PI / 180) *
+        Math.sin(dLon / 2) ** 2;
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
+
+    renderStores(allStores);
+
+    searchBtn.addEventListener('click', handleSearch);
+    geoBtn.addEventListener('click', handleLocateMe);
+
+    input.addEventListener('keyup', function (e) {
+      if (e.key === 'Enter') handleSearch();
+      if (!this.value) applyFilters('');
     });
-  }
 
-  function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371;
-    var dLat = deg2rad(lat2 - lat1);
-    var dLon = deg2rad(lon2 - lon1);
-    var a =
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-      Math.sin(dLon/2) * Math.sin(dLon/2);
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-    return R * c;
-  }
-
-  function deg2rad(deg) {
-    return deg * (Math.PI/180);
-  }
-
-  renderStores(allStores);
-
-  searchBtn.addEventListener('click', handleSearch);
-  input.addEventListener('keyup', function(e) {
-    if (e.key === 'Enter') handleSearch();
-    if (!this.value) handleSearch();
   });
-  geoBtn.addEventListener('click', handleGeoLocation);
-
-});
 </script>
+
 
 {% schema %}
 {
