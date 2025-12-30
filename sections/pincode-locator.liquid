@@ -28,6 +28,43 @@
   </div>
 </section>
 
+<section class="store-cards-wrapper page-width">
+  <div class="store-cards-grid" id="storeCardsGrid">
+    {% for block in section.blocks %}
+      {% if block.type == 'store_card' %}
+        <div
+          class="store-card"
+          data-lat="{{ block.settings.latitude }}"
+          data-lng="{{ block.settings.longitude }}"
+          data-pincode="{{ block.settings.store_pincode }}"
+          style="display:none"
+          {{ block.shopify_attributes }}
+        >
+          {% if block.settings.image != blank %}
+            <img
+              src="{{ block.settings.image | image_url: width: 600 }}"
+              alt="{{ block.settings.store_name }}"
+              loading="lazy"
+            >
+          {% endif %}
+
+          <h3>{{ block.settings.store_name }}</h3>
+          <p class="store-address">{{ block.settings.address }}</p>
+
+          <div class="store-actions">
+            {% if block.settings.visit_link != blank %}
+              <a href="{{ block.settings.visit_link }}" class="btn">Visit Store</a>
+            {% endif %}
+            {% if block.settings.design_link != blank %}
+              <a href="{{ block.settings.design_link }}" class="btn outline">View Designs</a>
+            {% endif %}
+          </div>
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</section>
+
 <style>
     .lucira_{{ section.id }} { margin-top: {{ section.settings.padding_top_desktop }}px; margin-bottom: {{ section.settings.padding_bottom_desktop }}px; padding-top: 40px; padding-bottom: 40px; }
     .store-locator-section{text-align: center; background-color: transparent; padding: 0;}
@@ -142,6 +179,54 @@
   });
 </script>
 
+<script>
+  function distanceInKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
+  async function getLatLngFromPincode(pincode) {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+
+    if (data[0].Status !== "Success") return null;
+
+    const po = data[0].PostOffice[0];
+    return {
+      lat: parseFloat(po.Latitude),
+      lng: parseFloat(po.Longitude)
+    };
+  }
+
+  document.addEventListener('pincodeDetected', async (e) => {
+    const pincode = e.detail.pincode;
+    const userLocation = await getLatLngFromPincode(pincode);
+    if (!userLocation) return;
+
+    document.querySelectorAll('.store-card').forEach(card => {
+      const lat = parseFloat(card.dataset.lat);
+      const lng = parseFloat(card.dataset.lng);
+
+      const distance = distanceInKm(
+        userLocation.lat,
+        userLocation.lng,
+        lat,
+        lng
+      );
+
+      card.style.display = distance <= 25 ? 'block' : 'none';
+    });
+  });
+</script>
 
 {% schema %}
 {
@@ -164,29 +249,61 @@
       "max": 100,
       "step": 5,
       "default": 60
-    },
+    }
+  ],
+  "blocks": [
     {
-      "type": "range",
-      "id": "padding_top_mobile",
-      "label": "Margin Top",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "default": 40
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom_mobile",
-      "label": "Margin Bottom",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "default": 40
+      "type": "store_card",
+      "name": "Store Card",
+      "settings": [
+        {
+          "type": "text",
+          "id": "store_name",
+          "label": "Store Name"
+        },
+        {
+          "type": "textarea",
+          "id": "address",
+          "label": "Store Address"
+        },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Store Image"
+        },
+        {
+          "type": "text",
+          "id": "store_pincode",
+          "label": "Store Pincode (reference)"
+        },
+        {
+          "type": "text",
+          "id": "latitude",
+          "label": "Latitude",
+          "info": "Required for 25km radius filter"
+        },
+        {
+          "type": "text",
+          "id": "longitude",
+          "label": "Longitude",
+          "info": "Required for 25km radius filter"
+        },
+        {
+          "type": "url",
+          "id": "visit_link",
+          "label": "Visit Store Link"
+        },
+        {
+          "type": "url",
+          "id": "design_link",
+          "label": "View Designs Link"
+        }
+      ]
     }
   ],
   "presets": [
     {
-      "name": "Pincode Locator"
+      "name": "Pincode Locator with Stores"
     }
   ]
 }
