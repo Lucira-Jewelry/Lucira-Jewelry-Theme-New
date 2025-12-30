@@ -58,8 +58,7 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-  
-  // 1. DATA: Get Stores from Schema
+
   var allStores = [
     {% for block in section.blocks %}
       {
@@ -75,24 +74,24 @@ document.addEventListener('DOMContentLoaded', function() {
     {% endfor %}
   ];
 
-  // 2. ELEMENTS
   var input = document.getElementById('store-search-input');
   var searchBtn = document.getElementById('store-search-btn');
   var geoBtn = document.getElementById('use-location-btn');
   var container = document.getElementById('store-results');
   var statusMsg = document.getElementById('geo-status');
 
-  // 3. RENDER FUNCTION
   function renderStores(list) {
     container.innerHTML = '';
-    if (list.length === 0) {
-      container.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">No stores found.</p>';
+    if (!list.length) {
+      container.innerHTML = '<p style="grid-column:1/-1;text-align:center;">No stores found.</p>';
       return;
     }
     list.forEach(function(store) {
       var card = document.createElement('div');
       card.className = 'store-card';
-      var distHtml = store.distance ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>` : '';
+      var distHtml = store.distance !== null
+        ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
+        : '';
       card.innerHTML = `
         ${distHtml}
         <span class="city-tag">${store.city}</span>
@@ -105,14 +104,12 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  // 4. SEARCH LOGIC (Text Filter)
   function handleSearch() {
     var query = input.value.toLowerCase().trim();
     if (!query) {
       renderStores(allStores);
       return;
     }
-    // Filter logic: Check if any field contains the query
     var filtered = allStores.filter(function(store) {
       var txt = (store.city + " " + store.pincode + " " + store.address + " " + store.name).toLowerCase();
       return txt.includes(query);
@@ -120,7 +117,18 @@ document.addEventListener('DOMContentLoaded', function() {
     renderStores(filtered);
   }
 
-  // 5. GEOLOCATION + REVERSE GEOCODING (The New Part)
+  function filterByRadius(userLat, userLng, radiusKm) {
+    var nearby = allStores.filter(function(store) {
+      if (!store.lat || !store.lng) return false;
+      store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
+      return store.distance <= radiusKm;
+    });
+    nearby.sort(function(a, b) {
+      return a.distance - b.distance;
+    });
+    renderStores(nearby);
+  }
+
   function handleGeoLocation() {
     if (!navigator.geolocation) {
       statusMsg.innerText = "Geolocation is not supported by your browser.";
@@ -128,82 +136,57 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     statusMsg.innerText = "Locating you...";
-    
+
     navigator.geolocation.getCurrentPosition(function(position) {
       var userLat = position.coords.latitude;
       var userLng = position.coords.longitude;
-      
-      statusMsg.innerText = "Location found. Fetching Pincode...";
 
-      // --- REVERSE GEOCODING CALL ---
-      var geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`;
+      statusMsg.innerText = "Detecting pincode...";
 
-      fetch(geocodeUrl)
-        .then(response => response.json())
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`)
+        .then(res => res.json())
         .then(data => {
-          console.log("Nominatim Data:", data); // Debugging
-          
-          if (data && data.address && data.address.postcode) {
-            var detectedPincode = data.address.postcode;
-            
-            // 1. Put Pincode in Input Box
-            input.value = detectedPincode;
-            statusMsg.innerText = "Detected Pincode: " + detectedPincode;
-
-            // 2. Trigger Search automatically
-            handleSearch();
-
-            // 3. (Optional) Also Sort by Distance for better UX
-            sortByDistance(userLat, userLng);
+          if (data?.address?.postcode) {
+            input.value = data.address.postcode;
+            statusMsg.innerText = "Detected Pincode: " + data.address.postcode;
           } else {
-            statusMsg.innerText = "Location found, but could not detect pincode.";
-            // Fallback: Just sort by distance if pincode fails
-            sortByDistance(userLat, userLng);
+            statusMsg.innerText = "Pincode not found. Showing nearest stores.";
           }
+          filterByRadius(userLat, userLng, 25);
         })
-        .catch(err => {
-          console.error("Geocoding Error:", err);
-          statusMsg.innerText = "Error fetching address details.";
-          // Fallback on error
-          sortByDistance(userLat, userLng);
+        .catch(() => {
+          statusMsg.innerText = "Error detecting location. Showing nearest stores.";
+          filterByRadius(userLat, userLng, 25);
         });
 
-    }, function(error) {
+    }, function() {
       statusMsg.innerText = "Unable to retrieve location.";
-      console.error(error);
     });
   }
 
-  // Helper: Sort list by distance (used as fallback or enhancement)
-  function sortByDistance(userLat, userLng) {
-    allStores.forEach(function(store) {
-      if(store.lat && store.lng) {
-        store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
-      } else {
-        store.distance = 99999; 
-      }
-    });
-    allStores.sort(function(a, b) { return a.distance - b.distance; });
-    // Re-render ONLY if the search input is empty. 
-    // If input has a pincode, handleSearch() already filtered the list.
-    if(input.value === "") renderStores(allStores);
-  }
-
-  // Helper: Haversine Formula
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371; 
+    var R = 6371;
     var dLat = deg2rad(lat2 - lat1);
     var dLon = deg2rad(lon2 - lon1);
-    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
-    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    var a =
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+      Math.sin(dLon/2) * Math.sin(dLon/2);
+    var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     return R * c;
   }
-  function deg2rad(deg) { return deg * (Math.PI/180); }
 
-  // 6. EVENTS
-  renderStores(allStores); // Init
+  function deg2rad(deg) {
+    return deg * (Math.PI/180);
+  }
+
+  renderStores(allStores);
+
   searchBtn.addEventListener('click', handleSearch);
-  input.addEventListener('keyup', function(e) { if(e.key === 'Enter') handleSearch(); if(this.value === "") renderStores(allStores); });
+  input.addEventListener('keyup', function(e) {
+    if (e.key === 'Enter') handleSearch();
+    if (!this.value) renderStores(allStores);
+  });
   geoBtn.addEventListener('click', handleGeoLocation);
 
 });
