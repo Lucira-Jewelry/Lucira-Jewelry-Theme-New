@@ -1,27 +1,17 @@
 <section class="store-locator-section lucira_{{ section.id }}">
   <div class="page-width">
     <div class="store-locator-box">
-      <label for="store-locator-input" class="store-locator-label" style="display: none;">ENTER YOUR PINCODE</label>
       <div class="store-locator-input-wrapper">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <mask id="mask0_4677_1207" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
-            <rect width="24" height="24" fill="#D9D9D9"/>
-            </mask>
-            <g mask="url(#mask0_4677_1207)">
-            <path d="M9.51759 15.6153C7.80993 15.6153 6.36376 15.023 5.17909 13.8385C3.99459 12.6538 3.40234 11.2077 3.40234 9.50002C3.40234 7.79235 3.99459 6.34618 5.17909 5.16152C6.36376 3.97702 7.80993 3.38477 9.51759 3.38477C11.2253 3.38477 12.6714 3.97702 13.8561 5.16152C15.0406 6.34618 15.6328 7.79235 15.6328 9.50002C15.6328 10.2142 15.513 10.8963 15.2733 11.5463C15.0335 12.1963 14.7136 12.7616 14.3136 13.2423L20.0676 18.9963C20.2061 19.1346 20.2769 19.3086 20.2801 19.5183C20.2833 19.7279 20.2124 19.9052 20.0676 20.05C19.9228 20.1948 19.7471 20.2673 19.5406 20.2673C19.3343 20.2673 19.1587 20.1948 19.0138 20.05L13.2598 14.296C12.7598 14.7088 12.1848 15.0319 11.5348 15.2653C10.8848 15.4986 10.2124 15.6153 9.51759 15.6153ZM9.51759 14.1155C10.8061 14.1155 11.8974 13.6683 12.7916 12.774C13.6859 11.8798 14.1331 10.7885 14.1331 9.50002C14.1331 8.21152 13.6859 7.12018 12.7916 6.22601C11.8974 5.33168 10.8061 4.88452 9.51759 4.88452C8.22909 4.88452 7.13776 5.33168 6.24359 6.22601C5.34926 7.12018 4.90209 8.21152 4.90209 9.50002C4.90209 10.7885 5.34926 11.8798 6.24359 12.774C7.13776 13.6683 8.22909 14.1155 9.51759 14.1155Z" fill="#666666"/>
-            </g>
-        </svg>
         <input
           id="store-locator-input"
           type="text"
           placeholder="Search by Pincode / City"
-          class="store-locator-input"
           maxlength="6"
           pattern="\d{6}"
           inputmode="numeric"
         >
-        <button id="store-locator-btn" class="store-locator-btn" type="button">
-          Search
+        <button id="store-locator-btn" type="button">
+          Locate Me
         </button>
       </div>
     </div>
@@ -29,16 +19,13 @@
 </section>
 
 <section class="store-cards-wrapper page-width">
-  <div class="store-cards-grid" id="storeCardsGrid">
+  <div id="storeCardsGrid">
     {% for block in section.blocks %}
       {% if block.type == 'store_card' %}
         <div
           class="store-card"
           data-lat="{{ block.settings.latitude }}"
           data-lng="{{ block.settings.longitude }}"
-          data-pincode="{{ block.settings.store_pincode }}"
-          style="display:none"
-          {{ block.shopify_attributes }}
         >
           {% if block.settings.image != blank %}
             <img
@@ -49,21 +36,113 @@
           {% endif %}
 
           <h3>{{ block.settings.store_name }}</h3>
-          <p class="store-address">{{ block.settings.address }}</p>
+          <p>{{ block.settings.address }}</p>
 
-          <div class="store-actions">
-            {% if block.settings.visit_link != blank %}
-              <a href="{{ block.settings.visit_link }}" class="btn">Visit Store</a>
-            {% endif %}
-            {% if block.settings.design_link != blank %}
-              <a href="{{ block.settings.design_link }}" class="btn outline">View Designs</a>
-            {% endif %}
-          </div>
+          {% if block.settings.visit_link != blank %}
+            <a href="{{ block.settings.visit_link }}">Visit Store</a>
+          {% endif %}
+          {% if block.settings.design_link != blank %}
+            <a href="{{ block.settings.design_link }}">View Designs</a>
+          {% endif %}
         </div>
       {% endif %}
     {% endfor %}
   </div>
 </section>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('store-locator-input');
+  const button = document.getElementById('store-locator-btn');
+  const cards = document.querySelectorAll('.store-card');
+
+  cards.forEach(card => card.style.display = 'block');
+
+  input.addEventListener('input', () => {
+    button.textContent = input.value.trim() ? 'Submit' : 'Locate Me';
+  });
+
+  button.addEventListener('click', () => {
+    if (input.value.trim()) {
+      document.dispatchEvent(new CustomEvent('pincodeDetected', {
+        detail: { pincode: input.value.trim() }
+      }));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(pos => {
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          if (d?.address?.postcode) {
+            input.value = d.address.postcode;
+            input.dispatchEvent(new Event('input'));
+            document.dispatchEvent(new CustomEvent('pincodeDetected', {
+              detail: { pincode: d.address.postcode }
+            }));
+          }
+        });
+    });
+  });
+});
+
+function distanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+async function getLatLngFromPincode(pincode) {
+  const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+  const data = await res.json();
+  if (!data[0] || data[0].Status !== "Success") return null;
+  const po = data[0].PostOffice[0];
+  return { lat: +po.Latitude, lng: +po.Longitude };
+}
+
+document.addEventListener('pincodeDetected', async e => {
+  const userLoc = await getLatLngFromPincode(e.detail.pincode);
+  if (!userLoc) return;
+
+  document.querySelectorAll('.store-card').forEach(card => {
+    const lat = +card.dataset.lat;
+    const lng = +card.dataset.lng;
+    const d = distanceInKm(userLoc.lat, userLoc.lng, lat, lng);
+    card.style.display = d <= 25 ? 'block' : 'none';
+  });
+});
+</script>
+
+{% schema %}
+{
+  "name": "Pincode Locator",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "store_card",
+      "name": "Store Card",
+      "settings": [
+        { "type": "text", "id": "store_name", "label": "Store Name" },
+        { "type": "textarea", "id": "address", "label": "Address" },
+        { "type": "image_picker", "id": "image", "label": "Image" },
+        { "type": "text", "id": "latitude", "label": "Latitude" },
+        { "type": "text", "id": "longitude", "label": "Longitude" },
+        { "type": "url", "id": "visit_link", "label": "Visit Store" },
+        { "type": "url", "id": "design_link", "label": "View Designs" }
+      ]
+    }
+  ],
+  "presets": [
+    { "name": "Pincode Locator with Stores" }
+  ]
+}
+{% endschema %}
 
 <style>
     .lucira_{{ section.id }} { margin-top: {{ section.settings.padding_top_desktop }}px; margin-bottom: {{ section.settings.padding_bottom_desktop }}px; padding-top: 40px; padding-bottom: 40px; }
@@ -93,218 +172,3 @@
     .store-locator-btn{padding:12px 16px;border:1px solid #ddd;border-radius:8px}
     .store-locator-input-wrapper{border:none;border-radius:unset}
 </style>
-
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const input = document.getElementById('store-locator-input');
-    const button = document.getElementById('store-locator-btn');
-    const text = button.querySelector('.btn-text');
-
-    // Detect typing → change button to Submit
-    input.addEventListener('input', () => {
-      if (input.value.trim() !== '') {
-        button.classList.add('submit');
-        text.textContent = 'Submit';
-      } else {
-        button.classList.remove('submit');
-        text.textContent = 'Locate Me';
-      }
-    });
-
-    // Locate Me / Submit logic
-    button.addEventListener('click', () => {
-      // If it's in submit mode
-      if (button.classList.contains('submit')) {
-        const pincode = input.value.trim();
-        if (pincode) {
-          const event = new CustomEvent('pincodeDetected', { detail: { pincode } });
-          document.dispatchEvent(event);
-          console.log('Submitted pincode:', pincode);
-        } else {
-          console.log('No pincode entered');
-        }
-        return;
-      }
-      if (!navigator.geolocation) {
-        alert('Geolocation is not supported by your browser.');
-        return;
-      }
-
-      text.textContent = 'Locating...';
-
-      navigator.geolocation.getCurrentPosition(success, error);
-
-      function success(position) {
-        const latitude = position.coords.latitude;
-        const longitude = position.coords.longitude;
-
-        const geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`;
-
-        fetch(geocodeUrl, {
-          headers: {
-            'User-Agent': 'ShopifyStoreLocator/1.0'
-          }
-        })
-          .then(response => response.json())
-          .then(data => {
-            console.log('Geocode response:', data);
-
-            if (data && data.address && data.address.postcode) {
-              const pincode = data.address.postcode;
-              input.value = pincode;
-              input.dispatchEvent(new Event('input'));
-
-              // Dispatch event for store filtering
-              const event = new CustomEvent('pincodeDetected', { detail: { pincode } });
-              document.dispatchEvent(event);
-            } else {
-              alert('Could not detect your pincode. Please enter manually.');
-            }
-
-            text.textContent = 'Locate Me';
-          })
-          .catch(err => {
-            console.error('Geocode fetch failed:', err);
-            alert('Failed to fetch location data.');
-            text.textContent = 'Locate Me';
-          });
-      }
-
-      function error() {
-        alert('Unable to retrieve your location.');
-        text.textContent = 'Locate Me';
-      }
-    });
-  });
-</script>
-
-<script>
-  function distanceInKm(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-
-    const a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  }
-
-  async function getLatLngFromPincode(pincode) {
-    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-    const data = await res.json();
-
-    if (data[0].Status !== "Success") return null;
-
-    const po = data[0].PostOffice[0];
-    return {
-      lat: parseFloat(po.Latitude),
-      lng: parseFloat(po.Longitude)
-    };
-  }
-
-  document.addEventListener('pincodeDetected', async (e) => {
-    const pincode = e.detail.pincode;
-    const userLocation = await getLatLngFromPincode(pincode);
-    if (!userLocation) return;
-
-    document.querySelectorAll('.store-card').forEach(card => {
-      const lat = parseFloat(card.dataset.lat);
-      const lng = parseFloat(card.dataset.lng);
-
-      const distance = distanceInKm(
-        userLocation.lat,
-        userLocation.lng,
-        lat,
-        lng
-      );
-
-      card.style.display = distance <= 25 ? 'block' : 'none';
-    });
-  });
-</script>
-
-{% schema %}
-{
-  "name": "Pincode Locator",
-  "settings": [
-    {
-      "type": "range",
-      "id": "padding_top_desktop",
-      "label": "Margin Top",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "default": 60
-    },
-    {
-      "type": "range",
-      "id": "padding_bottom_desktop",
-      "label": "Margin Bottom",
-      "min": 0,
-      "max": 100,
-      "step": 5,
-      "default": 60
-    }
-  ],
-  "blocks": [
-    {
-      "type": "store_card",
-      "name": "Store Card",
-      "settings": [
-        {
-          "type": "text",
-          "id": "store_name",
-          "label": "Store Name"
-        },
-        {
-          "type": "textarea",
-          "id": "address",
-          "label": "Store Address"
-        },
-        {
-          "type": "image_picker",
-          "id": "image",
-          "label": "Store Image"
-        },
-        {
-          "type": "text",
-          "id": "store_pincode",
-          "label": "Store Pincode (reference)"
-        },
-        {
-          "type": "text",
-          "id": "latitude",
-          "label": "Latitude",
-          "info": "Required for 25km radius filter"
-        },
-        {
-          "type": "text",
-          "id": "longitude",
-          "label": "Longitude",
-          "info": "Required for 25km radius filter"
-        },
-        {
-          "type": "url",
-          "id": "visit_link",
-          "label": "Visit Store Link"
-        },
-        {
-          "type": "url",
-          "id": "design_link",
-          "label": "View Designs Link"
-        }
-      ]
-    }
-  ],
-  "presets": [
-    {
-      "name": "Pincode Locator with Stores"
-    }
-  ]
-}
-{% endschema %}
