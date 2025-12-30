@@ -1,6 +1,6 @@
 {% comment %}
-  Section: Store Locator (Advanced)
-  Description: Show all stores by default. Filter by text OR sort by GPS location.
+  Section: Store Locator (Advanced with Reverse Geocoding)
+  Description: Auto-detects user pincode using OpenStreetMap API.
 {% endcomment %}
 
 <div class="store-locator-section page-width">
@@ -20,7 +20,7 @@
 
     <button id="use-location-btn" type="button">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-      Find Nearest Stores
+      Find Nearest Stores (Auto-Detect Pincode)
     </button>
     <p id="geo-status"></p>
   </div>
@@ -36,64 +36,24 @@
   .locator-header { text-align: center; margin-bottom: 30px; }
   
   /* Controls */
-  .locator-controls { 
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    gap: 15px; 
-    margin-bottom: 40px; 
-  }
-  
+  .locator-controls { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 40px; }
   .search-input-group { display: flex; width: 100%; max-width: 500px; }
   .search-input-group input { flex-grow: 1; padding: 12px; border: 1px solid #ccc; font-size: 16px; }
   .search-input-group button { padding: 12px 20px; background: #000; color: #fff; border: none; cursor: pointer; }
-
   .divider { font-size: 12px; color: #777; font-weight: bold; }
-
-  #use-location-btn { 
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 20px; 
-    background: white; 
-    border: 1px solid #000; 
-    color: #000; 
-    cursor: pointer; 
-    font-weight: 600;
-    transition: all 0.2s;
-  }
+  #use-location-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: white; border: 1px solid #000; color: #000; cursor: pointer; font-weight: 600; transition: all 0.2s; }
   #use-location-btn:hover { background: #f0f0f0; }
-  
   #geo-status { font-size: 12px; color: #666; margin: 0; min-height: 18px; }
 
   /* Results Grid */
-  .locator-results-grid { 
-    display: grid; 
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); 
-    gap: 20px; 
-  }
+  .locator-results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px; }
 
   /* Store Card */
-  .store-card { 
-    border: 1px solid #e5e5e5; 
-    padding: 20px; 
-    border-radius: 6px; 
-    background: #f9f9f9; 
-    position: relative;
-  }
+  .store-card { border: 1px solid #e5e5e5; padding: 20px; border-radius: 6px; background: #f9f9f9; position: relative; }
   .store-card h3 { margin: 0 0 8px 0; font-size: 18px; }
   .store-card p { margin: 4px 0; font-size: 14px; color: #555; }
-  .store-card .distance-badge {
-    position: absolute; top: 15px; right: 15px;
-    background: #e8f5e9; color: #2e7d32;
-    padding: 4px 8px; border-radius: 12px;
-    font-size: 11px; font-weight: bold;
-  }
-  .store-card .city-tag {
-    display: inline-block; background: #eee; padding: 2px 6px; 
-    font-size: 11px; margin-bottom: 8px; border-radius: 3px;
-  }
-  
-  /* Hidden helper class */
-  .hidden { display: none !important; }
+  .store-card .distance-badge { position: absolute; top: 15px; right: 15px; background: #e8f5e9; color: #2e7d32; padding: 4px 8px; border-radius: 12px; font-size: 11px; font-weight: bold; }
+  .store-card .city-tag { display: inline-block; background: #eee; padding: 2px 6px; font-size: 11px; margin-bottom: 8px; border-radius: 3px; }
 </style>
 
 <script>
@@ -110,7 +70,7 @@ document.addEventListener('DOMContentLoaded', function() {
         phone: {{ block.settings.phone | json }},
         lat: {{ block.settings.latitude | default: 0 }},
         lng: {{ block.settings.longitude | default: 0 }},
-        distance: null // Placeholder for calculation
+        distance: null
       }{% unless forloop.last %},{% endunless %}
     {% endfor %}
   ];
@@ -122,24 +82,17 @@ document.addEventListener('DOMContentLoaded', function() {
   var container = document.getElementById('store-results');
   var statusMsg = document.getElementById('geo-status');
 
-  // 3. RENDER FUNCTION (Draws the list)
+  // 3. RENDER FUNCTION
   function renderStores(list) {
     container.innerHTML = '';
-    
     if (list.length === 0) {
       container.innerHTML = '<p style="grid-column: 1/-1; text-align:center;">No stores found.</p>';
       return;
     }
-
     list.forEach(function(store) {
       var card = document.createElement('div');
       card.className = 'store-card';
-      
-      // If we have distance, show it
-      var distHtml = store.distance 
-        ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>` 
-        : '';
-
+      var distHtml = store.distance ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>` : '';
       card.innerHTML = `
         ${distHtml}
         <span class="city-tag">${store.city}</span>
@@ -156,20 +109,18 @@ document.addEventListener('DOMContentLoaded', function() {
   function handleSearch() {
     var query = input.value.toLowerCase().trim();
     if (!query) {
-      renderStores(allStores); // Show all if empty
+      renderStores(allStores);
       return;
     }
-
+    // Filter logic: Check if any field contains the query
     var filtered = allStores.filter(function(store) {
       var txt = (store.city + " " + store.pincode + " " + store.address + " " + store.name).toLowerCase();
       return txt.includes(query);
     });
-
     renderStores(filtered);
-    statusMsg.innerText = "Showing results for: " + query;
   }
 
-  // 5. GEOLOCATION LOGIC (Nearest Filter)
+  // 5. GEOLOCATION + REVERSE GEOCODING (The New Part)
   function handleGeoLocation() {
     if (!navigator.geolocation) {
       statusMsg.innerText = "Geolocation is not supported by your browser.";
@@ -182,56 +133,77 @@ document.addEventListener('DOMContentLoaded', function() {
       var userLat = position.coords.latitude;
       var userLng = position.coords.longitude;
       
-      // Calculate distance for each store
-      allStores.forEach(function(store) {
-        if(store.lat && store.lng) {
-          store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
-        } else {
-          store.distance = 99999; // Push to bottom if no coords
-        }
-      });
+      statusMsg.innerText = "Location found. Fetching Pincode...";
 
-      // Sort by Distance (Ascending)
-      allStores.sort(function(a, b) {
-        return a.distance - b.distance;
-      });
+      // --- REVERSE GEOCODING CALL ---
+      var geocodeUrl = `https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`;
 
-      renderStores(allStores);
-      statusMsg.innerText = "Stores sorted by distance from your location.";
-      input.value = ""; // Clear text search
+      fetch(geocodeUrl)
+        .then(response => response.json())
+        .then(data => {
+          console.log("Nominatim Data:", data); // Debugging
+          
+          if (data && data.address && data.address.postcode) {
+            var detectedPincode = data.address.postcode;
+            
+            // 1. Put Pincode in Input Box
+            input.value = detectedPincode;
+            statusMsg.innerText = "Detected Pincode: " + detectedPincode;
+
+            // 2. Trigger Search automatically
+            handleSearch();
+
+            // 3. (Optional) Also Sort by Distance for better UX
+            sortByDistance(userLat, userLng);
+          } else {
+            statusMsg.innerText = "Location found, but could not detect pincode.";
+            // Fallback: Just sort by distance if pincode fails
+            sortByDistance(userLat, userLng);
+          }
+        })
+        .catch(err => {
+          console.error("Geocoding Error:", err);
+          statusMsg.innerText = "Error fetching address details.";
+          // Fallback on error
+          sortByDistance(userLat, userLng);
+        });
 
     }, function(error) {
-      statusMsg.innerText = "Unable to retrieve your location. Check permissions.";
+      statusMsg.innerText = "Unable to retrieve location.";
       console.error(error);
     });
   }
 
-  // Helper: Haversine Formula (Math to calc distance)
+  // Helper: Sort list by distance (used as fallback or enhancement)
+  function sortByDistance(userLat, userLng) {
+    allStores.forEach(function(store) {
+      if(store.lat && store.lng) {
+        store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
+      } else {
+        store.distance = 99999; 
+      }
+    });
+    allStores.sort(function(a, b) { return a.distance - b.distance; });
+    // Re-render ONLY if the search input is empty. 
+    // If input has a pincode, handleSearch() already filtered the list.
+    if(input.value === "") renderStores(allStores);
+  }
+
+  // Helper: Haversine Formula
   function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371; // Radius of the earth in km
+    var R = 6371; 
     var dLat = deg2rad(lat2 - lat1);
     var dLon = deg2rad(lon2 - lon1);
-    var a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2) * Math.sin(dLon/2); 
     var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    var d = R * c; // Distance in km
-    return d;
+    return R * c;
   }
+  function deg2rad(deg) { return deg * (Math.PI/180); }
 
-  function deg2rad(deg) {
-    return deg * (Math.PI/180);
-  }
-
-  // 6. INIT & EVENTS
-  // Show ALL stores immediately on load
-  renderStores(allStores);
-
+  // 6. EVENTS
+  renderStores(allStores); // Init
   searchBtn.addEventListener('click', handleSearch);
-  input.addEventListener('keyup', function(e) { 
-    if(e.key === 'Enter') handleSearch();
-    if(this.value === "") renderStores(allStores); // Reset on clear
-  });
+  input.addEventListener('keyup', function(e) { if(e.key === 'Enter') handleSearch(); if(this.value === "") renderStores(allStores); });
   geoBtn.addEventListener('click', handleGeoLocation);
 
 });
@@ -239,79 +211,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% schema %}
 {
-  "name": "Store Locator Advanced",
+  "name": "Store Locator Auto-Pin",
   "settings": [
-    {
-      "type": "text",
-      "id": "heading",
-      "label": "Heading",
-      "default": "Find a Store"
-    },
-    {
-      "type": "text",
-      "id": "subheading",
-      "label": "Subheading",
-      "default": "See all locations below or find the nearest one."
-    }
+    { "type": "text", "id": "heading", "label": "Heading", "default": "Find a Store" },
+    { "type": "text", "id": "subheading", "label": "Subheading", "default": "Search or use your location." }
   ],
   "blocks": [
     {
       "type": "store",
       "name": "Store Location",
       "settings": [
-        {
-          "type": "header",
-          "content": "Store Details"
-        },
-        {
-          "type": "text",
-          "id": "store_name",
-          "label": "Store Name",
-          "default": "Lucira Bandra"
-        },
-        {
-          "type": "text",
-          "id": "city",
-          "label": "City",
-          "default": "Mumbai"
-        },
-        {
-          "type": "text",
-          "id": "pincode",
-          "label": "Pincode",
-          "default": "400050"
-        },
-        {
-          "type": "textarea",
-          "id": "address",
-          "label": "Address"
-        },
-        {
-          "type": "text",
-          "id": "phone",
-          "label": "Phone"
-        },
-        {
-          "type": "header",
-          "content": "Map Coordinates (Required for 'Nearest' feature)"
-        },
-        {
-          "type": "text",
-          "id": "latitude",
-          "label": "Latitude",
-          "info": "Example: 19.0760"
-        },
-        {
-          "type": "text",
-          "id": "longitude",
-          "label": "Longitude",
-          "info": "Example: 72.8777"
-        }
+        { "type": "header", "content": "Store Details" },
+        { "type": "text", "id": "store_name", "label": "Store Name", "default": "Lucira Bandra" },
+        { "type": "text", "id": "city", "label": "City", "default": "Mumbai" },
+        { "type": "text", "id": "pincode", "label": "Pincode", "default": "400050" },
+        { "type": "textarea", "id": "address", "label": "Address" },
+        { "type": "text", "id": "phone", "label": "Phone" },
+        { "type": "header", "content": "Map Coordinates" },
+        { "type": "text", "id": "latitude", "label": "Latitude" },
+        { "type": "text", "id": "longitude", "label": "Longitude" }
       ]
     }
   ],
-  "presets": [
-    { "name": "Store Locator Advanced" }
-  ]
+  "presets": [ { "name": "Store Locator Auto-Pin" } ]
 }
 {% endschema %}
