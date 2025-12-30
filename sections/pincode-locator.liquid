@@ -64,9 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const input = document.getElementById('store-locator-input');
   const button = document.getElementById('store-locator-btn');
 
-  document.querySelectorAll('.store-card').forEach(card => {
-    card.style.display = 'block';
-  });
+  // --- REMOVED THE CODE THAT FORCED CARDS TO SHOW HERE ---
 
   input.addEventListener('input', () => {
     button.textContent = input.value.trim() ? 'Submit' : 'Locate Me';
@@ -80,6 +78,7 @@ document.addEventListener('DOMContentLoaded', function() {
       return;
     }
 
+    // Geolocation logic
     navigator.geolocation.getCurrentPosition(pos => {
       fetch(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
         .then(r => r.json())
@@ -90,14 +89,17 @@ document.addEventListener('DOMContentLoaded', function() {
             document.dispatchEvent(new CustomEvent('pincodeDetected', {
               detail: { pincode: d.address.postcode }
             }));
+          } else {
+             alert("Could not detect pincode from your location.");
           }
-        });
+        })
+        .catch(e => console.error("Geolocation error:", e));
     });
   });
 });
 
 function distanceInKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
+  const R = 6371; // Radius of Earth in KM
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
   const a =
@@ -109,23 +111,46 @@ function distanceInKm(lat1, lon1, lat2, lon2) {
 }
 
 async function getLatLngFromPincode(pincode) {
-  const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
-  const data = await res.json();
-  if (!data[0] || data[0].Status !== "Success") return null;
-  const po = data[0].PostOffice[0];
-  return { lat: +po.Latitude, lng: +po.Longitude };
+  try {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+    if (!data[0] || data[0].Status !== "Success") {
+      alert("Invalid Pincode"); 
+      return null;
+    }
+    const po = data[0].PostOffice[0];
+    return { lat: +po.Latitude, lng: +po.Longitude };
+  } catch (err) {
+    console.error("API Error", err);
+    return null;
+  }
 }
 
 document.addEventListener('pincodeDetected', async e => {
   const userLoc = await getLatLngFromPincode(e.detail.pincode);
   if (!userLoc) return;
 
+  let foundStore = false;
+
   document.querySelectorAll('.store-card').forEach(card => {
     const lat = +card.dataset.lat;
     const lng = +card.dataset.lng;
+    
+    // Calculate distance
     const d = distanceInKm(userLoc.lat, userLoc.lng, lat, lng);
-    card.style.display = d <= 25 ? 'block' : 'none';
+    
+    // Check if within 25km
+    if (d <= 25) {
+      card.style.display = 'block';
+      foundStore = true;
+    } else {
+      card.style.display = 'none';
+    }
   });
+
+  if (!foundStore) {
+    alert("No stores found within 25km of this pincode.");
+  }
 });
 </script>
 
