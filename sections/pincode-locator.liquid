@@ -75,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function() {
   ];
 
   var currentStores = [...allStores];
+  var userLocation = null;
 
   var input = document.getElementById('store-search-input');
   var searchBtn = document.getElementById('store-search-btn');
@@ -106,37 +107,51 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   }
 
-  function handleSearch() {
-    var query = input.value.toLowerCase().trim();
-    if (!query) {
-      currentStores = [...allStores];
-      renderStores(currentStores);
-      return;
-    }
+  function applyFilters(query) {
+    query = query.toLowerCase();
 
-    currentStores = allStores.filter(function(store) {
-      var txt = (store.city + " " + store.pincode + " " + store.address + " " + store.name).toLowerCase();
-      return txt.includes(query);
+    var baseList = allStores.filter(function(store) {
+      var text = (store.name + " " + store.city + " " + store.address + " " + store.pincode)
+        .toLowerCase();
+      return text.includes(query);
     });
 
+    if (userLocation) {
+      baseList = baseList
+        .map(function(store) {
+          if (!store.lat || !store.lng) return null;
+          store.distance = getDistanceFromLatLonInKm(
+            userLocation.lat,
+            userLocation.lng,
+            store.lat,
+            store.lng
+          );
+          return store;
+        })
+        .filter(function(store) {
+          return store && store.distance <= 25;
+        })
+        .sort(function(a, b) {
+          return a.distance - b.distance;
+        });
+    }
+
+    currentStores = baseList;
     renderStores(currentStores);
   }
 
-  function filterByRadius(userLat, userLng, radiusKm) {
-    currentStores = allStores
-      .map(function(store) {
-        if (!store.lat || !store.lng) return null;
-        store.distance = getDistanceFromLatLonInKm(userLat, userLng, store.lat, store.lng);
-        return store;
-      })
-      .filter(function(store) {
-        return store && store.distance <= radiusKm;
-      })
-      .sort(function(a, b) {
-        return a.distance - b.distance;
-      });
-
-    renderStores(currentStores);
+  function handleSearch() {
+    var query = input.value.trim();
+    if (!query) {
+      if (userLocation) {
+        applyFilters('');
+      } else {
+        currentStores = [...allStores];
+        renderStores(currentStores);
+      }
+      return;
+    }
+    applyFilters(query);
   }
 
   function handleGeoLocation() {
@@ -148,25 +163,27 @@ document.addEventListener('DOMContentLoaded', function() {
     statusMsg.innerText = "Locating you...";
 
     navigator.geolocation.getCurrentPosition(function(position) {
-      var userLat = position.coords.latitude;
-      var userLng = position.coords.longitude;
+      userLocation = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude
+      };
 
       statusMsg.innerText = "Detecting pincode...";
 
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLat}&lon=${userLng}&format=json`)
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
         .then(res => res.json())
         .then(data => {
           if (data?.address?.postcode) {
             input.value = data.address.postcode;
             statusMsg.innerText = "Detected Pincode: " + data.address.postcode;
           } else {
-            statusMsg.innerText = "Pincode not found. Showing nearest stores.";
+            statusMsg.innerText = "Showing nearby stores.";
           }
-          filterByRadius(userLat, userLng, 25);
+          applyFilters('');
         })
         .catch(() => {
-          statusMsg.innerText = "Error detecting location. Showing nearest stores.";
-          filterByRadius(userLat, userLng, 25);
+          statusMsg.innerText = "Showing nearby stores.";
+          applyFilters('');
         });
 
     }, function() {
@@ -195,10 +212,7 @@ document.addEventListener('DOMContentLoaded', function() {
   searchBtn.addEventListener('click', handleSearch);
   input.addEventListener('keyup', function(e) {
     if (e.key === 'Enter') handleSearch();
-    if (!this.value) {
-      currentStores = [...allStores];
-      renderStores(currentStores);
-    }
+    if (!this.value) handleSearch();
   });
   geoBtn.addEventListener('click', handleGeoLocation);
 
