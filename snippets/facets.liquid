@@ -963,7 +963,7 @@
     .mobile-sort-drawer{
     display:none;
     }
-    
+
     @media screen and (max-width: 749px) {
 
       .mobile-sticky-bar {
@@ -2472,4 +2472,249 @@
       observer.observe(input, { attributes: true, attributeFilter: ['value'] });
     });
   });
+</script>
+
+
+<script>
+  // GTM DataLayer Tracking for Filters and Sort
+(function() {
+  'use strict';
+
+  // Helper function to push to dataLayer
+  function pushToDataLayer(eventName, eventData, locationId) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: eventName,
+      [eventName]: {
+        ...eventData,
+        location_id: locationId
+      }
+    });
+  }
+
+  // Track filter clicks (checkbox filters)
+  function trackFilterClick(filterLabel, filterValue, isActive, isMobile) {
+    const locationId = isMobile ? 'mobile-plp' : 'desktop-plp';
+    const action = isActive ? 'filter_applied' : 'filter_removed';
+    
+    pushToDataLayer('filterClick', {
+      filter_name: filterLabel,
+      filter_value: filterValue,
+      action: action
+    }, locationId);
+  }
+
+  // Track sort option selection
+  function trackSortClick(sortValue, sortLabel, isMobile) {
+    const locationId = isMobile ? 'mobile-plp' : 'desktop-plp';
+    
+    pushToDataLayer('sortClick', {
+      sort_option: sortLabel,
+      sort_value: sortValue
+    }, locationId);
+  }
+
+  // Track clear all filters
+  function trackClearAllFilters(isMobile) {
+    const locationId = isMobile ? 'mobile-plp' : 'desktop-plp';
+    
+    pushToDataLayer('filterClick', {
+      action: 'clear_all_filters'
+    }, locationId);
+  }
+
+  // Track price range filter
+  function trackPriceRangeFilter(minPrice, maxPrice, isMobile) {
+    const locationId = isMobile ? 'mobile-plp' : 'desktop-plp';
+    
+    pushToDataLayer('filterClick', {
+      filter_name: 'Price Range',
+      filter_value: `${minPrice} - ${maxPrice}`,
+      action: 'filter_applied'
+    }, locationId);
+  }
+
+  // Initialize tracking after DOM is ready
+  function initializeTracking() {
+    
+    // ============================================
+    // DESKTOP FILTER TRACKING
+    // ============================================
+    
+    // Track desktop filter checkbox clicks
+    const desktopFilters = document.querySelectorAll('#FacetFiltersForm input[type="checkbox"]');
+    desktopFilters.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const label = this.closest('label') || this.closest('.facets__label');
+        const filterText = label ? label.querySelector('.facet-checkbox__text-label')?.textContent.trim() : '';
+        const filterGroup = this.closest('.js-filter')?.querySelector('.facets__summary-label')?.textContent.trim() || 'Unknown';
+        
+        trackFilterClick(filterGroup, filterText, this.checked, false);
+      });
+    });
+
+    // Track desktop sort changes
+    const desktopSortSelect = document.querySelector('#SortBy');
+    if (desktopSortSelect) {
+      desktopSortSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        trackSortClick(this.value, selectedOption.text, false);
+      });
+    }
+
+    // Track desktop clear all filters
+    const desktopClearAll = document.querySelectorAll('.active-facets-desktop .active-facets__button-remove');
+    desktopClearAll.forEach(btn => {
+      btn.addEventListener('click', function() {
+        trackClearAllFilters(false);
+      });
+    });
+
+    // Track desktop individual filter removal
+    const desktopRemoveButtons = document.querySelectorAll('.active-facets-desktop facet-remove a.active-facets__button');
+    desktopRemoveButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const buttonText = this.querySelector('.active-facets__button-inner')?.textContent.trim() || '';
+        const [filterName, filterValue] = buttonText.split(':').map(s => s.trim());
+        
+        trackFilterClick(filterName || 'Unknown', filterValue || '', false, false);
+      });
+    });
+
+    // ============================================
+    // MOBILE FILTER TRACKING
+    // ============================================
+    
+    // Track mobile filter checkbox clicks
+    const mobileFilters = document.querySelectorAll('#FacetFiltersFormMobile input[type="checkbox"]');
+    mobileFilters.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        const label = this.closest('label') || this.closest('.mobile-facets__label');
+        const filterText = label ? label.querySelector('.facet-checkbox__text-label')?.textContent.trim() : '';
+        const filterGroup = this.closest('.mobile-facets__details')?.querySelector('.mobile-facets__summary span')?.textContent.trim() || 'Unknown';
+        
+        trackFilterClick(filterGroup, filterText, this.checked, true);
+      });
+    });
+
+    // Track mobile sort changes (from sort drawer)
+    const mobileSortOptions = document.querySelectorAll('.mobile-sort-option');
+    mobileSortOptions.forEach(option => {
+      option.addEventListener('click', function() {
+        const sortValue = this.dataset.value;
+        const sortLabel = this.querySelector('span')?.textContent.trim();
+        
+        if (sortValue && sortLabel) {
+          trackSortClick(sortValue, sortLabel, true);
+        }
+      });
+    });
+
+    // Track mobile sort select (fallback)
+    const mobileSortSelect = document.querySelector('#SortBy-mobile');
+    if (mobileSortSelect) {
+      mobileSortSelect.addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        trackSortClick(this.value, selectedOption.text, true);
+      });
+    }
+
+    // Track mobile clear all filters
+    const mobileClearAll = document.querySelectorAll('.active-facets-mobile .active-facets__button-remove');
+    mobileClearAll.forEach(btn => {
+      btn.addEventListener('click', function() {
+        trackClearAllFilters(true);
+      });
+    });
+
+    // Track mobile individual filter removal
+    const mobileRemoveButtons = document.querySelectorAll('.active-facets-mobile facet-remove a.active-facets__button');
+    mobileRemoveButtons.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const buttonText = this.querySelector('.active-facets__button-inner')?.textContent.trim() || '';
+        const [filterName, filterValue] = buttonText.split(':').map(s => s.trim());
+        
+        trackFilterClick(filterName || 'Unknown', filterValue || '', false, true);
+      });
+    });
+
+    // ============================================
+    // STICKY BAR TRACKING
+    // ============================================
+    
+    // Track mobile sticky bar clicks
+    const stickyFilterBtn = document.querySelector('.mobile-sticky-bar__item--filter');
+    if (stickyFilterBtn) {
+      stickyFilterBtn.addEventListener('click', function() {
+        pushToDataLayer('uiInteraction', {
+          element: 'filter_button',
+          action: 'open_filters'
+        }, 'mobile-plp-sticky-bar');
+      });
+    }
+
+    const stickySortBtn = document.querySelector('.mobile-sticky-bar__item--sort');
+    if (stickySortBtn) {
+      stickySortBtn.addEventListener('click', function() {
+        pushToDataLayer('uiInteraction', {
+          element: 'sort_button',
+          action: 'open_sort'
+        }, 'mobile-plp-sticky-bar');
+      });
+    }
+
+    // ============================================
+    // PRICE RANGE TRACKING
+    // ============================================
+    
+    // Track price range filter submissions
+    const priceRangeForms = document.querySelectorAll('price-range');
+    priceRangeForms.forEach(priceRange => {
+      const submitBtn = priceRange.querySelector('button[type="button"]');
+      if (submitBtn) {
+        submitBtn.addEventListener('click', function() {
+          const minInput = priceRange.querySelector('input[name*="min"]');
+          const maxInput = priceRange.querySelector('input[name*="max"]');
+          const isMobile = this.closest('#FacetFiltersFormMobile') !== null;
+          
+          if (minInput && maxInput) {
+            const minValue = minInput.value || '0';
+            const maxValue = maxInput.value || 'Max';
+            trackPriceRangeFilter(minValue, maxValue, isMobile);
+          }
+        });
+      }
+    });
+
+    // ============================================
+    // MUTATION OBSERVER FOR DYNAMIC CONTENT
+    // ============================================
+    
+    // Re-initialize tracking when content changes (for AJAX updates)
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+          // Re-attach event listeners to new elements
+          setTimeout(initializeTracking, 100);
+        }
+      });
+    });
+
+    const facetsContainer = document.querySelector('.facets-container');
+    if (facetsContainer) {
+      observer.observe(facetsContainer, {
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+
+  // Initialize when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeTracking);
+  } else {
+    initializeTracking();
+  }
+
+})();
 </script>
