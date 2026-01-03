@@ -2480,6 +2480,44 @@
 (function() {
   'use strict';
 
+  // Helper function to get collection URL
+  function getCollectionUrl() {
+    // Get current URL path
+    const pathname = window.location.pathname;
+    
+    // Return full collection URL
+    return window.location.origin + pathname;
+  }
+
+  // Helper function to get collection ID
+  function getCollectionId() {
+    // Try to get from meta tag
+    const metaCollection = document.querySelector('meta[property="og:url"]');
+    if (metaCollection) {
+      const url = metaCollection.content;
+      const match = url.match(/collections\/([^\/\?]+)/);
+      if (match) return match[1];
+    }
+    
+    // Try to get from URL
+    const pathname = window.location.pathname;
+    const match = pathname.match(/collections\/([^\/\?]+)/);
+    if (match) return match[1];
+    
+    // Try to get from Shopify object if available
+    if (typeof Shopify !== 'undefined' && Shopify.collection && Shopify.collection.id) {
+      return Shopify.collection.id.toString();
+    }
+    
+    // Fallback: try to get from body data attributes
+    const body = document.querySelector('body');
+    if (body && body.dataset.collectionId) {
+      return body.dataset.collectionId;
+    }
+    
+    return 'unknown';
+  }
+
   // Helper function to push to dataLayer
   function pushPromoClick(creativeName, locationId) {
     window.dataLayer = window.dataLayer || [];
@@ -2487,7 +2525,9 @@
       event: "promoClick",
       promoClick: {
         creative_name: creativeName,
-        location_id: locationId
+        location_id: locationId,
+        promo_name: getCollectionUrl(),
+        promo_id: getCollectionId()
       }
     });
   }
