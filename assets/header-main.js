@@ -264,12 +264,12 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const stickyHeader = document.querySelector("sticky-header");
+  const stickyHeader = document.querySelector("sticky-header test");
 
   if (stickyHeader) {
     window.addEventListener("scroll", function () {
       if (window.scrollY > 50) { 
-        stickyHeader.classList.add("sticky-header");
+        stickyHeader.classList.add("sticky-header test");
       } else {
         stickyHeader.classList.remove("sticky-header");
       }
