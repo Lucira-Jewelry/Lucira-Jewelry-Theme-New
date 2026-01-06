@@ -127,3 +127,5 @@ function handleGTMNewsletterSubscription(event) {
   })
   console.log(window.dataLayer);
 }
+
+console.log("testing");
