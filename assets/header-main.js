@@ -275,5 +275,36 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
-  console.table("working");
 });
+
+
+(function () {
+  function bindUpdateClick() {
+    const updateBtn = document.querySelector(".update-btn");
+    if (!updateBtn) return;
+
+    // prevent duplicate binding
+    if (updateBtn.dataset.lucientBound === "true") return;
+    updateBtn.dataset.lucientBound = "true";
+
+    updateBtn.addEventListener("click", function () {
+       console.table("created1");
+      const emailInput = document.querySelector(".update-user-email-input");
+      const email = emailInput ? emailInput.value.trim() : "";
+
+      if (email) {
+        console.table("created 2");
+      }
+    });
+  }
+
+  // Observe DOM continuously (Shopify popups are dynamic)
+  const observer = new MutationObserver(bindUpdateClick);
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true,
+  });
+
+  // Initial attempt
+  document.addEventListener("DOMContentLoaded", bindUpdateClick);
+})();
