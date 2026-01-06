@@ -278,23 +278,17 @@
       {% endif %} {% endcomment %}
 
       {% if section.settings.popup_image %}
-      {% assign image_src = section.settings.popup_image %}
-      <img
-        src="{{ image_src | img_url: '800x' }}"
-        srcset="{{ image_src | img_url: '400x' }} 400w,
-                {{ image_src | img_url: '600x' }} 600w,
-                {{ image_src | img_url: '800x' }} 800w,
-                {{ image_src | img_url: '1200x' }} 1200w"
-        sizes="(max-width: 768px) 90vw, 400px"
-        alt="{{ section.settings.popup_title }}"
-        title="{{ section.settings.popup_title }}"
-        class="popup-image-banner"
-        width="390"
-        height="390"
-        loading="lazy"
-        decoding="async"
-      >
-    {% endif %}
+        <img
+          src="{{ section.settings.popup_image | img_url: 'placeholder' }}"
+          data-src="{{ section.settings.popup_image | img_url: '800x' }}"
+          alt="{{ section.settings.popup_title }}"
+          title="{{ section.settings.popup_title }}"
+          class="popup-image-banner lazy-image"
+          width="390"
+          height="390"
+          loading="lazy"
+        >
+      {% endif %}
 
       {% if section.settings.popup_button_url %}
         <a href="{{ section.settings.popup_button_url }}" class="popup-box-link" onclick="closePopup()"></a>
@@ -326,3 +320,40 @@
     </div>
   </div>
 {% endif %}
+
+<script>
+  // Load popup image only when needed
+  document.addEventListener('DOMContentLoaded', function() {
+    const popupButton = document.getElementById('popupIconButton');
+    const popupOverlay = document.getElementById('popupOverlay');
+    
+    function loadPopupImage() {
+      const lazyImage = document.querySelector('.lazy-image');
+      if (lazyImage && lazyImage.dataset.src) {
+        lazyImage.src = lazyImage.dataset.src;
+      }
+    }
+    
+    if (popupButton) {
+      popupButton.addEventListener('click', loadPopupImage);
+    }
+    
+    // If popup shows automatically on scroll or load
+    if ({{ section.settings.show_immediately }} || {{ section.settings.auto_trigger_on_scroll }}) {
+      // Load image when popup becomes visible
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            loadPopupImage();
+            observer.unobserve(entry.target);
+          }
+        });
+      });
+      
+      const popupContainer = document.querySelector('.popup-container');
+      if (popupContainer) {
+        observer.observe(popupContainer);
+      }
+    }
+  });
+</script>
