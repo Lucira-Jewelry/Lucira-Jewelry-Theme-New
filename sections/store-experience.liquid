@@ -1,4 +1,4 @@
-<section class="store-experience-banner {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}">
+{% comment %} <section class="store-experience-banner {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}">
   <div class="swiper store-experience-banner-swiper">
     <div class="swiper-wrapper">
       {% for block in section.blocks %}
@@ -224,6 +224,528 @@
           "id": "mobile_slide_image", 
           "label": "Mobile Image",
           "info": "Recommended size: 750x1000px"
+        },
+        { "type": "url", "id": "slide_url", "label": "Slide URL" },
+        { "type": "text", "id": "slide_header", "label": "Header Text" },
+        { "type": "text", "id": "slide_subheader", "label": "Subheader Text" },
+        { "type": "text", "id": "slide_button_text", "label": "Button Text" },
+        { "type": "checkbox", "id": "show_button", "label": "Show Button" }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Store Experience Banner",
+      "category": "Image"
+    }
+  ],
+  "max_blocks": 5
+}
+{% endschema %} {% endcomment %}
+
+<section class="store-experience-banner {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}">
+  <div class="swiper store-experience-banner-swiper" data-autoplay="{{ section.settings.autoplay }}">
+    <div class="swiper-wrapper">
+      {% for block in section.blocks %}
+        {% liquid
+          assign slide_image = block.settings.slide_image
+          assign mobile_slide_image = block.settings.mobile_slide_image
+          assign first_slide = forloop.first
+        %}
+        <div class="swiper-slide">
+          <a
+            id="{{ block.settings.slide_id }}"
+            href="{{ block.settings.slide_url }}"
+            data-promo-id="{{ block.settings.dlv_promo_id }}"
+            data-promo-name="{{ block.settings.dlv_promo_name }}"
+            onclick="handleStoreExpGTMClick(event)"
+            aria-label="Explore store experience"
+            class="store-experience-banner-slider-item"
+            {% unless first_slide %}loading="lazy"{% endunless %}
+          >
+            <picture>
+              {% if mobile_slide_image %}
+                <source 
+                  media="(max-width: 749px)"
+                  srcset="
+                    {{ mobile_slide_image | img_url: '375x500', crop: 'center' }} 375w,
+                    {{ mobile_slide_image | img_url: '750x1000', crop: 'center' }} 750w
+                  "
+                  sizes="100vw"
+                  {% if first_slide %}
+                    fetchpriority="high"
+                  {% endif %}
+                >
+              {% endif %}
+              <img 
+                class="store-experience-banner-image"
+                src="{{ slide_image | img_url: '960x400', crop: 'center' }}"
+                srcset="
+                  {{ slide_image | img_url: '480x200', crop: 'center' }} 480w,
+                  {{ slide_image | img_url: '960x400', crop: 'center' }} 960w,
+                  {{ slide_image | img_url: '1440x600', crop: 'center' }} 1440w,
+                  {{ slide_image | img_url: '1920x823', crop: 'center' }} 1920w
+                "
+                sizes="100vw"
+                width="1920"
+                height="823"
+                alt="{{ slide_image.alt | default: block.settings.slide_header | escape }}"
+                title="{{ slide_image.alt | default: block.settings.slide_header | escape }}"
+                loading="{% if first_slide %}eager{% else %}lazy{% endif %}"
+                decoding="async"
+                {% if first_slide %}
+                  fetchpriority="high"
+                {% endif %}
+                onload="this.classList.add('loaded')"
+              >
+            </picture>
+
+            <div class="store-experience-banner-slider-content {{ section.settings.content_position }}">
+              <div>
+                {% if block.settings.slide_header != blank %}
+                  <p class="store-experience-banner-slider-content-header">{{ block.settings.slide_header }}</p>
+                {% endif %}
+                {% if block.settings.slide_subheader != blank %}
+                  <p class="store-experience-banner-slider-content-subheader">{{ block.settings.slide_subheader }}</p>
+                {% endif %}
+                {% if block.settings.show_button and block.settings.slide_button_text != blank %}
+                  <button class="store-experience-banner-slider-content-button">
+                    {{ block.settings.slide_button_text }}
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+    <div class="swiper-pagination"></div>
+    <div class="swiper-button-prev"></div>
+    <div class="swiper-button-next"></div>
+  </div>
+</section>
+
+<style>
+  /* Critical CSS for LCP */
+  .store-experience-banner-swiper {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    contain: layout style paint;
+  }
+  
+  .store-experience-banner-slider-item {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: block;
+    overflow: hidden;
+  }
+  
+  /* Add aspect ratio container to prevent CLS */
+  .store-experience-banner {
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .store-experience-banner.banner--large {
+    aspect-ratio: 16/7;
+  }
+  
+  .store-experience-banner.banner--medium {
+    aspect-ratio: 16/9;
+  }
+  
+  .store-experience-banner.banner--small {
+    aspect-ratio: 16/10;
+  }
+  
+  @media (max-width: 749px) {
+    .store-experience-banner.banner--large-mobile {
+      aspect-ratio: 3/4;
+    }
+    
+    .store-experience-banner.banner--medium-mobile {
+      aspect-ratio: 4/5;
+    }
+    
+    .store-experience-banner.banner--small-mobile {
+      aspect-ratio: 1/1;
+    }
+  }
+  
+  .store-experience-banner-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    opacity: 0;
+    transition: opacity 0.3s ease-in;
+  }
+  
+  .store-experience-banner-image.loaded {
+    opacity: 1;
+  }
+  
+  .store-experience-banner-swiper .swiper-slide {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    transition: opacity 0.5s ease-in-out;
+  }
+  
+  .store-experience-banner-swiper .swiper-slide-active {
+    opacity: 1;
+  }
+  
+  /* Content Styles */
+  .store-experience-banner-slider-content {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center !important;
+    padding: 50px;
+    pointer-events: none;
+    text-align: center;
+  }
+  
+  .store-experience-banner-slider-content.mid-left {
+    justify-content: flex-start;
+  }
+  
+  .store-experience-banner-slider-content.mid-center {
+    justify-content: center;
+    text-align: center;
+  }
+  
+  .store-experience-banner-slider-content.mid-right {
+    justify-content: flex-end;
+    text-align: right;
+  }
+  
+  .store-experience-banner-slider-content>div {
+    max-width: 60rem;
+    pointer-events: all;
+  }
+  
+  .store-experience-banner-slider-content-header {
+    font-size: 28px;
+    font-family: 'Futura Std', sans-serif !important;
+    font-weight: 500;
+    line-height: 1.2;
+    margin: 0 0 2rem 0;
+    color: #fff;
+    text-shadow: 2px 2px 4px rgba(0,0,0,.5);
+    text-transform: uppercase;
+  }
+  
+  .store-experience-banner-slider-content-subheader {
+    font-size: 20px;
+    line-height: 1.5;
+    margin: 0 0 2.5rem 0;
+    color: #fff;
+    text-shadow: 1px 1px 3px rgba(0,0,0,.5);
+  }
+  
+  .store-experience-banner-slider-content-button {
+    background: #fff;
+    text-transform: uppercase;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    padding: 1.2rem 3.5rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    color: #000;
+    transition: all .3s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,.2);
+    font-family: 'Futura Std', sans-serif;
+  }
+  
+  .store-experience-banner-slider-content-button:hover {
+    background: #8f6d6a;
+    color: #fff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  }
+  
+  /* Pagination */
+  .store-experience-banner .swiper-pagination-bullet {
+    width: 4px;
+    height: 4px;
+    display: inline-block;
+    border-radius: 3rem;
+    background: #fff;
+    opacity: 0.5;
+  }
+  
+  .store-experience-banner .swiper-pagination-bullet-active {
+    background: #fff;
+    width: 14px;
+    height: 4px;
+    opacity: 1;
+  }
+  
+  /* Navigation arrows - deferred loading */
+  .store-experience-banner .swiper-button-next,
+  .store-experience-banner .swiper-button-prev {
+    color: #fff;
+    height: 40px;
+    width: 40px;
+    background: rgba(0,0,0,.4);
+    border-radius: 50%;
+    transition: all .3s ease;
+    opacity: 0;
+    /* Will be shown after JS loads */
+  }
+  
+  .store-experience-banner.swiper-initialized .swiper-button-next,
+  .store-experience-banner.swiper-initialized .swiper-button-prev {
+    opacity: 1;
+  }
+  
+  .store-experience-banner .swiper-button-next:hover,
+  .store-experience-banner .swiper-button-prev:hover {
+    background: rgba(0,0,0,.6);
+  }
+  
+  .store-experience-banner .swiper-button-prev {
+    left: 20px;
+  }
+  
+  .store-experience-banner .swiper-button-next {
+    right: 20px;
+  }
+  
+  .store-experience-banner .swiper-button-next:after,
+  .store-experience-banner .swiper-button-prev:after {
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+  }
+  
+  /* Mobile Styles */
+  @media (max-width: 767px) {
+    .store-experience-banner .swiper-button-next,
+    .store-experience-banner .swiper-button-prev {
+      display: none;
+    }
+    
+    .store-experience-banner-slider-content {
+      padding: 5rem 2rem;
+    }
+    
+    .store-experience-banner-slider-content-header {
+      font-size: 20px;
+      margin-bottom: 1rem;
+    }
+    
+    .store-experience-banner-slider-content-subheader {
+      font-size: 16px;
+      margin-bottom: 2rem;
+    }
+    
+    .store-experience-banner-slider-content-button {
+      padding: 1rem 2.5rem;
+      font-size: 13px;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .store-experience-banner-slider-content {
+      padding: 3rem 1.5rem;
+    }
+    
+    .store-experience-banner-slider-content-header {
+      font-size: 18px;
+    }
+    
+    .store-experience-banner-slider-content-subheader {
+      font-size: 14px;
+    }
+  }
+</style>
+
+<script type="module">
+  // Defer Swiper loading until needed
+  function initSwiper() {
+    import('https://cdn.jsdelivr.net/npm/swiper@8/swiper-bundle.min.js').then(({ default: Swiper }) => {
+      const swiperEl = document.querySelector('.store-experience-banner-swiper');
+      const autoplay = swiperEl.dataset.autoplay === 'true';
+      
+      const swiper = new Swiper(swiperEl, {
+        loop: true,
+        speed: 500,
+        preloadImages: false,
+        lazy: {
+          loadPrevNext: true,
+          loadPrevNextAmount: 1,
+        },
+        autoplay: autoplay ? {
+          delay: 3000,
+          disableOnInteraction: false,
+          waitForTransition: true,
+        } : false,
+        pagination: {
+          el: '.swiper-pagination',
+          clickable: true,
+          dynamicBullets: true,
+        },
+        navigation: {
+          nextEl: '.store-experience-banner .swiper-button-next',
+          prevEl: '.store-experience-banner .swiper-button-prev',
+        },
+        on: {
+          init: function() {
+            document.querySelector('.store-experience-banner').classList.add('swiper-initialized');
+            trackStoreExpPromoView(this.slides[this.activeIndex]);
+          },
+          slideChange: function() {
+            trackStoreExpPromoView(this.slides[this.activeIndex]);
+          }
+        }
+      });
+      
+      // Pause autoplay on hover for better UX
+      if (autoplay) {
+        swiperEl.addEventListener('mouseenter', () => swiper.autoplay.stop());
+        swiperEl.addEventListener('mouseleave', () => swiper.autoplay.start());
+      }
+    }).catch(err => {
+      console.error('Failed to load Swiper:', err);
+    });
+  }
+  
+  // Initialize swiper when visible in viewport
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        initSwiper();
+        observer.unobserve(entry.target);
+      }
+    });
+  }, {
+    rootMargin: '100px',
+    threshold: 0.1
+  });
+  
+  document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.querySelector('.store-experience-banner-swiper');
+    if (banner) {
+      observer.observe(banner);
+    }
+  });
+  
+  // GTM Tracking Functions
+  function trackStoreExpPromoView(slide) {
+    if (!slide) return;
+    const target = slide.querySelector('a');
+    if (target && target.dataset.promoId) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'promoView',
+        promoView: {
+          promo_id: target.dataset.promoId,
+          promo_name: target.dataset.promoName,
+          creative_name: 'store_experience_banner',
+          promo_position: 'Home Page'
+        }
+      });
+    }
+  }
+  
+  window.handleStoreExpGTMClick = function(event) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        promo_id: target.dataset.promoId || target.id,
+        promo_name: target.dataset.promoName,
+        creative_name: 'store_experience_banner_image',
+        promo_position: 'Home Page'
+      }
+    });
+    
+    // Use requestIdleCallback for better performance
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(() => {
+        window.location.assign(target.href);
+      }, { timeout: 500 });
+    } else {
+      setTimeout(() => {
+        window.location.assign(target.href);
+      }, 100);
+    }
+  };
+</script>
+
+{% schema %}
+{
+  "name": "Store Experience Banner",
+  "settings": [
+    {
+      "type": "select",
+      "id": "banner_height",
+      "label": "Banner Height",
+      "options": [
+        { "value": "banner--small", "label": "Small" },
+        { "value": "banner--medium", "label": "Medium" },
+        { "value": "banner--large", "label": "Large" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "banner_height_mobile",
+      "label": "Banner Height (Mobile)",
+      "options": [
+        { "value": "banner--small-mobile", "label": "Small" },
+        { "value": "banner--medium-mobile", "label": "Medium" },
+        { "value": "banner--large-mobile", "label": "Large" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "content_position",
+      "label": "Content Position",
+      "options": [
+        { "value": "mid-left", "label": "Middle Left" },
+        { "value": "mid-center", "label": "Middle Center" },
+        { "value": "mid-right", "label": "Middle Right" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "AutoPlay",
+      "default": true
+    }
+  ],
+  "blocks": [
+    {
+      "type": "experience_slide",
+      "name": "Experience Slide",
+      "settings": [
+        { "type": "text", "id": "slide_id", "label": "Slide ID" },
+        { "type": "text", "id": "dlv_promo_id", "label": "DLV Promo ID" },
+        { "type": "text", "id": "dlv_promo_name", "label": "DLV Promo Name" },
+        { 
+          "type": "image_picker", 
+          "id": "slide_image", 
+          "label": "Desktop Image",
+          "info": "Recommended size: 1920x823px (16:7 ratio)"
+        },
+        { 
+          "type": "image_picker", 
+          "id": "mobile_slide_image", 
+          "label": "Mobile Image",
+          "info": "Recommended size: 750x1000px (3:4 ratio)"
         },
         { "type": "url", "id": "slide_url", "label": "Slide URL" },
         { "type": "text", "id": "slide_header", "label": "Header Text" },
