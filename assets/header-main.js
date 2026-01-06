@@ -281,6 +281,7 @@ document.addEventListener("DOMContentLoaded", function () {
   let updateBoxShown = false;
   let loginTracked = false;
   let registerTracked = false;
+  let otpFlowStarted = false; // 🔑 KEY FIX
 
   /* ===================== REGISTER TRACK ===================== */
   function bindRegisterTrack() {
@@ -299,50 +300,49 @@ document.addEventListener("DOMContentLoaded", function () {
         registerTracked = true;
         console.table("🆕 REGISTER EVENT");
 
-        // Example:
-        // window.dataLayer?.push({ event: "register", email });
-        // analytics.track("register", { email });
+        // dataLayer / analytics here
       }
     });
   }
 
   /* ===================== LOGIN TRACK ===================== */
-  function observeLoginFlow() {
-    const updateBox = document.querySelector(".update-user-box");
+  function observeAuthFlow() {
     const verifyBox = document.querySelector(".verify-box");
+    const updateBox = document.querySelector(".update-user-box");
 
-    // Reset flow when OTP screen opens again
+    // 🔹 OTP flow starts ONLY when verify box becomes visible
     if (verifyBox && !verifyBox.classList.contains("hideBox")) {
-      updateBoxShown = false;
+      otpFlowStarted = true;
       loginTracked = false;
+      updateBoxShown = false;
       registerTracked = false;
     }
 
-    // If update-user-box becomes visible → new user flow
+    // If update-user-box appears → new user
     if (updateBox && !updateBox.classList.contains("hideBox")) {
       updateBoxShown = true;
     }
 
-    // Existing user login (fire ONCE)
+    // 🔹 EXISTING USER LOGIN (fire once, only if OTP flow started)
     if (
+      otpFlowStarted &&
       verifyBox &&
       verifyBox.classList.contains("hideBox") &&
       !updateBoxShown &&
       !loginTracked
     ) {
       loginTracked = true;
+      otpFlowStarted = false; // reset
       console.table("🔁 LOGIN EVENT");
 
-      // Example:
-      // window.dataLayer?.push({ event: "login" });
-      // analytics.track("login");
+      // dataLayer / analytics here
     }
   }
 
   /* ===================== OBSERVER ===================== */
   const observer = new MutationObserver(() => {
     bindRegisterTrack();
-    observeLoginFlow();
+    observeAuthFlow();
   });
 
   observer.observe(document.body, {
@@ -353,6 +353,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   document.addEventListener("DOMContentLoaded", () => {
     bindRegisterTrack();
-    observeLoginFlow();
+    observeAuthFlow();
   });
 })();
