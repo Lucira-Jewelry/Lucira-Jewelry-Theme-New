@@ -127,6 +127,3 @@ function handleGTMNewsletterSubscription(event) {
   })
   console.log(window.dataLayer);
 }
-$(document).ready(function(){
-  console.log("ready");
-})
