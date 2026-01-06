@@ -275,6 +275,8 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
-
-  console.log("yes working");
 });
+
+(function () {
+  console.log("inside IIFE");
+})();
