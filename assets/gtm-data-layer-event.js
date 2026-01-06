@@ -127,18 +127,3 @@ function handleGTMNewsletterSubscription(event) {
   })
   console.log(window.dataLayer);
 }
-
-
-
-(function () {
-  function bindIwishDrawer() {
-    const btn = document.querySelector(".iwishDrawer");    
-
-    btn.addEventListener("click", function () {
-      console.log("test");
-    });
-  }
-
-  // Initial attempt
-  document.addEventListener("DOMContentLoaded", bindIwishDrawer);
-})();
