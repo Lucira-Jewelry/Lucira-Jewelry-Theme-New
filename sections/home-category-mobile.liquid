@@ -383,269 +383,295 @@
 {% endschema %} {% endcomment %}
 
 
-{% comment %}
-  Collection Grid Carousel - Mobile Only
-  COMPLETELY prevents loading on desktop
-{% endcomment %}
+<section class="store-experience-banner {{ section.settings.banner_height }} {{ section.settings.banner_height_mobile }}">
+  <div class="swiper store-experience-banner-swiper">
+    <div class="swiper-wrapper">
+      {% for block in section.blocks %}
+        <div class="swiper-slide">
+          <a
+            id="{{ block.settings.slide_id }}"
+            href="{{ block.settings.slide_url }}"
+            data-promo-id="{{ block.settings.dlv_promo_id }}"
+            data-promo-name="{{ block.settings.dlv_promo_name }}"
+            onclick="handleStoreExpGTMClick(event)"
+            aria-label="Explore store experience"
+            class="store-experience-banner-slider-item"
+          >
+            {% comment %} <picture>
+              <source 
+                media="(max-width: 749px)"
+                srcset="{{ block.settings.mobile_slide_image | img_url: '750x1000', crop: 'center' }} 750w,
+                        {{ block.settings.mobile_slide_image | img_url: '375x500', crop: 'center' }} 375w"
+                sizes="100vw"
+              >
+              <source 
+                srcset="{{ block.settings.slide_image | img_url: '1920x823', crop: 'center' }} 1920w,
+                        {{ block.settings.slide_image | img_url: '960x400', crop: 'center' }} 960w"
+                sizes="100vw"
+              >
+              <img 
+                class="store-experience-banner-image"
+                src="{{ block.settings.slide_image | img_url: '1920x823', crop: 'center' }}"
+                width="1920"
+                height="800"
+                alt="{{ block.settings.slide_image.alt | escape }}"
+                title="{{ block.settings.slide_image.alt | escape }}"
+                loading="{% if forloop.first %}eager{% else %}lazy{% endif %}"
+                decoding="async"
+                {% if forloop.first %}fetchpriority="high"{% endif %}
+              >
+            </picture> {% endcomment %}
 
-{%- liquid
-  # Detect if we should render at all
-  assign should_render = false
-  
-  # Always render in theme editor
-  if request.design_mode
-    assign should_render = true
-  # Only render on mobile viewport
-  elsif request.host contains 'm.' or request.host contains 'mobile.'
-    assign should_render = true
-  else
-    # We'll use JavaScript to conditionally render
-    assign should_render = 'conditional'
-  endif
--%}
+            <picture>
+            <source 
+              media="(max-width: 749px)"
+              data-srcset="{{ block.settings.mobile_slide_image | img_url: '750x1000', crop: 'center' }} 750w,
+                          {{ block.settings.mobile_slide_image | img_url: '375x500', crop: 'center' }} 375w"
+              sizes="100vw"
+            >
+            <source 
+              data-srcset="{{ block.settings.slide_image | img_url: '1920x823', crop: 'center' }} 1920w,
+                          {{ block.settings.slide_image | img_url: '960x400', crop: 'center' }} 960w"
+              sizes="100vw"
+            >
+            <img
+              class="store-experience-banner-image swiper-lazy"
+              data-src="{{ block.settings.slide_image | img_url: '1920x823', crop: 'center' }}"
+              width="1920"
+              height="800"
+              alt="{{ block.settings.slide_image.alt | escape }}"
+              decoding="async"
+              {% if forloop.first %}
+                fetchpriority="high"
+              {% endif %}
+            >
+          </picture>
 
-{%- if should_render == true or should_render == 'conditional' -%}
-  {%- if should_render == 'conditional' -%}
-    {% comment %} JavaScript will handle rendering only on mobile {% endcomment %}
-    <div class="custom-collection-grid-section" data-mobile-only-conditional></div>
-    
-    <script>
-      (function(){
-        'use strict';
-        // Only render on mobile devices
-        if (window.innerWidth <= 768) {
-          // Mobile device - render the component
-          fetchSectionContent();
-        }
-        
-        // Also handle resize (optional)
-        var resizeTimer;
-        window.addEventListener('resize', function(){
-          clearTimeout(resizeTimer);
-          resizeTimer = setTimeout(checkViewport, 250);
-        });
-        
-        function checkViewport() {
-          var container = document.querySelector('[data-mobile-only-conditional]');
-          if (!container) return;
-          
-          if (window.innerWidth <= 768 && !container.hasChildNodes()) {
-            // Switched to mobile - load content
-            fetchSectionContent();
-          } else if (window.innerWidth > 768 && container.hasChildNodes()) {
-            // Switched to desktop - remove content
-            container.innerHTML = '';
-          }
-        }
-        
-        function fetchSectionContent() {
-          var container = document.querySelector('[data-mobile-only-conditional]');
-          if (!container || container.dataset.loaded) return;
-          
-          container.dataset.loaded = true;
-          
-          // Create minimal HTML structure
-          container.innerHTML = `
-            <div class="custom-collection-scroll-container">
-              <div class="custom-collection-grid-wrapper" role="list">
-                {%- for block in section.blocks -%}
-                  {%- liquid
-                    assign is_priority = false
-                    if forloop.index <= 4
-                      assign is_priority = true
-                    endif
-                    
-                    assign img_url = block.settings.collection_image | img_url: '100x100', crop: 'center'
-                    assign collection_name = block.settings.collection_name | escape
-                  -%}
-                  
-                  <div class="custom-slider-item" role="listitem">
-                    {%- if block.settings.collection_link != blank -%}
-                      <a href="{{ block.settings.collection_link }}" 
-                         class="custom-collection-link"
-                         aria-label="Shop {{ collection_name }}">
-                    {%- endif -%}
-                    
-                    <div class="custom-collection-image-wrapper">
-                      {%- if block.settings.collection_image != blank -%}
-                        <img
-                          src="${window.innerWidth <= 768 ? '{{ img_url }}' : ''}"
-                          data-src="{{ img_url }}"
-                          alt="{{ collection_name }}"
-                          loading="lazy"
-                          width="100"
-                          height="100"
-                          class="custom-collection-image"
-                          onerror="this.style.display='none';this.parentElement.innerHTML='<svg viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"#e0e0e0\"/></svg>';"
-                        >
-                      {%- else -%}
-                        <div class="custom-collection-placeholder">
-                          <svg viewBox="0 0 100 100">
-                            <circle cx="50" cy="50" r="40" fill="#e0e0e0"/>
-                          </svg>
-                        </div>
-                      {%- endif -%}
-                    </div>
-                    
-                    <p class="custom-collection-name">{{ collection_name }}</p>
-                    
-                    {%- if block.settings.collection_link != blank -%}
-                      </a>
-                    {%- endif -%}
-                  </div>
-                {%- endfor -%}
+
+            <div class="store-experience-banner-slider-content {{ section.settings.content_position }}">
+              <div>
+                {% if block.settings.slide_header != blank %}
+                  <p class="store-experience-banner-slider-content-header">{{ block.settings.slide_header }}</p>
+                {% endif %}
+                {% if block.settings.slide_subheader != blank %}
+                  <p class="store-experience-banner-slider-content-subheader">{{ block.settings.slide_subheader }}</p>
+                {% endif %}
+                {% if block.settings.show_button and block.settings.slide_button_text != blank %}
+                  <button class="store-experience-banner-slider-content-button">
+                    {{ block.settings.slide_button_text }}
+                  </button>
+                {% endif %}
               </div>
             </div>
-          `;
-          
-          // Add event listener for tracking
-          container.addEventListener('click', function(e){
-            var item = e.target.closest('.custom-slider-item');
-            if(!item || !window.dataLayer) return;
-            var nameEl = item.querySelector('.custom-collection-name');
-            if(nameEl){
-              window.dataLayer.push({
-                event:'promoClick',
-                promoClick:{
-                  creative_name:'Homepage Mobile Collection Grid',
-                  promo_name:nameEl.textContent.trim()
-                }
-              });
-            }
-          }, true);
-          
-          // Load images only when in viewport
-          var images = container.querySelectorAll('img[data-src]');
-          if ('IntersectionObserver' in window) {
-            var imageObserver = new IntersectionObserver(function(entries){
-              entries.forEach(function(entry){
-                if (entry.isIntersecting) {
-                  var img = entry.target;
-                  img.src = img.dataset.src;
-                  img.removeAttribute('data-src');
-                  imageObserver.unobserve(img);
-                }
-              });
-            });
-            
-            images.forEach(function(img){
-              imageObserver.observe(img);
-            });
-          } else {
-            // Fallback for older browsers
-            images.forEach(function(img){
-              img.src = img.dataset.src;
-              img.removeAttribute('data-src');
-            });
-          }
-        }
-      })();
-    </script>
-    
-  {%- else -%}
-    {% comment %} Theme editor or mobile domain - render normally {% endcomment %}
-    <div class="custom-collection-grid-section">
-      <div class="custom-collection-scroll-container">
-        <div class="custom-collection-grid-wrapper" role="list">
-          {%- for block in section.blocks -%}
-            {%- liquid
-              assign is_priority = false
-              if forloop.index <= 4
-                assign is_priority = true
-              endif
-              
-              assign img_url = block.settings.collection_image | img_url: '100x100', crop: 'center'
-              assign collection_name = block.settings.collection_name | escape
-            -%}
-            
-            <div class="custom-slider-item" role="listitem">
-              {%- if block.settings.collection_link != blank -%}
-                <a href="{{ block.settings.collection_link }}" 
-                   class="custom-collection-link"
-                   aria-label="Shop {{ collection_name }}">
-              {%- endif -%}
-              
-              <div class="custom-collection-image-wrapper">
-                {%- if block.settings.collection_image != blank -%}
-                  <img
-                    src="{{ img_url }}"
-                    alt="{{ collection_name }}"
-                    loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
-                    width="100"
-                    height="100"
-                    class="custom-collection-image"
-                  >
-                {%- else -%}
-                  <div class="custom-collection-placeholder">
-                    <svg viewBox="0 0 100 100">
-                      <circle cx="50" cy="50" r="40" fill="#e0e0e0"/>
-                    </svg>
-                  </div>
-                {%- endif -%}
-              </div>
-              
-              <p class="custom-collection-name">{{ collection_name }}</p>
-              
-              {%- if block.settings.collection_link != blank -%}
-                </a>
-              {%- endif -%}
-            </div>
-          {%- endfor -%}
+          </a>
         </div>
-      </div>
+      {% endfor %}
     </div>
-  {%- endif -%}
+    <div class="swiper-pagination"></div>
+    <div class="swiper-button-prev"></div>
+    <div class="swiper-button-next"></div>
+  </div>
+</section>
 
-  {%- comment %} Mobile-only CSS {% endcomment -%}
-  <style>
-    .custom-collection-grid-section{display:none}
-    @media (max-width:768px){.custom-collection-grid-section{display:block;padding:0 1px 8px 10px;margin:0 auto;position:relative}.custom-collection-scroll-container{width:100%;position:relative;overflow:hidden}.custom-slider-item:last-child{margin-right:12px}.custom-collection-grid-wrapper{display:flex;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;gap:14px;align-items:center;padding:10px 5px;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch}.custom-collection-grid-wrapper::-webkit-scrollbar{display:none}.custom-slider-item{text-align:center;width:100px;min-width:100px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center}.custom-collection-link{text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px}.custom-collection-link:active{opacity:.7}.custom-collection-image-wrapper{width:100px;height:100px;border-radius:50%;overflow:hidden;margin:0 auto;background-color:#f5f5f5;aspect-ratio:1/1}.custom-collection-image{width:100%;height:100%;object-fit:cover}.custom-collection-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background-color:#e0e0e0}.custom-collection-name{font-size:12px;font-weight:400;text-transform:uppercase;color:#333;margin:0;letter-spacing:.5px;line-height:1.2}@media (max-width:480px){.custom-collection-name{font-size:10px}}}
-    
-    {%- if request.design_mode -%}
-      @media (min-width:769px){.custom-collection-grid-section{display:block;opacity:0.5;border:2px dashed #ccc;padding:20px}.custom-collection-grid-section::before{content:"MOBILE ONLY - Hidden on desktop";display:block;color:#666;font-size:14px;margin-bottom:10px}}
-    {%- endif -%}
-  </style>
-{%- endif -%}
+<style>
+  .store-experience-banner-swiper{width:100%;height:100%;position:relative;}
+  .store-experience-banner-swiper .swiper-slide{display:flex;justify-content:center;align-items:center;opacity:0;transition:opacity 1s ease-in-out;}
+  .store-experience-banner-swiper .swiper-slide-active{opacity:1;}
+  .store-experience-banner-slider-item{position:relative;width:100%;height:100%;display:block;overflow:hidden}
+  .store-experience-banner-image{width:100%;height:100%;object-fit:cover;display:block;content-visibility:auto}
+  .store-experience-banner-slider-content{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center!important;padding:50px;pointer-events:none;text-align:center}
+  .store-experience-banner-slider-content.mid-left{justify-content:flex-start}
+  .store-experience-banner-slider-content.mid-center{justify-content:center;text-align:center}
+  .store-experience-banner-slider-content.mid-right{justify-content:flex-end;text-align:right}
+  .store-experience-banner-slider-content>div{max-width:60rem;pointer-events:all}
+  .store-experience-banner-slider-content-header{font-size:28px;font-family:'Futura Std',sans-serif!important;font-weight:500;line-height:1.2;margin:0 0 2rem 0;color:#fff;text-shadow:2px 2px 4px rgba(0,0,0,.5)}
+  .store-experience-banner-slider-content-subheader{font-size:20px;line-height:1.5;margin:0 0 2.5rem 0;color:#fff;text-shadow:1px 1px 3px rgba(0,0,0,.5)}
+  .store-experience-banner-slider-content-button{background:#fff;text-transform:uppercase;font-size:14px;font-weight:500;letter-spacing:1px;padding:1.2rem 3.5rem;border-radius:8px;border:none;cursor:pointer;color:#000;transition:all .3s ease;box-shadow:0 2px 8px rgba(0,0,0,.2);font-family:'Futura Std',sans-serif}
+  .store-experience-banner-slider-content-button:hover{background:#8f6d6a;color:#fff;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .store-experience-banner .swiper-pagination-bullet{width:4px;height:4px;display:inline-block;border-radius:3rem;background:#fff}
+  .store-experience-banner .swiper-pagination-bullet-active{background:#fff;width:14px;height:4px}
+  
+  /* Navigation arrows */
+  .store-experience-banner .swiper-button-next:after,.store-experience-banner .swiper-button-prev:after{color:#fff;font-size:20px;font-weight:bold;}
+  .store-experience-banner .swiper-button-next,.store-experience-banner .swiper-button-prev{color:#fff;height:40px;width:40px;background:rgba(0,0,0,.4);border-radius:50%;transition:all .3s ease;}
+  .store-experience-banner .swiper-button-next:hover,.store-experience-banner .swiper-button-prev:hover{background:rgba(0,0,0,.6);}
+  .store-experience-banner .swiper-button-prev{left:20px;}
+  .store-experience-banner .swiper-button-next{right:20px;}
+  .store-experience-banner-slider-content-header {font-weight: 500; text-transform: uppercase; font-size: 24px;}
+  
+  @media (max-width:767px){
+    .store-experience-banner .swiper-button-next,.store-experience-banner .swiper-button-prev{display:none}
+    .store-experience-banner-slider-content{padding:5rem 2rem}
+    .store-experience-banner-slider-content-header{font-size:20px;margin-bottom:1rem}
+    .store-experience-banner-slider-content-subheader{font-size:16px;margin-bottom:2rem}
+    .store-experience-banner-slider-content-button{padding:1rem 2.5rem;font-size:13px}
+    .store-experience-banner-slider-content-header { font-size: 20px; margin-bottom: 20px; }
+  }
+  @media (max-width:480px){
+    .store-experience-banner-slider-content{padding:3rem 1.5rem}
+    .store-experience-banner-slider-content-header{font-size:20px}
+    .store-experience-banner-slider-content-subheader{font-size:14px}
+  }
+</style>
+
+<script defer>
+  window.addEventListener("load", function () {
+    {% comment %} const swiper = new Swiper(".store-experience-banner-swiper", {
+      loop:true,
+      autoplay: {{ section.settings.autoplay | json }} ? { 
+        delay:3000, 
+        disableOnInteraction:false 
+      } : false,
+      pagination: { 
+        el:".swiper-pagination", 
+        clickable:true 
+      },
+      navigation: { 
+        nextEl:".store-experience-banner .swiper-button-next", 
+        prevEl:".store-experience-banner .swiper-button-prev" 
+      },
+      on:{
+        init:function(){ 
+          trackStoreExpPromoView(this.slides[this.activeIndex]); 
+        },
+        slideChange:function(){ 
+          trackStoreExpPromoView(this.slides[this.activeIndex]); 
+        }
+      }
+    }); {% endcomment %}
+
+    const swiper = new Swiper(".store-experience-banner-swiper", {
+      loop: true,
+      preloadImages: false,
+      lazy: {
+        loadPrevNext: true,
+        loadOnTransitionStart: true
+      },
+      autoplay: {{ section.settings.autoplay | json }} ? {
+        delay: 3000,
+        disableOnInteraction: false
+      } : false,
+      pagination: {
+        el: ".swiper-pagination",
+        clickable: true
+      },
+      navigation: {
+        nextEl: ".store-experience-banner .swiper-button-next",
+        prevEl: ".store-experience-banner .swiper-button-prev"
+      }
+    });
+
+
+    function trackStoreExpPromoView(slide){
+      if(!slide) return;
+      const target=slide.querySelector("a");
+      if(target && target.dataset.promoId){
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event:"promoView",
+          promoView:{
+            promo_id: target.dataset.promoId,
+            promo_name: target.dataset.promoName,
+            creative_name:"store_experience_banner",
+            promo_position:"Home Page"
+          }
+        });
+      }
+    }
+
+    window.handleStoreExpGTMClick = function(event){
+      event.preventDefault();
+      const target = event.currentTarget;
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event:"promoClick",
+        promoClick:{
+          promo_id: target.dataset.promoId || target.id,
+          promo_name: target.dataset.promoName,
+          creative_name:"store_experience_banner_image",
+          promo_position:"Home Page"
+        }
+      });
+      setTimeout(()=>{ window.location.assign(target.href); }, 100);
+    };
+  });
+</script>
 
 {% schema %}
 {
-  "name": "Mobile Collection",
-  "class": "mobile-only-section",
-  "settings": [],
+  "name": "Store Experience Banner",
+  "settings": [
+    {
+      "type": "select",
+      "id": "banner_height",
+      "label": "Banner Height",
+      "options": [
+        { "value": "banner--small", "label": "Small" },
+        { "value": "banner--medium", "label": "Medium" },
+        { "value": "banner--large", "label": "Large" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "banner_height_mobile",
+      "label": "Banner Height (Mobile)",
+      "options": [
+        { "value": "banner--small", "label": "Small" },
+        { "value": "banner--medium-mobile", "label": "Medium" },
+        { "value": "banner--large-mobile", "label": "Large" }
+      ]
+    },
+    {
+      "type": "select",
+      "id": "content_position",
+      "label": "Content Position",
+      "options": [
+        { "value": "mid-left", "label": "Middle Left" },
+        { "value": "mid-center", "label": "Middle Center" },
+        { "value": "mid-right", "label": "Middle Right" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "AutoPlay",
+      "default": true
+    }
+  ],
   "blocks": [
     {
-      "type": "collection_item",
-      "name": "Collection Item",
+      "type": "experience_slide",
+      "name": "Experience Slide",
       "settings": [
-        {
-          "type": "image_picker",
-          "id": "collection_image",
-          "label": "Collection Image"
+        { "type": "text", "id": "slide_id", "label": "Slide ID" },
+        { "type": "text", "id": "dlv_promo_id", "label": "DLV Promo ID" },
+        { "type": "text", "id": "dlv_promo_name", "label": "DLV Promo Name" },
+        { 
+          "type": "image_picker", 
+          "id": "slide_image", 
+          "label": "Desktop Image",
+          "info": "Recommended size: 1920x800px"
         },
-        {
-          "type": "text",
-          "id": "collection_name",
-          "label": "Collection Name",
-          "default": "Collection"
+        { 
+          "type": "image_picker", 
+          "id": "mobile_slide_image", 
+          "label": "Mobile Image",
+          "info": "Recommended size: 750x1000px"
         },
-        {
-          "type": "url",
-          "id": "collection_link",
-          "label": "Collection Link"
-        }
+        { "type": "url", "id": "slide_url", "label": "Slide URL" },
+        { "type": "text", "id": "slide_header", "label": "Header Text" },
+        { "type": "text", "id": "slide_subheader", "label": "Subheader Text" },
+        { "type": "text", "id": "slide_button_text", "label": "Button Text" },
+        { "type": "checkbox", "id": "show_button", "label": "Show Button" }
       ]
     }
   ],
   "presets": [
     {
-      "name": "Mobile Collection Carousel",
-      "blocks": [
-        {"type": "collection_item", "settings": {"collection_name": "RINGS"}},
-        {"type": "collection_item", "settings": {"collection_name": "EARRINGS"}},
-        {"type": "collection_item", "settings": {"collection_name": "BRACELET"}}
-      ]
+      "name": "Store Experience Banner",
+      "category": "Image"
     }
   ],
-  "max_blocks": 12
+  "max_blocks": 5
 }
 {% endschema %}
