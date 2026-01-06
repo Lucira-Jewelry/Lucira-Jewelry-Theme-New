@@ -277,3 +277,82 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
+(function () {
+  let updateBoxShown = false;
+  let loginTracked = false;
+  let registerTracked = false;
+
+  /* ===================== REGISTER TRACK ===================== */
+  function bindRegisterTrack() {
+    const updateBtn = document.querySelector(".update-btn");
+    if (!updateBtn || updateBtn.dataset.registerBound) return;
+
+    updateBtn.dataset.registerBound = "true";
+
+    updateBtn.addEventListener("click", function () {
+      if (registerTracked) return;
+
+      const email =
+        document.querySelector(".update-user-email-input")?.value.trim();
+
+      if (email) {
+        registerTracked = true;
+        console.log("🆕 REGISTER EVENT");
+
+        // Example:
+        // window.dataLayer?.push({ event: "register", email });
+        // analytics.track("register", { email });
+      }
+    });
+  }
+
+  /* ===================== LOGIN TRACK ===================== */
+  function observeLoginFlow() {
+    const updateBox = document.querySelector(".update-user-box");
+    const verifyBox = document.querySelector(".verify-box");
+
+    // Reset flow when OTP screen opens again
+    if (verifyBox && !verifyBox.classList.contains("hideBox")) {
+      updateBoxShown = false;
+      loginTracked = false;
+      registerTracked = false;
+    }
+
+    // If update-user-box becomes visible → new user flow
+    if (updateBox && !updateBox.classList.contains("hideBox")) {
+      updateBoxShown = true;
+    }
+
+    // Existing user login (fire ONCE)
+    if (
+      verifyBox &&
+      verifyBox.classList.contains("hideBox") &&
+      !updateBoxShown &&
+      !loginTracked
+    ) {
+      loginTracked = true;
+      console.log("🔁 LOGIN EVENT");
+
+      // Example:
+      // window.dataLayer?.push({ event: "login" });
+      // analytics.track("login");
+    }
+  }
+
+  /* ===================== OBSERVER ===================== */
+  const observer = new MutationObserver(() => {
+    bindRegisterTrack();
+    observeLoginFlow();
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    attributes: true,
+    subtree: true,
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+    bindRegisterTrack();
+    observeLoginFlow();
+  });
+})();
