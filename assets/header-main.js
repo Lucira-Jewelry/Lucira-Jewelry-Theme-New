@@ -80,7 +80,6 @@ document.addEventListener("DOMContentLoaded", function () {
       });
     });
   }
-  console.log("yes");
 });
 
 
@@ -276,4 +275,6 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
+
+  console.log("yes working");
 });
