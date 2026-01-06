@@ -264,19 +264,15 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const stickyHeader = document.querySelector("sticky-header test");
+  const stickyHeader = document.querySelector("sticky-header");
 
   if (stickyHeader) {
     window.addEventListener("scroll", function () {
       if (window.scrollY > 50) { 
-        stickyHeader.classList.add("sticky-header test");
+        stickyHeader.classList.add("sticky-header");
       } else {
         stickyHeader.classList.remove("sticky-header");
       }
     });
   }
 });
-
-(function () {
-  console.log("inside IIFE");
-})();
