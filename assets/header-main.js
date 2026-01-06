@@ -269,7 +269,7 @@ document.addEventListener("DOMContentLoaded", function () {
   if (stickyHeader) {
     window.addEventListener("scroll", function () {
       if (window.scrollY > 50) { 
-        stickyHeader.classList.add("sticky-headers");
+        stickyHeader.classList.add("sticky-header");
       } else {
         stickyHeader.classList.remove("sticky-header");
       }
