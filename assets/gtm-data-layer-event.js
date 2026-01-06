@@ -128,5 +128,8 @@ function handleGTMNewsletterSubscription(event) {
   console.log(window.dataLayer);
 }
 (function () {
-  console.log("testing");
+  const updateBtn = document.querySelector(".iwishDrawer");
+  updateBtn.addEventListener("click", function () {
+    console.log("test";)
+    });
 })();
