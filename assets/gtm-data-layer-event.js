@@ -127,5 +127,6 @@ function handleGTMNewsletterSubscription(event) {
   })
   console.log(window.dataLayer);
 }
-
-console.log("testing");
+(function () {
+  console.log("testing");
+})();
