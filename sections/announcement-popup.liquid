@@ -322,38 +322,106 @@
 {% endif %}
 
 <script>
-  // Load popup image only when needed
-  document.addEventListener('DOMContentLoaded', function() {
-    const popupButton = document.getElementById('popupIconButton');
+  // Function to load the high-quality image
+  function loadPopupImage() {
+    const lazyImage = document.querySelector('.lazy-image');
+    if (!lazyImage) return;
+    
+    // If already loaded, do nothing
+    if (lazyImage.classList.contains('loaded')) return;
+    
+    // Create a new Image object to preload
+    const highResImage = new Image();
+    
+    // When high-res image loads
+    highResImage.onload = function() {
+      // Swap the source
+      lazyImage.src = this.src;
+      // Add loaded class for fade-in effect
+      lazyImage.classList.add('loaded');
+      console.log('Popup image loaded on demand');
+    };
+    
+    // Start loading the high-res image
+    highResImage.src = lazyImage.dataset.src;
+  }
+  
+  // Function to toggle popup
+  function togglePopup() {
     const popupOverlay = document.getElementById('popupOverlay');
+    const popupIconButton = document.getElementById('popupIconButton');
     
-    function loadPopupImage() {
-      const lazyImage = document.querySelector('.lazy-image');
-      if (lazyImage && lazyImage.dataset.src) {
-        lazyImage.src = lazyImage.dataset.src;
-      }
-    }
-    
-    if (popupButton) {
-      popupButton.addEventListener('click', loadPopupImage);
-    }
-    
-    // If popup shows automatically on scroll or load
-    if ({{ section.settings.show_immediately }} || {{ section.settings.auto_trigger_on_scroll }}) {
-      // Load image when popup becomes visible
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            loadPopupImage();
-            observer.unobserve(entry.target);
-          }
-        });
-      });
+    if (popupOverlay.classList.contains('active')) {
+      // Close popup
+      popupOverlay.classList.remove('active');
+      popupIconButton.classList.remove('active');
+    } else {
+      // Open popup
+      popupOverlay.classList.add('active');
+      popupIconButton.classList.add('active');
       
-      const popupContainer = document.querySelector('.popup-container');
-      if (popupContainer) {
-        observer.observe(popupContainer);
+      // Load the image when popup opens
+      loadPopupImage();
+    }
+  }
+  
+  // Function to close popup
+  function closePopup() {
+    const popupOverlay = document.getElementById('popupOverlay');
+    const popupIconButton = document.getElementById('popupIconButton');
+    
+    popupOverlay.classList.remove('active');
+    popupIconButton.classList.remove('active');
+  }
+  
+  // Event listeners
+  document.addEventListener('DOMContentLoaded', function() {
+    const popupIconButton = document.getElementById('popupIconButton');
+    const popupCloseButton = document.querySelector('.popup-close');
+    
+    // If icon button exists, add click event
+    if (popupIconButton) {
+      popupIconButton.addEventListener('click', togglePopup);
+    }
+    
+    // If close button exists, add click event
+    if (popupCloseButton) {
+      popupCloseButton.addEventListener('click', closePopup);
+    }
+    
+    // Close popup when clicking outside
+    const popupOverlay = document.getElementById('popupOverlay');
+    if (popupOverlay) {
+      popupOverlay.addEventListener('click', function(e) {
+        if (e.target === this) {
+          closePopup();
+        }
+      });
+    }
+    
+    // Auto-trigger on scroll (if enabled)
+    {% if section.settings.auto_trigger_on_scroll %}
+    let scrollTriggered = false;
+    window.addEventListener('scroll', function() {
+      if (!scrollTriggered && window.scrollY > {{ section.settings.scroll_trigger }}) {
+        scrollTriggered = true;
+        togglePopup();
       }
+    });
+    {% endif %}
+    
+    // Show immediately on page load (if enabled)
+    {% if section.settings.show_immediately %}
+    setTimeout(function() {
+      togglePopup();
+    }, {{ section.settings.immediate_delay | times: 1000 }});
+    {% endif %}
+  });
+  
+  // Also handle clicks on the popup box link
+  document.addEventListener('click', function(e) {
+    if (e.target.closest('.popup-box-link')) {
+      closePopup();
     }
   });
 </script>
