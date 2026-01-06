@@ -132,24 +132,12 @@ function handleGTMNewsletterSubscription(event) {
 
 (function () {
   function bindIwishDrawer() {
-    const btn = document.querySelector(".iwishDrawer");
-    if (!btn) return;
-
-    // prevent duplicate binding
-    if (btn.dataset.bound === "true") return;
-    btn.dataset.bound = "true";
+    const btn = document.querySelector(".iwishDrawer");    
 
     btn.addEventListener("click", function () {
       console.log("test");
     });
   }
-
-  // Observe dynamic DOM changes (Shopify drawers)
-  const observer = new MutationObserver(bindIwishDrawer);
-  observer.observe(document.body, {
-    childList: true,
-    subtree: true,
-  });
 
   // Initial attempt
   document.addEventListener("DOMContentLoaded", bindIwishDrawer);
