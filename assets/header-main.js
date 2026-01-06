@@ -297,7 +297,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       if (email) {
         registerTracked = true;
-        console.log("🆕 REGISTER EVENT");
+        console.table("🆕 REGISTER EVENT");
 
         // Example:
         // window.dataLayer?.push({ event: "register", email });
@@ -331,7 +331,7 @@ document.addEventListener("DOMContentLoaded", function () {
       !loginTracked
     ) {
       loginTracked = true;
-      console.log("🔁 LOGIN EVENT");
+      console.table("🔁 LOGIN EVENT");
 
       // Example:
       // window.dataLayer?.push({ event: "login" });
