@@ -275,5 +275,5 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     });
   }
-  console.log("working");
+  console.table("working");
 });
