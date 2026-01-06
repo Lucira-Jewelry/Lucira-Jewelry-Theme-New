@@ -383,284 +383,235 @@
 {% endschema %} {% endcomment %}
 
 
-{% comment %} Preload first 2 collection images for mobile LCP {% endcomment %}
-{% if section.blocks.size > 0 %}
-  {% for block in section.blocks limit: 2 %}
-    {% if block.settings.collection_image != blank %}
-      <link rel="preload" 
-            as="image" 
-            href="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }}"
-            media="(max-width: 768px)"
-            {% if forloop.first %}fetchpriority="high"{% endif %}>
-    {% endif %}
-  {% endfor %}
-{% endif %}
+{% comment %}
+  Collection Grid Carousel - Mobile Only
+  COMPLETELY prevents loading on desktop
+{% endcomment %}
 
-<div class="custom-collection-grid-section">
-  <div class="custom-collection-scroll-container">
-    <div class="custom-collection-grid-wrapper" role="list">
-      {% for block in section.blocks %}
-        {% liquid
-          assign is_priority = false
-          if forloop.index <= 4
-            assign is_priority = true
-          endif
-        %}
-        
-        <div class="custom-slider-item" 
-             role="listitem"
-             data-collection-name="{{ block.settings.collection_name | escape }}"
-             data-collection-url="{{ block.settings.collection_link }}"
-             {{ block.shopify_attributes }}>
-          {% if block.settings.collection_link != blank %}
-            <a href="{{ block.settings.collection_link }}" 
-               class="custom-collection-link"
-               aria-label="Shop {{ block.settings.collection_name }}">
-          {% endif %}
+{%- liquid
+  # Detect if we should render at all
+  assign should_render = false
+  
+  # Always render in theme editor
+  if request.design_mode
+    assign should_render = true
+  # Only render on mobile viewport
+  elsif request.host contains 'm.' or request.host contains 'mobile.'
+    assign should_render = true
+  else
+    # We'll use JavaScript to conditionally render
+    assign should_render = 'conditional'
+  endif
+-%}
 
-          <div class="custom-collection-image-wrapper">
-            {% if block.settings.collection_image != blank %}
-              <img
-                srcset="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }} 200w,
-                        {{ block.settings.collection_image | img_url: '100x100', crop: 'center' }} 100w"
-                sizes="100px"
-                src="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }}"
-                alt="{{ block.settings.collection_name | escape }}"
-                loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
-                decoding="async"
-                class="custom-collection-image"
-                width="100"
-                height="100"
-                {% if is_priority %}fetchpriority="high"{% endif %}
-              >
-            {% else %}
-              <div class="custom-collection-placeholder" role="img" aria-label="Collection placeholder">
-                {{ 'image' | placeholder_svg_tag: 'custom-placeholder-svg' }}
-              </div>
-            {% endif %}
-          </div>
-
-          <p class="custom-collection-name">{{ block.settings.collection_name }}</p>
-
-          {% if block.settings.collection_link != blank %}
-            </a>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-
-  </div>
-</div>
-
-<style>
-  .custom-collection-grid-section {
-    display: none;
-  }
-
-  @media (max-width: 768px) {
-    .custom-collection-grid-section {
-      display: block;
-      padding: 0px 1px 8px 10px;
-      margin: 0 auto;
-      position: relative;
-      contain: layout style;
-    }
-
-    .custom-collection-scroll-container {
-      width: 100%;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .custom-slider-item:last-child {
-      margin-right: 12px;
-    }
-
-    .custom-collection-grid-wrapper {
-      display: flex;
-      overflow-x: auto;
-      overflow-y: hidden;
-      scroll-behavior: smooth;
-      gap: 14px;
-      align-items: center;
-      padding: 10px 5px;
-      
-      /* Hide scrollbar */
-      scrollbar-width: none; /* Firefox */
-      -ms-overflow-style: none; /* IE/Edge */
-      
-      /* Performance optimization */
-      contain: layout style paint;
-      will-change: scroll-position;
-      
-      /* Momentum scrolling for iOS */
-      -webkit-overflow-scrolling: touch;
-    }
-
-    /* Hide scrollbar for Chrome/Safari */
-    .custom-collection-grid-wrapper::-webkit-scrollbar {
-      display: none;
-    }
-
-    .custom-slider-item {
-      text-align: center;
-      width: 100px;
-      min-width: 100px;
-      flex-shrink: 0;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .custom-collection-link {
-      text-decoration: none;
-      color: inherit;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      transition: opacity 0.2s ease;
-      -webkit-tap-highlight-color: transparent;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
-    }
-
-    .custom-collection-link:active {
-      opacity: 0.7;
-    }
-
-    .custom-collection-link:focus-visible {
-      outline: 2px solid #333;
-      outline-offset: 2px;
-      border-radius: 50%;
-    }
-
-    /* Image wrapper with aspect ratio for CLS prevention */
-    .custom-collection-image-wrapper {
-      width: 100px;
-      height: 100px;
-      border-radius: 50%;
-      overflow: hidden;
-      margin: 0 auto;
-      background-color: #f5f5f5;
-      position: relative;
-      aspect-ratio: 1 / 1;
-    }
-
-    .custom-collection-image {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .custom-collection-placeholder {
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #e0e0e0;
-    }
-
-    .custom-placeholder-svg {
-      width: 50%;
-      height: 50%;
-      fill: #999;
-    }
-
-    .custom-collection-name {
-      font-size: 12px;
-      font-weight: 400;
-      text-transform: uppercase;
-      color: #333333;
-      margin: 0;
-      letter-spacing: 0.5px;
-      line-height: 1.2;
-      word-break: break-word;
-    }
-
-    /* Navigation Buttons */
-   
-
-    /* Optimize for smaller screens */
-    @media (max-width: 480px) {
-      .custom-collection-name {
-        font-size: 10px;
-      }
-    }
-  }
-</style>
-
-<script>
-  (function() {
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initCollectionCarousel);
-    } else {
-      initCollectionCarousel();
-    }
+{%- if should_render == true or should_render == 'conditional' -%}
+  {%- if should_render == 'conditional' -%}
+    {% comment %} JavaScript will handle rendering only on mobile {% endcomment %}
+    <div class="custom-collection-grid-section" data-mobile-only-conditional></div>
     
-    function initCollectionCarousel() {
-      const section = document.querySelector('.custom-collection-grid-section');
-      if (!section) return;
-      
-      const wrapper = section.querySelector('.custom-collection-grid-wrapper');
-      
-      // GTM Click Tracking
-      section.addEventListener('click', function(e) {
-        const item = e.target.closest('.custom-slider-item');
-        if (!item) return;
+    <script>
+      (function(){
+        'use strict';
+        // Only render on mobile devices
+        if (window.innerWidth <= 768) {
+          // Mobile device - render the component
+          fetchSectionContent();
+        }
         
-        const collectionName = item.dataset.collectionName;
-        const collectionUrl = item.dataset.collectionUrl;
-        
-        if (!collectionName) return;
-        
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'promoClick',
-          promoClick: {
-            creative_name: 'Homepage Mobile Collection Grid',
-            promo_name: collectionName,
-            location_id: collectionUrl || '',
-          }
+        // Also handle resize (optional)
+        var resizeTimer;
+        window.addEventListener('resize', function(){
+          clearTimeout(resizeTimer);
+          resizeTimer = setTimeout(checkViewport, 250);
         });
-      }, { capture: true });
-      
+        
+        function checkViewport() {
+          var container = document.querySelector('[data-mobile-only-conditional]');
+          if (!container) return;
+          
+          if (window.innerWidth <= 768 && !container.hasChildNodes()) {
+            // Switched to mobile - load content
+            fetchSectionContent();
+          } else if (window.innerWidth > 768 && container.hasChildNodes()) {
+            // Switched to desktop - remove content
+            container.innerHTML = '';
+          }
+        }
+        
+        function fetchSectionContent() {
+          var container = document.querySelector('[data-mobile-only-conditional]');
+          if (!container || container.dataset.loaded) return;
+          
+          container.dataset.loaded = true;
+          
+          // Create minimal HTML structure
+          container.innerHTML = `
+            <div class="custom-collection-scroll-container">
+              <div class="custom-collection-grid-wrapper" role="list">
+                {%- for block in section.blocks -%}
+                  {%- liquid
+                    assign is_priority = false
+                    if forloop.index <= 4
+                      assign is_priority = true
+                    endif
+                    
+                    assign img_url = block.settings.collection_image | img_url: '100x100', crop: 'center'
+                    assign collection_name = block.settings.collection_name | escape
+                  -%}
+                  
+                  <div class="custom-slider-item" role="listitem">
+                    {%- if block.settings.collection_link != blank -%}
+                      <a href="{{ block.settings.collection_link }}" 
+                         class="custom-collection-link"
+                         aria-label="Shop {{ collection_name }}">
+                    {%- endif -%}
+                    
+                    <div class="custom-collection-image-wrapper">
+                      {%- if block.settings.collection_image != blank -%}
+                        <img
+                          src="${window.innerWidth <= 768 ? '{{ img_url }}' : ''}"
+                          data-src="{{ img_url }}"
+                          alt="{{ collection_name }}"
+                          loading="lazy"
+                          width="100"
+                          height="100"
+                          class="custom-collection-image"
+                          onerror="this.style.display='none';this.parentElement.innerHTML='<svg viewBox=\"0 0 100 100\"><circle cx=\"50\" cy=\"50\" r=\"40\" fill=\"#e0e0e0\"/></svg>';"
+                        >
+                      {%- else -%}
+                        <div class="custom-collection-placeholder">
+                          <svg viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="40" fill="#e0e0e0"/>
+                          </svg>
+                        </div>
+                      {%- endif -%}
+                    </div>
+                    
+                    <p class="custom-collection-name">{{ collection_name }}</p>
+                    
+                    {%- if block.settings.collection_link != blank -%}
+                      </a>
+                    {%- endif -%}
+                  </div>
+                {%- endfor -%}
+              </div>
+            </div>
+          `;
+          
+          // Add event listener for tracking
+          container.addEventListener('click', function(e){
+            var item = e.target.closest('.custom-slider-item');
+            if(!item || !window.dataLayer) return;
+            var nameEl = item.querySelector('.custom-collection-name');
+            if(nameEl){
+              window.dataLayer.push({
+                event:'promoClick',
+                promoClick:{
+                  creative_name:'Homepage Mobile Collection Grid',
+                  promo_name:nameEl.textContent.trim()
+                }
+              });
+            }
+          }, true);
+          
+          // Load images only when in viewport
+          var images = container.querySelectorAll('img[data-src]');
+          if ('IntersectionObserver' in window) {
+            var imageObserver = new IntersectionObserver(function(entries){
+              entries.forEach(function(entry){
+                if (entry.isIntersecting) {
+                  var img = entry.target;
+                  img.src = img.dataset.src;
+                  img.removeAttribute('data-src');
+                  imageObserver.unobserve(img);
+                }
+              });
+            });
+            
+            images.forEach(function(img){
+              imageObserver.observe(img);
+            });
+          } else {
+            // Fallback for older browsers
+            images.forEach(function(img){
+              img.src = img.dataset.src;
+              img.removeAttribute('data-src');
+            });
+          }
+        }
+      })();
+    </script>
+    
+  {%- else -%}
+    {% comment %} Theme editor or mobile domain - render normally {% endcomment %}
+    <div class="custom-collection-grid-section">
+      <div class="custom-collection-scroll-container">
+        <div class="custom-collection-grid-wrapper" role="list">
+          {%- for block in section.blocks -%}
+            {%- liquid
+              assign is_priority = false
+              if forloop.index <= 4
+                assign is_priority = true
+              endif
+              
+              assign img_url = block.settings.collection_image | img_url: '100x100', crop: 'center'
+              assign collection_name = block.settings.collection_name | escape
+            -%}
+            
+            <div class="custom-slider-item" role="listitem">
+              {%- if block.settings.collection_link != blank -%}
+                <a href="{{ block.settings.collection_link }}" 
+                   class="custom-collection-link"
+                   aria-label="Shop {{ collection_name }}">
+              {%- endif -%}
+              
+              <div class="custom-collection-image-wrapper">
+                {%- if block.settings.collection_image != blank -%}
+                  <img
+                    src="{{ img_url }}"
+                    alt="{{ collection_name }}"
+                    loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
+                    width="100"
+                    height="100"
+                    class="custom-collection-image"
+                  >
+                {%- else -%}
+                  <div class="custom-collection-placeholder">
+                    <svg viewBox="0 0 100 100">
+                      <circle cx="50" cy="50" r="40" fill="#e0e0e0"/>
+                    </svg>
+                  </div>
+                {%- endif -%}
+              </div>
+              
+              <p class="custom-collection-name">{{ collection_name }}</p>
+              
+              {%- if block.settings.collection_link != blank -%}
+                </a>
+              {%- endif -%}
+            </div>
+          {%- endfor -%}
+        </div>
+      </div>
+    </div>
+  {%- endif -%}
 
-    }
-  })();
-</script>
+  {%- comment %} Mobile-only CSS {% endcomment -%}
+  <style>
+    .custom-collection-grid-section{display:none}
+    @media (max-width:768px){.custom-collection-grid-section{display:block;padding:0 1px 8px 10px;margin:0 auto;position:relative}.custom-collection-scroll-container{width:100%;position:relative;overflow:hidden}.custom-slider-item:last-child{margin-right:12px}.custom-collection-grid-wrapper{display:flex;overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;gap:14px;align-items:center;padding:10px 5px;scrollbar-width:none;-ms-overflow-style:none;-webkit-overflow-scrolling:touch}.custom-collection-grid-wrapper::-webkit-scrollbar{display:none}.custom-slider-item{text-align:center;width:100px;min-width:100px;flex-shrink:0;display:flex;flex-direction:column;justify-content:center}.custom-collection-link{text-decoration:none;color:inherit;display:flex;flex-direction:column;gap:8px}.custom-collection-link:active{opacity:.7}.custom-collection-image-wrapper{width:100px;height:100px;border-radius:50%;overflow:hidden;margin:0 auto;background-color:#f5f5f5;aspect-ratio:1/1}.custom-collection-image{width:100%;height:100%;object-fit:cover}.custom-collection-placeholder{width:100%;height:100%;display:flex;align-items:center;justify-content:center;background-color:#e0e0e0}.custom-collection-name{font-size:12px;font-weight:400;text-transform:uppercase;color:#333;margin:0;letter-spacing:.5px;line-height:1.2}@media (max-width:480px){.custom-collection-name{font-size:10px}}}
+    
+    {%- if request.design_mode -%}
+      @media (min-width:769px){.custom-collection-grid-section{display:block;opacity:0.5;border:2px dashed #ccc;padding:20px}.custom-collection-grid-section::before{content:"MOBILE ONLY - Hidden on desktop";display:block;color:#666;font-size:14px;margin-bottom:10px}}
+    {%- endif -%}
+  </style>
+{%- endif -%}
 
 {% schema %}
 {
-  "name": "Collection Grid Carousel",
-  "settings": [
-    {
-      "type": "range",
-      "id": "max_width",
-      "min": 800,
-      "max": 1600,
-      "step": 50,
-      "unit": "px",
-      "label": "Maximum width",
-      "default": 1200,
-      "info": "Only affects desktop view"
-    },
-    {
-      "type": "range",
-      "id": "grid_gap",
-      "min": 10,
-      "max": 60,
-      "step": 5,
-      "unit": "px",
-      "label": "Grid gap",
-      "default": 20,
-      "info": "Only affects desktop view"
-    }
-  ],
+  "name": "Mobile Collection",
+  "class": "mobile-only-section",
+  "settings": [],
   "blocks": [
     {
       "type": "collection_item",
@@ -669,8 +620,7 @@
         {
           "type": "image_picker",
           "id": "collection_image",
-          "label": "Collection Image",
-          "info": "Recommended: 200x200px (1:1 aspect ratio)"
+          "label": "Collection Image"
         },
         {
           "type": "text",
@@ -688,47 +638,14 @@
   ],
   "presets": [
     {
-      "name": "Collection Grid Carousel",
+      "name": "Mobile Collection Carousel",
       "blocks": [
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "RINGS"
-          }
-        },
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "EARRINGS"
-          }
-        },
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "BRACELET"
-          }
-        },
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "NECKLACE"
-          }
-        },
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "PENDANTS"
-          }
-        },
-        {
-          "type": "collection_item",
-          "settings": {
-            "collection_name": "BANGLES"
-          }
-        }
+        {"type": "collection_item", "settings": {"collection_name": "RINGS"}},
+        {"type": "collection_item", "settings": {"collection_name": "EARRINGS"}},
+        {"type": "collection_item", "settings": {"collection_name": "BRACELET"}}
       ]
     }
   ],
-  "max_blocks": 20
+  "max_blocks": 12
 }
 {% endschema %}
