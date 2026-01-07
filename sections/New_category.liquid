@@ -1,214 +1,111 @@
 {% liquid
-  assign first_block = section.blocks.first
+  assign first_three_blocks = section.blocks | slice: 0, 6
 %}
 
-{% comment %} Preload only first category image for LCP {% endcomment %}
-{% if first_block and first_block.settings.category_image_desktop %}
-  <link rel="preload" 
-        as="image" 
-        href="{{ first_block.settings.category_image_desktop | img_url: '400x560', crop: 'center' }}"
-        media="(min-width: 768px)"
-        fetchpriority="high">
-{% endif %}
-{% if first_block and first_block.settings.category_image_mobile %}
-  <link rel="preload" 
-        as="image" 
-        href="{{ first_block.settings.category_image_mobile | img_url: '300x420', crop: 'center' }}"
-        media="(max-width: 767px)"
-        fetchpriority="high">
+{% comment %} Preload first category images for LCP {% endcomment %}
+{% if section.blocks.size > 0 %}
+  {% assign first_block = section.blocks.first %}
+  {% if first_block.settings.category_image_desktop %}
+    <link rel="preload" 
+          as="image" 
+          href="{{ first_block.settings.category_image_desktop | img_url: '400x560', crop: 'center' }}"
+          media="(min-width: 768px)"
+          fetchpriority="high">
+  {% endif %}
+  {% if first_block.settings.category_image_mobile %}
+    <link rel="preload" 
+          as="image" 
+          href="{{ first_block.settings.category_image_mobile | img_url: '300x420', crop: 'center' }}"
+          media="(max-width: 767px)"
+          fetchpriority="high">
+  {% endif %}
 {% endif %}
 
-<div class="categories-lazy" data-categories-section>
-  {% comment %} Skeleton Loader {% endcomment %}
-  <div class="categories-skeleton page-width">
-    {% if section.settings.category_heading != blank %}
-      <div class="skeleton-heading"></div>
-    {% endif %}
-    {% if section.settings.category_subheading != blank %}
-      <div class="skeleton-subheading"></div>
-    {% endif %}
-    <div class="skeleton-grid">
-      {% for i in (1..6) %}
-        <div class="skeleton-card"></div>
-      {% endfor %}
-    </div>
+<div class="categories-section page-width">
+  {% comment %} Better SEO: Use visible H1 or move to main page context {% endcomment %}
+  <div class="visually-hidden">
+    <h1>Lucira Jewelry - Official Lab Grown Diamond Jewelry in India</h1>
   </div>
 
-  {% comment %} Actual Content (Hidden Initially) {% endcomment %}
-  <div class="categories-content" style="display:none">
-    <div class="categories-section page-width">
-      <div class="visually-hidden">
-        <h1>Lucira Jewelry - Official Lab Grown Diamond Jewelry in India</h1>
-      </div>
+  {% if section.settings.category_heading != blank %}
+    <h2 class="categories-heading">{{ section.settings.category_heading }}</h2>
+  {% endif %}
+  
+  {% if section.settings.category_subheading != blank %}
+    <p class="categories-subheading">{{ section.settings.category_subheading }}</p>
+  {% endif %}
 
-      {% if section.settings.category_heading != blank %}
-        <h2 class="categories-heading">{{ section.settings.category_heading }}</h2>
-      {% endif %}
+  <div class="categories-grid">
+    {% for block in section.blocks %}
+      {% liquid
+        assign is_priority = false
+        if forloop.index <= 6
+          assign is_priority = true
+        endif
+        
+        assign desktop_img = block.settings.category_image_desktop
+        assign mobile_img = block.settings.category_image_mobile
+      %}
       
-      {% if section.settings.category_subheading != blank %}
-        <p class="categories-subheading">{{ section.settings.category_subheading }}</p>
-      {% endif %}
+      <div class="category-card" data-block-id="{{ block.id }}">
+        {% if block.settings.link != blank %}
+          <a
+            href="{{ block.settings.link }}"
+            class="category-link"
+            data-category-title="{{ block.settings.title | escape }}"
+            data-category-link="{{ block.settings.link }}"
+            data-block-id="{{ block.id }}"
+            aria-label="Shop {{ block.settings.title }}"
+          >
+        {% endif %}
 
-      <div class="categories-grid">
-        {% for block in section.blocks %}
-          {% liquid
-            assign is_first = false
-            if forloop.index == 1
-              assign is_first = true
-            endif
-            
-            assign desktop_img = block.settings.category_image_desktop
-            assign mobile_img = block.settings.category_image_mobile
-          %}
-          
-          <div class="category-card" data-block-id="{{ block.id }}">
-            {% if block.settings.link != blank %}
-              <a
-                href="{{ block.settings.link }}"
-                class="category-link"
-                data-category-title="{{ block.settings.title | escape }}"
-                data-category-link="{{ block.settings.link }}"
-                data-block-id="{{ block.id }}"
-                aria-label="Shop {{ block.settings.title }}"
+        <div class="category-image-wrapper">
+          <picture>
+            {% if mobile_img %}
+              <source
+                media="(max-width: 767px)"
+                srcset="{{ mobile_img | img_url: '300x420', crop: 'center' }} 300w,
+                        {{ mobile_img | img_url: '150x210', crop: 'center' }} 150w"
+                sizes="(max-width: 767px) 33vw, 300px"
               >
             {% endif %}
-
-            <div class="category-image-wrapper">
-              <picture>
-                {% if mobile_img %}
-                  <source
-                    media="(max-width: 767px)"
-                    srcset="{{ mobile_img | img_url: '300x420', crop: 'center' }} 300w,
-                            {{ mobile_img | img_url: '150x210', crop: 'center' }} 150w"
-                    sizes="(max-width: 767px) 33vw, 300px"
-                  >
-                {% endif %}
-                
-                {% if desktop_img %}
-                  <source
-                    media="(min-width: 768px)"
-                    srcset="{{ desktop_img | img_url: '400x560', crop: 'center' }} 400w,
-                            {{ desktop_img | img_url: '300x420', crop: 'center' }} 300w,
-                            {{ desktop_img | img_url: '200x280', crop: 'center' }} 200w"
-                    sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw"
-                  >
-                  
-                  <img
-                    class="category-image"
-                    src="{{ desktop_img | img_url: '400x560', crop: 'center' }}"
-                    alt="{{ block.settings.title | escape }}"
-                    width="400"
-                    height="560"
-                    loading="{% if is_first %}eager{% else %}lazy{% endif %}"
-                    decoding="async"
-                    {% if is_first %}fetchpriority="high"{% endif %}
-                  >
-                {% endif %}
-              </picture>
-            </div>
-
-            <span class="category-title">{{ block.settings.title }}</span>
-            <span class="shop-now-text desktop-only" aria-hidden="true">Shop Now</span>
-
-            {% if block.settings.link != blank %}
-              </a>
+            
+            {% if desktop_img %}
+              <source
+                media="(min-width: 768px)"
+                srcset="{{ desktop_img | img_url: '400x560', crop: 'center' }} 400w,
+                        {{ desktop_img | img_url: '300x420', crop: 'center' }} 300w,
+                        {{ desktop_img | img_url: '200x280', crop: 'center' }} 200w"
+                sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw"
+              >
+              
+              <img
+                class="category-image"
+                src="{{ desktop_img | img_url: '400x560', crop: 'center' }}"
+                alt="{{ block.settings.title | escape }}"
+                width="400"
+                height="560"
+                loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
+                decoding="async"
+                {% if is_priority %}fetchpriority="high"{% endif %}
+              >
             {% endif %}
-          </div>
-        {% endfor %}
+          </picture>
+        </div>
+
+        <span class="category-title">{{ block.settings.title }}</span>
+        <span class="shop-now-text desktop-only" aria-hidden="true">Shop Now</span>
+
+        {% if block.settings.link != blank %}
+          </a>
+        {% endif %}
       </div>
-    </div>
+    {% endfor %}
   </div>
 </div>
 
 <style>
-  /* ===== Skeleton Loader Styles ===== */
-  .categories-skeleton {
-    text-align: center;
-    margin: 0 auto;
-    padding: 40px 0 0;
-  }
-  
-  .skeleton-heading {
-    height: 32px;
-    width: 250px;
-    margin: 0 auto 12px;
-    border-radius: 4px;
-    background: linear-gradient(
-      90deg,
-      #eee 25%,
-      #f5f5f5 37%,
-      #eee 63%
-    );
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  
-  .skeleton-subheading {
-    height: 24px;
-    width: 200px;
-    margin: 0 auto 40px;
-    border-radius: 4px;
-    background: linear-gradient(
-      90deg,
-      #eee 25%,
-      #f5f5f5 37%,
-      #eee 63%
-    );
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  
-  .skeleton-grid {
-    display: grid;
-    grid-template-columns: repeat(6, 1fr);
-    gap: 20px;
-    max-width: 1600px;
-    margin: 0 auto;
-  }
-  
-  .skeleton-card {
-    aspect-ratio: 5 / 7;
-    border-radius: 8px;
-    background: linear-gradient(
-      90deg,
-      #eee 25%,
-      #f5f5f5 37%,
-      #eee 63%
-    );
-    background-size: 400% 100%;
-    animation: shimmer 1.4s ease infinite;
-  }
-  
-  @keyframes shimmer {
-    0% { background-position: 100% 0; }
-    100% { background-position: -100% 0; }
-  }
-  
-  @media (max-width: 999px) and (min-width: 768px) {
-    .skeleton-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-  
-  @media (max-width: 767px) {
-    .skeleton-grid {
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    
-    .skeleton-heading {
-      height: 24px;
-      width: 180px;
-    }
-    
-    .skeleton-subheading {
-      height: 18px;
-      width: 150px;
-      margin-bottom: 24px;
-    }
-  }
-
-  /* ===== Main Content Styles ===== */
+  /* Accessibility helper */
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -220,6 +117,7 @@
     border: 0;
   }
   
+  /* Main container */
   .categories-section {
     text-align: center;
     margin: 0 auto;
@@ -231,6 +129,7 @@
     padding-right: 0;
   }
   
+  /* Typography */
   .categories-heading {
     margin: 0;
     font-weight: 500;
@@ -248,6 +147,7 @@
     line-height: 1.9;
   }
   
+  /* Grid layout */
   .categories-grid {
     display: flex;
     justify-content: center;
@@ -255,6 +155,7 @@
     flex-wrap: wrap;
   }
   
+  /* Category card */
   .category-card {
     width: 16.5%;
     position: relative;
@@ -267,10 +168,11 @@
     text-decoration: none;
   }
   
+  /* Image wrapper with aspect ratio for CLS prevention */
   .category-image-wrapper {
     position: relative;
     width: 100%;
-    aspect-ratio: 5 / 7;
+    aspect-ratio: 5 / 7; /* 400/560 = 5/7 */
     overflow: hidden;
   }
   
@@ -283,6 +185,7 @@
     will-change: transform;
   }
   
+  /* Text overlays */
   .category-title,
   .shop-now-text {
     position: absolute;
@@ -310,6 +213,7 @@
     transition: bottom 0.4s ease, opacity 0.4s ease;
   }
   
+  /* Desktop hover effects */
   @media (min-width: 768px) {
     .category-card:hover .category-image {
       border-radius: 100% / 60%;
@@ -326,6 +230,7 @@
     }
   }
   
+  /* Tablet layout */
   @media (max-width: 999px) and (min-width: 768px) {
     .categories-grid {
       display: grid;
@@ -339,6 +244,7 @@
     }
   }
   
+  /* Mobile layout */
   @media (max-width: 767px) {
     .categories-section {
       padding: 40px 0 0;
@@ -367,7 +273,7 @@
     }
     
     .category-image-wrapper {
-      aspect-ratio: 5 / 7;
+      aspect-ratio: 5 / 7; /* Mobile aspect ratio */
     }
     
     .category-title {
@@ -383,6 +289,7 @@
     }
   }
   
+  /* Large desktop */
   @media (min-width: 1600px) {
     .categories-section {
       padding: 20px 0 0;
@@ -397,6 +304,7 @@
     }
   }
   
+  /* Medium desktop */
   @media (min-width: 1024px) and (max-width: 1600px) {
     .categories-section {
       padding-top: 40px;
@@ -405,116 +313,73 @@
 </style>
 
 <script>
-(function() {
-  'use strict';
-  
-  // Initialize on DOM ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initCategoriesLazyLoad);
-  } else {
-    initCategoriesLazyLoad();
-  }
-  
-  function initCategoriesLazyLoad() {
-    const categoriesContainer = document.querySelector('[data-categories-section]');
-    if (!categoriesContainer) return;
+  (function() {
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCategoryTracking);
+    } else {
+      initCategoryTracking();
+    }
     
-    const skeleton = categoriesContainer.querySelector('.categories-skeleton');
-    const content = categoriesContainer.querySelector('.categories-content');
-    
-    if (!skeleton || !content) return;
-    
-    // IntersectionObserver for lazy loading
-    const lazyObserver = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          // Show content with fade-in
-          content.style.display = 'block';
-          content.style.opacity = '0';
-          content.style.transition = 'opacity 0.4s ease';
+    function initCategoryTracking() {
+      const categoryLinks = document.querySelectorAll('.category-link');
+      
+      categoryLinks.forEach(function(link) {
+        link.addEventListener('click', function(event) {
+          event.preventDefault();
           
-          requestAnimationFrame(function() {
-            content.style.opacity = '1';
-            skeleton.remove();
+          const title = this.dataset.categoryTitle;
+          const url = this.dataset.categoryLink;
+          const blockId = this.dataset.blockId;
+          
+          // Push to GTM dataLayer
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            event: 'promoClick',
+            promoClick: {
+              promo_id: blockId,
+              creative_name: title,
+              promo_position: url,
+              promo_location: 'categories_grid'
+            }
           });
           
-          // Initialize tracking after content loads
-          setTimeout(initCategoryTracking, 100);
-          
-          lazyObserver.disconnect();
-        }
-      });
-    }, {
-      rootMargin: '300px', // Preload 300px before visible
-      threshold: 0
-    });
-    
-    lazyObserver.observe(categoriesContainer);
-  }
-  
-  function initCategoryTracking() {
-    const categoryLinks = document.querySelectorAll('.category-link');
-    
-    // Click tracking
-    categoryLinks.forEach(function(link) {
-      link.addEventListener('click', function(event) {
-        event.preventDefault();
-        
-        const title = this.dataset.categoryTitle;
-        const url = this.dataset.categoryLink;
-        const blockId = this.dataset.blockId;
-        
-        // Push to GTM dataLayer
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'promoClick',
-          promoClick: {
-            promo_id: blockId,
-            creative_name: title,
-            promo_position: url,
-            promo_location: 'categories_grid'
-          }
+          // Navigate after brief delay for tracking
+          setTimeout(function() {
+            window.location.href = url;
+          }, 100);
         });
-        
-        // Navigate after tracking
-        setTimeout(function() {
-          window.location.href = url;
-        }, 100);
-      });
-    });
-    
-    // View tracking with IntersectionObserver
-    if ('IntersectionObserver' in window) {
-      const viewObserver = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-          if (entry.isIntersecting && !entry.target.dataset.tracked) {
-            const link = entry.target.querySelector('.category-link');
-            if (link) {
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                event: 'promoView',
-                promoView: {
-                  promo_id: link.dataset.blockId,
-                  creative_name: link.dataset.categoryTitle,
-                  promo_position: link.dataset.categoryLink,
-                  promo_location: 'categories_grid'
-                }
-              });
-              entry.target.dataset.tracked = 'true';
-            }
-          }
-        });
-      }, { 
-        threshold: 0.5,
-        rootMargin: '50px'
       });
       
-      document.querySelectorAll('.category-card').forEach(function(card) {
-        viewObserver.observe(card);
-      });
+      // Track promo views on scroll (intersection observer)
+      if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver(function(entries) {
+          entries.forEach(function(entry) {
+            if (entry.isIntersecting && !entry.target.dataset.tracked) {
+              const link = entry.target.querySelector('.category-link');
+              if (link) {
+                window.dataLayer = window.dataLayer || [];
+                window.dataLayer.push({
+                  event: 'promoView',
+                  promoView: {
+                    promo_id: link.dataset.blockId,
+                    creative_name: link.dataset.categoryTitle,
+                    promo_position: link.dataset.categoryLink,
+                    promo_location: 'categories_grid'
+                  }
+                });
+                entry.target.dataset.tracked = 'true';
+              }
+            }
+          });
+        }, { threshold: 0.5 });
+        
+        document.querySelectorAll('.category-card').forEach(function(card) {
+          observer.observe(card);
+        });
+      }
     }
-  }
-})();
+  })();
 </script>
 
 {% schema %}
