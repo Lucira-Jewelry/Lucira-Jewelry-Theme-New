@@ -15,24 +15,7 @@
 
   <!-- 🔽 Main Content (hidden initially) 🔽 -->
   <div class="categories-content" style="display: none;">
-    {% comment %} Preload first category images for LCP {% endcomment %}
-    {% if section.blocks.size > 0 %}
-      {% assign first_block = section.blocks.first %}
-      {% if first_block.settings.category_image_desktop %}
-        <link rel="preload" 
-              as="image" 
-              href="{{ first_block.settings.category_image_desktop | img_url: '400x' }}"
-              media="(min-width: 768px)"
-              fetchpriority="high">
-      {% endif %}
-      {% if first_block.settings.category_image_mobile %}
-        <link rel="preload" 
-              as="image" 
-              href="{{ first_block.settings.category_image_mobile | img_url: '300x' }}"
-              media="(max-width: 767px)"
-              fetchpriority="high">
-      {% endif %}
-    {% endif %}
+    {% comment %} PRELOAD ONLY WHEN NEEDED - REMOVED IMMEDIATE PRELOAD {% endcomment %}
 
     <div class="categories-section page-width">
       <div class="visually-hidden">
@@ -50,24 +33,23 @@
       <div class="categories-grid">
         {% for block in section.blocks %}
           {% liquid
-            assign is_priority = false
-            if forloop.index <= 3
-              assign is_priority = true
-            endif
-            
             assign desktop_img = block.settings.category_image_desktop
             assign mobile_img = block.settings.category_image_mobile
             
-            # Generate responsive image sizes
+            # Generate responsive image sizes - only generate URLs when needed
             assign desktop_srcset = ""
+            assign mobile_srcset = ""
+            assign placeholder_src = ""
+            
             if desktop_img
               assign desktop_srcset = desktop_img | img_url: '200x' | append: ' 200w,'
               assign desktop_srcset = desktop_srcset | append: desktop_img | img_url: '300x' | append: ' 300w,'
-              assign desktop_srcset = desktop_srcset | append: desktop_img | img_url: '400x' | append: ' 400w,'
-              assign desktop_srcset = desktop_srcset | append: desktop_img | img_url: '600x' | append: ' 600w'
+              assign desktop_srcset = desktop_srcset | append: desktop_img | img_url: '400x' | append: ' 400w'
+              
+              # Use a transparent 1x1 pixel as placeholder instead of 20px image
+              assign placeholder_src = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='
             endif
             
-            assign mobile_srcset = ""
             if mobile_img
               assign mobile_srcset = mobile_img | img_url: '150x' | append: ' 150w,'
               assign mobile_srcset = mobile_srcset | append: mobile_img | img_url: '300x' | append: ' 300w'
@@ -91,7 +73,7 @@
                 {% if mobile_img and mobile_srcset != blank %}
                   <source
                     media="(max-width: 767px)"
-                    srcset="{{ mobile_srcset }}"
+                    data-srcset="{{ mobile_srcset }}"
                     sizes="(max-width: 767px) calc(33vw - 16px), 300px"
                   >
                 {% endif %}
@@ -99,7 +81,7 @@
                 {% if desktop_img and desktop_srcset != blank %}
                   <source
                     media="(min-width: 768px)"
-                    srcset="{{ desktop_srcset }}"
+                    data-srcset="{{ desktop_srcset }}"
                     sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, calc(33vw - 16px)"
                   >
                   
@@ -112,19 +94,12 @@
                     height="560"
                     loading="lazy"
                     decoding="async"
-                    {% if is_priority %}data-priority="true"{% endif %}
+                    src="{{ placeholder_src }}"
+                    data-sizes="auto"
                   >
-                {% endif %}
-                
-                {% comment %} Low-quality image placeholder {% endcomment %}
-                {% if desktop_img %}
-                  <img
-                    class="category-image-placeholder"
-                    src="{{ desktop_img | img_url: '20x' }}"
-                    alt=""
-                    aria-hidden="true"
-                    style="filter: blur(5px);"
-                  >
+                {% else %}
+                  {% comment %} Fallback if no image {% endcomment %}
+                  <div class="category-image-placeholder-fallback"></div>
                 {% endif %}
               </picture>
             </div>
@@ -271,20 +246,17 @@
     transition: transform 0.5s ease, border-radius 0.5s ease;
     opacity: 0;
     transition: opacity 0.3s ease;
+    background-color: #f8f8f8;
   }
   
   .category-image.lazyloaded {
     opacity: 1;
   }
   
-  .category-image-placeholder {
-    position: absolute;
-    top: 0;
-    left: 0;
+  .category-image-placeholder-fallback {
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    opacity: 0.5;
+    background-color: #f8f8f8;
   }
   
   /* Text overlays */
@@ -450,6 +422,15 @@ document.addEventListener('DOMContentLoaded', function () {
         requestAnimationFrame(() => {
           content.style.opacity = '1';
           
+          // Now preload the first image (LCP candidate)
+          preloadFirstImage();
+          
+          // Initialize lazy loading for all images
+          initLazyLoading();
+          
+          // Initialize tracking
+          initCategoryTracking();
+          
           // Remove skeleton after content is shown
           setTimeout(() => {
             if (skeleton && skeleton.parentNode) {
@@ -458,12 +439,6 @@ document.addEventListener('DOMContentLoaded', function () {
           }, 300);
         });
 
-        // Initialize lazy loading for images
-        initLazyLoading();
-        
-        // Initialize tracking
-        initCategoryTracking();
-        
         observer.disconnect();
       }
     });
@@ -474,24 +449,33 @@ document.addEventListener('DOMContentLoaded', function () {
 
   observer.observe(categoriesGrid);
 
-  // Function to initialize lazy loading
+  // Function to preload only the first image (LCP candidate)
+  function preloadFirstImage() {
+    const firstImage = document.querySelector('.category-image.lazyload');
+    if (firstImage && firstImage.dataset.src) {
+      // Create a hidden preload link
+      const preloadLink = document.createElement('link');
+      preloadLink.rel = 'preload';
+      preloadLink.as = 'image';
+      preloadLink.href = firstImage.dataset.src;
+      preloadLink.fetchpriority = 'high';
+      document.head.appendChild(preloadLink);
+      
+      // Load this image immediately
+      firstImage.src = firstImage.dataset.src;
+      if (firstImage.dataset.srcset) {
+        firstImage.srcset = firstImage.dataset.srcset;
+      }
+      firstImage.classList.add('lazyloaded');
+    }
+  }
+
+  // Function to initialize lazy loading for remaining images
   function initLazyLoading() {
-    const images = document.querySelectorAll('.category-image.lazyload');
+    const images = document.querySelectorAll('.category-image.lazyload:not(.lazyloaded)');
     
-    if ('loading' in HTMLImageElement.prototype) {
-      // Browser supports native lazy loading
-      images.forEach(img => {
-        img.loading = 'lazy';
-        if (img.dataset.src) {
-          img.src = img.dataset.src;
-        }
-        if (img.dataset.srcset) {
-          img.srcset = img.dataset.srcset;
-        }
-        img.classList.add('lazyloaded');
-      });
-    } else {
-      // Fallback for browsers without native lazy loading
+    if ('loading' in HTMLImageElement.prototype && 'IntersectionObserver' in window) {
+      // Modern browsers with both native lazy loading and IntersectionObserver
       const lazyImageObserver = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
           if (entry.isIntersecting) {
@@ -504,6 +488,15 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             img.classList.add('lazyloaded');
             lazyImageObserver.unobserve(img);
+            
+            // Also load the source elements inside picture
+            const picture = img.closest('picture');
+            if (picture) {
+              const sources = picture.querySelectorAll('source[data-srcset]');
+              sources.forEach(source => {
+                source.srcset = source.dataset.srcset;
+              });
+            }
           }
         });
       }, {
@@ -512,10 +505,21 @@ document.addEventListener('DOMContentLoaded', function () {
       });
       
       images.forEach(img => lazyImageObserver.observe(img));
+    } else {
+      // Fallback for older browsers
+      images.forEach(img => {
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+        }
+        if (img.dataset.srcset) {
+          img.srcset = img.dataset.srcset;
+        }
+        img.classList.add('lazyloaded');
+      });
     }
   }
 
-  // Function to initialize tracking (moved from global scope)
+  // Function to initialize tracking
   function initCategoryTracking() {
     const categoryLinks = document.querySelectorAll('.category-link');
     
@@ -576,60 +580,3 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 });
 </script>
-
-{% schema %}
-{
-  "name": "Categories Grid",
-  "settings": [
-    {
-      "type": "text",
-      "id": "category_heading",
-      "label": "Section Heading",
-      "default": "Shop By Category"
-    },
-    {
-      "type": "text",
-      "id": "category_subheading",
-      "label": "Category Subheading",
-      "default": "Discover our collection"
-    }
-  ],
-  "blocks": [
-    {
-      "type": "category",
-      "name": "Category Item",
-      "settings": [
-        {
-          "type": "image_picker",
-          "id": "category_image_desktop",
-          "label": "Desktop Image",
-          "info": "Recommended: 400x560px (5:7 aspect ratio)"
-        },
-        {
-          "type": "image_picker",
-          "id": "category_image_mobile",
-          "label": "Mobile Image",
-          "info": "Recommended: 300x420px (5:7 aspect ratio)"
-        },
-        {
-          "type": "text",
-          "id": "title",
-          "label": "Title",
-          "default": "Category"
-        },
-        {
-          "type": "url",
-          "id": "link",
-          "label": "Link"
-        }
-      ]
-    }
-  ],
-  "presets": [
-    {
-      "name": "Categories Grid"
-    }
-  ],
-  "max_blocks": 12
-}
-{% endschema %}
