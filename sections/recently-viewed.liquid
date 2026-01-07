@@ -37,16 +37,17 @@
 .rv-{{ section.id }} .rv-price-current{font-size:14px}
 .rv-{{ section.id }} .rv-price-compare{font-size:12px}
 .rv-{{ section.id }} .rv-view-details{font-size:12px;display:none;}
-.rv-mobile-scroll{overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-bottom:14px}
-.rv-mobile-scroll::-webkit-scrollbar{height:1.5px;background:#F5F5F5}
-.rv-mobile-scroll::-webkit-scrollbar-thumb{background:#b67665}
+.rv-mobile-scroll{overflow-x:auto;overflow-y:hidden;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding-bottom:14px;}
+/* .rv-mobile-scroll::-webkit-scrollbar{height:1.5px;background:#F5F5F5}
+.rv-mobile-scroll::-webkit-scrollbar-thumb{background:#b67665} */
 .rv-mobile-grid{display:flex;gap:8px}
 .rv-mobile-item{flex:0 0 calc(50vw - 32px)}
+.rv-lcp-wrapper .collection.page-width { width: 100% !important; padding-left: 20px !important; }
 }
 
 /* Desktop */
 .rv-desktop-grid{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;max-width:100%;list-style:none;padding:0;margin:0}
-.rv-desktop-grid .grid__item{flex:0 0 auto;border-radius:8px;max-width:308px;box-sizing:border-box;list-style:none}
+.rv-desktop-grid .grid__item{flex:0 0 auto;border-radius:8px;max-width:calc(25% - 14px);box-sizing:border-box;list-style:none}
 .rv-desktop-grid .card-wrapper{width:100%;display:block;overflow:hidden}
 .rv-desktop-grid .rv-content{padding:4px 8px 4px 12px;text-align:left}
 
@@ -79,305 +80,352 @@
 @media (min-width:750px){
 .mobile-only{display:none!important}
 .desktop-only{display:flex!important}
+
 }
 
 .shopify-editor-visible{display:block!important}
+
+/* ===== Recently Viewed Skeleton (LCP Safe) ===== */
+.rv-lcp-wrapper.loading .rv-{{ section.id }}{
+  display:none;
+}
+.rv-lcp-wrapper.loading::before{
+  content:"";
+  display:block;
+  height:360px;
+  margin:40px auto;
+  max-width:1100px;
+  background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);
+  background-size:400% 100%;
+  animation:rvShimmer 1.4s infinite;
+}
+@keyframes rvShimmer{
+  0%{background-position:100% 0}
+  100%{background-position:-100% 0}
+}
 
 
 
 {%- endstyle -%}
 
-<div class="color-{{ section.settings.color_scheme }} gradient rv-{{ section.id }} section-{{ section.id }}-padding" data-section-id="{{ section.id }}">
- <div class="collection page-width">
-    
-    {%- if section.settings.header != blank or section.settings.subheader != blank -%}
-    <div class="title-wrapper">
-      {%- if section.settings.header != blank -%}
-        <h2 class="title inline-richtext {{ section.settings.heading_size }} rv-title">{{ section.settings.header }}</h2>
-      {%- endif -%}
-      {%- if section.settings.subheader != blank -%}
-        <p class="rv-subtitle">{{ section.settings.subheader }}</p>
-      {%- endif -%}
-    </div>
-    {%- endif -%}
-
-    <!-- Mobile -->
-    <div class="rv-mobile-scroll mobile-only">
-      <div class="rv-mobile-grid" id="rv-m-{{ section.id }}"></div>
-    </div>
-
-    <!-- Desktop -->
-    <ul class="rv-desktop-grid desktop-only" id="rv-d-{{ section.id }}" role="list" aria-label="Recently viewed products"></ul>
-
-    <!-- Placeholder -->
-    <div class="rv-placeholder" style="text-align:center;padding:40px;display:none">
-      <p>Browse products to see your recently viewed items here.</p>
-    </div>
-
-</div> 
-</div>
-
-<script>
-(function(){
-const SID='{{ section.id }}',
-KEY='recentlyViewedProducts',
-MAX=4,
-EXP=30*864e5,
-CUR='{{ shop.currency }}',
-SHOW_SEC={{ section.settings.show_secondary_image | json }},
-PLACEHOLDER='https://via.placeholder.com/400x500/ffffff/cccccc?text=No+Image';
-
-let currentHandle=null,cache={};
-
-function init(){
-  const path=window.location.pathname;
-  if(path.includes('/products/')){
-    const match=path.split('/products/')[1];
-    currentHandle=match?match.split('/')[0]:null;
-    setTimeout(trackProduct,600);
-  }
-  checkDisplay();
-}
-
-function getStorage(){
-  try{
-    const raw=localStorage.getItem(KEY);
-    if(!raw)return[];
-    const arr=JSON.parse(raw);
-    if(!Array.isArray(arr))return[];
-    const now=Date.now();
-    const valid=arr.filter(p=>(now-(p.timestamp||now))<EXP);
-    if(valid.length!==arr.length)localStorage.setItem(KEY,JSON.stringify(valid));
-    return valid;
-  }catch(e){
-    return[];
-  }
-}
-
-function setStorage(items){
-  try{
-    localStorage.setItem(KEY,JSON.stringify(items));
-  }catch(e){}
-}
-
-function trackProduct(){
-  if(!currentHandle)return;
-  
-  const fromShopify=window.Shopify?.product;
-  let data;
-  
-  if(fromShopify){
-    const variant=fromShopify.selected_or_first_available_variant||fromShopify.variants?.[0];
-    data={
-      id:variant?.id||fromShopify.id||`p_${Date.now()}`,
-      handle:fromShopify.handle||currentHandle,
-      title:fromShopify.title||'',
-      image:fromShopify.featured_image||'',
-      price:getCurrentPrice(),
-      url:`/products/${currentHandle}`,
-      timestamp:Date.now()
-    };
-  }else{
-    const title=document.querySelector('h1.product__title,h1.product-title')?.textContent?.trim()||'';
-    const variantId=document.querySelector('form[action*="/cart/add"] [name="id"]')?.value||`p_${Date.now()}`;
-    data={
-      id:variantId,
-      handle:currentHandle,
-      title,
-      image:document.querySelector('.product__media img,.product-image img')?.src||'',
-      price:getCurrentPrice(),
-      url:`/products/${currentHandle}`,
-      timestamp:Date.now()
-    };
-  }
-  
-  let items=getStorage();
-  items=items.filter(p=>p.handle!==data.handle);
-  items.unshift(data);
-  if(items.length>12)items=items.slice(0,12);
-  setStorage(items);
-}
-
-function getCurrentPrice(){
-  const selectors=[
-    '[data-product-price]',
-    '[data-price]',
-    '.price__regular .price-item',
-    '.price-item--regular',
-    '.product-price'
-  ];
-  for(const sel of selectors){
-    const el=document.querySelector(sel);
-    if(el){
-      const txt=el.getAttribute('data-price')||el.textContent?.trim();
-      if(txt)return txt;
-    }
-  }
-  return'';
-}
-
-async function checkDisplay(){
-  const section=document.querySelector(`[data-section-id="${SID}"]`);
-  if(!section)return;
-  
-  let items=getStorage();
-  if(currentHandle)items=items.filter(p=>p.handle!==currentHandle);
-  
-  if(items.length<1){
-    if(window.Shopify?.designMode){
-      section.classList.add('shopify-editor-visible');
-      section.querySelector('.rv-placeholder').style.display='block';
-    }
-    return;
-  }
-  
-  section.classList.add('rv-visible');
-  
-  const toShow=items.slice(0,MAX);
-  const enriched=await Promise.all(toShow.map(enrich));
-  const valid=enriched.filter(p=>p!==null);
-  
-  if(valid.length<1)return;
-  
-  render(valid);
-}
-
-async function enrich(product){
-  const h=product.handle;
-  if(!h)return product;
-  
-  if(cache[h])return cache[h];
-  
-  try{
-    const resp=await fetch(`/products/${h}.js`,{credentials:'same-origin'});
-    if(!resp.ok)return null;
-    
-    const data=await resp.json();
-    if(!data.published_at||!data.available)return null;
-    
-    const img1=data.images?.[0]||product.image||PLACEHOLDER;
-    const img2=data.images?.[1]||img1;
-    
-    let price=product.price||'';
-    let comparePrice='';
-    
-    if(data.variants?.length){
-      const storedId=String(product.id||'').replace(/[^0-9]/g,'');
-      let variant=storedId?data.variants.find(v=>String(v.id)===storedId):data.variants[0];
-      if(!variant)variant=data.variants[0];
+<div class="rv-lcp-wrapper" data-rv-lcp>
+  <div class="color-{{ section.settings.color_scheme }} gradient rv-{{ section.id }} section-{{ section.id }}-padding" data-section-id="{{ section.id }}">
+    <div class="collection page-width">
       
-      if(variant.price!=null)price=formatPrice(Number(variant.price));
-      if(variant.compare_at_price>variant.price)comparePrice=formatPrice(Number(variant.compare_at_price));
-    }else if(data.price!=null){
-      price=formatPrice(Number(data.price));
-      if(data.compare_at_price>data.price)comparePrice=formatPrice(Number(data.compare_at_price));
+      {%- if section.settings.header != blank or section.settings.subheader != blank -%}
+      <div class="title-wrapper">
+        {%- if section.settings.header != blank -%}
+          <h2 class="title inline-richtext {{ section.settings.heading_size }} rv-title">{{ section.settings.header }}</h2>
+        {%- endif -%}
+        {%- if section.settings.subheader != blank -%}
+          <p class="rv-subtitle">{{ section.settings.subheader }}</p>
+        {%- endif -%}
+      </div>
+      {%- endif -%}
+
+      <!-- Mobile -->
+      <div class="rv-mobile-scroll mobile-only">
+        <div class="rv-mobile-grid" id="rv-m-{{ section.id }}"></div>
+      </div>
+
+      <!-- Desktop -->
+      <ul class="rv-desktop-grid desktop-only" id="rv-d-{{ section.id }}" role="list" aria-label="Recently viewed products"></ul>
+
+      <!-- Placeholder -->
+      <div class="rv-placeholder" style="text-align:center;padding:40px;display:none">
+        <p>Browse products to see your recently viewed items here.</p>
+      </div>
+
+    </div> 
+  </div>
+</div>
+<script>
+  (function(){
+    const SID='{{ section.id }}',
+    KEY='recentlyViewedProducts',
+    MAX=4,
+    EXP=30*864e5,
+    CUR='{{ shop.currency }}',
+    SHOW_SEC={{ section.settings.show_secondary_image | json }},
+    PLACEHOLDER='https://via.placeholder.com/400x500/ffffff/cccccc?text=No+Image';
+
+    let currentHandle=null,cache={};
+
+    function init(){
+      const path=window.location.pathname;
+      if(path.includes('/products/')){
+        const match=path.split('/products/')[1];
+        currentHandle=match?match.split('/')[0]:null;
+        setTimeout(trackProduct,600);
+      }
+      checkDisplay();
     }
-    
-    const result={
-      ...product,
-      title:data.title||product.title||'Product',
-      image:img1,
-      image2:img2,
-      price,
-      comparePrice,
-      url:`/products/${h}`
-    };
-    
-    cache[h]=result;
-    return result;
-  }catch(e){
-    return null;
-  }
-}
 
-function formatPrice(p){
-  if(typeof p==='number'){
-    const norm=p>1000?p/100:p;
-    try{
-      return new Intl.NumberFormat('en-IN',{style:'currency',currency:CUR,minimumFractionDigits:0,maximumFractionDigits:0}).format(norm);
-    }catch(e){
-      return(CUR==='INR'?'₹':'')+Math.round(norm).toLocaleString();
-    }
-  }
-  return p;
-}
-
-function render(products){
-  const mobileGrid=document.getElementById(`rv-m-${SID}`);
-  const desktopGrid=document.getElementById(`rv-d-${SID}`);
-  
-  if(!mobileGrid||!desktopGrid)return;
-  
-  const mobileHTML=products.map(p=>createCard(p,true)).join('');
-  const desktopHTML=products.map(p=>createCard(p,false)).join('');
-  
-  mobileGrid.innerHTML=mobileHTML;
-  desktopGrid.innerHTML=desktopHTML;
-  
-  attachTracking();
-}
-
-function createCard(p,isMobile){
-  const title=(p.title||'Product').replace(/"/g,'&quot;');
-  const url=p.url||`/products/${p.handle}`;
-  const img1=p.image||PLACEHOLDER;
-  const img2=p.image2||img1;
-  
-  let priceHTML='';
-  if(p.comparePrice&&p.price){
-    priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">${p.price}</span><span class="rv-price-compare">${p.comparePrice}</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
-    </svg>
-    </span></div>`;
-  }else if(p.price){
-    priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">${p.price}</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
-    </svg></span></div>`;
-  }else{
-    priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">—</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
-    </svg></span></div>`;
-  }
-  
-  const imgHTML=SHOW_SEC&&img2!==img1?
-    `<div class="rv-img-wrap"><div class="rv-img-stack"><img src="${img1}" alt="${title}" class="rv-img primary" loading="lazy" width="400" height="500"><img src="${img2}" alt="${title}" class="rv-img secondary" loading="lazy" width="400" height="500"></div></div>`:
-    `<div class="rv-img-wrap"><div class="rv-img-stack"><img src="${img1}" alt="${title}" class="rv-img primary" loading="lazy" width="400" height="500"></div></div>`;
-  
-  const cardContent=`<div class="rv-card">${imgHTML}<div class="rv-content"><h3 class="rv-title-text">${title}</h3>${priceHTML}</div></div>`;
-  
-  if(isMobile){
-    return`<div class="rv-mobile-item"><a href="${url}" class="card-wrapper rv-link" data-handle="${p.handle}" data-name="${title}"  data-id="${p.id || p.handle || ''}" aria-label="${title}">${cardContent}</a></div>`;
-  }else{
-    return`<li class="grid__item"><a href="${url}" class="card-wrapper rv-link" data-handle="${p.handle}" data-name="${title}"  data-id="${p.id || p.handle || ''}" aria-label="${title}">${cardContent}</a></li>`;
-  }
-}
-
-function attachTracking(){
-  document.querySelectorAll(`[data-section-id="${SID}"] .rv-link`).forEach((a,idx)=>{
-    a.addEventListener('click',()=>{
+    function getStorage(){
       try{
-        window.dataLayer=window.dataLayer||[];
-        window.dataLayer.push({
-          event:"promoClick",
-          promoClick:{
-            promo_id:a.dataset.id||'',
-            creative_name:"Recently Viewed",
-            promo_name:a.dataset.name||'',
-            promo_position:`recently_viewed_position_${idx+1}`,
-            location_id:'PDP Bottom'
-          }
-        });
-      }catch(e){}
-    },{once:true});
-  });
-}
+        const raw=localStorage.getItem(KEY);
+        if(!raw)return[];
+        const arr=JSON.parse(raw);
+        if(!Array.isArray(arr))return[];
+        const now=Date.now();
+        const valid=arr.filter(p=>(now-(p.timestamp||now))<EXP);
+        if(valid.length!==arr.length)localStorage.setItem(KEY,JSON.stringify(valid));
+        return valid;
+      }catch(e){
+        return[];
+      }
+    }
 
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',init);
-}else{
-  init();
-}
-})();
+    function setStorage(items){
+      try{
+        localStorage.setItem(KEY,JSON.stringify(items));
+      }catch(e){}
+    }
+
+    function trackProduct(){
+      if(!currentHandle)return;
+      
+      const fromShopify=window.Shopify?.product;
+      let data;
+      
+      if(fromShopify){
+        const variant=fromShopify.selected_or_first_available_variant||fromShopify.variants?.[0];
+        data={
+          id:variant?.id||fromShopify.id||`p_${Date.now()}`,
+          handle:fromShopify.handle||currentHandle,
+          title:fromShopify.title||'',
+          image:fromShopify.featured_image||'',
+          price:getCurrentPrice(),
+          url:`/products/${currentHandle}`,
+          timestamp:Date.now()
+        };
+      }else{
+        const title=document.querySelector('h1.product__title,h1.product-title')?.textContent?.trim()||'';
+        const variantId=document.querySelector('form[action*="/cart/add"] [name="id"]')?.value||`p_${Date.now()}`;
+        data={
+          id:variantId,
+          handle:currentHandle,
+          title,
+          image:document.querySelector('.product__media img,.product-image img')?.src||'',
+          price:getCurrentPrice(),
+          url:`/products/${currentHandle}`,
+          timestamp:Date.now()
+        };
+      }
+      
+      let items=getStorage();
+      items=items.filter(p=>p.handle!==data.handle);
+      items.unshift(data);
+      if(items.length>12)items=items.slice(0,12);
+      setStorage(items);
+    }
+
+    function getCurrentPrice(){
+      const selectors=[
+        '[data-product-price]',
+        '[data-price]',
+        '.price__regular .price-item',
+        '.price-item--regular',
+        '.product-price'
+      ];
+      for(const sel of selectors){
+        const el=document.querySelector(sel);
+        if(el){
+          const txt=el.getAttribute('data-price')||el.textContent?.trim();
+          if(txt)return txt;
+        }
+      }
+      return'';
+    }
+
+    async function checkDisplay(){
+      const section=document.querySelector(`[data-section-id="${SID}"]`);
+      if(!section)return;
+      
+      let items=getStorage();
+      if(currentHandle)items=items.filter(p=>p.handle!==currentHandle);
+      
+      if(items.length<1){
+        if(window.Shopify?.designMode){
+          section.classList.add('shopify-editor-visible');
+          section.querySelector('.rv-placeholder').style.display='block';
+        }
+        return;
+      }
+      
+      section.classList.add('rv-visible');
+      
+      const toShow=items.slice(0,MAX);
+      const enriched=await Promise.all(toShow.map(enrich));
+      const valid=enriched.filter(p=>p!==null);
+      
+      if(valid.length<1)return;
+      
+      render(valid);
+    }
+
+    async function enrich(product){
+      const h=product.handle;
+      if(!h)return product;
+      
+      if(cache[h])return cache[h];
+      
+      try{
+        const resp=await fetch(`/products/${h}.js`,{credentials:'same-origin'});
+        if(!resp.ok)return null;
+        
+        const data=await resp.json();
+        if(!data.published_at||!data.available)return null;
+        
+        const img1=data.images?.[0]||product.image||PLACEHOLDER;
+        const img2=data.images?.[1]||img1;
+        
+        let price=product.price||'';
+        let comparePrice='';
+        
+        if(data.variants?.length){
+          const storedId=String(product.id||'').replace(/[^0-9]/g,'');
+          let variant=storedId?data.variants.find(v=>String(v.id)===storedId):data.variants[0];
+          if(!variant)variant=data.variants[0];
+          
+          if(variant.price!=null)price=formatPrice(Number(variant.price));
+          if(variant.compare_at_price>variant.price)comparePrice=formatPrice(Number(variant.compare_at_price));
+        }else if(data.price!=null){
+          price=formatPrice(Number(data.price));
+          if(data.compare_at_price>data.price)comparePrice=formatPrice(Number(data.compare_at_price));
+        }
+        
+        const result={
+          ...product,
+          title:data.title||product.title||'Product',
+          image:img1,
+          image2:img2,
+          price,
+          comparePrice,
+          url:`/products/${h}`
+        };
+        
+        cache[h]=result;
+        return result;
+      }catch(e){
+        return null;
+      }
+    }
+
+    function formatPrice(p){
+      if(typeof p==='number'){
+        const norm=p>1000?p/100:p;
+        try{
+          return new Intl.NumberFormat('en-IN',{style:'currency',currency:CUR,minimumFractionDigits:0,maximumFractionDigits:0}).format(norm);
+        }catch(e){
+          return(CUR==='INR'?'₹':'')+Math.round(norm).toLocaleString();
+        }
+      }
+      return p;
+    }
+
+    function render(products){
+      const mobileGrid=document.getElementById(`rv-m-${SID}`);
+      const desktopGrid=document.getElementById(`rv-d-${SID}`);
+      
+      if(!mobileGrid||!desktopGrid)return;
+      
+      const mobileHTML=products.map(p=>createCard(p,true)).join('');
+      const desktopHTML=products.map(p=>createCard(p,false)).join('');
+      
+      mobileGrid.innerHTML=mobileHTML;
+      desktopGrid.innerHTML=desktopHTML;
+      
+      attachTracking();
+    }
+
+    function createCard(p,isMobile){
+      const title=(p.title||'Product').replace(/"/g,'&quot;');
+      const url=p.url||`/products/${p.handle}`;
+      const img1=p.image||PLACEHOLDER;
+      const img2=p.image2||img1;
+      
+      let priceHTML='';
+      if(p.comparePrice&&p.price){
+        priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">${p.price}</span><span class="rv-price-compare">${p.comparePrice}</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
+        </svg>
+        </span></div>`;
+      }else if(p.price){
+        priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">${p.price}</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
+        </svg></span></div>`;
+      }else{
+        priceHTML=`<div class="rv-price-row"><div class="rv-price"><span class="rv-price-current">—</span></div><span class="rv-view-details">View Details <svg width="16" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M8.07532 4.89038C8.07532 4.78244 8.09393 4.67529 8.13098 4.57593C8.16812 4.47647 8.22322 4.38657 8.29114 4.31128C8.35888 4.23581 8.43898 4.17586 8.52649 4.1355C8.61376 4.09531 8.707 4.075 8.8009 4.07495C8.89501 4.07495 8.98885 4.0952 9.07629 4.1355C9.16381 4.17586 9.24391 4.23581 9.31165 4.31128L15.7091 11.4207C15.777 11.4959 15.8321 11.5859 15.8693 11.6853C15.9064 11.7847 15.9249 11.8918 15.9249 11.9998C15.9249 12.1077 15.9063 12.2148 15.8693 12.3142C15.8507 12.3639 15.8276 12.4115 15.8009 12.4558L15.7091 12.5789L9.31165 19.6892C9.1748 19.8412 8.9906 19.9246 8.8009 19.9246C8.61139 19.9245 8.42788 19.841 8.29114 19.6892C8.15409 19.5369 8.07537 19.3285 8.07532 19.1101C8.07532 18.8916 8.15404 18.6834 8.29114 18.531L14.1241 12.0505L14.1691 11.9998L14.1241 11.95L8.29114 5.46948C8.22326 5.39424 8.16812 5.30422 8.13098 5.20483C8.09388 5.10547 8.07535 4.99835 8.07532 4.89038Z" fill="#1A1A1A" stroke="white" stroke-width="0.15"/>
+        </svg></span></div>`;
+      }
+      
+      const imgHTML=SHOW_SEC&&img2!==img1?
+        `<div class="rv-img-wrap"><div class="rv-img-stack"><img src="${img1}" alt="${title}" class="rv-img primary" loading="lazy" width="500" height="500"><img src="${img2}" alt="${title}" class="rv-img secondary" loading="lazy" width="500" height="500"></div></div>`:
+        `<div class="rv-img-wrap"><div class="rv-img-stack"><img src="${img1}" alt="${title}" class="rv-img primary" loading="lazy" width="500" height="500"></div></div>`;
+      
+      const cardContent=`<div class="rv-card">${imgHTML}<div class="rv-content"><h3 class="rv-title-text">${title}</h3>${priceHTML}</div></div>`;
+      
+      if(isMobile){
+        return`<div class="rv-mobile-item"><a href="${url}" class="card-wrapper rv-link" data-handle="${p.handle}" data-name="${title}"  data-id="${p.id || p.handle || ''}" aria-label="${title}">${cardContent}</a></div>`;
+      }else{
+        return`<li class="grid__item"><a href="${url}" class="card-wrapper rv-link" data-handle="${p.handle}" data-name="${title}"  data-id="${p.id || p.handle || ''}" aria-label="${title}">${cardContent}</a></li>`;
+      }
+    }
+
+    function attachTracking(){
+      document.querySelectorAll(`[data-section-id="${SID}"] .rv-link`).forEach((a,idx)=>{
+        a.addEventListener('click',()=>{
+          try{
+            window.dataLayer=window.dataLayer||[];
+            window.dataLayer.push({
+              event:"promoClick",
+              promoClick:{
+                promo_id:a.dataset.id||'',
+                creative_name:"Recently Viewed",
+                promo_name:a.dataset.name||'',
+                promo_position:`recently_viewed_position_${idx+1}`,
+                location_id:'PDP Bottom'
+              }
+            });
+          }catch(e){}
+        },{once:true});
+      });
+    }
+
+    function lazyInit(){
+      const wrapper=document.querySelector('[data-rv-lcp]');
+      if(!wrapper)return;
+
+      /* Shopify editor should always show */
+      if(window.Shopify?.designMode){
+        wrapper.classList.remove('loading');
+        init();
+        return;
+      }
+
+      wrapper.classList.add('loading');
+
+      const io=new IntersectionObserver(entries=>{
+        if(entries[0].isIntersecting){
+          wrapper.classList.remove('loading');
+          init();            // 🔥 YOUR ORIGINAL LOGIC
+          io.disconnect();
+        }
+      },{
+        rootMargin:'300px'   // preload before visible
+      });
+
+      io.observe(wrapper);
+    }
+
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded',lazyInit);
+    }else{
+      lazyInit();
+    }
+  })();
 </script>
 
 {% schema %}
