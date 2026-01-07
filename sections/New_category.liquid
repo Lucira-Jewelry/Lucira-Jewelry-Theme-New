@@ -1,111 +1,110 @@
 {% liquid
-  assign first_three_blocks = section.blocks | slice: 0, 6
+  assign first_block = section.blocks.first
 %}
 
-{% comment %} Preload first category images for LCP {% endcomment %}
-{% if section.blocks.size > 0 %}
-  {% assign first_block = section.blocks.first %}
-  {% if first_block.settings.category_image_desktop %}
-    <link rel="preload" 
-          as="image" 
-          href="{{ first_block.settings.category_image_desktop | img_url: '400x560', crop: 'center' }}"
-          media="(min-width: 768px)"
-          fetchpriority="high">
-  {% endif %}
-  {% if first_block.settings.category_image_mobile %}
-    <link rel="preload" 
-          as="image" 
-          href="{{ first_block.settings.category_image_mobile | img_url: '300x420', crop: 'center' }}"
-          media="(max-width: 767px)"
-          fetchpriority="high">
-  {% endif %}
+{% comment %} Preload ONLY first category for LCP {% endcomment %}
+{% if first_block and first_block.settings.category_image_desktop %}
+  <link rel="preload" 
+        as="image" 
+        href="{{ first_block.settings.category_image_desktop | img_url: '400x560', crop: 'center' }}"
+        media="(min-width: 768px)"
+        fetchpriority="high">
 {% endif %}
 
-<div class="categories-section page-width">
-  {% comment %} Better SEO: Use visible H1 or move to main page context {% endcomment %}
-  <div class="visually-hidden">
-    <h1>Lucira Jewelry - Official Lab Grown Diamond Jewelry in India</h1>
+<div class="categories-lazy" data-categories-lazy>
+  {% comment %} Skeleton Loader - Always Visible Initially {% endcomment %}
+  <div class="categories-skeleton page-width">
+    {% if section.settings.category_heading != blank %}
+      <div class="skeleton-heading"></div>
+    {% endif %}
+    {% if section.settings.category_subheading != blank %}
+      <div class="skeleton-subheading"></div>
+    {% endif %}
+    <div class="skeleton-grid">
+      {% for i in (1..6) %}
+        <div class="skeleton-card"></div>
+      {% endfor %}
+    </div>
   </div>
 
-  {% if section.settings.category_heading != blank %}
-    <h2 class="categories-heading">{{ section.settings.category_heading }}</h2>
-  {% endif %}
-  
-  {% if section.settings.category_subheading != blank %}
-    <p class="categories-subheading">{{ section.settings.category_subheading }}</p>
-  {% endif %}
-
-  <div class="categories-grid">
-    {% for block in section.blocks %}
-      {% liquid
-        assign is_priority = false
-        if forloop.index <= 6
-          assign is_priority = true
-        endif
-        
-        assign desktop_img = block.settings.category_image_desktop
-        assign mobile_img = block.settings.category_image_mobile
-      %}
-      
-      <div class="category-card" data-block-id="{{ block.id }}">
-        {% if block.settings.link != blank %}
-          <a
-            href="{{ block.settings.link }}"
-            class="category-link"
-            data-category-title="{{ block.settings.title | escape }}"
-            data-category-link="{{ block.settings.link }}"
-            data-block-id="{{ block.id }}"
-            aria-label="Shop {{ block.settings.title }}"
-          >
-        {% endif %}
-
-        <div class="category-image-wrapper">
-          <picture>
-            {% if mobile_img %}
-              <source
-                media="(max-width: 767px)"
-                srcset="{{ mobile_img | img_url: '300x420', crop: 'center' }} 300w,
-                        {{ mobile_img | img_url: '150x210', crop: 'center' }} 150w"
-                sizes="(max-width: 767px) 33vw, 300px"
-              >
-            {% endif %}
-            
-            {% if desktop_img %}
-              <source
-                media="(min-width: 768px)"
-                srcset="{{ desktop_img | img_url: '400x560', crop: 'center' }} 400w,
-                        {{ desktop_img | img_url: '300x420', crop: 'center' }} 300w,
-                        {{ desktop_img | img_url: '200x280', crop: 'center' }} 200w"
-                sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw"
-              >
-              
-              <img
-                class="category-image"
-                src="{{ desktop_img | img_url: '400x560', crop: 'center' }}"
-                alt="{{ block.settings.title | escape }}"
-                width="400"
-                height="560"
-                loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
-                decoding="async"
-                {% if is_priority %}fetchpriority="high"{% endif %}
-              >
-            {% endif %}
-          </picture>
-        </div>
-
-        <span class="category-title">{{ block.settings.title }}</span>
-        <span class="shop-now-text desktop-only" aria-hidden="true">Shop Now</span>
-
-        {% if block.settings.link != blank %}
-          </a>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
+  {% comment %} Hidden data template - Images NOT loaded initially {% endcomment %}
+  <script type="application/json" data-categories-data>
+    {
+      "heading": {{ section.settings.category_heading | json }},
+      "subheading": {{ section.settings.category_subheading | json }},
+      "categories": [
+        {% for block in section.blocks %}
+          {
+            "id": {{ block.id | json }},
+            "title": {{ block.settings.title | json }},
+            "link": {{ block.settings.link | json }},
+            "desktop_image": {
+              "url_400": {{ block.settings.category_image_desktop | img_url: '400x560', crop: 'center' | json }},
+              "url_300": {{ block.settings.category_image_desktop | img_url: '300x420', crop: 'center' | json }},
+              "url_200": {{ block.settings.category_image_desktop | img_url: '200x280', crop: 'center' | json }}
+            },
+            "mobile_image": {
+              "url_300": {{ block.settings.category_image_mobile | img_url: '300x420', crop: 'center' | json }},
+              "url_150": {{ block.settings.category_image_mobile | img_url: '150x210', crop: 'center' | json }}
+            },
+            "is_first": {% if forloop.first %}true{% else %}false{% endif %}
+          }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ]
+    }
+  </script>
 </div>
 
 <style>
-  /* Accessibility helper */
+  /* ===== Skeleton Loader ===== */
+  .categories-skeleton {
+    text-align: center;
+    margin: 0 auto;
+    padding: 40px 0 0;
+  }
+  
+  .skeleton-heading {
+    height: 32px;
+    width: 250px;
+    margin: 0 auto 12px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  
+  .skeleton-subheading {
+    height: 24px;
+    width: 200px;
+    margin: 0 auto 40px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  
+  .skeleton-grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 20px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  
+  .skeleton-card {
+    aspect-ratio: 5 / 7;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+    background-size: 400% 100%;
+    animation: shimmer 1.4s ease infinite;
+  }
+  
+  @keyframes shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  /* ===== Actual Content Styles ===== */
   .visually-hidden {
     position: absolute;
     width: 1px;
@@ -117,11 +116,16 @@
     border: 0;
   }
   
-  /* Main container */
   .categories-section {
     text-align: center;
     margin: 0 auto;
     padding: 40px 0 0;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  
+  .categories-section.loaded {
+    opacity: 1;
   }
   
   .categories-section.page-width {
@@ -129,7 +133,6 @@
     padding-right: 0;
   }
   
-  /* Typography */
   .categories-heading {
     margin: 0;
     font-weight: 500;
@@ -147,7 +150,6 @@
     line-height: 1.9;
   }
   
-  /* Grid layout */
   .categories-grid {
     display: flex;
     justify-content: center;
@@ -155,7 +157,6 @@
     flex-wrap: wrap;
   }
   
-  /* Category card */
   .category-card {
     width: 16.5%;
     position: relative;
@@ -168,11 +169,10 @@
     text-decoration: none;
   }
   
-  /* Image wrapper with aspect ratio for CLS prevention */
   .category-image-wrapper {
     position: relative;
     width: 100%;
-    aspect-ratio: 5 / 7; /* 400/560 = 5/7 */
+    aspect-ratio: 5 / 7;
     overflow: hidden;
   }
   
@@ -182,10 +182,8 @@
     object-fit: cover;
     display: block;
     transition: transform 0.5s ease, border-radius 0.5s ease;
-    will-change: transform;
   }
   
-  /* Text overlays */
   .category-title,
   .shop-now-text {
     position: absolute;
@@ -202,7 +200,7 @@
   .category-title {
     bottom: 10%;
     font-size: 16px;
-    transition: bottom 0.4s ease, font-size 0.4s ease;
+    transition: bottom 0.4s ease;
   }
   
   .shop-now-text {
@@ -213,7 +211,6 @@
     transition: bottom 0.4s ease, opacity 0.4s ease;
   }
   
-  /* Desktop hover effects */
   @media (min-width: 768px) {
     .category-card:hover .category-image {
       border-radius: 100% / 60%;
@@ -230,11 +227,18 @@
     }
   }
   
-  /* Tablet layout */
   @media (max-width: 999px) and (min-width: 768px) {
+    .skeleton-grid,
+    .categories-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .skeleton-grid {
+      display: grid;
+    }
+    
     .categories-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
       gap: 20px;
     }
     
@@ -244,10 +248,25 @@
     }
   }
   
-  /* Mobile layout */
   @media (max-width: 767px) {
     .categories-section {
       padding: 40px 0 0;
+    }
+    
+    .skeleton-grid {
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    
+    .skeleton-heading {
+      height: 24px;
+      width: 180px;
+    }
+    
+    .skeleton-subheading {
+      height: 18px;
+      width: 150px;
+      margin-bottom: 24px;
     }
     
     .categories-heading {
@@ -272,10 +291,6 @@
       min-width: auto;
     }
     
-    .category-image-wrapper {
-      aspect-ratio: 5 / 7; /* Mobile aspect ratio */
-    }
-    
     .category-title {
       bottom: 15%;
       font-size: 12px;
@@ -289,7 +304,6 @@
     }
   }
   
-  /* Large desktop */
   @media (min-width: 1600px) {
     .categories-section {
       padding: 20px 0 0;
@@ -303,83 +317,206 @@
       font-size: 18px;
     }
   }
-  
-  /* Medium desktop */
-  @media (min-width: 1024px) and (max-width: 1600px) {
-    .categories-section {
-      padding-top: 40px;
-    }
-  }
 </style>
 
 <script>
-  (function() {
-    // Initialize on DOM ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initCategoryTracking);
-    } else {
-      initCategoryTracking();
+(function() {
+  'use strict';
+  
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  
+  function init() {
+    const container = document.querySelector('[data-categories-lazy]');
+    if (!container) return;
+    
+    const skeleton = container.querySelector('.categories-skeleton');
+    const dataScript = container.querySelector('[data-categories-data]');
+    
+    if (!skeleton || !dataScript) return;
+    
+    let data;
+    try {
+      data = JSON.parse(dataScript.textContent);
+    } catch (e) {
+      console.error('Failed to parse categories data:', e);
+      return;
     }
     
-    function initCategoryTracking() {
-      const categoryLinks = document.querySelectorAll('.category-link');
-      
-      categoryLinks.forEach(function(link) {
-        link.addEventListener('click', function(event) {
-          event.preventDefault();
-          
-          const title = this.dataset.categoryTitle;
-          const url = this.dataset.categoryLink;
-          const blockId = this.dataset.blockId;
-          
-          // Push to GTM dataLayer
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: 'promoClick',
-            promoClick: {
-              promo_id: blockId,
-              creative_name: title,
-              promo_position: url,
-              promo_location: 'categories_grid'
-            }
-          });
-          
-          // Navigate after brief delay for tracking
-          setTimeout(function() {
-            window.location.href = url;
-          }, 100);
-        });
+    // IntersectionObserver - Load content when near viewport
+    const observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          loadCategories(container, skeleton, data);
+          observer.disconnect();
+        }
       });
-      
-      // Track promo views on scroll (intersection observer)
-      if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver(function(entries) {
-          entries.forEach(function(entry) {
-            if (entry.isIntersecting && !entry.target.dataset.tracked) {
-              const link = entry.target.querySelector('.category-link');
-              if (link) {
-                window.dataLayer = window.dataLayer || [];
-                window.dataLayer.push({
-                  event: 'promoView',
-                  promoView: {
-                    promo_id: link.dataset.blockId,
-                    creative_name: link.dataset.categoryTitle,
-                    promo_position: link.dataset.categoryLink,
-                    promo_location: 'categories_grid'
-                  }
-                });
-                entry.target.dataset.tracked = 'true';
-              }
-            }
-          });
-        }, { threshold: 0.5 });
-        
-        document.querySelectorAll('.category-card').forEach(function(card) {
-          observer.observe(card);
-        });
-      }
+    }, {
+      rootMargin: '200px', // Load 200px before visible
+      threshold: 0
+    });
+    
+    observer.observe(container);
+  }
+  
+  function loadCategories(container, skeleton, data) {
+    // Create section
+    const section = document.createElement('div');
+    section.className = 'categories-section page-width';
+    
+    // H1 for SEO
+    const h1 = document.createElement('div');
+    h1.className = 'visually-hidden';
+    h1.innerHTML = '<h1>Lucira Jewelry - Official Lab Grown Diamond Jewelry in India</h1>';
+    section.appendChild(h1);
+    
+    // Heading
+    if (data.heading) {
+      const heading = document.createElement('h2');
+      heading.className = 'categories-heading';
+      heading.textContent = data.heading;
+      section.appendChild(heading);
     }
-  })();
+    
+    // Subheading
+    if (data.subheading) {
+      const subheading = document.createElement('p');
+      subheading.className = 'categories-subheading';
+      subheading.textContent = data.subheading;
+      section.appendChild(subheading);
+    }
+    
+    // Grid
+    const grid = document.createElement('div');
+    grid.className = 'categories-grid';
+    
+    data.categories.forEach(function(cat) {
+      const card = createCategoryCard(cat);
+      grid.appendChild(card);
+    });
+    
+    section.appendChild(grid);
+    
+    // Replace skeleton with content
+    container.appendChild(section);
+    
+    requestAnimationFrame(function() {
+      section.classList.add('loaded');
+      setTimeout(function() {
+        skeleton.remove();
+        initClickTracking();
+      }, 400);
+    });
+  }
+  
+  function createCategoryCard(cat) {
+    const card = document.createElement('div');
+    card.className = 'category-card';
+    card.dataset.blockId = cat.id;
+    
+    const link = document.createElement('a');
+    link.href = cat.link;
+    link.className = 'category-link';
+    link.dataset.categoryTitle = cat.title;
+    link.dataset.categoryLink = cat.link;
+    link.dataset.blockId = cat.id;
+    link.setAttribute('aria-label', 'Shop ' + cat.title);
+    
+    // Image wrapper
+    const imgWrapper = document.createElement('div');
+    imgWrapper.className = 'category-image-wrapper';
+    
+    // Picture element
+    const picture = document.createElement('picture');
+    
+    // Mobile source
+    if (cat.mobile_image.url_300) {
+      const mobileSource = document.createElement('source');
+      mobileSource.media = '(max-width: 767px)';
+      mobileSource.srcset = cat.mobile_image.url_300 + ' 300w, ' + cat.mobile_image.url_150 + ' 150w';
+      mobileSource.sizes = '(max-width: 767px) 33vw, 300px';
+      picture.appendChild(mobileSource);
+    }
+    
+    // Desktop source
+    if (cat.desktop_image.url_400) {
+      const desktopSource = document.createElement('source');
+      desktopSource.media = '(min-width: 768px)';
+      desktopSource.srcset = cat.desktop_image.url_400 + ' 400w, ' + 
+                             cat.desktop_image.url_300 + ' 300w, ' + 
+                             cat.desktop_image.url_200 + ' 200w';
+      desktopSource.sizes = '(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw';
+      picture.appendChild(desktopSource);
+      
+      // IMG tag
+      const img = document.createElement('img');
+      img.className = 'category-image';
+      img.src = cat.desktop_image.url_400;
+      img.alt = cat.title;
+      img.width = '400';
+      img.height = '560';
+      img.loading = cat.is_first ? 'eager' : 'lazy';
+      img.decoding = 'async';
+      if (cat.is_first) {
+        img.fetchPriority = 'high';
+      }
+      picture.appendChild(img);
+    }
+    
+    imgWrapper.appendChild(picture);
+    link.appendChild(imgWrapper);
+    
+    // Title
+    const title = document.createElement('span');
+    title.className = 'category-title';
+    title.textContent = cat.title;
+    link.appendChild(title);
+    
+    // Shop now text
+    const shopNow = document.createElement('span');
+    shopNow.className = 'shop-now-text desktop-only';
+    shopNow.setAttribute('aria-hidden', 'true');
+    shopNow.textContent = 'Shop Now';
+    link.appendChild(shopNow);
+    
+    card.appendChild(link);
+    return card;
+  }
+  
+  function initClickTracking() {
+    const links = document.querySelectorAll('.category-link');
+    
+    links.forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        
+        const title = this.dataset.categoryTitle;
+        const url = this.dataset.categoryLink;
+        const blockId = this.dataset.blockId;
+        
+        // GTM tracking - promoClick ONLY
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'promoClick',
+          promoClick: {
+            promo_id: blockId,
+            creative_name: title,
+            promo_position: url,
+            promo_location: 'categories_grid'
+          }
+        });
+        
+        // Navigate
+        setTimeout(function() {
+          window.location.href = url;
+        }, 100);
+      });
+    });
+  }
+})();
 </script>
 
 {% schema %}
