@@ -1,7 +1,3 @@
-{% liquid
-  assign first_three_blocks = section.blocks | slice: 0, 6
-%}
-
 <div class="categories-lazy" data-categories>
   <div class="categories-skeleton">
     {% for i in (1..12) %}
@@ -10,27 +6,8 @@
   </div>
 
   <div class="categories-content" style="display:none">
-    <!-- 🔽 YOUR EXISTING CODE STARTS 🔽 -->
+    <!-- REMOVED ALL PRELOAD TAGS - They were causing early loading -->
     
-    {% comment %} Preload first category images for LCP {% endcomment %}
-    {% if section.blocks.size > 0 %}
-      {% assign first_block = section.blocks.first %}
-      {% if first_block.settings.category_image_desktop %}
-        <link rel="preload" 
-              as="image" 
-              href="{{ first_block.settings.category_image_desktop | img_url: '400x560', crop: 'center' }}"
-              media="(min-width: 768px)"
-              fetchpriority="high">
-      {% endif %}
-      {% if first_block.settings.category_image_mobile %}
-        <link rel="preload" 
-              as="image" 
-              href="{{ first_block.settings.category_image_mobile | img_url: '300x420', crop: 'center' }}"
-              media="(max-width: 767px)"
-              fetchpriority="high">
-      {% endif %}
-    {% endif %}
-
     <div class="categories-section page-width">
       {% comment %} Better SEO: Use visible H1 or move to main page context {% endcomment %}
       <div class="visually-hidden">
@@ -48,16 +25,12 @@
       <div class="categories-grid">
         {% for block in section.blocks %}
           {% liquid
-            assign is_priority = false
-            if forloop.index <= 6
-              assign is_priority = true
-            endif
-            
             assign desktop_img = block.settings.category_image_desktop
             assign mobile_img = block.settings.category_image_mobile
+            assign placeholder_svg = 'image' | placeholder_svg_tag: 'category-image-placeholder'
           %}
           
-          <div class="category-card" data-block-id="{{ block.id }}">
+          <div class="category-card" data-block-id="{{ block.id }}" data-category-index="{{ forloop.index0 }}">
             {% if block.settings.link != blank %}
               <a
                 href="{{ block.settings.link }}"
@@ -70,28 +43,35 @@
             {% endif %}
 
             <div class="category-image-wrapper">
-              <picture>
+              {% comment %} Lazy placeholder first {% endcomment %}
+              <div class="category-image-placeholder">
+                {{ placeholder_svg }}
+              </div>
+              
+              {% comment %} Actual images with data-src for lazy loading {% endcomment %}
+              <picture class="category-picture" style="display: none;">
                 {% if mobile_img %}
                   <source
                     media="(max-width: 767px)"
-                    srcset="{{ mobile_img | img_url: '300x420', crop: 'center' }} 300w,
-                            {{ mobile_img | img_url: '150x210', crop: 'center' }} 150w"
-                    sizes="(max-width: 767px) 33vw, 300px"
+                    data-srcset="{{ mobile_img | img_url: '300x420', crop: 'center' }} 300w,
+                                {{ mobile_img | img_url: '150x210', crop: 'center' }} 150w"
+                    data-sizes="(max-width: 767px) 33vw, 300px"
                   >
                 {% endif %}
                 
                 {% if desktop_img %}
                   <source
                     media="(min-width: 768px)"
-                    srcset="{{ desktop_img | img_url: '400x560', crop: 'center' }} 400w,
-                            {{ desktop_img | img_url: '300x420', crop: 'center' }} 300w,
-                            {{ desktop_img | img_url: '200x280', crop: 'center' }} 200w"
-                    sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw"
+                    data-srcset="{{ desktop_img | img_url: '400x560', crop: 'center' }} 400w,
+                                {{ desktop_img | img_url: '300x420', crop: 'center' }} 300w,
+                                {{ desktop_img | img_url: '200x280', crop: 'center' }} 200w"
+                    data-sizes="(min-width: 1600px) 300px, (min-width: 1000px) 16.5vw, (min-width: 768px) 30vw, 33vw"
                   >
                   
                   <img
                     class="category-image"
-                    src="{{ desktop_img | img_url: '400x560', crop: 'center' }}"
+                    src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 560'%3E%3C/svg%3E"
+                    data-src="{{ desktop_img | img_url: '400x560', crop: 'center' }}"
                     alt="{{ block.settings.title | escape }}"
                     width="400"
                     height="560"
@@ -112,8 +92,6 @@
         {% endfor %}
       </div>
     </div>
-    
-    <!-- 🔼 YOUR EXISTING CODE ENDS 🔼 -->
   </div>
 </div>
 
@@ -140,9 +118,9 @@
     border-radius: 8px;
     background: linear-gradient(
       90deg,
-      #eee 25%,
-      #f5f5f5 37%,
-      #eee 63%
+      #f0f0f0 25%,
+      #f8f8f8 37%,
+      #f0f0f0 63%
     );
     background-size: 400% 100%;
     animation: shimmer 1.4s ease infinite;
@@ -158,32 +136,53 @@
     to { opacity: 1; }
   }
   
-  /* Tablet skeleton */
-  @media (max-width: 999px) and (min-width: 768px) {
-    .categories-skeleton {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-    }
-    
-    .skeleton-card {
-      width: 100%;
-      min-width: auto;
-    }
+  /* ===== Image Loading States ===== */
+  .category-image-placeholder {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #f8f8f8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    transition: opacity 0.3s ease;
   }
   
-  /* Mobile skeleton */
-  @media (max-width: 767px) {
-    .categories-skeleton {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-    }
-    
-    .skeleton-card {
-      width: 100%;
-      min-width: auto;
-    }
+  .category-image-placeholder svg {
+    width: 60px;
+    height: 60px;
+    opacity: 0.3;
+  }
+  
+  .category-picture {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  
+  .category-picture.loaded {
+    opacity: 1;
+  }
+  
+  .category-picture.loaded + .category-image-placeholder {
+    opacity: 0;
+    pointer-events: none;
+  }
+  
+  .category-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.5s ease, border-radius 0.5s ease;
+    will-change: transform;
   }
   
   /* ===== Original Categories Styles ===== */
@@ -246,34 +245,29 @@
     width: 16.5%;
     position: relative;
     min-width: 150px;
-    animation: slideUp 0.5s ease forwards;
     opacity: 0;
+    transform: translateY(20px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  
+  .category-card.loaded {
+    opacity: 1;
+    transform: translateY(0);
   }
   
   /* Staggered animation for cards */
-  .categories-grid .category-card:nth-child(1) { animation-delay: 0.1s; }
-  .categories-grid .category-card:nth-child(2) { animation-delay: 0.15s; }
-  .categories-grid .category-card:nth-child(3) { animation-delay: 0.2s; }
-  .categories-grid .category-card:nth-child(4) { animation-delay: 0.25s; }
-  .categories-grid .category-card:nth-child(5) { animation-delay: 0.3s; }
-  .categories-grid .category-card:nth-child(6) { animation-delay: 0.35s; }
-  .categories-grid .category-card:nth-child(7) { animation-delay: 0.4s; }
-  .categories-grid .category-card:nth-child(8) { animation-delay: 0.45s; }
-  .categories-grid .category-card:nth-child(9) { animation-delay: 0.5s; }
-  .categories-grid .category-card:nth-child(10) { animation-delay: 0.55s; }
-  .categories-grid .category-card:nth-child(11) { animation-delay: 0.6s; }
-  .categories-grid .category-card:nth-child(12) { animation-delay: 0.65s; }
-  
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
+  .category-card:nth-child(1) { transition-delay: 0.1s; }
+  .category-card:nth-child(2) { transition-delay: 0.15s; }
+  .category-card:nth-child(3) { transition-delay: 0.2s; }
+  .category-card:nth-child(4) { transition-delay: 0.25s; }
+  .category-card:nth-child(5) { transition-delay: 0.3s; }
+  .category-card:nth-child(6) { transition-delay: 0.35s; }
+  .category-card:nth-child(7) { transition-delay: 0.4s; }
+  .category-card:nth-child(8) { transition-delay: 0.45s; }
+  .category-card:nth-child(9) { transition-delay: 0.5s; }
+  .category-card:nth-child(10) { transition-delay: 0.55s; }
+  .category-card:nth-child(11) { transition-delay: 0.6s; }
+  .category-card:nth-child(12) { transition-delay: 0.65s; }
   
   .category-link {
     display: block;
@@ -287,15 +281,6 @@
     width: 100%;
     aspect-ratio: 5 / 7;
     overflow: hidden;
-  }
-  
-  .category-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-    transition: transform 0.5s ease, border-radius 0.5s ease;
-    will-change: transform;
   }
   
   /* Text overlays */
@@ -343,22 +328,36 @@
     }
   }
   
-  /* Tablet layout */
+  /* Responsive skeleton and layout */
   @media (max-width: 999px) and (min-width: 768px) {
+    .categories-skeleton,
     .categories-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 20px;
     }
     
+    .skeleton-card,
     .category-card {
       width: 100%;
       min-width: auto;
     }
   }
   
-  /* Mobile layout */
   @media (max-width: 767px) {
+    .categories-skeleton,
+    .categories-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    
+    .skeleton-card,
+    .category-card {
+      width: 100%;
+      min-width: auto;
+    }
+    
     .categories-section {
       padding: 40px 0 0;
     }
@@ -373,22 +372,6 @@
       margin-bottom: 24px;
     }
     
-    .categories-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-top: 24px;
-    }
-    
-    .category-card {
-      width: 100%;
-      min-width: auto;
-    }
-    
-    .category-image-wrapper {
-      aspect-ratio: 5 / 7;
-    }
-    
     .category-title {
       bottom: 15%;
       font-size: 12px;
@@ -401,28 +384,6 @@
       display: none;
     }
   }
-  
-  /* Large desktop */
-  @media (min-width: 1600px) {
-    .categories-section {
-      padding: 20px 0 0;
-    }
-    
-    .categories-heading {
-      font-size: 28px;
-    }
-    
-    .categories-subheading {
-      font-size: 18px;
-    }
-  }
-  
-  /* Medium desktop */
-  @media (min-width: 1024px) and (max-width: 1600px) {
-    .categories-section {
-      padding-top: 40px;
-    }
-  }
 </style>
 
 <script>
@@ -430,40 +391,91 @@ document.addEventListener('DOMContentLoaded', function () {
   const categoriesContainer = document.querySelector('[data-categories]');
   if (!categoriesContainer) return;
 
-  // Initialize Intersection Observer
+  // Initialize Intersection Observer with different threshold for immediate sections
   const observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
       if (entry.isIntersecting) {
-        const skeleton = categoriesContainer.querySelector('.categories-skeleton');
-        const content = categoriesContainer.querySelector('.categories-content');
-
-        // Show content with fade in effect
-        content.style.display = 'block';
-        content.style.opacity = '0';
-        content.style.transition = 'opacity 0.4s ease';
-
-        // Remove skeleton and show content
-        requestAnimationFrame(() => {
-          content.style.opacity = '1';
-          if (skeleton) {
-            skeleton.style.display = 'none';
-            skeleton.remove();
-          }
-          
-          // Initialize tracking after content loads
-          initCategoryTracking();
-        });
-
+        loadCategories();
         observer.disconnect();
       }
     });
   }, {
-    rootMargin: '200px' // Load 200px before entering viewport
+    threshold: 0.1, // Lower threshold since it's below banner
+    rootMargin: '100px' // Load 100px before entering viewport
   });
 
   observer.observe(categoriesContainer);
 
-  // Category tracking function
+  function loadCategories() {
+    const skeleton = categoriesContainer.querySelector('.categories-skeleton');
+    const content = categoriesContainer.querySelector('.categories-content');
+
+    // Show content
+    content.style.display = 'block';
+    content.style.opacity = '0';
+    content.style.transition = 'opacity 0.3s ease';
+
+    // Remove skeleton and show content
+    requestAnimationFrame(() => {
+      content.style.opacity = '1';
+      if (skeleton) {
+        skeleton.style.display = 'none';
+        skeleton.remove();
+      }
+      
+      // Initialize images and tracking
+      lazyLoadImages();
+      initCategoryTracking();
+    });
+  }
+
+  function lazyLoadImages() {
+    const pictures = document.querySelectorAll('.category-picture');
+    const categoryCards = document.querySelectorAll('.category-card');
+    
+    // Load images with priority for first 3, lazy for others
+    pictures.forEach((picture, index) => {
+      const sources = picture.querySelectorAll('source');
+      const img = picture.querySelector('img');
+      
+      // Add loaded class to card for animation
+      setTimeout(() => {
+        categoryCards[index].classList.add('loaded');
+      }, index * 50);
+      
+      // Load sources
+      sources.forEach(source => {
+        if (source.dataset.srcset) {
+          source.srcset = source.dataset.srcset;
+          source.sizes = source.dataset.sizes;
+        }
+      });
+      
+      // Load image
+      if (img && img.dataset.src) {
+        img.src = img.dataset.src;
+        
+        // Load first 3 images immediately, others lazily
+        if (index < 3) {
+          img.loading = 'eager';
+          img.fetchpriority = 'high';
+        }
+        
+        img.onload = function() {
+          picture.style.display = 'block';
+          setTimeout(() => {
+            picture.classList.add('loaded');
+          }, 100);
+        };
+        
+        // Fallback for images that might fail to load
+        img.onerror = function() {
+          picture.style.display = 'none';
+        };
+      }
+    });
+  }
+
   function initCategoryTracking() {
     const categoryLinks = document.querySelectorAll('.category-link');
     
@@ -493,34 +505,6 @@ document.addEventListener('DOMContentLoaded', function () {
         }, 100);
       });
     });
-    
-    // Track promo views on scroll
-    if ('IntersectionObserver' in window) {
-      const viewObserver = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-          if (entry.isIntersecting && !entry.target.dataset.tracked) {
-            const link = entry.target.querySelector('.category-link');
-            if (link) {
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                event: 'promoView',
-                promoView: {
-                  promo_id: link.dataset.blockId,
-                  creative_name: link.dataset.categoryTitle,
-                  promo_position: link.dataset.categoryLink,
-                  promo_location: 'categories_grid'
-                }
-              });
-              entry.target.dataset.tracked = 'true';
-            }
-          }
-        });
-      }, { threshold: 0.5 });
-      
-      document.querySelectorAll('.category-card').forEach(function(card) {
-        viewObserver.observe(card);
-      });
-    }
   }
 });
 </script>
