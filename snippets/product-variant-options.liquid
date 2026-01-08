@@ -1,26 +1,8 @@
-{% comment %}
-  Renders product variant options
-
-  Accepts:
-  - product: {Object} product object.
-  - option: {Object} current product_option object.
-  - block: {Object} block object.
-  - picker_type: {String} type of picker to dispay
-
-
-  Usage:
-  {% render 'product-variant-options',
-    product: product,
-    option: option,
-    block: block
-    picker_type: picker_type
-  %}
-{% endcomment %}
 {%- liquid
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
-{%- if option.name == 'Size' -%}
+{%- if option.name == 'Size' or option.name == 'Color' -%}
   {%- assign sorted_values = option.values | sort -%}
 {%- else -%}
   {%- assign sorted_values = option.values -%}
@@ -160,8 +142,7 @@
           </span>
           {{ label_unavailable }}
         </span>
-        
-        {%- comment -%}Store variant data for each color-size combination{%- endcomment -%}
+
         {% for variant in product.variants %}
           {% if variant.option2 == value %}
             <script>
@@ -174,7 +155,6 @@
             </script>
           {% endif %}
         {% endfor %}
-
 
       {%- else -%}
         <span class="variant-text">
@@ -255,4 +235,72 @@
       }
     });
   });
+</script>
+
+<script>
+  (function () {
+
+    function normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+
+        // 09KT → 9KT (ONLY this remains)
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+
+        node.nodeValue = t;
+      }
+    }
+
+    /* ---------- 1. Initial page load ---------- */
+    document.addEventListener('DOMContentLoaded', function () {
+      normalizeVariantText(document.body);
+    });
+
+    /* ---------- 2. When drawer trigger is clicked ---------- */
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#product_variant_drawer')) {
+        setTimeout(function () {
+          const drawer = document.getElementById('variant-drawer');
+          if (drawer) normalizeVariantText(drawer);
+        }, 0);
+      }
+    });
+
+    /* ---------- 3. Shopify variant change ---------- */
+    document.addEventListener('variant:change', function () {
+      const drawer = document.getElementById('variant-drawer');
+      if (drawer) {
+        setTimeout(() => normalizeVariantText(drawer), 0);
+      }
+    });
+
+    /* ---------- 4. Safety net for AJAX re-renders ---------- */
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (
+            node.nodeType === 1 &&
+            node.closest &&
+            node.closest('#variant-drawer')
+          ) {
+            normalizeVariantText(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+  })();
 </script>
