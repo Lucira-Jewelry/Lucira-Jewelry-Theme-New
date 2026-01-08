@@ -236,3 +236,75 @@
     });
   });
 </script>
+
+<script>
+  (function () {
+
+    function normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+
+        // 09KT → 9KT
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+
+        // 05 → 5 (standalone numbers only)
+        t = t.replace(/\b0([1-9])\b/g, '$1');
+
+        node.nodeValue = t;
+      }
+    }
+
+    /* ---------- 1. Initial page load ---------- */
+    document.addEventListener('DOMContentLoaded', function () {
+      normalizeVariantText(document.body);
+    });
+
+    /* ---------- 2. When drawer trigger is clicked ---------- */
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#product_variant_drawer')) {
+        // Wait for drawer DOM injection/render
+        setTimeout(function () {
+          const drawer = document.getElementById('variant-drawer');
+          if (drawer) normalizeVariantText(drawer);
+        }, 0);
+      }
+    });
+
+    /* ---------- 3. Shopify variant change (Dawn & OS 2.0) ---------- */
+    document.addEventListener('variant:change', function () {
+      const drawer = document.getElementById('variant-drawer');
+      if (drawer) {
+        setTimeout(() => normalizeVariantText(drawer), 0);
+      }
+    });
+
+    /* ---------- 4. Safety net for AJAX re-renders ---------- */
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (
+            node.nodeType === 1 &&
+            node.closest &&
+            node.closest('#variant-drawer')
+          ) {
+            normalizeVariantText(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+  })();
+</script>
