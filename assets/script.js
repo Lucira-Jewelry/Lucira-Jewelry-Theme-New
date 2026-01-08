@@ -55,17 +55,14 @@ jQuery(document).ready(function () {
       <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
     </svg>`;
 
-  // Add icon to each accordion title
   jQuery(".accordion .accordion-title").append(`<span class="accordion-icon">${plusIcon}</span>`);
 
   jQuery(".accordion .accordion-title").click(function () {
     const icon = jQuery(this).find(".accordion-icon");
 
-    // toggle accordion
     jQuery(this).toggleClass("active");
     jQuery(this).next(".accordion-content").slideToggle();
 
-    // swap svg
     icon.html(jQuery(this).hasClass("active") ? closeIcon : plusIcon);
   });
 });
