@@ -247,35 +247,36 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductCount(html) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-    // 1. Find the source container in the new HTML first
+    // 1. Get the source container from the NEW HTML
     const sourceContainer = parsedHTML.getElementById('ProductCount');
     
-    // If the source container or the count span inside it is missing, stop here.
+    // Safety check: if the new HTML doesn't have the count, stop.
     if (!sourceContainer) return;
-    const sourceCountSpan = sourceContainer.querySelector('[data-product-count]');
-    if (!sourceCountSpan) return;
+    
+    // 2. Extract strictly the number from the source
+    const sourceSpan = sourceContainer.querySelector('[data-product-count]');
+    if (!sourceSpan) return;
+    
+    const newCountValue = sourceSpan.innerHTML;
 
-    // 2. Extract the new count value
-    const newCountValue = sourceCountSpan.innerHTML;
-
-    // 3. Helper function to update the existing elements on your page
-    const updateTarget = (elementId) => {
-      const container = document.getElementById(elementId);
+    // 3. Define helper to update the LIVE DOM
+    const updateLiveSpan = (containerId) => {
+      const container = document.getElementById(containerId);
       if (container) {
-        // Target strictly the span inside the container
+        // Find the specific span inside the live container
         const targetSpan = container.querySelector('[data-product-count]');
         
+        // Update ONLY the span, leaving "designs" and <small> tags alone
         if (targetSpan) {
           targetSpan.innerHTML = newCountValue;
         }
-        
         container.classList.remove('loading');
       }
     };
 
-    // 4. Update both Mobile and Desktop containers
-    updateTarget('ProductCount');
-    updateTarget('ProductCountDesktop');
+    // 4. Update both ID instances
+    updateLiveSpan('ProductCount');
+    updateLiveSpan('ProductCountDesktop');
 
     // 5. Hide loading spinners
     document
