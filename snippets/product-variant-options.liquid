@@ -237,3 +237,51 @@
   });
 </script>
 
+<script>
+(function () {
+
+  function normalizeTextNodes(root) {
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
+
+    let node;
+    while ((node = walker.nextNode())) {
+      let text = node.nodeValue;
+
+      // 09KT → 9KT
+      text = text.replace(/\b0(\d+KT)\b/g, '$1');
+
+      // 05 → 5 , 06 → 6 , 09 → 9 (pure numbers only)
+      text = text.replace(/\b0([1-9])\b/g, '$1');
+
+      node.nodeValue = text;
+    }
+  }
+
+  // Initial run
+  document.addEventListener('DOMContentLoaded', function () {
+    normalizeTextNodes(document.body);
+  });
+
+  // Observe dynamic content (drawer, variant switch, ajax)
+  const observer = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      mutation.addedNodes.forEach(function(node) {
+        if (node.nodeType === 1) {
+          normalizeTextNodes(node);
+        }
+      });
+    });
+  });
+
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+})();
+</script>
