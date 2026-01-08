@@ -240,39 +240,50 @@
 <script>
 (function () {
 
-  function normalizeTextNodes(root) {
+  function normalizeVisibleText(root = document) {
+
     const walker = document.createTreeWalker(
       root,
       NodeFilter.SHOW_TEXT,
-      null,
-      false
+      {
+        acceptNode(node) {
+          if (!node.nodeValue) return NodeFilter.FILTER_REJECT;
+          if (!node.nodeValue.match(/\b0\d|\b0\d+KT/)) return NodeFilter.FILTER_REJECT;
+          return NodeFilter.FILTER_ACCEPT;
+        }
+      }
     );
 
     let node;
     while ((node = walker.nextNode())) {
-      let text = node.nodeValue;
+      let t = node.nodeValue;
 
       // 09KT → 9KT
-      text = text.replace(/\b0(\d+KT)\b/g, '$1');
+      t = t.replace(/\b0(\d+KT)\b/g, '$1');
 
-      // 05 → 5 , 06 → 6 , 09 → 9 (pure numbers only)
-      text = text.replace(/\b0([1-9])\b/g, '$1');
+      // 05 → 5 (only standalone numbers)
+      t = t.replace(/\b0([1-9])\b/g, '$1');
 
-      node.nodeValue = text;
+      node.nodeValue = t;
     }
   }
 
-  // Initial run
+  /* ---------- RUN ON LOAD ---------- */
   document.addEventListener('DOMContentLoaded', function () {
-    normalizeTextNodes(document.body);
+    normalizeVisibleText();
   });
 
-  // Observe dynamic content (drawer, variant switch, ajax)
+  /* ---------- RUN AFTER SHOPIFY VARIANT CHANGE ---------- */
+  document.addEventListener('variant:change', function () {
+    setTimeout(normalizeVisibleText, 0);
+  });
+
+  /* ---------- OBSERVE DYNAMIC DOM ---------- */
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       mutation.addedNodes.forEach(function(node) {
         if (node.nodeType === 1) {
-          normalizeTextNodes(node);
+          normalizeVisibleText(node);
         }
       });
     });
