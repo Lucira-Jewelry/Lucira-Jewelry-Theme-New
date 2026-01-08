@@ -245,42 +245,42 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderProductCount(html) {
-    const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
+  const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-    // 1. Get the source container from the NEW HTML
-    const sourceContainer = parsedHTML.getElementById('ProductCount');
-    
-    // Safety check: if the new HTML doesn't have the count, stop.
-    if (!sourceContainer) return;
-    
-    // 2. Extract strictly the number from the source
+  // 1. Define the live containers on the current page
+  const liveContainer = document.getElementById('ProductCount');
+  const liveContainerDesktop = document.getElementById('ProductCountDesktop');
+
+  // 2. Try to find the new data in the incoming HTML
+  const sourceContainer = parsedHTML.getElementById('ProductCount');
+
+  // 3. Update logic: Only run if we successfully found the new data
+  if (sourceContainer) {
     const sourceSpan = sourceContainer.querySelector('[data-product-count]');
-    if (!sourceSpan) return;
-    
-    const newCountValue = sourceSpan.innerHTML;
+    const newCountValue = sourceSpan ? sourceSpan.innerHTML : null;
 
-    // 3. Define helper to update the LIVE DOM
-    const updateLiveSpan = (containerId) => {
-      const container = document.getElementById(containerId);
-      if (container) {
-        // Find the specific span inside the live container
+    // Helper to update a specific container
+    const updateContainer = (container) => {
+      if (container && newCountValue) {
         const targetSpan = container.querySelector('[data-product-count]');
-        
-        // Update ONLY the span, leaving "designs" and <small> tags alone
         if (targetSpan) {
           targetSpan.innerHTML = newCountValue;
         }
-        container.classList.remove('loading');
       }
     };
 
-    // 4. Update both ID instances
-    updateLiveSpan('ProductCount');
-    updateLiveSpan('ProductCountDesktop');
+    updateContainer(liveContainer);
+    updateContainer(liveContainerDesktop);
+  }
 
-    // 5. Hide loading spinners
-    document
-      .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
+  // 4. CRITICAL FIX: Remove 'loading' class ALWAYS, even if sourceContainer was missing.
+  // This ensures the text becomes visible again.
+  if (liveContainer) liveContainer.classList.remove('loading');
+  if (liveContainerDesktop) liveContainerDesktop.classList.remove('loading');
+
+  // 5. Hide any other loading spinners
+  document
+    .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
   }
 
