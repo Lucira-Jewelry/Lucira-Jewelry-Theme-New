@@ -247,34 +247,18 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductCount(html) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-    const newCountSpan = parsedHTML.querySelector(
-      '#ProductCount [data-product-count]'
-    );
-    if (!newCountSpan) return;
+    const newCountEl = parsedHTML.querySelector('[data-product-count]');
+    const currentCountEl = document.querySelector('[data-product-count]');
 
-    const currentCountSpan = document.querySelector(
-      '#ProductCount [data-product-count]'
-    );
+    if (!newCountEl || !currentCountEl) return;
 
-    if (currentCountSpan) {
-      currentCountSpan.textContent = newCountSpan.textContent;
-    }
+    currentCountEl.textContent = newCountEl.textContent;
 
-    // Optional desktop mirror
-    const desktopCountSpan = document.querySelector(
-      '#ProductCountDesktop [data-product-count]'
-    );
-    if (desktopCountSpan) {
-      desktopCountSpan.textContent = newCountSpan.textContent;
-    }
-
+    // remove loading states (same as Dawn)
     document
       .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
   }
-
-
-
 
   static renderFilters(html, event) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
