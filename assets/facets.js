@@ -247,34 +247,28 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductCount(html) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-    // 1. Get the LIVE elements from your current page
-    const liveContainer = document.getElementById('ProductCount');
-    const liveContainerDesktop = document.getElementById('ProductCountDesktop');
+    const newCount = parsedHTML.getElementById('ProductCount');
+    if (!newCount) return;
 
-    // 2. Extract the NEW count value from the incoming HTML
-    // We look for the ID, then the span inside it
-    const newCountElement = parsedHTML.querySelector('#ProductCount [data-product-count]');
-    const newCountValue = newCountElement ? newCountElement.innerHTML : null;
+    const container = document.getElementById('ProductCount');
+    const containerDesktop = document.getElementById('ProductCountDesktop');
 
-    // 3. Update the LIVE spans ONLY if we found a new value
-    if (newCountValue !== null) {
-      [liveContainer, liveContainerDesktop].forEach(container => {
-        if (container) {
-          const span = container.querySelector('[data-product-count]');
-          if (span) span.innerHTML = newCountValue;
-        }
-      });
+    if (container) {
+      container.innerHTML = newCount.innerHTML;
+      container.classList.remove('loading');
     }
 
-    // 4. FIX: Always remove 'loading' class so the element becomes visible
-    if (liveContainer) liveContainer.classList.remove('loading');
-    if (liveContainerDesktop) liveContainerDesktop.classList.remove('loading');
+    if (containerDesktop) {
+      containerDesktop.innerHTML = newCount.innerHTML;
+      containerDesktop.classList.remove('loading');
+    }
 
-    // 5. Cleanup spinners
     document
       .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
   }
+
+
 
   static renderFilters(html, event) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
