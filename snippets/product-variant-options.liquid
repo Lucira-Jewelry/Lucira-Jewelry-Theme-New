@@ -240,35 +240,39 @@
 <script>
 (function () {
 
-  function normalizeText(root = document) {
+  function normalizeTextNodes(root) {
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      null,
+      false
+    );
 
-    /* -------- KARAT FIX -------- */
-    root.querySelectorAll('.variant-karat, .variant-text').forEach(function(el) {
-      el.innerHTML = el.innerHTML.replace(/\b0(\d+KT)\b/g, '$1');
-    });
+    let node;
+    while ((node = walker.nextNode())) {
+      let text = node.nodeValue;
 
-    /* -------- SIZE FIX -------- */
-    root.querySelectorAll(
-      '.variant-text, .variant-label, label, button, span'
-    ).forEach(function(el) {
-      // match ONLY pure numbers like 05, 06, 09
-      if (/^0\d+$/.test(el.textContent.trim())) {
-        el.textContent = el.textContent.replace(/^0(\d+)$/, '$1');
-      }
-    });
+      // 09KT → 9KT
+      text = text.replace(/\b0(\d+KT)\b/g, '$1');
+
+      // 05 → 5 , 06 → 6 , 09 → 9 (pure numbers only)
+      text = text.replace(/\b0([1-9])\b/g, '$1');
+
+      node.nodeValue = text;
+    }
   }
 
   // Initial run
   document.addEventListener('DOMContentLoaded', function () {
-    normalizeText();
+    normalizeTextNodes(document.body);
   });
 
-  // Observe all dynamic DOM changes
+  // Observe dynamic content (drawer, variant switch, ajax)
   const observer = new MutationObserver(function(mutations) {
     mutations.forEach(function(mutation) {
       mutation.addedNodes.forEach(function(node) {
         if (node.nodeType === 1) {
-          normalizeText(node);
+          normalizeTextNodes(node);
         }
       });
     });
