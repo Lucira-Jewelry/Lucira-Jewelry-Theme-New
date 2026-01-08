@@ -245,29 +245,24 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderProductCount(html) {
-  const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
+    const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-  const newCount = parsedHTML.getElementById('ProductCount');
-  if (!newCount) return;
+    const newCountEl = parsedHTML.querySelector('#ProductCount [data-product-count]');
+    if (!newCountEl) return;
 
-  const container = document.getElementById('ProductCount');
-  const containerDesktop = document.getElementById('ProductCountDesktop');
+    const currentCountEls = document.querySelectorAll(
+      '#ProductCount [data-product-count], #ProductCountDesktop [data-product-count]'
+    );
 
-  if (container) {
-    container.innerHTML = newCount.innerHTML;
-    container.classList.remove('loading');
+    currentCountEls.forEach((el) => {
+      el.textContent = newCountEl.textContent;
+      el.closest('#ProductCount, #ProductCountDesktop')?.classList.remove('loading');
+    });
+
+    document
+      .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
+      .forEach((spinner) => spinner.classList.add('hidden'));
   }
-
-  if (containerDesktop) {
-    containerDesktop.innerHTML = newCount.innerHTML;
-    containerDesktop.classList.remove('loading');
-  }
-
-  document
-    .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
-    .forEach((spinner) => spinner.classList.add('hidden'));
-  }
-
 
   static renderFilters(html, event) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
