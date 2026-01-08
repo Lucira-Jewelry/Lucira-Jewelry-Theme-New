@@ -247,20 +247,37 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductCount(html) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-    const newContainer = parsedHTML.getElementById('ProductCount');
-    const currentContainer = document.getElementById('ProductCount');
+    // 1. Find the source container in the new HTML first
+    const sourceContainer = parsedHTML.getElementById('ProductCount');
+    
+    // If the source container or the count span inside it is missing, stop here.
+    if (!sourceContainer) return;
+    const sourceCountSpan = sourceContainer.querySelector('[data-product-count]');
+    if (!sourceCountSpan) return;
 
-    if (!newContainer || !currentContainer) return;
+    // 2. Extract the new count value
+    const newCountValue = sourceCountSpan.innerHTML;
 
-    const newCount = newContainer.querySelector('[data-product-count]');
-    const currentCount = currentContainer.querySelector('[data-product-count]');
+    // 3. Helper function to update the existing elements on your page
+    const updateTarget = (elementId) => {
+      const container = document.getElementById(elementId);
+      if (container) {
+        // Target strictly the span inside the container
+        const targetSpan = container.querySelector('[data-product-count]');
+        
+        if (targetSpan) {
+          targetSpan.innerHTML = newCountValue;
+        }
+        
+        container.classList.remove('loading');
+      }
+    };
 
-    if (!newCount || !currentCount) return;
+    // 4. Update both Mobile and Desktop containers
+    updateTarget('ProductCount');
+    updateTarget('ProductCountDesktop');
 
-    // ✅ Update ONLY the number
-    currentCount.textContent = newCount.textContent;
-
-    // Dawn cleanup
+    // 5. Hide loading spinners
     document
       .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
