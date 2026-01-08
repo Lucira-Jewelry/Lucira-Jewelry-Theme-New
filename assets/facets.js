@@ -246,30 +246,21 @@ class FacetFiltersForm extends HTMLElement {
 
   static renderProductCount(html) {
     const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
-    
-    // Find the new count value from the incoming HTML
-    const newCountElement = parsedHTML.querySelector('[data-product-count]');
-    if (!newCountElement) return;
 
-    const newCountValue = newCountElement.textContent.trim();
+    const newContainer = parsedHTML.getElementById('ProductCount');
+    const currentContainer = document.getElementById('ProductCount');
 
-    // Helper function to update only the span inside a container
-    const updateSpan = (containerId) => {
-      const container = document.getElementById(containerId);
-      if (container) {
-        const span = container.querySelector('[data-product-count]');
-        if (span) {
-          span.textContent = newCountValue;
-        }
-        container.classList.remove('loading');
-      }
-    };
+    if (!newContainer || !currentContainer) return;
 
-    // Update both mobile and desktop instances
-    updateSpan('ProductCount');
-    updateSpan('ProductCountDesktop');
+    const newCount = newContainer.querySelector('[data-product-count]');
+    const currentCount = currentContainer.querySelector('[data-product-count]');
 
-    // Hide loading spinners
+    if (!newCount || !currentCount) return;
+
+    // ✅ Update ONLY the number
+    currentCount.textContent = newCount.textContent;
+
+    // Dawn cleanup
     document
       .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
