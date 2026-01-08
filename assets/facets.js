@@ -245,42 +245,34 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderProductCount(html) {
-  const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
+    const parsedHTML = new DOMParser().parseFromString(html, 'text/html');
 
-  // 1. Define the live containers on the current page
-  const liveContainer = document.getElementById('ProductCount');
-  const liveContainerDesktop = document.getElementById('ProductCountDesktop');
+    // 1. Get the LIVE elements from your current page
+    const liveContainer = document.getElementById('ProductCount');
+    const liveContainerDesktop = document.getElementById('ProductCountDesktop');
 
-  // 2. Try to find the new data in the incoming HTML
-  const sourceContainer = parsedHTML.getElementById('ProductCount');
+    // 2. Extract the NEW count value from the incoming HTML
+    // We look for the ID, then the span inside it
+    const newCountElement = parsedHTML.querySelector('#ProductCount [data-product-count]');
+    const newCountValue = newCountElement ? newCountElement.innerHTML : null;
 
-  // 3. Update logic: Only run if we successfully found the new data
-  if (sourceContainer) {
-    const sourceSpan = sourceContainer.querySelector('[data-product-count]');
-    const newCountValue = sourceSpan ? sourceSpan.innerHTML : null;
-
-    // Helper to update a specific container
-    const updateContainer = (container) => {
-      if (container && newCountValue) {
-        const targetSpan = container.querySelector('[data-product-count]');
-        if (targetSpan) {
-          targetSpan.innerHTML = newCountValue;
+    // 3. Update the LIVE spans ONLY if we found a new value
+    if (newCountValue !== null) {
+      [liveContainer, liveContainerDesktop].forEach(container => {
+        if (container) {
+          const span = container.querySelector('[data-product-count]');
+          if (span) span.innerHTML = newCountValue;
         }
-      }
-    };
+      });
+    }
 
-    updateContainer(liveContainer);
-    updateContainer(liveContainerDesktop);
-  }
+    // 4. FIX: Always remove 'loading' class so the element becomes visible
+    if (liveContainer) liveContainer.classList.remove('loading');
+    if (liveContainerDesktop) liveContainerDesktop.classList.remove('loading');
 
-  // 4. CRITICAL FIX: Remove 'loading' class ALWAYS, even if sourceContainer was missing.
-  // This ensures the text becomes visible again.
-  if (liveContainer) liveContainer.classList.remove('loading');
-  if (liveContainerDesktop) liveContainerDesktop.classList.remove('loading');
-
-  // 5. Hide any other loading spinners
-  document
-    .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
+    // 5. Cleanup spinners
+    document
+      .querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner')
       .forEach((spinner) => spinner.classList.add('hidden'));
   }
 
