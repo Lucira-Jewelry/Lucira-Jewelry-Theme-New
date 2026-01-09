@@ -2,7 +2,7 @@
   assign product_form_id = 'product-form-' | append: section.id
 -%}
 
-{%- if option.name == 'Size' -%}
+{%- if option.name == 'Size' or option.name == 'Color' -%}
   {%- assign sorted_values = option.values | sort -%}
 {%- else -%}
   {%- assign sorted_values = option.values -%}
@@ -130,6 +130,7 @@
       {%- elsif option.name == 'Size' -%}
         {% assign selected_color = product.selected_or_first_available_variant.option1 %}
         {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+
         <span class="variant-text" style="display: inline-block !important;">
           {{ value }}
           <span class="Variant_Stock_Status" data-size="{{ value }}">
@@ -141,6 +142,7 @@
           </span>
           {{ label_unavailable }}
         </span>
+
         {% for variant in product.variants %}
           {% if variant.option2 == value %}
             <script>
@@ -153,6 +155,7 @@
             </script>
           {% endif %}
         {% endfor %}
+
       {%- else -%}
         <span class="variant-text">
           {{ value }}
@@ -207,18 +210,97 @@
       if (stock && stock.available && Number(stock.inventory) > 0) {
         el.innerHTML = '<span class="stock-active">In Stock</span>';
       }
+
+      // Optional: visually disable unavailable sizes (uncomment if needed)
+      /*
+      var sizeInput = document.querySelector('input[name^="Size"][value="'+ size +'"]');
+      if (sizeInput) sizeInput.disabled = !(stock && stock.available);
+      */
     });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
+    // Initial render based on current selected color
     updateSizeStockStatus('{{ product.selected_or_first_available_variant.option1 | escape }}');
+
+    // Trigger update when color changes (radio buttons)
     document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
       radio.addEventListener('change', function(){ updateSizeStockStatus(this.value); });
     });
+
+    // Also react to Shopify variant:change event (Dawn theme support)
     document.addEventListener('variant:change', function (evt) {
       if (evt.detail && evt.detail.variant) {
         updateSizeStockStatus(evt.detail.variant.option1);
       }
     });
   });
+</script>
+
+<script>
+  (function () {
+
+    function normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+
+        // 09KT → 9KT (ONLY this remains)
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+
+        node.nodeValue = t;
+      }
+    }
+
+    /* ---------- 1. Initial page load ---------- */
+    document.addEventListener('DOMContentLoaded', function () {
+      normalizeVariantText(document.body);
+    });
+
+    /* ---------- 2. When drawer trigger is clicked ---------- */
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#product_variant_drawer')) {
+        setTimeout(function () {
+          const drawer = document.getElementById('variant-drawer');
+          if (drawer) normalizeVariantText(drawer);
+        }, 0);
+      }
+    });
+
+    /* ---------- 3. Shopify variant change ---------- */
+    document.addEventListener('variant:change', function () {
+      const drawer = document.getElementById('variant-drawer');
+      if (drawer) {
+        setTimeout(() => normalizeVariantText(drawer), 0);
+      }
+    });
+
+    /* ---------- 4. Safety net for AJAX re-renders ---------- */
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (
+            node.nodeType === 1 &&
+            node.closest &&
+            node.closest('#variant-drawer')
+          ) {
+            normalizeVariantText(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+
+  })();
 </script>
