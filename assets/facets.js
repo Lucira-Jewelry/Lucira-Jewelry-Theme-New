@@ -1,8 +1,3 @@
-// ============================================
-// OPTIMIZED FACET FILTERS SYSTEM
-// Performance improvements for jewelry e-commerce
-// ============================================
-
 // Utility: Enhanced debounce with immediate option
 function debounce(func, wait, immediate = false) {
   let timeout;
