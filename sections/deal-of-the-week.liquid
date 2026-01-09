@@ -1,59 +1,58 @@
-
-
 <div
-  class="deal-week-container"
-  data-section="lazy-products"
-  data-threshold="0.3"
+  class="lazy-section deal-week-lazy"
+  data-section-id="deal-week-content"
 >
-  <div class="deal-week-container">
-    <!-- your skeleton markup -->
+  <!-- ===== Skeleton Loader ===== -->
+  <div class="deal-week-skeleton-wrapper">
+    {% for i in (1..8) %}
+      <div class="deal-week-skeleton-card"></div>
+    {% endfor %}
   </div>
 </div>
 
-
 <script>
-  document.addEventListener('DOMContentLoaded', () => {
-    const lazySections = document.querySelectorAll('.deal-week-container');
+document.addEventListener('DOMContentLoaded', () => {
 
-    if (!lazySections.length) return;
+  const lazySections = document.querySelectorAll('.lazy-section');
+  if (!lazySections.length) return;
 
-    const observer = new IntersectionObserver(
-      async (entries, obs) => {
-        for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
+  const observer = new IntersectionObserver(async (entries, obs) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
 
-          const el = entry.target;
-          obs.unobserve(el);
+      const el = entry.target;
+      obs.unobserve(el);
 
-          const sectionId = el.dataset.section;
-          if (!sectionId) return;
+      const sectionId = el.dataset.sectionId;
+      if (!sectionId) return;
 
-          try {
-            const res = await fetch(`${Shopify.routes.root}?section_id=deal-week-content`);
+      try {
+        const res = await fetch(
+          `${Shopify.routes.root}?section_id=${sectionId}`
+        );
 
-            if (!res.ok) throw new Error('Section fetch failed');
+        if (!res.ok) throw new Error('Section fetch failed');
 
-            const html = await res.text();
-            el.innerHTML = html;
+        const html = await res.text();
+        el.innerHTML = html;
 
-            /* 🔁 Re-trigger Shopify section JS if needed */
-            document.dispatchEvent(
-              new CustomEvent('shopify:section:load', {
-                detail: { sectionId },
-              })
-            );
-          } catch (err) {
-            console.error('Lazy section error:', err);
-            el.remove(); // or show fallback
-          }
-        }
-      },
-      {
-        rootMargin: '200px',
-        threshold: 0.3,
+        // Shopify hooks
+        document.dispatchEvent(
+          new CustomEvent('shopify:section:load', {
+            detail: { sectionId }
+          })
+        );
+
+      } catch (err) {
+        console.error('Lazy section error:', err);
+        el.remove();
       }
-    );
-
-    lazySections.forEach((el) => observer.observe(el));
+    }
+  }, {
+    rootMargin: '200px',
+    threshold: 0.3
   });
+
+  lazySections.forEach(el => observer.observe(el));
+});
 </script>
