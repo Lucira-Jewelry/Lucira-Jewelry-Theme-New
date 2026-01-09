@@ -617,13 +617,11 @@
 {{ 'product-detail.css' | asset_url | stylesheet_tag: preload: true }}
 
 {% if section.settings.image_shape == 'blob' %}
-  <link rel="preload" href="{{ 'mask-blobs.css' | asset_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="{{ 'mask-blobs.css' | asset_url }}"></noscript>
+  {{ 'mask-blobs.css' | asset_url | stylesheet_tag: preload: true }}
 {%- endif -%}
 
 {%- unless section.settings.quick_add == 'none' -%}
-  <link rel="preload" href="{{ 'quick-add.css' | asset_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
-  <noscript><link rel="stylesheet" href="{{ 'quick-add.css' | asset_url }}"></noscript>
+  {{ 'quick-add.css' | asset_url | stylesheet_tag: preload: true }}
 {%- endunless -%}
 
 {%- if section.settings.quick_add == 'standard' -%}
@@ -657,36 +655,12 @@
       padding-bottom: {{ section.settings.padding_bottom }}px;
     }
   }
-  
-  /* CLS Prevention - Keep layout stable */
-  .product-grid {
-    display: grid;
-    gap: 16px;
-    grid-template-columns: repeat({{ section.settings.columns_mobile }}, 1fr);
-  }
-  
-  @media screen and (min-width: 750px) {
-    .product-grid {
-      grid-template-columns: repeat({{ section.settings.columns_desktop }}, 1fr);
-    }
-  }
-  
-  .grid__item {
-    min-height: 1px; /* Prevent collapse */
-  }
-  
-  .lucira-plp-pg-component-image {
-    width: 100%;
-    height: auto;
-    aspect-ratio: 374/420; /* Maintain aspect ratio */
-    background-color: #f5f5f5; /* Placeholder color */
-  }
 {%- endstyle -%}
 
 <div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
   {%- paginate collection.products by section.settings.products_per_page -%}
     {% comment %} Sort is the first tabbable element when filter type is vertical {% endcomment %}
-    {% comment %} {%- if section.settings.enable_sorting and section.settings.filter_type == 'vertical' -%}
+    {%- if section.settings.enable_sorting and section.settings.filter_type == 'vertical' -%}
       <facet-filters-form class="facets facets-vertical-sort page-width small-hide">
         <form class="facets-vertical-form" id="FacetSortForm">
           <div class="facet-filters sorting caption">
@@ -742,7 +716,7 @@
           </div>
         </form>
       </facet-filters-form>
-    {%- endif -%} {% endcomment %}
+    {%- endif -%}
 
     <div class="{% if section.settings.filter_type == 'vertical' %} facets-vertical page-width{% endif %}">
       {{ 'component-facets.css' | asset_url | stylesheet_tag: preload: true }}
@@ -827,27 +801,27 @@
                       <div class="lucira-plp-pg-component">
                           <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
                           {% if section.settings.plp_banner_id != blank %}
-                          {% comment %} Preload banner image for LCP {% endcomment %}
+                          {% comment %} Performance optimization: Add preload for banner {% endcomment %}
                           {% if forloop.index0 == banner_position %}
-                            <link rel="preload" as="image" href="{{ section.settings.plp_banner_id | img_url: 'master' }}" imagesrcset="{% if section.settings.plp_banner_mobile_id != blank %}{{ section.settings.plp_banner_mobile_id | img_url: 'master' }} 750w,{% endif %} {{ section.settings.plp_banner_id | img_url: 'master' }} 1200w">
+                            <link rel="preload" as="image" href="{{ section.settings.plp_banner_id | img_url: 'master' }}" fetchpriority="high">
+                            {% if section.settings.plp_banner_mobile_id != blank %}
+                              <link rel="preload" as="image" href="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}" media="(max-width: 749px)" fetchpriority="high">
+                            {% endif %}
                           {% endif %}
                           
                           <picture class="lucira-plp-pg-component-image-wrapper-picture">
                               {% if section.settings.plp_banner_mobile_id != blank %}
-                                <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
+                                <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}" width="750" height="auto">
                               {% endif %}
                               <img class="lucira-plp-pg-component-image" 
                                   src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
-                                  srcset="{% if section.settings.plp_banner_mobile_id != blank %}{{ section.settings.plp_banner_mobile_id | img_url: 'master' }} 750w,{% endif %} {{ section.settings.plp_banner_id | img_url: 'master' }} 1200w"
-                                  sizes="(max-width: 749px) 100vw, 50vw"
                                   alt="PLP Banner" 
                                   title="PLP Banner" 
                                   href="https://www.lucirajewelry.com/collections/hexa"
-                                  width="374" 
-                                  height="420"
+                                  width="374" height="420"
                                   loading="eager"
                                   fetchpriority="high">
-                            </picture>
+                                </picture>
                           {% endif %}
                       </div>
                   </div>
@@ -905,67 +879,42 @@
 {% render 'product-collection-card' %}
 
 <script>
-  // Performance optimization: Load heavy scripts after page is interactive
+  // Performance optimization: Defer heavy scripts and analytics
   document.addEventListener('DOMContentLoaded', function() {
-    // Initialize Intersection Observer for lazy loading
-    if ('IntersectionObserver' in window) {
-      const lazyLoadObserver = new IntersectionObserver(function(entries) {
-        entries.forEach(function(entry) {
-          if (entry.isIntersecting) {
-            const lazyElement = entry.target;
-            
-            // Handle lazy images
-            if (lazyElement.tagName === 'IMG' && lazyElement.dataset.src) {
-              lazyElement.src = lazyElement.dataset.src;
-              if (lazyElement.dataset.srcset) {
-                lazyElement.srcset = lazyElement.dataset.srcset;
-              }
-              lazyElement.classList.remove('lazy');
-              lazyLoadObserver.unobserve(lazyElement);
-            }
-            
-            // Handle lazy background images
-            if (lazyElement.dataset.bg) {
-              lazyElement.style.backgroundImage = `url(${lazyElement.dataset.bg})`;
-              lazyLoadObserver.unobserve(lazyElement);
-            }
+    // Initialize Intersection Observer for infinite scroll
+    const infiniteScroll = document.querySelector('infinite-scroll');
+    if (infiniteScroll && 'IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting && !window.isLoadingMore) {
+            loadMoreProducts();
           }
         });
       }, {
-        rootMargin: '50px 0px',
+        rootMargin: '200px 0px',
         threshold: 0.1
       });
-
-      // Observe lazy images
-      document.querySelectorAll('img[data-src]').forEach(function(img) {
-        lazyLoadObserver.observe(img);
-      });
-
-      // Observe elements with lazy backgrounds
-      document.querySelectorAll('[data-bg]').forEach(function(el) {
-        lazyLoadObserver.observe(el);
-      });
+      
+      io.observe(infiniteScroll);
     }
+    
+    // Prefetch next page for faster loading
+    setTimeout(() => {
+      const nextPageLink = document.querySelector('infinite-scroll a[href]');
+      if (nextPageLink) {
+        const link = document.createElement('link');
+        link.rel = 'prefetch';
+        link.href = nextPageLink.href;
+        document.head.appendChild(link);
+      }
+    }, 2000);
+  });
 
-    // Infinite scroll with Intersection Observer
-    const infiniteScrollElement = document.querySelector('infinite-scroll');
-    if (infiniteScrollElement && 'IntersectionObserver' in window) {
-      const infiniteScrollObserver = new IntersectionObserver(function(entries) {
-        if (entries[0].isIntersecting) {
-          loadMoreProducts();
-        }
-      }, {
-        rootMargin: '100px 0px',
-        threshold: 0.1
-      });
-
-      infiniteScrollObserver.observe(infiniteScrollElement);
-    }
-
-    // Defer GTM events until after page is fully loaded
-    window.addEventListener('load', function() {
-      setTimeout(function() {
-        window.dataLayer = window.dataLayer || [];
+  // GTM events - deferred execution
+  window.addEventListener('load', function() {
+    setTimeout(function() {
+      window.dataLayer = window.dataLayer || [];
+      (function() {
         var products = [
           {% for product in collection.products limit: section.settings.products_per_page %}
             {
@@ -981,32 +930,21 @@
           {% endfor %}
         ];
 
-        // Filter out any products with missing essential details
+        // Filter out any products with missing essential details (optional safety)
         products = products.filter(function(p) {
           return p.item_id && p.item_name && p.price != null;
         });
 
-        // Push to dataLayer
+        // Push to dataLayer asynchronously to avoid blocking rendering
         window.dataLayer.push({
           event: 'productImpression',
           products: products
         });
-      }, 500); // Delay to prioritize page rendering
-    });
-
-    // Prefetch next page for faster navigation
-    const nextPageLink = document.querySelector('infinite-scroll a[href]');
-    if (nextPageLink) {
-      setTimeout(function() {
-        const link = document.createElement('link');
-        link.rel = 'prefetch';
-        link.href = nextPageLink.href;
-        document.head.appendChild(link);
-      }, 2000); // Prefetch after 2 seconds
-    }
+      })();
+    }, 1000);
   });
 
-  // Optimized product click handler with passive listeners
+  // Product click handler with performance optimizations
   (function () {
     if (window.__gtmProductClickBound) return;
     window.__gtmProductClickBound = true;
@@ -1017,105 +955,139 @@
 
       event.preventDefault();
 
-      const productData = {
-        event: "productClick",
-        products: {
-          productId: link.dataset.productId,
-          variantId: link.dataset.variantId,
-          sku: link.dataset.sku,
-          productName: link.dataset.productName,
-          productType: link.dataset.productType,
-          productCategory: link.dataset.productCategory,
-          category: link.dataset.category,
-          subCategory: link.dataset.subCategory,
-          productUrl: link.dataset.productUrl || link.href,
-          thumbnailImage: link.dataset.thumbnailImage,
-          purity: link.dataset.purity,
-          price: link.dataset.price,
-          offerPrice: link.dataset.offerPrice,
-          expectedDeliveryDate: link.dataset.expectedDeliveryDate,
-          couponCode: link.dataset.couponCode,
-          makingCharges: link.dataset.makingCharges,
-          numberOfReview: link.dataset.numberOfReview,
-          rating: link.dataset.rating,
-          indexPosition: link.dataset.indexPosition
-        }
-      };
-
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push(productData);
-
       // Use requestAnimationFrame for smoother navigation
-      requestAnimationFrame(function() {
-        window.location.href = link.href;
+      requestAnimationFrame(() => {
+        const productData = {
+          event: "productClick",
+          products: {
+            productId: link.dataset.productId,
+            variantId: link.dataset.variantId,
+            sku: link.dataset.sku,
+            productName: link.dataset.productName,
+            productType: link.dataset.productType,
+            productCategory: link.dataset.productCategory,
+            category: link.dataset.category,
+            subCategory: link.dataset.subCategory,
+            productUrl: link.dataset.productUrl || link.href,
+            thumbnailImage: link.dataset.thumbnailImage,
+            purity: link.dataset.purity,
+            price: link.dataset.price,
+            offerPrice: link.dataset.offerPrice,
+            expectedDeliveryDate: link.dataset.expectedDeliveryDate,
+            couponCode: link.dataset.couponCode,
+            makingCharges: link.dataset.makingCharges,
+            numberOfReview: link.dataset.numberOfReview,
+            rating: link.dataset.rating,
+            indexPosition: link.dataset.indexPosition
+          }
+        };
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(productData);
+
+        // navigate after GTM registers
+        setTimeout(() => {
+          window.location.href = link.href;
+        }, 150);
       });
     }, { passive: false });
   })();
 
   // Infinite scroll loading function
   async function loadMoreProducts() {
-    const infiniteScroll = document.querySelector('infinite-scroll');
-    if (!infiniteScroll || infiniteScroll.loading) return;
+    if (window.isLoadingMore) return;
     
-    const nextLink = infiniteScroll.querySelector('a[href]');
+    const infiniteScroll = document.querySelector('infinite-scroll');
+    const nextLink = infiniteScroll ? infiniteScroll.querySelector('a[href]') : null;
+    
     if (!nextLink) return;
     
-    infiniteScroll.loading = true;
+    window.isLoadingMore = true;
     
     try {
+      // Show loading indicator
+      const loadingSpinner = document.createElement('div');
+      loadingSpinner.className = 'loading-spinner';
+      loadingSpinner.innerHTML = '<div class="spinner"></div>';
+      infiniteScroll.appendChild(loadingSpinner);
+      
       const response = await fetch(nextLink.href);
       const text = await response.text();
       
-      // Parse the HTML response
+      // Parse response
       const parser = new DOMParser();
       const doc = parser.parseFromString(text, 'text/html');
       
-      // Extract new products
-      const newProducts = doc.querySelectorAll('#product-grid .grid__item');
-      const productGrid = document.getElementById('product-grid');
-      
-      // Append new products
-      newProducts.forEach(product => {
-        productGrid.appendChild(product);
-      });
-      
-      // Update infinite scroll link
-      const newNextLink = doc.querySelector('infinite-scroll a[href]');
-      if (newNextLink) {
-        nextLink.href = newNextLink.href;
-      } else {
-        infiniteScroll.style.display = 'none';
-      }
-      
-      // Re-initialize lazy loading for new images
-      if ('IntersectionObserver' in window) {
-        const observer = new IntersectionObserver(function(entries) {
-          entries.forEach(function(entry) {
-            if (entry.isIntersecting) {
-              const img = entry.target;
-              if (img.dataset.src) {
-                img.src = img.dataset.src;
-              }
-              if (img.dataset.srcset) {
-                img.srcset = img.dataset.srcset;
-              }
-              observer.unobserve(img);
-            }
-          });
+      // Find new products
+      const newProductsContainer = doc.getElementById('product-grid');
+      if (newProductsContainer) {
+        const currentGrid = document.getElementById('product-grid');
+        const newProducts = Array.from(newProductsContainer.children);
+        
+        // Append new products with animation delay
+        newProducts.forEach((product, index) => {
+          setTimeout(() => {
+            currentGrid.appendChild(product.cloneNode(true));
+          }, index * 50);
         });
         
-        doc.querySelectorAll('img[data-src]').forEach(img => {
-          observer.observe(img);
-        });
+        // Update the next link
+        const newNextLink = doc.querySelector('infinite-scroll a[href]');
+        if (newNextLink) {
+          nextLink.href = newNextLink.href;
+        } else {
+          infiniteScroll.style.display = 'none';
+        }
+      }
+      
+      // Remove loading spinner
+      if (loadingSpinner.parentNode) {
+        loadingSpinner.parentNode.removeChild(loadingSpinner);
       }
       
     } catch (error) {
       console.error('Error loading more products:', error);
     } finally {
-      infiniteScroll.loading = false;
+      window.isLoadingMore = false;
     }
   }
 </script>
+
+<style>
+  /* Performance optimization: Critical CSS for CLS prevention */
+  .product-grid {
+    display: grid;
+    gap: 16px;
+  }
+  
+  .lucira-plp-pg-component-image {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 374/420;
+  }
+  
+  /* Loading spinner styles */
+  .loading-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 20px;
+    width: 100%;
+  }
+  
+  .loading-spinner .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #3498db;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+</style>
 
 <script type="application/ld+json">
 {
@@ -1132,7 +1104,7 @@
 }
 </script>
 
-<script defer type="application/ld+json">
+<script type="application/ld+json">
 {
   "@context": "https://schema.org",
   "@type": "ItemList",
