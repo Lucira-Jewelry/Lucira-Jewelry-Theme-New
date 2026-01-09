@@ -4,14 +4,22 @@
 
   {% liquid
     assign LIMIT = 16
+    assign count = 0
+    assign rendered = ''
     assign primary = ''
     assign fallback = ''
+
+    # Get all handles once to check for specific priority
     assign all_handles = product.collections | map: 'handle'
   %}
   
   {% for c in product.collections %}
     {% assign h = c.handle %}
 
+    {% comment %} 
+      FIX: If the product is a Sui Dhaga, we force the primary mapping immediately 
+      to ensure it doesn't get skipped by other collections.
+    {% endcomment %}
     {% if all_handles contains 'sui-dhagas' %}
        {% assign primary = 'sui-dhagas' %}
        {% assign fallback = 'all-earrings' %}
@@ -46,6 +54,7 @@
       {% assign primary = 'mens-engagement-rings' %}
       {% assign fallback = 'mens-ring,jewelry-mens-collection' %}
       {% break %}
+
     {% elsif h == 'solitaire-rings' %}
       {% assign primary = 'solitaire-rings' %}
       {% assign fallback = 'all-rings' %}
@@ -62,6 +71,7 @@
       {% assign primary = 'casual-rings' %}
       {% assign fallback = 'all-rings' %}
       {% break %}
+
     {% elsif h == 'eternity-wedding-rings' %}
       {% assign primary = 'eternity-wedding-rings' %}
       {% assign fallback = 'wedding-rings,all-rings' %}
@@ -82,10 +92,12 @@
       {% assign primary = 'mens-wedding-rings' %}
       {% assign fallback = 'mens-ring,jewelry-mens-collection' %}
       {% break %}
+
     {% elsif h == 'mens-ring' %}
       {% assign primary = 'mens-ring' %}
       {% assign fallback = 'jewelry-mens-collection' %}
       {% break %}
+    
     {% elsif h == 'hoop-earrings' %}
       {% assign primary = 'hoop-earrings' %}
       {% assign fallback = 'all-earrings' %}
@@ -118,6 +130,7 @@
       {% assign primary = 'mens-stud' %}
       {% assign fallback = 'all-earrings' %}
       {% break %}
+
     {% elsif h == 'chain-bracelets' %}
       {% assign primary = 'chain-bracelets' %}
       {% assign fallback = 'all-bracelets' %}
@@ -137,6 +150,7 @@
     {% elsif h == 'mens-bracelets' %}
       {% assign primary = 'mens-bracelets' %}
       {% break %}
+
     {% elsif h == 'chain-necklaces' %}
       {% assign primary = 'chain-necklaces' %}
       {% assign fallback = 'all-necklaces' %}
@@ -165,32 +179,25 @@
   {% endif %}
 
   <div class="ymal-grid">
-    {% liquid
-      assign scan = primary | append: ',' | append: fallback | split: ',' | uniq
-      assign product_pool = "" | split: ""
-      assign temp_ids = ""
-      
-      for handle in scan
-        assign col = collections[handle]
-        if col
-          for p in col.products
-            if p.id != product.id
-              unless temp_ids contains p.id
-                assign p_array = p | sort
-                assign product_pool = product_pool | concat: p_array
-                assign temp_ids = temp_ids | append: p.id | append: ","
-              endunless
-            endif
-          endfor
-        endif
-      endfor
+    {% assign scan = primary | append: ',' | append: fallback | split: ',' | uniq %}
 
-      assign sorted_products = product_pool | sort: 'price'
-      
-      for p in sorted_products limit: LIMIT
-        render 'card-product', card_product: p
-      endfor
-    %}
+    {% for handle in scan %}
+      {% assign col = collections[handle] %}
+      {% if col and count < LIMIT %}
+        {% for p in col.products %}
+          {% if count >= LIMIT %}
+            {% break %}
+          {% endif %}
+          {% if p.id != product.id %}
+            {% unless rendered contains p.id %}
+              {% render 'card-product', card_product: p %}
+              {% assign rendered = rendered | append: p.id | append: ',' %}
+              {% assign count = count | plus: 1 %}
+            {% endunless %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
   </div>
 </div>
 
