@@ -132,14 +132,8 @@ class FacetFiltersForm extends HTMLElement {
     const sections = FacetFiltersForm.getSections();
     const countContainer = document.getElementById('ProductCount');
     const countContainerDesktop = document.getElementById('ProductCountDesktop');
-    
-    // CRITICAL: Store scroll position IMMEDIATELY before any DOM manipulation
     const scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
-    
-    // Store globally for restoration
     window.lastScrollPosition = scrollY;
-    
-    // Show preloader
     FacetFiltersForm.showPreloader();
     
     const loadingSpinners = document.querySelectorAll(
@@ -181,8 +175,6 @@ class FacetFiltersForm extends HTMLElement {
         FacetFiltersForm.renderProductGridContainer(html);
         FacetFiltersForm.renderProductCount(html);
         if (typeof initializeScrollAnimationTrigger === 'function') initializeScrollAnimationTrigger(html.innerHTML);
-        
-        // Restore scroll position after render
         FacetFiltersForm.restoreScrollPosition();
       })
       .catch((error) => {
@@ -197,33 +189,21 @@ class FacetFiltersForm extends HTMLElement {
     FacetFiltersForm.renderProductGridContainer(html);
     FacetFiltersForm.renderProductCount(html);
     if (typeof initializeScrollAnimationTrigger === 'function') initializeScrollAnimationTrigger(html.innerHTML);
-    
-    // Restore scroll position after render
     FacetFiltersForm.restoreScrollPosition();
   }
 
   static restoreScrollPosition() {
     const scrollY = window.lastScrollPosition || 0;
-    
-    // Multiple attempts to ensure scroll restoration
     const restoreScroll = () => {
       if (window.pageYOffset !== scrollY) {
         window.scrollTo(0, scrollY);
       }
     };
-    
-    // Immediate restoration
     restoreScroll();
-    
-    // Double-check with RAF
     requestAnimationFrame(() => {
       restoreScroll();
-      
-      // Triple-check after another frame
       requestAnimationFrame(() => {
         restoreScroll();
-        
-        // Hide preloader after scroll is definitely restored
         setTimeout(() => {
           FacetFiltersForm.hidePreloader();
         }, 50);
