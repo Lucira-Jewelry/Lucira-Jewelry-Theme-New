@@ -160,9 +160,7 @@ document.addEventListener("click", function (e) {
     '.fixed-cta-whatsapp a[href*="wa.me"]'
   );
 
-  if (!whatsappAnchor) return;
-
-  // Get URL param
+// Get URL param
   function getParam(param) {
     return new URLSearchParams(window.location.search).get(param);
   }
@@ -182,6 +180,9 @@ document.addEventListener("click", function (e) {
 
   // Console log for testing
   console.table("WhatsApp fbclid:",  getCookie("CLID"));
+
+
+  if (!whatsappAnchor) return;  
 
   // Fire Nitro event
   if (window.nitro && typeof window.nitro.track === "function") {
