@@ -23,8 +23,9 @@
   function loadSecondaryImage(mediaContainer, secondaryImg) {
     const imageId = secondaryImg.id;
     
-    // If already loaded, just return
+    // If already loaded, just show it
     if (loadedImages.has(imageId)) {
+      secondaryImg.style.display = '';
       return;
     }
     
@@ -66,6 +67,9 @@
         secondaryImg.sizes = sizes;
         secondaryImg.removeAttribute('data-sizes');
       }
+      
+      // Show the image
+      secondaryImg.style.display = '';
       
       // Mark as loaded
       loadedImages.add(imageId);
