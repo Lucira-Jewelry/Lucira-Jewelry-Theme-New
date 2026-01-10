@@ -170,7 +170,7 @@ document.addEventListener("click", function (e) {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
       //page_type: "{{ template.name }}",
-      "meta_id": fbID
+      "meta_id": fbID,
     });
   }
 });
