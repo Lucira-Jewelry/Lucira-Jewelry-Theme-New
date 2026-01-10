@@ -154,7 +154,6 @@ $(document).ready(function(){
   }
 })();
 
-
 (function() {
   function getCookie(name) {
     const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
