@@ -154,24 +154,6 @@ $(document).ready(function(){
   }
 })();
 
-document.addEventListener("click", function (e) {
-  var whatsappAnchor = e.target.closest(
-    '.fixed-cta-whatsapp a[href*="wa.me"]'
-  );
-
-  if (!whatsappAnchor) return;
-  function getParam(param) {
-    return new URLSearchParams(window.location.search).get(param);
-  }
-
-  if (window.nitro && typeof window.nitro.track === "function") {
-    window.nitro.track("whatsapp_click", {
-      page_url: window.location.href,
-      page_type: "{{ canonical.url }}",
-      "meta_id": getParam('fbclid')
-    });
-  }
-});
 
 (function() {
   function getCookie(name) {
