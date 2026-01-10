@@ -171,8 +171,6 @@ $(document).ready(function(){
 
     var fbclid = getCookie("_fbc");
 
-    console.log("WhatsApp fbclid:", fbclid);
-
     if (window.nitro && typeof window.nitro.track === "function") {
       var payload = {
         page_url: window.location.href
