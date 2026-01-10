@@ -180,7 +180,7 @@ document.addEventListener("click", function (e) {
     getCookie("_fbc"); // Meta sometimes stores it as _fbc
 
   // Console log for testing
-  console.log("WhatsApp fbclid:", fbclid);
+  console.table("WhatsApp fbclid:", fbclid);
 
   // Fire Nitro event
   if (window.nitro && typeof window.nitro.track === "function") {
