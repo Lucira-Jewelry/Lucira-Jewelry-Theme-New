@@ -107,73 +107,47 @@ $(document).ready(function(){
 });
 
 (function() {
-  // 1. HELPER: Get URL parameters
   function getParam(param) {
     return new URLSearchParams(window.location.search).get(param);
   }
-
-  // 2. HELPER: Set Cookie (FIXED: Added SameSite=Lax; Secure)
   function setCookie(name, value, days = 90) {
     const date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    // This line now satisfies Chrome's security requirements
-    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/; SameSite=Lax; Secure`;
+    date.setTime(date.getTime() + (days*24*60*60*1000));
+    document.cookie = `${name}=${encodeURIComponent(value)}; expires=${date.toUTCString()}; path=/`;
   }
-
-  // 3. HELPER: Get Cookie
   function getCookie(name) {
     const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
     return match ? decodeURIComponent(match[2]) : null;
   }
-
-  // --- CAPTURE DATA ---
   const utm_source = getParam('utm_source');
   const utm_medium = getParam('utm_medium');
   const utm_campaign = getParam('utm_campaign');
   const utm_term = getParam('utm_term');
   const utm_content = getParam('utm_content');
-  
-  // Capture Click IDs independently
   const gclid = getParam('gclid');
-  const fbclid = getParam('fbclid'); // Capture Facebook Click ID
-
+  const fbclid = getParam('fbclid');
   const referrer = document.referrer;
-
-  // Check if standard UTMs exist
   const hasUTM = utm_source && utm_medium && utm_campaign;
-  
-  // Logic helpers
   const isDirect = (!referrer || referrer.includes(window.location.hostname)) && !hasUTM;
   const isReferral = referrer && !hasUTM && !referrer.includes(window.location.hostname);
-  
   const existingSource = getCookie('utm_source');
   const existingMedium = getCookie('utm_medium');
-
-  // --- LOGIC EXECUTION ---
-
-  // 1. Always save Click IDs if they exist (Moved outside hasUTM check)
-  if (gclid) setCookie('gclid', gclid);
-  if (fbclid) setCookie('fbclid', fbclid);
-
-  // 2. Save Standard UTMs if present
   if (hasUTM) {
     setCookie('utm_source', utm_source);
     setCookie('utm_medium', utm_medium);
     setCookie('utm_campaign', utm_campaign);
     if (utm_term) setCookie('utm_term', utm_term);
     if (utm_content) setCookie('utm_content', utm_content);
-    
+    if (gclid) setCookie('gclid', gclid);
+    if (fbclid) setCookie('fbclid', fbclid);
   } else if (isReferral) {
-    // 3. Organic Referral Logic (only if no UTMs)
     if (!existingSource || !existingMedium) {
       const link = document.createElement('a');
       link.href = referrer;
       setCookie('utm_source', link.hostname);
       setCookie('utm_medium', 'referral');
     }
-
   } else if (isDirect) {
-    // 4. Direct Traffic Logic
     if (!existingSource) {
       console.log('Direct traffic, first-time visitor, no cookies stored.');
     }
@@ -203,7 +177,8 @@ document.addEventListener("click", function (e) {
   var fbclid =
     getParam("fbclid") ||
     getCookie("fbclid") ||
-    getCookie("_fbc"); // Meta sometimes stores it as _fbc
+    getCookie("_fbc") || 
+    getCookie("CLID"); // Meta sometimes stores it as _fbc
 
   // Console log for testing
   console.table("WhatsApp fbclid:", fbclid);
