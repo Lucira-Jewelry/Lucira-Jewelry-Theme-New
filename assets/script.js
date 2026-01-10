@@ -154,37 +154,24 @@ $(document).ready(function(){
   }
 })();
 
-// Nitro custom event - WhatsApp click
 document.addEventListener("click", function (e) {
   var whatsappAnchor = e.target.closest(
     '.fixed-cta-whatsapp a[href*="wa.me"]'
   );
 
-// Get URL param
-  function getParam(param) {
-    return new URLSearchParams(window.location.search).get(param);
-  }
+  if (!whatsappAnchor) return;
 
-  // Get cookie value
   function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    var match = document.cookie.match(
+      new RegExp("(^| )" + name + "=([^;]+)")
+    );
     return match ? decodeURIComponent(match[2]) : null;
   }
 
-  // fbclid from URL first, fallback to cookie
-  var fbclid =
-    getParam("fbclid") ||
-    getCookie("fbclid") ||
-    getCookie("_fbc") || 
-    getCookie("cart"); // Meta sometimes stores it as _fbc
+  var fbclid = getCookie("_fbc");
 
-  // Console log for testing
-  console.table("WhatsApp fbclid:",  getCookie("CLID"));
+  console.log("WhatsApp fbclid:", fbclid);
 
-
-  if (!whatsappAnchor) return;  
-
-  // Fire Nitro event
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
