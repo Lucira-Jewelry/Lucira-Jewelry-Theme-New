@@ -160,13 +160,15 @@ document.addEventListener("click", function (e) {
   );
 
   if (!whatsappAnchor) return;
-  console.table("test nitro");
+  function getParam(param) {
+    return new URLSearchParams(window.location.search).get(param);
+  }
 
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
       page_type: "{{ template.name }}",
-      "meta_id": fbclid
+      "meta_id": getParam('fbclid')
     });
   }
 });
