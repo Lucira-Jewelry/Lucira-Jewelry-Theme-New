@@ -154,35 +154,30 @@ $(document).ready(function(){
   }
 })();
 
-  //custome nitro event
-  document.addEventListener("click", function (e) {
-    var whatsappAnchor = e.target.closest(
-      '.fixed-cta-whatsapp a[href*="wa.me"]'
+//custome nitro event
+document.addEventListener("click", function (e) {
+  var whatsappAnchor = e.target.closest(
+    '.fixed-cta-whatsapp a[href*="wa.me"]'
+  );
+
+  if (!whatsappAnchor) return;
+
+  function getCookie(name) {
+    var match = document.cookie.match(
+      new RegExp("(^| )" + name + "=([^;]+)")
     );
+    return match ? decodeURIComponent(match[2]) : null;
+  }
 
-    if (!whatsappAnchor) return;
-
-    function getCookie(name) {
-      var match = document.cookie.match(
-        new RegExp("(^| )" + name + "=([^;]+)")
-      );
-      return match ? decodeURIComponent(match[2]) : null;
-    }
-
-    var fbclid = getCookie("_fbc");
-
-    if (window.nitro && typeof window.nitro.track === "function") {
-      var payload = {
-        page_url: window.location.href
-      };
-
-      if (fbclid) {
-        payload.meta_id = fbclid;
-      }
-
-      window.nitro.track("whatsapp_click", payload);
-    }
-  });
+  var fbclid = getCookie("_fbc");
+  
+  if (window.nitro && typeof window.nitro.track === "function") {
+    window.nitro.track("whatsapp_click", {
+      page_url: window.location.href,
+      fbclid && meta_id: fbclid
+    });
+  }
+});
 
 (function() {
   function getCookie(name) {
