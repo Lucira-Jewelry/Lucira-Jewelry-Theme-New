@@ -277,19 +277,3 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-document.addEventListener("click", function (e) {
-  var whatsappAnchor = e.target.closest(
-    '.fixed-cta-whatsapp a[href*="wa.me"]'
-  );
-
-  if (!whatsappAnchor) return;
-  console.table("test nitro");
-
-  if (window.nitro && typeof window.nitro.track === "function") {
-    window.nitro.track("whatsapp_click", {
-      page_url: window.location.href,
-      page_type: "{{ template.name }}",
-      meta_id: fbclid
-    });
-  }
-});
