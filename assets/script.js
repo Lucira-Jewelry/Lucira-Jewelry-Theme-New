@@ -154,6 +154,7 @@ $(document).ready(function(){
   }
 })();
 
+//custome nitro event
 document.addEventListener("click", function (e) {
   var whatsappAnchor = e.target.closest(
     '.fixed-cta-whatsapp a[href*="wa.me"]'
@@ -175,7 +176,7 @@ document.addEventListener("click", function (e) {
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
-      meta_id: fbclid
+      fbclid && meta_id: fbclid
     });
   }
 });
