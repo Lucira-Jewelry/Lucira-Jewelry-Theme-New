@@ -158,8 +158,6 @@ $(document).ready(function(){
 document.addEventListener("click", function (e) {
   // Find the WhatsApp anchor
   var whatsappAnchor = e.target.closest('a[href*="wa.me"]');
-
-  // Ensure click is from allowed WhatsApp wrappers
   if (
     !whatsappAnchor ||
     !whatsappAnchor.closest(".fixed-cta-whatsapp, .custom-wp_btn-link")
