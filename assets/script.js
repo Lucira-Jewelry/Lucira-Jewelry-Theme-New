@@ -173,11 +173,13 @@ document.addEventListener("click", function (e) {
   }
 
   var fbclid = getCookie("_fbc");
+  var customerMobile = "{{ customer.phone | default: '' }}";
 
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
-      meta_id: fbclid
+      meta_id: fbclid,
+      customer_mobile: customerMobile
     });
   }
 });
