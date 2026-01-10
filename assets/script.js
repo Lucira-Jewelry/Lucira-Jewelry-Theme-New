@@ -106,6 +106,8 @@ $(document).ready(function(){
   });
 });
 
+let fbID = "";
+
 (function() {
   function getParam(param) {
     return new URLSearchParams(window.location.search).get(param);
@@ -125,7 +127,9 @@ $(document).ready(function(){
   const utm_term = getParam('utm_term');
   const utm_content = getParam('utm_content');
   const gclid = getParam('gclid');
-  const fbclid = getParam('fbclid');
+  const 
+   = getParam('fbclid');
+   fbID = getParam('fbclid');
   const referrer = document.referrer;
   const hasUTM = utm_source && utm_medium && utm_campaign;
   const isDirect = (!referrer || referrer.includes(window.location.hostname)) && !hasUTM;
@@ -153,6 +157,23 @@ $(document).ready(function(){
     }
   }
 })();
+
+document.addEventListener("click", function (e) {
+  var whatsappAnchor = e.target.closest(
+    '.fixed-cta-whatsapp a[href*="wa.me"]'
+  );
+
+  if (!whatsappAnchor) return;
+  console.table("test nitro");
+
+  if (window.nitro && typeof window.nitro.track === "function") {
+    window.nitro.track("whatsapp_click", {
+      page_url: window.location.href,
+      //page_type: "{{ template.name }}",
+      "meta_id": fbID
+    });
+  }
+});
 
 (function() {
   function getCookie(name) {
