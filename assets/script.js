@@ -154,13 +154,18 @@ $(document).ready(function(){
   }
 })();
 
-//Custom nitro event
+// Custom Nitro WhatsApp event
 document.addEventListener("click", function (e) {
-  var whatsappAnchor = e.target.closest(
-    '.fixed-cta-whatsapp a[href*="wa.me"]'
-  );
+  // Find the WhatsApp anchor
+  var whatsappAnchor = e.target.closest('a[href*="wa.me"]');
 
-  if (!whatsappAnchor) return;
+  // Ensure click is from allowed WhatsApp wrappers
+  if (
+    !whatsappAnchor ||
+    !whatsappAnchor.closest(".fixed-cta-whatsapp, .custom-wp_btn-link")
+  ) {
+    return;
+  }
 
   function getCookie(name) {
     var match = document.cookie.match(
