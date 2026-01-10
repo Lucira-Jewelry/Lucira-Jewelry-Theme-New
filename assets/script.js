@@ -106,8 +106,6 @@ $(document).ready(function(){
   });
 });
 
-let fbID = "";
-
 (function() {
   function getParam(param) {
     return new URLSearchParams(window.location.search).get(param);
@@ -127,8 +125,7 @@ let fbID = "";
   const utm_term = getParam('utm_term');
   const utm_content = getParam('utm_content');
   const gclid = getParam('gclid');
-  const = getParam('fbclid');
-  fbID = getParam('fbclid');
+  const fbclid = getParam('fbclid');
   const referrer = document.referrer;
   const hasUTM = utm_source && utm_medium && utm_campaign;
   const isDirect = (!referrer || referrer.includes(window.location.hostname)) && !hasUTM;
@@ -168,8 +165,8 @@ document.addEventListener("click", function (e) {
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
-      //page_type: "{{ template.name }}",
-      "meta_id": fbID,
+      page_type: "{{ template.name }}",
+      "meta_id": fbclid
     });
   }
 });
