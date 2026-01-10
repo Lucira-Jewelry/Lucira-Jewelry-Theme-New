@@ -127,9 +127,8 @@ let fbID = "";
   const utm_term = getParam('utm_term');
   const utm_content = getParam('utm_content');
   const gclid = getParam('gclid');
-  const 
-   = getParam('fbclid');
-   fbID = getParam('fbclid');
+  const = getParam('fbclid');
+  fbID = getParam('fbclid');
   const referrer = document.referrer;
   const hasUTM = utm_source && utm_medium && utm_campaign;
   const isDirect = (!referrer || referrer.includes(window.location.hostname)) && !hasUTM;
