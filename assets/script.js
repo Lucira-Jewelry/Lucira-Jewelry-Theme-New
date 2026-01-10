@@ -176,7 +176,7 @@ document.addEventListener("click", function (e) {
   var customerMobile = "{{ customer.phone | default: '' }}";
 
   if (window.nitro && typeof window.nitro.track === "function") {
-    window.nitro.track("whatsapp_click", {
+    window.nitro.track("facebook_identify", {
       page_url: window.location.href,
       meta_id: fbclid,
       customer_mobile: customerMobile
