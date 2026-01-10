@@ -170,7 +170,7 @@ document.addEventListener("click", function (e) {
 
   var fbclid = getCookie("_fbc");
 
-  console.log("WhatsApp fbclid:", fbclid);
+  console.table("WhatsApp fbclid:", fbclid);
 
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
