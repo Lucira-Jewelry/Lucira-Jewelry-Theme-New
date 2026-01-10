@@ -288,7 +288,8 @@ document.addEventListener("click", function (e) {
   if (window.nitro && typeof window.nitro.track === "function") {
     window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
-      page_type: "{{ template.name }}"
+      page_type: "{{ template.name }}",
+      meta_id: fbclid
     });
   }
 });
