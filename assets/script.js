@@ -177,7 +177,8 @@ document.addEventListener("click", function (e) {
   var fbclid =
     getParam("fbclid") ||
     getCookie("fbclid") ||
-    getCookie("_fbc"); // Meta sometimes stores it as _fbc
+    getCookie("_fbc"); || 
+    getCookie("CLID"); // Meta sometimes stores it as _fbc
 
   // Console log for testing
   console.table("WhatsApp fbclid:", fbclid);
