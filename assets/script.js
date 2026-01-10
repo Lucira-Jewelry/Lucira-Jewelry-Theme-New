@@ -176,7 +176,7 @@ document.addEventListener("click", function (e) {
     getParam("fbclid") ||
     getCookie("fbclid") ||
     getCookie("_fbc") || 
-    getCookie("CLID"); // Meta sometimes stores it as _fbc
+    getCookie("cart"); // Meta sometimes stores it as _fbc
 
   // Console log for testing
   console.table("WhatsApp fbclid:",  getCookie("CLID"));
