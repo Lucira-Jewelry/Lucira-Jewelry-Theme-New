@@ -276,3 +276,18 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+
+document.addEventListener("click", function (e) {
+  var whatsappAnchor = e.target.closest(
+    '.fixed-cta-whatsapp a[href*="wa.me"]'
+  );
+
+  if (!whatsappAnchor) return;
+
+  if (window.nitrocommerce && typeof window.nitrocommerce.track === "function") {
+    window.nitrocommerce.track("whatsapp_click", {
+      page_url: window.location.href,
+      page_type: "{{ template.name }}"
+    });
+  }
+});
