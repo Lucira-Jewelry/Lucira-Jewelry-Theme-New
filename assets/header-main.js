@@ -285,8 +285,8 @@ document.addEventListener("click", function (e) {
   if (!whatsappAnchor) return;
   console.table("test nitro");
 
-  if (window.nitrocommerce && typeof window.nitrocommerce.track === "function") {
-    window.nitrocommerce.track("whatsapp_click", {
+  if (window.nitro && typeof window.nitro.track === "function") {
+    window.nitro.track("whatsapp_click", {
       page_url: window.location.href,
       page_type: "{{ template.name }}"
     });
