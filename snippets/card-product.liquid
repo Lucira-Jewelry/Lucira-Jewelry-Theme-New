@@ -1,3 +1,38 @@
+<style>
+  /* Add to your product-card.css or theme.css */
+.card__media .media {
+  position: relative;
+  overflow: hidden;
+}
+
+.secondary-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  will-change: opacity;
+}
+
+.secondary-image.loaded {
+  opacity: 1;
+}
+
+/* Hover effect - show secondary image */
+.card__inner:hover .secondary-image.loaded {
+  opacity: 1;
+}
+
+/* Ensure primary image stays visible when secondary hasn't loaded */
+.secondary-image:not(.loaded) {
+  display: none;
+}
+</style>
+
+
 {%- if card_product and card_product != empty -%}
   {%- liquid
     assign ratio = 1.4
@@ -684,3 +719,139 @@
   </div>
 {%- endif -%}
 
+<script>
+class LazySecondaryImageLoader {
+  constructor() {
+    this.initialized = false;
+    this.hoverTimeouts = new Map();
+    this.observedCards = new Set();
+    this.init();
+  }
+
+  init() {
+    if (this.initialized) return;
+    
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.setup());
+    } else {
+      this.setup();
+    }
+    
+    this.initialized = true;
+  }
+
+  setup() {
+    // Use IntersectionObserver to only setup hover listeners for visible cards
+    if ('IntersectionObserver' in window) {
+      this.setupIntersectionObserver();
+    } else {
+      // Fallback for older browsers
+      this.setupHoverForAllCards();
+    }
+  }
+
+  setupIntersectionObserver() {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const card = entry.target.closest('[data-product-handle]');
+          if (card && !this.observedCards.has(card)) {
+            this.setupCardHover(card);
+            this.observedCards.add(card);
+            observer.unobserve(entry.target);
+          }
+        }
+      });
+    }, {
+      rootMargin: '200px 0px',
+      threshold: 0.01
+    });
+
+    // Observe all product card media containers
+    document.querySelectorAll('.card__media .media').forEach(media => {
+      observer.observe(media);
+    });
+  }
+
+  setupHoverForAllCards() {
+    document.querySelectorAll('[data-product-handle]').forEach(card => {
+      this.setupCardHover(card);
+    });
+  }
+
+  setupCardHover(card) {
+    const secondaryImg = card.querySelector('.secondary-image.lazy-secondary');
+    if (!secondaryImg || !secondaryImg.dataset.src) return;
+
+    let hasLoaded = false;
+    let hoverTimeout;
+
+    const loadSecondaryImage = () => {
+      if (hasLoaded) return;
+      
+      clearTimeout(hoverTimeout);
+      hoverTimeout = setTimeout(() => {
+        if (!hasLoaded && secondaryImg.dataset.src) {
+          // Set the src and srcset attributes
+          secondaryImg.src = secondaryImg.dataset.src;
+          if (secondaryImg.dataset.srcset) {
+            secondaryImg.srcset = secondaryImg.dataset.srcset;
+          }
+          if (secondaryImg.dataset.sizes) {
+            secondaryImg.sizes = secondaryImg.dataset.sizes;
+          }
+          
+          // Remove data attributes to prevent reloading
+          delete secondaryImg.dataset.src;
+          delete secondaryImg.dataset.srcset;
+          delete secondaryImg.dataset.sizes;
+          
+          // Add loaded class when image loads
+          secondaryImg.addEventListener('load', () => {
+            secondaryImg.classList.add('loaded');
+            hasLoaded = true;
+          }, { once: true });
+          
+          // Fallback in case load event doesn't fire
+          setTimeout(() => {
+            if (!hasLoaded) {
+              secondaryImg.classList.add('loaded');
+              hasLoaded = true;
+            }
+          }, 1000);
+        }
+      }, 100); // 100ms delay to prevent loading on quick mouse passes
+    };
+
+    const mouseEnterHandler = () => loadSecondaryImage();
+    const touchStartHandler = (e) => {
+      if (e.cancelable) {
+        e.preventDefault();
+      }
+      loadSecondaryImage();
+    };
+    const mouseLeaveHandler = () => clearTimeout(hoverTimeout);
+
+    // Add event listeners
+    card.addEventListener('mouseenter', mouseEnterHandler);
+    card.addEventListener('touchstart', touchStartHandler, { passive: false });
+    card.addEventListener('mouseleave', mouseLeaveHandler);
+
+    // Store for cleanup
+    this.hoverTimeouts.set(card, hoverTimeout);
+  }
+
+  destroy() {
+    // Cleanup timeouts
+    this.hoverTimeouts.forEach(timeout => clearTimeout(timeout));
+    this.hoverTimeouts.clear();
+    this.observedCards.clear();
+  }
+}
+
+// Initialize the lazy loader
+if (typeof window.lazySecondaryLoader === 'undefined') {
+  window.lazySecondaryLoader = new LazySecondaryImageLoader();
+}
+</script>
