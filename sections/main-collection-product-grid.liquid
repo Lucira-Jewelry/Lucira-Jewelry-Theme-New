@@ -625,3 +625,111 @@
   ]
 }
 {% endschema %}
+
+<script>
+(function() {
+  // Wait for DOM to be ready
+  document.addEventListener('DOMContentLoaded', function() {
+    // Function to load secondary image on hover
+    function initLazySecondaryImages() {
+      const productCards = document.querySelectorAll('.card-wrapper[data-product-handle]');
+      
+      productCards.forEach(function(card) {
+        const cardInner = card.querySelector('.card__inner');
+        if (!cardInner) return;
+        
+        // Check if this product has secondary image data
+        const secondaryData = card.querySelector('.secondary-image-data');
+        if (!secondaryData) return;
+        
+        // Get the media container
+        const mediaContainer = card.querySelector('.media.media--transparent.media--hover-effect');
+        if (!mediaContainer) return;
+        
+        let secondaryImageLoaded = false;
+        let hoverTimeout = null;
+        
+        // Mouse enter handler
+        cardInner.addEventListener('mouseenter', function() {
+          if (secondaryImageLoaded) return;
+          
+          // Small delay to prevent accidental hover triggers
+          hoverTimeout = setTimeout(function() {
+            loadSecondaryImage(card, secondaryData, mediaContainer);
+          }, 100);
+        });
+        
+        // Mouse leave handler
+        cardInner.addEventListener('mouseleave', function() {
+          if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+          }
+        });
+        
+        // Touch events for mobile
+        cardInner.addEventListener('touchstart', function(e) {
+          e.preventDefault();
+          if (!secondaryImageLoaded) {
+            loadSecondaryImage(card, secondaryData, mediaContainer);
+          }
+        }, { passive: false });
+      });
+    }
+    
+    // Function to load and insert secondary image
+    function loadSecondaryImage(card, secondaryData, mediaContainer) {
+      const productId = card.getAttribute('data-product-handle');
+      const secondaryImg = document.createElement('img');
+      
+      secondaryImg.id = 'product-image-secondary-' + productId;
+      secondaryImg.className = 'motion-reduce secondary-image';
+      secondaryImg.src = secondaryData.getAttribute('data-secondary-src');
+      secondaryImg.srcset = secondaryData.getAttribute('data-secondary-srcset');
+      secondaryImg.alt = secondaryData.getAttribute('data-secondary-alt');
+      secondaryImg.width = secondaryData.getAttribute('data-secondary-width');
+      secondaryImg.height = secondaryData.getAttribute('data-secondary-height');
+      secondaryImg.loading = 'lazy';
+      secondaryImg.decoding = 'async';
+      
+      // Insert the secondary image
+      mediaContainer.appendChild(secondaryImg);
+      
+      // Mark as loaded
+      const cardInner = card.querySelector('.card__inner');
+      if (cardInner) {
+        cardInner.setAttribute('data-secondary-loaded', 'true');
+      }
+    }
+    
+    // Initialize on page load
+    initLazySecondaryImages();
+    
+    // Re-initialize when new products are loaded via infinite scroll
+    const observer = new MutationObserver(function(mutations) {
+      mutations.forEach(function(mutation) {
+        if (mutation.addedNodes.length) {
+          // Check if new product cards were added
+          const newCards = document.querySelectorAll('.card-wrapper[data-product-handle]');
+          if (newCards.length) {
+            // Small delay to ensure DOM is ready
+            setTimeout(initLazySecondaryImages, 100);
+          }
+        }
+      });
+    });
+    
+    // Observe the product grid container
+    const productGrid = document.getElementById('product-grid');
+    if (productGrid) {
+      observer.observe(productGrid, { childList: true, subtree: true });
+    }
+    
+    // Also observe for infinite scroll updates
+    const infiniteScroll = document.querySelector('infinite-scroll');
+    if (infiniteScroll) {
+      observer.observe(infiniteScroll, { childList: true, subtree: true });
+    }
+  });
+})();
+</script>
