@@ -48,7 +48,6 @@
 
 <div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
   {%- paginate collection.products by section.settings.products_per_page -%}
-    
     <div class="{% if section.settings.filter_type == 'vertical' %} facets-vertical page-width{% endif %}">
       {{ 'component-facets.css' | asset_url | stylesheet_tag: preload: true }}
       <script src="{{ 'facets.js' | asset_url }}" defer="defer"></script>
@@ -108,7 +107,7 @@
               {% assign skip_card_product_styles = false %}
               {%- for product in collection.products -%}
                 {% assign lazy_load = false %}
-                {%- if forloop.index > 6 -%}
+                {%- if forloop.index > 2 -%}
                   {%- assign lazy_load = true -%}
                 {%- endif -%}
                 
@@ -128,32 +127,26 @@
                         data-cascade
                         style="--animation-order: {{ forloop.index }};"
                     {% endif %}
-                    data-lazy-item
                   >
                       <div class="lucira-plp-pg-component">
                           <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
                           {% if section.settings.plp_banner_id != blank %}
+                          {% comment %} <img class="lucira-plp-pg-component-image" 
+                              src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
+                              alt="PLP Banner" 
+                              title="PLP Banner" 
+                              href="https://www.lucirajewelry.com/collections/hexa"
+                              width="374" height="420"> {% endcomment %}
                               <picture class="lucira-plp-pg-component-image-wrapper-picture">
                                   {% if section.settings.plp_banner_mobile_id != blank %}
-                                    <source media="(max-width: 749px)" 
-                                      {% if forloop.index > 6 %}
-                                        data-srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}"
-                                      {% else %}
-                                        srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}"
-                                      {% endif %}>
+                                    <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
                                   {% endif %}
                                   <img class="lucira-plp-pg-component-image" 
-                                      {% if forloop.index > 6 %}
-                                        data-src="{{ section.settings.plp_banner_id | img_url: 'master' }}"
-                                        src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 374 420'%3E%3C/svg%3E"
-                                      {% else %}
-                                        src="{{ section.settings.plp_banner_id | img_url: 'master' }}"
-                                      {% endif %}
+                                      src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
                                       alt="PLP Banner" 
                                       title="PLP Banner" 
-                                      width="374" 
-                                      height="420"
-                                      loading="{% if forloop.index <= 6 %}eager{% else %}lazy{% endif %}">
+                                      href="https://www.lucirajewelry.com/collections/hexa"
+                                      width="374" height="420">
                                 </picture>
                           {% endif %}
                       </div>
@@ -168,7 +161,6 @@
                     data-cascade
                     style="--animation-order: {{ forloop.index }};"
                   {% endif %}
-                  data-lazy-item
                 >
                   {% render 'card-product',
                     card_product: product,
@@ -197,6 +189,9 @@
             {%- endif -%}
           </infinite-scroll>
 
+            {% comment %} {%- if paginate.pages > 1 -%}
+              {% render 'pagination', paginate: paginate, anchor: '' %}
+            {%- endif -%} {% endcomment %}
           </div>
         {%- endif -%}
       </div>
@@ -210,10 +205,8 @@
 {% render 'product-collection-card' %}
 
 <script>
-(function() {
   window.dataLayer = window.dataLayer || [];
-  
-  function initAnalytics() {
+  (function() {
     var products = [
       {% for product in collection.products limit: section.settings.products_per_page %}
         {
@@ -229,32 +222,19 @@
       {% endfor %}
     ];
 
+    // Filter out any products with missing essential details (optional safety)
     products = products.filter(function(p) {
       return p.item_id && p.item_name && p.price != null;
     });
 
-    window.dataLayer.push({
-      event: 'productImpression',
-      products: products
-    });
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(initAnalytics, { timeout: 2000 });
-      } else {
-        setTimeout(initAnalytics, 1000);
-      }
-    });
-  } else {
-    if ('requestIdleCallback' in window) {
-      requestIdleCallback(initAnalytics, { timeout: 2000 });
-    } else {
-      setTimeout(initAnalytics, 1000);
-    }
-  }
-})();
+    // Push to dataLayer asynchronously to avoid blocking rendering
+    setTimeout(function() {
+      window.dataLayer.push({
+        event: 'productImpression',
+        products: products
+      });
+    }, 0);
+  })();
 </script>
 
 <script>
@@ -296,70 +276,14 @@
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push(productData);
 
-    if (navigator.sendBeacon) {
+    // navigate after GTM registers
+    setTimeout(() => {
       window.location.href = link.href;
-    } else {
-      setTimeout(() => {
-        window.location.href = link.href;
-      }, 100);
-    }
-  }, { passive: false });
-})();
-</script>
-
-<script>
-(function() {
-  if (!('IntersectionObserver' in window)) return;
-
-  var config = {
-    root: null,
-    rootMargin: '100px 0px',
-    threshold: 0.01
-  };
-
-  var observer = new IntersectionObserver(function(entries) {
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting) {
-        var item = entry.target;
-        
-        var lazyImg = item.querySelector('[data-src]');
-        if (lazyImg) {
-          lazyImg.src = lazyImg.dataset.src;
-          lazyImg.removeAttribute('data-src');
-          
-          var lazySources = item.querySelectorAll('source[data-srcset]');
-          lazySources.forEach(function(source) {
-            source.srcset = source.dataset.srcset;
-            source.removeAttribute('data-srcset');
-          });
-        }
-        
-        observer.unobserve(item);
-      }
-    });
-  }, config);
-
-  var lazyItems = document.querySelectorAll('[data-lazy-item]');
-  lazyItems.forEach(function(item) {
-    observer.observe(item);
+    }, 250);
   });
-
-  var nextLink = document.querySelector('infinite-scroll a');
-  if (nextLink) {
-    var prefetchObserver = new IntersectionObserver(function(entries) {
-      if (entries[0].isIntersecting) {
-        var link = document.createElement('link');
-        link.rel = 'prefetch';
-        link.href = nextLink.href;
-        document.head.appendChild(link);
-        prefetchObserver.disconnect();
-      }
-    }, { rootMargin: '200px' });
-    
-    prefetchObserver.observe(nextLink.parentElement);
-  }
 })();
 </script>
+
 
 <script type="application/ld+json">
 {
