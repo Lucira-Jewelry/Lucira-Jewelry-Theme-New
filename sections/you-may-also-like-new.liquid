@@ -12,17 +12,17 @@
     # Get all handles once to check for specific priority
     assign all_handles = product.collections | map: 'handle'
   %}
-  
+
   {% for c in product.collections %}
     {% assign h = c.handle %}
 
-    {% comment %} 
-      FIX: If the product is a Sui Dhaga, we force the primary mapping immediately 
+    {% comment %}
+      FIX: If the product is a Sui Dhaga, we force the primary mapping immediately
       to ensure it doesn't get skipped by other collections.
     {% endcomment %}
     {% if all_handles contains 'sui-dhagas' %}
-       {% assign primary = 'sui-dhagas' %}
-       {% break %}
+      {% assign primary = 'sui-dhagas' %}
+      {% break %}
     {% endif %}
 
     {% if h == 'solitaire-engagement-rings' %}
@@ -96,7 +96,7 @@
       {% assign primary = 'men-s-ring' %}
       {% assign fallback = 'jewelry-mens-collection' %}
       {% break %}
-    
+
     {% elsif h == 'hoop-earrings' %}
       {% assign primary = 'hoop-earrings' %}
       {% break %}
@@ -163,14 +163,28 @@
 
   <div class="ymal-grid">
     {% assign scan = primary | append: ',' | append: fallback | split: ',' | uniq %}
+    {% assign total_found = 0 %}
 
+    {%- comment -%} ===== COUNT PRODUCTS FIRST ===== {%- endcomment -%}
     {% for handle in scan %}
       {% assign col = collections[handle] %}
-      {% if col and count < LIMIT %}
+      {% if col %}
+        {% assign total_found = total_found | plus: col.products_count %}
+      {% endif %}
+    {% endfor %}
+
+    {% assign remainder = total_found | modulo: 4 %}
+    {% assign max_show = total_found | minus: remainder %}
+
+    {%- comment -%} ===== RENDER ONLY FULL ROWS ===== {%- endcomment -%}
+    {% for handle in scan %}
+      {% assign col = collections[handle] %}
+      {% if col %}
         {% for p in col.products %}
-          {% if count >= LIMIT %}
+          {% if count >= max_show or count >= LIMIT %}
             {% break %}
           {% endif %}
+
           {% if p.id != product.id %}
             {% unless rendered contains p.id %}
               {% render 'card-product', card_product: p %}
@@ -189,8 +203,8 @@
     .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:15px;}
     h2.ymal-h2{text-align: center; font-size: 24px; margin-bottom: 0px; margin-top: 0px;}
     p.ymal-p{text-align:center;color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
-    
-    
+
+
     @media (max-width: 1080px) {
     .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:10px;}
     h2.ymal-h2{text-align: center; font-size: 22px; margin-bottom: 0px; margin-top: 0px;}
@@ -205,5 +219,3 @@
     h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
     }
 </style>
-
-
