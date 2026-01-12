@@ -1,4 +1,4 @@
-{% assign gender_labels = product.metafields.shopify['target-gender'].value | map: 'label' %}
+{% comment %} {% assign gender_labels = product.metafields.shopify['target-gender'].value | map: 'label' %}
 {% assign collection_handles_exclude = product.collections | map: 'handle' %}
 
 {% unless gender_labels contains 'Male' or collection_handles_exclude contains 'nose-pins' %}
@@ -258,6 +258,390 @@
       "min": 3,
       "max": 20,
       "step": 1
+    }
+  ],
+  "presets": [
+    {
+      "name": "Match and Shine",
+      "category": "Cross-sell"
+    }
+  ]
+}
+{% endschema %} {% endcomment %}
+
+{%- liquid
+  # Skip section for Male products and nose-pins
+  assign gender_labels = product.metafields.shopify['target-gender'].value | map: 'label'
+  assign collection_handles_exclude = product.collections | map: 'handle'
+  
+  # Check if we should show this section
+  assign show_section = true
+  if gender_labels contains 'Male' or collection_handles_exclude contains 'nose-pins'
+    assign show_section = false
+  endif
+-%}
+
+{%- if show_section -%}
+  {%- liquid
+    # Initialize settings
+    assign current_variant_price = product.selected_or_first_available_variant.price | divided_by: 100.0
+    assign price_factor = section.settings.price_range | default: 20.0
+    assign max_products = section.settings.product_limit | default: 8
+    
+    # Calculate price range once
+    assign range_value = current_variant_price | times: price_factor | divided_by: 100.0
+    assign lower_limit = current_variant_price | minus: range_value
+    assign upper_limit = current_variant_price | plus: range_value
+    
+    # Define categories based on product tags - using case statement for better performance
+    case true
+      when product.tags contains 'Rings'
+        assign categories = 'all-necklaces,all-earrings,all-bracelets' | split: ','
+      when product.tags contains 'Necklaces'
+        assign categories = 'all-rings,all-earrings,all-bracelets' | split: ','
+      when product.tags contains 'Bracelets'
+        assign categories = 'all-rings,all-earrings,all-necklaces' | split: ','
+      when product.tags contains 'Earrings'
+        assign categories = 'all-rings,all-necklaces,all-bracelets' | split: ','
+      else
+        assign categories = 'all-rings,all-necklaces,all-bracelets,all-earrings' | split: ','
+    endcase
+    
+    # Optimize image size
+    assign featured_image_size = '500x500'
+    
+    # Initialize variables
+    assign counter = 0
+  -%}
+
+  <div class="mas-lazy" data-mas data-section-id="{{ section.id }}">
+    <!-- ===== SKELETON ===== -->
+    <div class="mas-skeleton page-width">
+      <div class="mas-skeleton-wrapper">
+        <div class="mas-skeleton-image"></div>
+        <div class="mas-skeleton-grid">
+          {%- for i in (1..3) -%}
+            <div class="mas-skeleton-card"></div>
+          {%- endfor -%}
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== ACTUAL CONTENT (LOADED ON INTERSECTION) ===== -->
+    <div class="mas-content" style="display:none" data-mas-content>
+      <div class="match-and-shine">
+        <h2 class="mas-title">{{ section.settings.heading | default: 'Match & Shine' }}</h2>
+        <p class="mas-subheading">{{ section.settings.subheading | default: 'Designed to Complement, Meant to Shine' }}</p>
+
+        <div class="page-width">
+          <div class="mas-image-features-product-wrapper">
+            <div class="mas-image-features-product desktop-show">
+              {%- if product.featured_media -%}
+                <img
+                  src="{{ product.featured_media | img_url: featured_image_size }}"
+                  loading="lazy"
+                  width="472"
+                  height="472"
+                  alt="{{ product.title | escape }}"
+                  title="{{ product.title | escape }}"
+                  onerror="this.style.display='none'"
+                >
+              {%- endif -%}
+            </div>
+
+            <div class="mas-grid" data-mas-grid>
+              {%- for category in categories -%}
+                {%- if counter >= max_products -%}{%- break -%}{%- endif -%}
+                
+                {%- assign collection = collections[category] -%}
+                {%- if collection != blank and collection.products_count > 0 -%}
+                  {%- assign items = collection.products -%}
+                  {%- assign found_product = false -%}
+                  {%- assign fallback_item = nil -%}
+                  
+                  {%- for item in items -%}
+                    {%- if counter >= max_products -%}{%- break -%}{%- endif -%}
+                    
+                    {%- comment -%} Skip if current product {%- endcomment -%}
+                    {%- if item.handle == product.handle -%}{%- continue -%}{%- endif -%}
+                    
+                    {%- comment -%} Skip male products {%- endcomment -%}
+                    {%- assign item_gender_labels = item.metafields.shopify['target-gender'].value | map: 'label' -%}
+                    {%- if item_gender_labels contains 'Male' -%}{%- continue -%}{%- endif -%}
+                    
+                    {%- comment -%} Set fallback product {%- endcomment -%}
+                    {%- if fallback_item == nil -%}
+                      {%- assign fallback_item = item -%}
+                    {%- endif -%}
+                    
+                    {%- comment -%} Check price range {%- endcomment -%}
+                    {%- assign item_price = item.selected_or_first_available_variant.price | divided_by: 100.0 -%}
+                    {%- if item_price >= lower_limit and item_price <= upper_limit -%}
+                      {%- assign found_product = item -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  
+                  {%- assign final_item = found_product | default: fallback_item -%}
+                  
+                  {%- if final_item != blank -%}
+                    {%- assign product_url = final_item.url | default: '/products/' | append: final_item.handle -%}
+                    
+                    <div
+                      class="mas-product-card"
+                      data-handle="{{ final_item.handle }}"
+                      data-name="{{ final_item.title | escape }}"
+                      data-id="{{ final_item.id }}"
+                      data-price="{{ final_item.price | divided_by: 100.0 }}"
+                      data-category="{{ final_item.type | escape }}"
+                      data-sku="{{ final_item.selected_or_first_available_variant.sku | default: '' }}"
+                      data-url="{{ product_url }}"
+                    >
+                      {%- render 'card-product', card_product: final_item, lazy_load: true -%}
+                    </div>
+                    
+                    {%- assign counter = counter | plus: 1 -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endfor -%}
+              
+              {%- comment -%} Fallback if no products found {%- endcomment -%}
+              {%- if counter == 0 -%}
+                <div class="mas-no-products" style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+                  <p>No matching products found</p>
+                </div>
+              {%- endif -%}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      // Debounce function for performance
+      function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+          const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+          };
+          clearTimeout(timeout);
+          timeout = setTimeout(later, wait);
+        };
+      }
+      
+      // Lazy load section
+      function initMatchAndShine() {
+        const mas = document.querySelector('[data-mas]');
+        if (!mas) return;
+        
+        const io = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                const skeleton = mas.querySelector('.mas-skeleton');
+                const content = mas.querySelector('.mas-content');
+                
+                if (content) {
+                  content.style.display = 'block';
+                  content.style.opacity = '0';
+                  content.style.transition = 'opacity 0.4s ease';
+                  
+                  requestAnimationFrame(() => {
+                    content.style.opacity = '1';
+                    if (skeleton) skeleton.remove();
+                  });
+                  
+                  // Setup click tracking after content is loaded
+                  setupClickTracking();
+                }
+                
+                io.disconnect();
+              }
+            });
+          },
+          { 
+            rootMargin: '300px',
+            threshold: 0.1
+          }
+        );
+        
+        io.observe(mas);
+      }
+      
+      // Setup click tracking with delegation
+      function setupClickTracking() {
+        const masGrid = document.querySelector('[data-mas-grid]');
+        if (!masGrid) return;
+        
+        // Use event delegation for better performance
+        masGrid.addEventListener('click', function(e) {
+          let target = e.target;
+          
+          // Find the product link
+          while (target && target !== this) {
+            if (target.matches('a[href*="/products/"]')) {
+              e.preventDefault();
+              const card = target.closest('.mas-product-card');
+              
+              if (card && card.dataset.url) {
+                const cardData = card.dataset;
+                
+                // Send GA4 event
+                if (window.dataLayer) {
+                  window.dataLayer.push({
+                    event: 'promoClick',
+                    promoClick: {
+                      promo_id: cardData.sku || cardData.id,
+                      promo_name: cardData.name,
+                      creative_name: 'Match and shine',
+                    }
+                  });
+                }
+                
+                // Navigate after a short delay
+                setTimeout(() => {
+                  window.location.href = cardData.url;
+                }, 100);
+              }
+              break;
+            }
+            target = target.parentElement;
+          }
+        });
+      }
+      
+      // Initialize when DOM is ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initMatchAndShine);
+      } else {
+        initMatchAndShine();
+      }
+    })();
+  </script>
+
+  <style>
+    /* Critical CSS - Inline for above-the-fold */
+    .mas-skeleton-wrapper,
+    .mas-image-features-product-wrapper {
+      display: grid;
+      grid-template-columns: calc(36% - 10px) calc(64% - 10px);
+      gap: 20px;
+      background: #f2f2f2;
+      padding: 45px;
+      border-radius: 12px;
+    }
+    
+    .mas-skeleton-image,
+    .mas-skeleton-card {
+      background: linear-gradient(90deg, #eee 25%, #f5f5f5 37%, #eee 63%);
+      background-size: 400% 100%;
+      animation: shimmer 1.4s infinite;
+      border-radius: 12px;
+    }
+    
+    .mas-skeleton-image { height: 472px; }
+    .mas-skeleton-card { height: 360px; }
+    
+    .match-and-shine {
+      padding: 40px 0 0;
+      background-color: transparent;
+      text-align: center;
+    }
+    
+    .mas-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      justify-content: center;
+      gap: 10px;
+    }
+    
+    /* Non-critical CSS - Load via media query */
+    @media (max-width: 768px) {
+      .mas-skeleton-wrapper,
+      .mas-image-features-product-wrapper {
+        display: flex;
+        padding: 10px;
+      }
+      
+      .mas-skeleton-image { display: none; }
+      
+      .mas-skeleton-grid,
+      .mas-grid {
+        display: flex;
+        gap: 10px;
+        overflow-x: auto;
+        scrollbar-width: thin;
+        scrollbar-color: #b67665 #f5f5f5;
+      }
+      
+      .mas-skeleton-card,
+      .mas-product-card {
+        flex: 0 0 250px;
+        min-width: 250px;
+      }
+      
+      .match-and-shine { padding: 20px 0; }
+      .mas-title { font-size: 20px; }
+      .mas-subheading { font-size: 14px; }
+      
+      /* Custom scrollbar for WebKit browsers */
+      .mas-grid::-webkit-scrollbar { height: 2px; }
+      .mas-grid::-webkit-scrollbar-track { background: #f5f5f5; }
+      .mas-grid::-webkit-scrollbar-thumb { background: #b67665; }
+    }
+    
+    /* Animation */
+    @keyframes shimmer {
+      0% { background-position: 100% 0; }
+      100% { background-position: -100% 0; }
+    }
+  </style>
+{%- endif -%}
+
+{% schema %}
+{
+  "name": "Match and Shine New",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Match & Shine"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "Subheading",
+      "default": "Designed to Complement, Meant to Shine"
+    },
+    {
+      "type": "range",
+      "id": "price_range",
+      "label": "Price Range (%)",
+      "default": 20,
+      "min": 5,
+      "max": 50,
+      "step": 5,
+      "unit": "%"
+    },
+    {
+      "type": "range",
+      "id": "product_limit",
+      "label": "Number of products to show",
+      "default": 8,
+      "min": 3,
+      "max": 20,
+      "step": 1
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_lazy_load",
+      "label": "Enable lazy loading",
+      "default": true
     }
   ],
   "presets": [
