@@ -1,3 +1,20 @@
+function initWishlist() {
+  try {
+    if (typeof iWish !== "undefined" && typeof iWish.init === "function") {
+      iWish.init();
+    }
+
+    document.dispatchEvent(new CustomEvent("iwish:reload"));
+    document.dispatchEvent(new CustomEvent("wishlist:init"));
+
+    if (typeof iWishCounter === "function") {
+      iWishCounter();
+    }
+  } catch (e) {
+    console.log("Wishlist init error", e);
+  }
+}
+
 function debounce(func, wait, immediate = false) {
   let timeout;
   return function executedFunction(...args) {
@@ -322,25 +339,24 @@ class FacetFiltersForm extends HTMLElement {
     });
   }
 
-  // OPTIMIZED: More efficient DOM updates using DocumentFragment
   static renderProductGridContainer(parsedHTML) {
     const container = document.getElementById('ProductGridContainer');
     const newContainer = parsedHTML.getElementById('ProductGridContainer');
     
     if (!container || !newContainer) return;
     
-    // Use morphdom-like approach for minimal DOM changes
     const currentProducts = Array.from(container.querySelectorAll('[data-product-id]'));
     const newProducts = Array.from(newContainer.querySelectorAll('[data-product-id]'));
     
-    // Quick check if we can do a simple replace
-    const needsFullReplace = currentProducts.length !== newProducts.length || 
-                            !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
+    const needsFullReplace =
+      currentProducts.length !== newProducts.length || 
+      !currentProducts.every(
+        (el, i) => el.dataset.productId === newProducts[i]?.dataset.productId
+      );
     
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
     } else {
-      // Update only changed elements (prices, availability, etc.)
       currentProducts.forEach((el, i) => {
         const newEl = newProducts[i];
         if (el.innerHTML !== newEl.innerHTML) {
@@ -348,6 +364,17 @@ class FacetFiltersForm extends HTMLElement {
         }
       });
     }
+    
+    // Cancel scroll animations
+    container.querySelectorAll('.scroll-trigger').forEach((element) => {
+      element.classList.add('scroll-trigger--cancel');
+    });
+
+    // 🔥 ALWAYS re-init wishlist
+    requestAnimationFrame(() => {
+      initWishlist();
+    });
+  }
     
     // Cancel scroll animations
     container.querySelectorAll('.scroll-trigger').forEach((element) => {
