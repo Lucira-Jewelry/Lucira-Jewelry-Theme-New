@@ -317,24 +317,113 @@ document.addEventListener('DOMContentLoaded', function() {
     updateMuteIcons();
   });
 });
-</script> {% endcomment %}
+</script>
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+{% schema %}
+{
+  "name": "Video Banner",
+  "settings": [
+    {
+      "type": "header",
+      "content": "Video Settings"
+    },
+    {
+      "type": "video",
+      "id": "desktop_video",
+      "label": "Desktop Video"
+    },
+    {
+      "type": "video",
+      "id": "mobile_video",
+      "label": "Mobile Video (Optional)"
+    },
+    {
+      "type": "image_picker",
+      "id": "fallback_image_desktop",
+      "label": "Desktop Fallback Image"
+    },
+    {
+      "type": "image_picker",
+      "id": "fallback_image_mobile",
+      "label": "Mobile Fallback Image"
+    },
+    {
+      "type": "checkbox",
+      "id": "autoplay",
+      "label": "Enable Autoplay",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "show_controls",
+      "label": "Show Play/Pause & Audio Controls",
+      "default": true
+    },
+    {
+      "type": "checkbox",
+      "id": "loop_video",
+      "label": "Loop Video",
+      "default": true,
+      "info": "If disabled, video will stop at the end and show fallback image"
+    },
+    {
+      "type": "header",
+      "content": "Redirect Settings"
+    },
+    {
+      "type": "url",
+      "id": "redirect_url",
+      "label": "Click Redirect URL",
+      "info": "URL to redirect when video or title/subtitle is clicked. Example: /collections/hexa"
+    },
+    {
+      "type": "header",
+      "content": "Content"
+    },
+    {
+      "type": "text",
+      "id": "title",
+      "label": "Title",
+      "default": "Exquisite Jewelry Collection"
+    },
+    {
+      "type": "text",
+      "id": "subtitle",
+      "label": "Subtitle",
+      "default": "Crafted with passion, designed for elegance"
+    },
+    {
+      "type": "header",
+      "content": "Layout"
+    },
+    {
+      "type": "range",
+      "id": "min_height",
+      "label": "Minimum Height",
+      "min": 300,
+      "max": 800,
+      "step": 50,
+      "unit": "px",
+      "default": 400
+    }
+  ],
+  "presets": [
+    {
+      "name": "Home Video Banner",
+      "settings": {
+        "title": "Exquisite Jewelry Collection",
+        "subtitle": "Crafted with passion, designed for elegance",
+        "autoplay": true,
+        "show_controls": true,
+        "loop_video": true,
+        "min_height": 400,
+        "redirect_url": "/collections/hexa"
+      }
+    }
+  ]
+}
+{% endschema %} {% endcomment %}
 
 <style>
 
@@ -368,6 +457,8 @@ document.addEventListener('DOMContentLoaded', function() {
     .video-banner__audio-controls{bottom:20px;left:20px}
     .video-banner__mute-unmute{width:40px;height:40px}
     .video-banner__mute-unmute svg{width:20px;height:20px}
+
+    
     }
     @media (max-width:390px){
     .brad-mob-logo{max-width:80%}
@@ -378,6 +469,28 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     .video-banner__fallback{position:absolute;top:0;left:0;width:100%;height:100%;background-size:cover;background-position:center;background-repeat:no-repeat;z-index:0;cursor:pointer}
 
+  /* Updated mobile-specific video handling */
+  {% if section.settings.mobile_video != blank %}
+    /* Only hide desktop video on mobile if mobile video exists */
+    @media (max-width: 768px) {
+      .video-banner__video-desktop {
+        display: none;
+      }
+    }
+    
+    @media (min-width: 769px) {
+      .video-banner__video-mobile {
+        display: none;
+      }
+    }
+  {% else %}
+    /* If no mobile video, hide the mobile fallback on desktop */
+    @media (min-width: 769px) {
+      .video-banner__video-mobile {
+        display: none;
+      }
+    }
+  {% endif %}
   @media only screen and (min-width:410px) and (max-width:767px;){
       section.video-banner {
           height: 90vh !important;
@@ -385,73 +498,99 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 </style>
 
-<section class="video-banner" style="min-height: 400px;" data-promo-name="Exquisite Jewelry Collection">
+<section class="video-banner" style="min-height: {{ section.settings.min_height }}px;" data-promo-name="{{ section.settings.title | escape }}">
 
   <!-- Fallback Images (shown immediately) -->
-  <div id="videoBannerFallbackDesktop" class="video-banner__fallback video-banner__fallback-desktop" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;"></div>
-  <div id="videoBannerFallbackMobile" class="video-banner__fallback video-banner__fallback-mobile" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;"></div>
+  <div id="videoBannerFallbackDesktop" class="video-banner__fallback video-banner__fallback-desktop" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;" {% if section.settings.redirect_url != blank %}data-redirect-url="{{ section.settings.redirect_url }}"{% endif %}></div>
+  <div id="videoBannerFallbackMobile" class="video-banner__fallback video-banner__fallback-mobile" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; display: none;" {% if section.settings.redirect_url != blank %}data-redirect-url="{{ section.settings.redirect_url }}"{% endif %}></div>
 
   <!-- Desktop Video -->
-  <video class="video-banner__video video-banner__video-desktop" 
-         id="videoBannerDesktop"
-         muted 
-         loop
-         playsinline
-         preload="none" loading="lazy">
-    <source src="" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
+  {% if section.settings.desktop_video != blank %}
+    <video class="video-banner__video video-banner__video-desktop" 
+           id="videoBannerDesktop"
+           muted 
+           {% if section.settings.loop_video %}loop{% endif %}
+           playsinline
+           preload="none" loading="lazy"
+           {% if section.settings.redirect_url != blank %}data-redirect-url="{{ section.settings.redirect_url }}"{% endif %}>
+      <source src="{{ section.settings.desktop_video.sources[1].url }}" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  {% endif %}
 
   <!-- Mobile Video -->
-  <video class="video-banner__video video-banner__video-mobile" 
-         id="videoBannerMobile"
-         muted 
-         loop
-         playsinline
-         preload="none" loading="lazy">
-    <source src="" type="video/mp4">
-    Your browser does not support the video tag.
-  </video>
+  {% if section.settings.mobile_video != blank %}
+    <video class="video-banner__video video-banner__video-mobile" 
+           id="videoBannerMobile"
+           muted 
+           {% if section.settings.loop_video %}loop{% endif %}
+           playsinline
+           preload="none" loading="lazy"
+           {% if section.settings.redirect_url != blank %}data-redirect-url="{{ section.settings.redirect_url }}"{% endif %}>
+      <source src="{{ section.settings.mobile_video.sources[1].url }}" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  {% elsif section.settings.desktop_video != blank %}
+    <!-- Fallback: Use desktop video on mobile if no mobile video is set -->
+    <video class="video-banner__video video-banner__video-mobile" 
+           id="videoBannerMobileFallback"
+           muted 
+           {% if section.settings.loop_video %}loop{% endif %}
+           playsinline
+           preload="none" loading="lazy"
+           {% if section.settings.redirect_url != blank %}data-redirect-url="{{ section.settings.redirect_url }}"{% endif %}>
+      <source src="{{ section.settings.desktop_video.sources[1].url }}" type="video/mp4">
+      Your browser does not support the video tag.
+    </video>
+  {% endif %}
 
   <!-- Content -->
   <div class="video-banner__content">
-    <a href="#" data-promo-name="Exquisite Jewelry Collection">
-      <div class="video-banner__title">Exquisite Jewelry Collection</div>
-    </a>
-    <a href="#" data-promo-name="Exquisite Jewelry Collection">
-      <p class="video-banner__subtitle">Crafted with passion, designed for elegance</p>
-    </a>
+    {% if section.settings.title != blank %}
+      <a href="{{ section.settings.redirect_url | default: '#' }}" data-promo-name="{{ section.settings.title | escape }}">
+        <div class="video-banner__title">{{ section.settings.title }}</div>
+      </a>
+    {% endif %}
+    {% if section.settings.subtitle != blank %}
+      <a href="{{ section.settings.redirect_url | default: '#' }}" data-promo-name="{{ section.settings.title | escape }}">
+        <p class="video-banner__subtitle">{{ section.settings.subtitle }}</p>
+      </a>
+    {% endif %}
   </div>
 
   <!-- Play/Pause Controls -->
-  <div class="video-banner__controls">
-    <button class="video-banner__play-pause" id="playPauseBtn" aria-label="Play/Pause video">
-      <svg class="pause-icon" viewBox="0 0 24 24" style="display: none;">
-        <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
-      </svg>
-      <svg class="play-icon" viewBox="0 0 24 24">
-        <path d="M8 5v14l11-7z"/>
-      </svg>
-    </button>
-  </div>
+  {% if section.settings.show_controls %}
+    <div class="video-banner__controls">
+      <button class="video-banner__play-pause" id="playPauseBtn" aria-label="Play/Pause video">
+        <svg class="pause-icon" viewBox="0 0 24 24" style="display: none;">
+          <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+        </svg>
+        <svg class="play-icon" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z"/>
+        </svg>
+      </button>
+    </div>
+  {% endif %}
 
   <!-- Audio Controls -->
-  <div class="video-banner__audio-controls">
-    <button class="video-banner__mute-unmute" id="muteUnmuteBtn" aria-label="Mute/Unmute video">
-      <svg class="unmute-icon" viewBox="0 0 24 24">
-        <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
-      </svg>
-      <svg class="mute-icon" viewBox="0 0 24 24" style="display: none;">
-        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-      </svg>
-    </button>
-  </div>
+  {% if section.settings.show_controls %}
+    <div class="video-banner__audio-controls">
+      <button class="video-banner__mute-unmute" id="muteUnmuteBtn" aria-label="Mute/Unmute video">
+        <svg class="unmute-icon" viewBox="0 0 24 24">
+          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+        <svg class="mute-icon" viewBox="0 0 24 24" style="display: none;">
+          <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      </button>
+    </div>
+  {% endif %}
 </section>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
   const desktopVideo = document.getElementById('videoBannerDesktop');
-  const mobileVideo = document.getElementById('videoBannerMobile');
+  const mobileVideo = document.getElementById('videoBannerMobile') || document.getElementById('videoBannerMobileFallback');
   const fallbackDesktop = document.getElementById('videoBannerFallbackDesktop');
   const fallbackMobile = document.getElementById('videoBannerFallbackMobile');
   const playPauseBtn = document.getElementById('playPauseBtn');
@@ -467,62 +606,39 @@ document.addEventListener('DOMContentLoaded', function() {
   const currentFallback = isMobile ? fallbackMobile : fallbackDesktop;
 
   // STEP 1: Always load fallback image immediately
+  const fallbackUrl = isMobile ? '{{ section.settings.fallback_image_mobile | img_url: "1080x1920" }}' : '{{ section.settings.fallback_image_desktop | img_url: "1920x1080" }}';
   if(currentFallback) {
+    currentFallback.style.backgroundImage = `url('${fallbackUrl}')`;
+    currentFallback.style.backgroundSize = 'cover';
+    currentFallback.style.backgroundPosition = 'center';
+    currentFallback.style.width = '100%';
+    currentFallback.style.height = '100%';
     currentFallback.style.display = 'block';
   }
 
   // Add click handler for video redirect and dataLayer tracking
   if(currentVideo) {
-    currentVideo.addEventListener('click', function(e) {
-      if(!e.target.closest('.video-banner__controls') && !e.target.closest('.video-banner__audio-controls')) {
-        const promoName = videoBannerSection?.dataset.promoName || 'Exquisite Jewelry Collection';
-        dataLayer.push({
-          event: "promoClick",
-          promoClick: {
-            promo_name: promoName,
-            creative_name: "Homepage Video Banner",
-            promo_position: "homepage_top"
-          },
-          "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
-        });
-      }
-    });
-  }
-
-  // Add click handler for fallback redirect and dataLayer tracking
-  if(currentFallback) {
-    currentFallback.addEventListener('click', function(e) {
-      const promoName = videoBannerSection?.dataset.promoName || 'Exquisite Jewelry Collection';
-      dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          promo_name: promoName,
-          creative_name: "Homepage Video Banner",
-          promo_position: "homepage_top"
-        },
-        "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
+    const redirectUrl = currentVideo.dataset.redirectUrl;
+    if(redirectUrl) {
+      currentVideo.addEventListener('click', function(e) {
+        // Don't redirect if clicking on controls
+        if(!e.target.closest('.video-banner__controls') && !e.target.closest('.video-banner__audio-controls')) {
+          const promoName = videoBannerSection?.dataset.promoName || "Video Banner";
+          dataLayer.push({
+            event: "promoClick",
+            promoClick: {
+              promo_name: promoName,
+              creative_name: "Homepage Video Banner",
+              promo_position: "homepage_top"
+            },
+            "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
+          });
+          window.location.href = redirectUrl;
+        }
       });
-    });
-  }
+    }
 
-  // Add click handler for title and subtitle links
-  document.querySelectorAll('.video-banner__content a').forEach(link => {
-    link.addEventListener('click', function(e) {
-      const promoName = this.dataset.promoName || videoBannerSection?.dataset.promoName || 'Exquisite Jewelry Collection';
-      dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-          promo_name: promoName,
-          creative_name: "Homepage Video Banner",
-          promo_position: "homepage_top"
-        },
-        "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
-      });
-    });
-  });
-
-  // Ensure autoplay disabled initially
-  if(currentVideo) {
+    // Ensure autoplay disabled initially
     currentVideo.autoplay = false;
     currentVideo.pause();
 
@@ -544,14 +660,53 @@ document.addEventListener('DOMContentLoaded', function() {
       if(currentFallback) currentFallback.style.display = 'block';
     });
 
-    // Handle video end when not looping
+    // Handle video end when not looping - pause at last frame
     currentVideo.addEventListener('ended', () => {
+      // Keep video visible at last frame, don't show fallback
       currentVideo.pause();
       updatePlayIcons();
     });
   }
 
-  // STEP 2: Delay autoplay until 5s after page fully loaded
+  // Add click handler for fallback redirect and dataLayer tracking
+  if(currentFallback) {
+    const redirectUrl = currentFallback.dataset.redirectUrl;
+    if(redirectUrl) {
+      currentFallback.addEventListener('click', function() {
+        const promoName = videoBannerSection?.dataset.promoName || "Video Banner";
+        dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_name: promoName,
+            creative_name: "Homepage Video Banner",
+            promo_position: "homepage_top"
+          },
+          "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
+        });
+        if(redirectUrl) {
+          window.location.href = redirectUrl;
+        }
+      });
+    }
+  }
+
+  // Add click handler for title and subtitle links with dataLayer tracking
+  document.querySelectorAll('.video-banner__content a').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const promoName = this.dataset.promoName || videoBannerSection?.dataset.promoName || "Video Banner";
+      dataLayer.push({
+        event: "promoClick",
+        promoClick: {
+          promo_name: promoName,
+          creative_name: "Homepage Video Banner",
+          promo_position: "homepage_top"
+        },
+        "gtm.uniqueEventId": Math.floor(Math.random() * 10000)
+      });
+    });
+  });
+
+  // STEP 2: Delay autoplay until 500ms after page fully loaded
   window.addEventListener('load', () => {
     setTimeout(() => {
       if(currentVideo && currentVideo.paused){
@@ -562,7 +717,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Play/Pause logic
   playPauseBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent video redirect
     if(!currentVideo) return;
     if(currentVideo.paused){
       currentVideo.play().catch(err => console.log('Play failed:', err));
@@ -573,7 +728,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Mute/Unmute logic
   muteUnmuteBtn?.addEventListener('click', (e) => {
-    e.stopPropagation();
+    e.stopPropagation(); // Prevent video redirect
     if(!currentVideo) return;
     currentVideo.muted = !currentVideo.muted;
     updateMuteIcons();
@@ -624,8 +779,6 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-
-
 
 
 {% schema %}
