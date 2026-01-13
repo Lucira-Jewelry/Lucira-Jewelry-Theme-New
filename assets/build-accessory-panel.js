@@ -16,7 +16,7 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 2.0;
+  const SIZE_MULTIPLIER = 1.35;
 
 
   const ARC_START_DEG = 210;
@@ -31,7 +31,7 @@ window.MainBaseCharm = function () {
 
   const CHAIN_CENTER_Y_FACTOR = 0.42;
   const CHAIN_RADIUS_FACTOR = 0.55;
-  const CHARM_ATTACH_OFFSET_FACTOR = 0.008;
+  const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
   const $ = (id) => document.getElementById(id);
@@ -180,6 +180,36 @@ function getSelectedCount() {
     setPlusButtonsDisabled(atCap);
     updateMinusButtonsForCap(atCap);
   }
+ 
+
+/* 👇 ADD IT HERE */
+function toggleZoomBar() {
+  const slider = document.getElementById('zoom-range');
+  const zoomIn = document.getElementById('zoom-in');
+  const zoomOut = document.getElementById('zoom-out');
+  const wrap =
+    document.querySelector('.variant-zoom-controls') ||
+    slider?.parentElement;
+
+  let hasCharms = false;
+
+  try {
+    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+    if (cart && cart.items) {
+      hasCharms = Object.values(cart.items).some(
+        (item) => Number(item.qty || 0) > 0
+      );
+    }
+  } catch {}
+
+  const display = hasCharms ? '' : 'none';
+
+  if (wrap) wrap.style.display = display;
+  if (slider) slider.style.display = display;
+  if (zoomIn) zoomIn.style.display = display;
+  if (zoomOut) zoomOut.style.display = display;
+}
+
 
  function updateMinusButtonsForCap(atCap) {
   document.querySelectorAll('.charm-card').forEach((card) => {
@@ -381,6 +411,9 @@ function getSelectedCount() {
               ? ''
               : 'none';
         });
+      
+      // Apply KT filtering immediately after collection switch
+      filterCharmsBySelectedVariantCarat();
     }, 500);
 
     moveGridsColumnBelowTile(targetId);
@@ -407,7 +440,9 @@ function getSelectedCount() {
     const loadCart = () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        return raw ? JSON.parse(raw) : { items: {}, totals: { metal: 0, diamond: 0 } };
+      return raw
+        ? JSON.parse(raw)
+        : { items: {}, sequence: [], totals: { metal: 0, diamond: 0 } };
       } catch (err) {
         console.error('loadCart error', err);
         return { items: {}, totals: { metal: 0, diamond: 0 } };
@@ -445,32 +480,54 @@ function getSelectedCount() {
     };
 
     const changeQty = (variantId, delta, metalPerUnit, diamondPerUnit) => {
-      const cart = loadCart();
-      const items = cart.items || {};
+  const cart = loadCart();
 
-      const existing = items[variantId] || {
-        qty: 0,
-        metalPerUnit: metalPerUnit,
-        diamondPerUnit: diamondPerUnit,
-      };
+  // ✅ ENSURE STRUCTURE
+  cart.items = cart.items || {};
+  cart.sequence = cart.sequence || [];
 
-      let newQty = parseInt(existing.qty || 0, 10) + delta;
-      if (newQty < 0) newQty = 0;
+  const items = cart.items;
 
-      if (newQty === 0) {
-        if (items[variantId]) delete items[variantId];
-      } else {
-        upsertItem(cart, variantId, metalPerUnit, diamondPerUnit, newQty);
-      }
+  const existing = items[variantId] || {
+    qty: 0,
+    metalPerUnit: metalPerUnit,
+    diamondPerUnit: diamondPerUnit,
+  };
 
-      cart.items = items;
-      recomputeTotals(cart);
-      saveCart(cart);
+  let newQty = parseInt(existing.qty || 0, 10) + delta;
+  if (newQty < 0) newQty = 0;
 
-      document.dispatchEvent(new CustomEvent('charmCartUpdated', { detail: { cart } }));
+  // ================================
+  // ✅ SEQUENCE LOGIC (CORE FIX)
+  // ================================
+  if (delta === 1) {
+    // ➕ ADD → store order
+    cart.sequence.push(String(variantId));
+  }
 
-      return cart;
-    };
+  if (delta === -1) {
+    // ➖ REMOVE → remove last occurrence
+    const idx = cart.sequence.lastIndexOf(String(variantId));
+    if (idx > -1) cart.sequence.splice(idx, 1);
+  }
+  // ================================
+
+  if (newQty === 0) {
+    delete items[variantId];
+  } else {
+    upsertItem(cart, variantId, metalPerUnit, diamondPerUnit, newQty);
+  }
+
+  cart.items = items;
+  recomputeTotals(cart);
+  saveCart(cart);
+
+  document.dispatchEvent(
+    new CustomEvent('charmCartUpdated', { detail: { cart } })
+  );
+
+  return cart;
+};
 
     const initUIFromCart = () => {
       const cart = loadCart();
@@ -784,40 +841,41 @@ _renderProductIfNeeded() {
     .catch(() => {});
 }
 
-_resetToBaseView(animate = true) {
-  const stage = this.stage;
-  if (!stage) return;
+  _resetToBaseView(animate = true) {
+    const stage = this.stage;
+    if (!stage) return;
 
-  const center = {
-    x: this.stageSize / 2,
-    y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-  };
+    // Adjust center position to account for charm positioning
+    const center = {
+      x: this.stageSize / 2,
+      y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05), // Slightly higher to show charms better
+    };
 
-  const posX = center.x - center.x * 1;
-  const posY = center.y - center.y * 1;
+    const posX = center.x - center.x * 1;
+    const posY = center.y - center.y * 1;
 
-  if (animate) {
-    stage.to({
-      scaleX: 1,
-      scaleY: 1,
-      x: posX,
-      y: posY,
-      duration: 0.18,
-    });
-  } else {
-    stage.scale({ x: 1, y: 1 });
-    stage.position({ x: posX, y: posY });
-    stage.batchDraw();
+    if (animate) {
+      stage.to({
+        scaleX: 1,
+        scaleY: 1,
+        x: posX,
+        y: posY,
+        duration: 0.18,
+      });
+    } else {
+      stage.scale({ x: 1, y: 1 });
+      stage.position({ x: posX, y: posY });
+      stage.batchDraw();
+    }
+
+    this.zoomFactor = 1;
+    stage.draggable(false);
+
+    if (this.slider) {
+      this.slider.value = '1';
+      this._updateZoomTrack && this._updateZoomTrack();
+    }
   }
-
-  this.zoomFactor = 1;
-  stage.draggable(false);
-
-  if (this.slider) {
-    this.slider.value = '1';
-    this._updateZoomTrack && this._updateZoomTrack();
-  }
-}
 
  async render(vis) {
   if (!vis || !vis.product) return;
@@ -920,28 +978,56 @@ _resetToBaseView(animate = true) {
 
     this._placedCharmPositions = [];
 
-   const geom =
-  this._chainGeom || {
-    center: {
-      x: this.stageSize / 2,
-      y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-    },
-    radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
-  };
+    const geom = this._chainGeom || {
+      center: {
+        x: this.stageSize / 2,
+        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+      },
+      radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+    };
 
-const chainR = geom.radius;
-
-const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
-
+    const chainR = geom.radius;
+    const centerIndex = Math.floor((count - 1) / 2);
+    
+    // More aggressive cropping prevention - ensure charms fit within stage
+    const stageBottom = this.stageSize - (size * 0.5); // Increased margin for better safety
 
     for (let i = 0; i < count; i++) {
       const c = charms[i];
       const basePt = pts[i] || pts[0];
-
       const angleRad = (basePt.angle * Math.PI) / 180;
-
-      const x = geom.center.x + charmR * Math.cos(angleRad);
-      const y = geom.center.y - charmR * Math.sin(angleRad);
+      
+      // Calculate chain attachment point
+      const chainX = geom.center.x + chainR * Math.cos(angleRad);
+      const chainY = geom.center.y - chainR * Math.sin(angleRad);
+      
+      // Position-based hang distance
+      let hangDistance;
+      if (i === centerIndex) {
+        hangDistance = size * 0.25; // Center charm hangs more below
+      } else if (i === 0 || i === count - 1) {
+        hangDistance = size * 0.08; // Side charms closer to chain
+      } else {
+        hangDistance = size * 0.12; // Medium distance
+      }
+      
+      // Position charm below chain with enhanced cropping prevention
+      let x = chainX;
+      // Ensure all charms hang below the chain center, not above it
+      // Use the lower of chainY or chain center Y, then add hangDistance
+      const baseY = Math.max(chainY, geom.center.y);
+      let y = baseY + hangDistance;
+      
+      // Enhanced cropping prevention - check both individual charm and overall bounds
+      const charmBottom = y + (size / 2);
+      if (charmBottom > stageBottom) {
+        // Adjust position to prevent cropping
+        const maxAllowedY = stageBottom - (size / 2);
+        y = Math.min(y, maxAllowedY);
+        // Recalculate hang distance to maintain proper positioning
+        hangDistance = Math.max(y - baseY, size * 0.05);
+        y = baseY + hangDistance;
+      }
 
       try {
         const img = await this.createImage(c.image || '');
@@ -952,13 +1038,26 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
           width: size,
           height: size,
           listening: true,
+          offsetX: size / 2,
+          offsetY: size / 2,
         });
 
-        kimg.offsetX(size / 2);
-        kimg.offsetY(size / 2);
-        kimg.rotation(0);
+        // Calculate rotation based on position
+        let rotation = 0;
+        if (i !== centerIndex) {
+          const chainAngleDeg = basePt.angle;
+          if (chainAngleDeg > 270) {
+            rotation = -((chainAngleDeg - 270) * 0.8); // Left tilt
+          } else if (chainAngleDeg < 270) {
+            rotation = (270 - chainAngleDeg) * 0.8; // Right tilt
+          }
+          rotation = Math.max(-30, Math.min(30, rotation));
+        }
+        
+        kimg.rotation(rotation);
         kimg._productId = c.id;
 
+        // Hover effects
         kimg.on('mouseenter', () => {
           document.body.style.cursor = 'pointer';
           kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
@@ -1075,7 +1174,8 @@ const charmR = chainR * (1 - CHARM_ATTACH_OFFSET_FACTOR);
     const boxCenterX = minX + boxW / 2;
     const boxCenterY = minY + boxH / 2;
 
-    const desiredFraction = 0.42;
+    // Improved fraction for better visibility without cropping
+    const desiredFraction = 0.5; // Increased from 0.42 for better view
     const scaleX = (this.stageSize * desiredFraction) / boxW;
     const scaleY = (this.stageSize * desiredFraction) / boxH;
 
@@ -1255,6 +1355,132 @@ function ensureBaseProductFromLS() {
   }
 }
 
+  function getSelectedVariantCarat() {
+    try {
+      // First try to get from Carat-value localStorage (most reliable)
+      const caratValue = localStorage.getItem('Carat-value');
+      if (caratValue) {
+        const normalized = caratValue.toUpperCase().trim();
+        if (normalized.includes('18KT') || normalized.includes('18')) return '18KT';
+        if (normalized.includes('14KT') || normalized.includes('14')) return '14KT';
+        if (normalized.includes('9KT') || normalized.includes('9')) return '9KT';
+      }
+
+      // Fallback to variant data if Carat-value is not available
+      const saved = readSavedVariantFromLS();
+      if (!saved) return null;
+
+      const vid = saved.variantId || saved.id;
+      if (!vid) return null;
+
+      const resolved = resolveVariantFromPage(vid);
+      if (!resolved) return null;
+
+      // Extract carat from variant title or options
+      const variantText = `${resolved.title || ''} ${resolved.option1 || ''} ${resolved.option2 || ''} ${resolved.option3 || ''}`.toUpperCase();
+      
+      if (variantText.includes('18KT') || variantText.includes('18 KT')) return '18KT';
+      if (variantText.includes('14KT') || variantText.includes('14 KT')) return '14KT';
+      if (variantText.includes('9KT') || variantText.includes('9 KT')) return '9KT';
+
+      return null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Track if counts have been initialized to prevent unnecessary updates
+  let countsInitialized = false;
+
+  function filterCharmsBySelectedVariantCarat() {
+    const caratValue = localStorage.getItem('Carat-value');
+    if (!caratValue) {
+      console.log('No Carat-value found in localStorage - showing all charms');
+      // Update counts even when no KT filter is applied
+      if (!countsInitialized) {
+        setTimeout(() => {
+          updateCountsUI();
+          countsInitialized = true;
+        }, 50);
+      }
+      return;
+    }
+
+    const selectedKT = caratValue.toUpperCase().trim();
+    console.log('🔍 Filtering charms by KT only:', selectedKT);
+
+    let hiddenCount = 0;
+    let shownCount = 0;
+    let debugCount = 0;
+
+    // Simple KT-only filtering - don't break existing color functionality
+    document.querySelectorAll('.charm-card').forEach((card) => {
+      // Skip if card is already hidden by other filters (color, etc.)
+      const wasAlreadyHidden = card.style.display === 'none';
+      if (wasAlreadyHidden) return;
+      
+      const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
+      const cardCarats = (card.dataset.carat || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
+      
+      // Check if this charm variant matches the selected KT
+      let shouldShow = false;
+      
+      // Method 1: Check data-carat attribute
+      if (cardCarats.length > 0) {
+        shouldShow = cardCarats.some(carat => {
+          const normalizedCarat = carat.replace(/\s+/g, '');
+          const normalizedSelected = selectedKT.replace(/\s+/g, '');
+          return normalizedCarat === normalizedSelected || 
+                 normalizedCarat.includes(normalizedSelected) ||
+                 (normalizedSelected.includes('14') && normalizedCarat.includes('14')) ||
+                 (normalizedSelected.includes('18') && normalizedCarat.includes('18'));
+        });
+      }
+      
+      // Method 2: Check title if data-carat is empty or didn't match
+      if (!shouldShow && cardTitle) {
+        const titleUpper = cardTitle.toUpperCase();
+        shouldShow = (selectedKT.includes('14') && titleUpper.includes('14KT')) ||
+                    (selectedKT.includes('18') && titleUpper.includes('18KT')) ||
+                    titleUpper.includes(selectedKT);
+      }
+      
+      // Debug first few cards
+      if (debugCount < 5) {
+        console.log(`Card ${debugCount + 1}: "${cardTitle.substring(0, 30)}...", Carats: [${cardCarats.join(', ')}], Should show: ${shouldShow}`);
+        debugCount++;
+      }
+      
+      // Apply KT filtering (only hide, don't show if already hidden by color filter)
+      if (!shouldShow) {
+        card.style.display = 'none';
+        hiddenCount++;
+      } else {
+        shownCount++;
+      }
+    });
+
+    console.log(`✅ KT filtering complete: ${shownCount} shown, ${hiddenCount} hidden by KT filter`);
+
+    // Update the color filter label to show the selected carat
+    const colorNameEl = document.getElementById('lf-color-name');
+    if (colorNameEl) {
+      const currentText = colorNameEl.textContent;
+      const cleanText = currentText.replace(/^\d+KT\s*/, ''); // Remove existing KT prefix
+      colorNameEl.textContent = `${selectedKT} ${cleanText}`;
+    }
+
+    // IMPORTANT: Update collection counts AFTER KT filtering is complete
+    // But only if counts haven't been initialized yet
+    if (!countsInitialized) {
+      setTimeout(() => {
+        updateCountsUI();
+        countsInitialized = true;
+        console.log('🔄 Counts initialized after KT filtering');
+      }, 50);
+    }
+  }
+
   const full = $('lucira-accessory-fullscreen');
 
   function openPanel() {
@@ -1315,6 +1541,18 @@ function ensureBaseProductFromLS() {
   bindCollectionTiles();
   buildColorMapForActiveGrid();
   buildSwatchDots();
+  toggleZoomBar();
+  
+  // Apply KT filtering when panel first opens
+  setTimeout(() => {
+    filterCharmsBySelectedVariantCarat();
+    // Force count update for all collections on panel open
+    setTimeout(() => {
+      updateCountsUI();
+      countsInitialized = true;
+      console.log('🔄 All collection counts initialized on panel open');
+    }, 100);
+  }, 200);
 }, 80);
     if (full) {
       full.style.display = 'block';
@@ -1487,32 +1725,24 @@ function ensureBaseProductFromLS() {
 function rebuildVisualiserFromCart() {
   try {
     const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
-
-    // 🔥 HARD RESET every time
     visualiser.charms.length = 0;
 
-    if (!cart || !cart.items) return;
+    if (!cart || !Array.isArray(cart.sequence)) return;
 
-    Object.keys(cart.items).forEach((variantId) => {
-      const qty = Number(cart.items[variantId].qty || 0);
-      if (qty <= 0) return;
-
-      // 🔥 FIX: variantId ≠ productId
+    cart.sequence.forEach((variantId) => {
       const card = document.querySelector(
         `.charm-card[data-variant-id="${variantId}"],
          .charm-card[data-product-id="${variantId}"]`
       );
       if (!card) return;
 
-      for (let i = 0; i < qty; i++) {
-        visualiser.charms.push(buildCharmObjFromCard(card));
-      }
+      visualiser.charms.push(buildCharmObjFromCard(card));
     });
   } catch (e) {
-    console.warn('rebuildVisualiserFromCart failed', e);
     visualiser.charms.length = 0;
   }
 }
+
 
 function syncUIFromCart() {
     ensureBaseProductFromLS();
@@ -1520,6 +1750,7 @@ function syncUIFromCart() {
   const bv = ensureBV();
   bv._productRendered = false;
   bv.render(visualiser).catch(() => {});
+  toggleZoomBar();
   const selectedCount = getSelectedCount();
 
   if (selectedCount > 0) {
@@ -1893,7 +2124,13 @@ function syncUIFromCart() {
 
     wrap.innerHTML = '';
 
-    if (currentCarat == null) currentCarat = deriveCaratFromLS();
+    // Use the selected variant's carat if available, otherwise fall back to localStorage
+    const selectedVariantCarat = getSelectedVariantCarat();
+    if (selectedVariantCarat) {
+      currentCarat = selectedVariantCarat;
+    } else if (currentCarat == null) {
+      currentCarat = deriveCaratFromLS();
+    }
 
     const colors = availableColorsInActiveGrid();
 
@@ -1918,6 +2155,12 @@ function syncUIFromCart() {
         dot.classList.add('active');
 
         setActiveLabel(color);
+        
+        // Apply KT filtering after color filtering
+        setTimeout(() => {
+          filterCharmsBySelectedVariantCarat();
+        }, 50);
+        
         refreshCapState();
       });
 
@@ -1926,6 +2169,11 @@ function syncUIFromCart() {
 
     applyColorFilter(currentColorLabel);
     setActiveLabel(currentColorLabel);
+    
+    // Apply KT filtering after building color dots
+    setTimeout(() => {
+      filterCharmsBySelectedVariantCarat();
+    }, 100);
   }
 
   function applyColorFilter(colorLabel) {
@@ -2002,6 +2250,145 @@ function syncUIFromCart() {
 
   window.luciraOpenAccessory = openPanel;
   window.luciraCloseAccessory = closePanel;
+  
+  // Expose the filtering function globally
+  window.filterCharmsBySelectedVariantCarat = filterCharmsBySelectedVariantCarat;
+  window.getSelectedVariantCarat = getSelectedVariantCarat;
+
+  // Debug function to test filtering
+  window.debugCaratFiltering = function() {
+    const caratValue = localStorage.getItem('Carat-value');
+    
+    console.log('=== CARAT FILTERING DEBUG ===');
+    console.log('localStorage Carat-value:', caratValue);
+    
+    const charmCards = document.querySelectorAll('.charm-card');
+    console.log(`Total charm cards found: ${charmCards.length}`);
+    
+    let visibleCount = 0;
+    let hiddenCount = 0;
+    
+    charmCards.forEach((card, index) => {
+      const cardCarats = card.dataset.carat || '';
+      const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
+      const isVisible = card.style.display !== 'none';
+      
+      if (isVisible) visibleCount++;
+      else hiddenCount++;
+      
+      if (index < 10) { // Show first 10 for debugging
+        console.log(`Card ${index + 1}: 
+          Title: "${cardTitle}"
+          data-carat: "${cardCarats}"
+          Visible: ${isVisible}`);
+      }
+    });
+    
+    console.log(`Summary: ${visibleCount} visible, ${hiddenCount} hidden`);
+    console.log('=== END DEBUG ===');
+    
+    return { caratValue, totalCards: charmCards.length, visibleCount, hiddenCount };
+  };
+
+  // Manual filter trigger for testing
+  window.testCaratFilter = function() {
+    console.log('Manually triggering carat filter...');
+    filterCharmsBySelectedVariantCarat();
+    return debugCaratFiltering();
+  };
+
+  // Test combined color and KT filtering
+  window.testCombinedFilter = function(color = null) {
+    const caratValue = localStorage.getItem('Carat-value');
+    const testColor = color || currentColorLabel || 'All';
+    
+    console.log('=== TESTING COMBINED FILTER ===');
+    console.log('KT from localStorage:', caratValue);
+    console.log('Color filter:', testColor);
+    
+    applyColorFilter(testColor);
+    
+    const visible = document.querySelectorAll('.charm-card:not([style*="display: none"])').length;
+    const hidden = document.querySelectorAll('.charm-card[style*="display: none"]').length;
+    
+    console.log(`Results: ${visible} visible, ${hidden} hidden`);
+    console.log('=== END TEST ===');
+    
+    return { caratValue, testColor, visible, hidden };
+  };
+
+  // Debug collection counts
+  window.debugCollectionCounts = function() {
+    const caratValue = localStorage.getItem('Carat-value');
+    console.log('=== COLLECTION COUNTS DEBUG ===');
+    console.log('Selected KT:', caratValue);
+    
+    document.querySelectorAll('.charms-grid-container').forEach((container) => {
+      const containerId = container.id;
+      const isActive = container.classList.contains('active');
+      
+      if (isActive) {
+        const allCards = container.querySelectorAll('.charm-card');
+        const visibleCards = container.querySelectorAll('.charm-card:not([style*="display: none"])');
+        
+        console.log(`\n📊 Active Collection: ${containerId}`);
+        console.log(`   Total charm cards: ${allCards.length}`);
+        console.log(`   Visible after filtering: ${visibleCards.length}`);
+        
+        // Sample first few cards
+        allCards.forEach((card, index) => {
+          if (index < 3) {
+            const title = card.dataset.title || 'No title';
+            const carats = card.dataset.carat || 'No carat data';
+            const isVisible = card.style.display !== 'none';
+            console.log(`   Card ${index + 1}: "${title.substring(0, 40)}..." | Carats: "${carats}" | Visible: ${isVisible}`);
+          }
+        });
+      }
+    });
+    
+    console.log('=== END DEBUG ===');
+  };
+
+  // Debug charm rotations
+  window.debugCharmRotations = function() {
+    console.log('=== CHARM ROTATIONS DEBUG ===');
+    const charmImages = document.querySelectorAll('.konvajs-content canvas');
+    if (charmImages.length > 0) {
+      console.log(`Found ${charmImages.length} Konva canvases`);
+      // Check if we can access Konva objects
+      if (window.bv && window.bv.charmLayer) {
+        const charms = window.bv.charmLayer.children;
+        charms.forEach((charm, index) => {
+          console.log(`Charm ${index}: rotation = ${charm.rotation()}°, position = (${charm.x()}, ${charm.y()})`);
+        });
+      }
+    } else {
+      console.log('No Konva canvases found');
+    }
+    console.log('=== END DEBUG ===');
+  };
+
+  // Debug canvas bounds
+  window.debugCanvasBounds = function() {
+    console.log('=== CANVAS BOUNDS DEBUG ===');
+    if (window.bv && window.bv.stage) {
+      const stage = window.bv.stage;
+      console.log(`Canvas size: ${stage.width()} x ${stage.height()}`);
+      console.log(`Container size: ${stage.container().offsetWidth} x ${stage.container().offsetHeight}`);
+      
+      if (window.bv.charmLayer) {
+        const charms = window.bv.charmLayer.children;
+        charms.forEach((charm, index) => {
+          const bounds = charm.getClientRect();
+          console.log(`Charm ${index} bounds: x=${bounds.x}, y=${bounds.y}, width=${bounds.width}, height=${bounds.height}`);
+          console.log(`  - Right edge: ${bounds.x + bounds.width}, Bottom edge: ${bounds.y + bounds.height}`);
+          console.log(`  - Within canvas: ${bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= stage.width() && bounds.y + bounds.height <= stage.height()}`);
+        });
+      }
+    }
+    console.log('=== END DEBUG ===');
+  };
 
 };
 
@@ -2120,28 +2507,58 @@ function findMetal(v) {
 }
 
 function computeCountsSimple() {
+  const selectedKT = (localStorage.getItem('Carat-value') || '')
+    .toUpperCase()
+    .replace(/\s+/g, '');
+
   document.querySelectorAll('.charms-grid-container').forEach((container) => {
     const containerId = container.id;
     if (!containerId) return;
+
     const cards = container.querySelectorAll('.charm-card');
-    const totalCount = cards.length;
-    let selected = 0;
+
+    let visibleCount = 0;
+    let selectedQty = 0;
+
     cards.forEach((card) => {
-      const q = Number(card.querySelector('.qty-input')?.value || 0);
-      if (q > 0) selected += q;
+      // 👉 SAME KT LOGIC AS ACTIVE GRID
+      const carats = (card.dataset.carat || '')
+        .split(',')
+        .map(v => v.toUpperCase().replace(/\s+/g, ''))
+        .filter(Boolean);
+
+      const title = (card.dataset.title || '').toUpperCase();
+
+      let matchesKT = true;
+
+      if (selectedKT) {
+        matchesKT =
+          carats.includes(selectedKT) ||
+          title.includes(selectedKT);
+      }
+
+      if (matchesKT) {
+        visibleCount++;
+
+        const q = Number(card.querySelector('.qty-input')?.value || 0);
+        if (q > 0) selectedQty += q;
+      }
     });
+
+    // 👉 UPDATE ONLY THIS TILE
     const tile = document.querySelector(
       `.collection-tile[data-target="${containerId}"]`
     );
     if (!tile) return;
 
-    const visible = tile.querySelector('.ct-visible-count');
-    const qty = tile.querySelector('.ct-qty');
+    const countEl = tile.querySelector('.ct-visible-count');
+    const qtyEl = tile.querySelector('.ct-qty');
 
-    if (visible) visible.textContent = totalCount;
-    if (qty) qty.textContent = selected > 0 ? `(${selected})` : '';
+    if (countEl) countEl.textContent = visibleCount;
+    if (qtyEl) qtyEl.textContent = selectedQty > 0 ? `(${selectedQty})` : '';
   });
 }
+
 
 function updateCountsUI() {
   computeCountsSimple();
@@ -2162,7 +2579,9 @@ function scheduleUpdateCounts() {
   __countsScheduled = true;
   const run = () => {
     __countsScheduled = false;
-    updateCountsUI();
+    // Don't update counts directly - let KT filtering handle it
+    // This prevents counting before KT filtering is applied
+    console.log('Scheduled count update - will be handled by KT filtering');
   };
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(() =>
@@ -2173,7 +2592,10 @@ function scheduleUpdateCounts() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', updateCountsUI);
+document.addEventListener('DOMContentLoaded', () => {
+  // Don't update counts immediately - wait for KT filtering
+  console.log('DOM loaded - counts will be updated after KT filtering');
+});
 
 document.addEventListener('click', (e) => {
   if (
