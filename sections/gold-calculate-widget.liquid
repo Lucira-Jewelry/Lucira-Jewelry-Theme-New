@@ -70,7 +70,7 @@
 
 <div class="gold-calc-section">
   <div class="page-width">
-    <h1 class="gold-calc__heading">CALCULATE YOUR GOLD</h1>
+    <h1 class="gold-calc__heading">Gold Rate Today in {{ page.metafields.custom.city_name }}</h1>
   </div>
   <div class="gst-main page-width">
     <div class="gold-calc__container">
@@ -201,6 +201,40 @@
           {%- endfor -%}
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<div class="gold-rate-rise-and-fall">
+  <div class="page-width">
+    <div class="information-content-wrapper">
+      <h2>Gold Rate Today in  {{ page.metafields.custom.city_name }} – [current_date]</h2>
+      <div id="gold-rise" style="display:none">
+        <h3>Gold Rate Rises</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], 24-carat gold is priced at
+          [gold_rate_24kt_10gm] per 10 grams, while 22-carat gold stands at
+          [gold_rate_22kt_10gm] per 10 grams.
+        </p>
+      </div>
+
+      <div id="gold-fall" style="display:none">
+        <h3>Gold Rate Falls</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], 24-carat gold is available at
+          [gold_rate_24kt_10gm] per 10 grams, with 22-carat gold priced at
+          [gold_rate_22kt_10gm] per 10 grams.
+        </p>
+      </div>
+
+      <div id="gold-stable" style="display:none">
+        <h3>Gold Rate Remains Stable</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], gold prices remain steady with
+          24-carat gold at [gold_rate_24kt_10gm] per 10 grams and
+          22-carat gold at [gold_rate_22kt_10gm] per 10 grams.
+        </p>
+      </div>
     </div>
   </div>
 </div>
@@ -351,7 +385,7 @@ input[type=number] {
 
   .location-dropdown {position: relative;display: flex;flex-direction: column;}
   .location-dropdown label {font-size: 12px;color: white;margin-left: 12px;position: absolute;top: -16px;background: transparent;padding: 0 5px;text-transform: capitalize;}
-  .location-dropdown select {padding: 12px 16px;border: 2px solid white;border-radius: 12px;background: transparent;color: white;font-size: 16px;font-weight: 600;appearance: none;text-transform: uppercase;min-width: 180px;cursor: pointer;}
+  .location-dropdown select {padding: 12px 16px;border: 2px solid white;border-radius: 12px;background: transparent;color: white;font-size: 16px;font-weight: 600;appearance: none;text-transform: uppercase;min-width: 180px;cursor: pointer;margin-top:5px;}
   .location-dropdown select option {
     color: black; /* dropdown text */
   }
@@ -1009,7 +1043,7 @@ input[type=number] {
     });
   });
 </script>
-<script>
+{% comment %} <script>
   $(document).ready(function () {
     let selectedKarat = 9; // Default based on initial HTML selection
 
@@ -1185,6 +1219,183 @@ input[type=number] {
       calculateAndDisplayPrice(); // Recalculate using the newly active mode
     });
   });
+</script> {% endcomment %}
+
+<script>
+  $(document).ready(function () {
+  let selectedKarat = 9;
+
+  const baseRate = parseFloat($('#goldRate').data('base'));
+
+  // Helper function to calculate the rate for 1 gram at a specific karatage
+  function getRateByKarat(baseRate, karat) {
+    const perGramRate = baseRate / 10; // Rate for 1 gram of 24kt
+    return perGramRate * (karat / 24); // Rate for 1 gram of selected karat
+  }
+
+  // Function to update the visible rate display for the selected karat
+  function updateRateDisplay(karat) {
+    const calculatedRate = karat === 24 ? baseRate / 10 : getRateByKarat(baseRate, karat);
+
+    $('.gold-calc__label--desktop').text(`Today's Standard Rate of ${karat}kt Gold`);
+    $('.gold-calc__label--mobile').text(`Today's ${karat}kt Gold Rate`);
+    $('#goldRate').text(
+      '₹ ' +
+        parseFloat(calculatedRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    );
+  }
+
+  // The core function to calculate and display Gold Price (with/without GST)
+  function calculateAndDisplayPrice() {
+    const weight = parseFloat($('#weightInput').val());
+    const gstResultsContainer = $('#gstResults');
+    const activeKaratText = $('.gold-calc__karat.gold-calc__karat--active').text();
+    const activeKarat = parseInt(activeKaratText.replace('kt', ''));
+
+    // 1. Input Validation
+    if (isNaN(weight) || weight <= 0) {
+      $('#goldCalcResult').hide();
+      gstResultsContainer
+        .html(
+          `
+              <p style="text-align:center; font-size:16px; color:#A68380; margin-top:20px;">
+                  Please enter a valid weight in grams.
+              </p>
+          `
+        )
+        .slideDown();
+      return;
+    }
+
+    // 2. Gold Price Calculation
+    const currentRate = activeKarat === 24 ? baseRate / 10 : getRateByKarat(baseRate, activeKarat);
+
+    const goldPrice = weight * currentRate;
+    const totalExcludingGST = goldPrice.toFixed(2);
+
+    // 3. Update Main Calculator Result (Always Excluding GST)
+    $('#goldValueOutput').text(
+      `₹${parseFloat(totalExcludingGST).toLocaleString('en-IN', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`
+    );
+    $('#goldCalcResult').show();
+
+    // 4. Update GST Calculator Result (Based on active toggle)
+
+    // If 'Excluding GST' is active
+    if ($('.gst-button.excluding-gst').hasClass('active')) {
+      gstResultsContainer
+        .html(
+          `
+              <div class="gst-result-item">
+                  <span class="gst-label">Gold Price</span>
+                  <span class="gst-value" id="goldPriceGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item final-amount">
+                  <p class="gst-label-son">Final Amount <span class="includesmall"> (Excluding GST)</span></p>
+                  <p class="gst-value-son" id="finalAmountGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</p>
+              </div>
+              <p class="gold-calc__note">*This value is not the final value as Gold Rate might change*</p>
+          `
+        )
+        .slideDown();
+    }
+    // If 'Including GST' is active (Default)
+    else {
+      const gstRate = 0.03; // 3% GST on gold
+      const totalGST = goldPrice * gstRate;
+      const finalAmountGST = goldPrice + totalGST;
+      const cgstValue = totalGST / 2; // 1.5%
+      const sgstValue = totalGST / 2; // 1.5%
+
+      gstResultsContainer
+        .html(
+          `
+              <div class="gst-result-item">
+                  <span class="gst-label">Gold Price</span>
+                  <span class="gst-value" id="goldPriceGST">₹${goldPrice.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item">
+                  <span class="gst-label">CGST (Central GST)</span>
+                  <span class="gst-value" id="cgstValue">₹${cgstValue.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item">
+                  <span class="gst-label">SGST/UTGST (State GST)</span>
+                  <span class="gst-value" id="sgstValue">₹${sgstValue.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item total-gst">
+                  <span class="gst-label">Total GST Amount</span>
+                  <span class="gst-value" id="totalGST">₹${totalGST.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</span>
+              </div>
+              <div class="gst-result-item final-amount">
+                  <p class="gst-label vv">Final Amount <span class="includesmall"> ( Including GST)</span></p>
+                  <p class="gst-value nn" id="finalAmountGST">₹${finalAmountGST.toLocaleString('en-IN', {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}</p>
+              </div>
+              <p class="gold-calc__note">*This value is not the final value as Gold Rate might change*</p>
+          `
+        )
+        .slideDown();
+    }
+  }
+
+  // --- Initial Setup and Events ---
+
+  // 1. Initial display setup - ONLY update rate display, DO NOT calculate
+  updateRateDisplay(selectedKarat);
+  
+  // Hide results initially
+  $('#goldCalcResult').hide();
+  $('#gstResults').hide();
+
+  // 2. Karat Button Click Handler (Only updates rate display, no auto-calculation)
+  $('.gold-calc__karat').on('click', function () {
+    $('.gold-calc__karat').removeClass('gold-calc__karat--active');
+    $(this).addClass('gold-calc__karat--active');
+
+    selectedKarat = parseInt($(this).text().replace('kt', ''));
+    updateRateDisplay(selectedKarat);
+    
+    // DO NOT auto-calculate here
+  });
+
+  // 3. Weight Input Handler (No auto-calculation)
+  $('#weightInput').on('input', function () {
+    // DO NOT auto-calculate here
+  });
+
+  // 4. Calculate Button - ONLY calculate when clicked
+  $('.gold-calc__button').on('click', calculateAndDisplayPrice);
+
+  // 5. GST Toggle Buttons (Only changes view mode, then recalculates for that mode)
+  $('.gst-button').on('click', function () {
+    $('.gst-button').removeClass('active');
+    $(this).addClass('active');
+    calculateAndDisplayPrice(); // Recalculate using the newly active mode
+  });
+});
 </script>
 <script>
   document.addEventListener('DOMContentLoaded', function () {
@@ -1235,14 +1446,24 @@ input[type=number] {
     const ratePerGram = baseRate / 10;
 
     const rates = {
+      // Per 1 gram
       '[gold_rate_24kt]': Math.round(ratePerGram),
       '[gold_rate_22kt]': Math.round(ratePerGram * (22 / 24)),
       '[gold_rate_18kt]': Math.round(ratePerGram * (18 / 24)),
       '[gold_rate_14kt]': Math.round(ratePerGram * (14 / 24)),
       '[gold_rate_9kt]': Math.round(ratePerGram * (9 / 24)),
+
+      // ✅ Per 10 gram
+      '[gold_rate_24kt_10gm]': Math.round(ratePerGram * 10),
+      '[gold_rate_22kt_10gm]': Math.round(ratePerGram * 10 * (22 / 24)),
+      '[gold_rate_18kt_10gm]': Math.round(ratePerGram * 10 * (18 / 24)),
+      '[gold_rate_14kt_10gm]': Math.round(ratePerGram * 10 * (14 / 24)),
+      '[gold_rate_9kt_10gm]': Math.round(ratePerGram * 10 * (9 / 24)),
     };
 
-    const containers = document.querySelectorAll('p, li, span, div, h1, h2, h3, h4, h5, h6');
+    const containers = document.querySelectorAll(
+      'p, li, span, div, h1, h2, h3, h4, h5, h6'
+    );
 
     containers.forEach((el) => {
       let html = el.innerHTML;
@@ -1250,7 +1471,10 @@ input[type=number] {
 
       Object.entries(rates).forEach(([shortcode, price]) => {
         if (html.includes(shortcode)) {
-          html = html.replaceAll(shortcode, `₹${price.toLocaleString('en-IN')}`);
+          html = html.replaceAll(
+            shortcode,
+            `₹${price.toLocaleString('en-IN')}`
+          );
           changed = true;
         }
       });
@@ -1259,10 +1483,7 @@ input[type=number] {
     });
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    // Only replace shortcodes
-    replaceGoldShortcodes();
-  });
+  document.addEventListener('DOMContentLoaded', replaceGoldShortcodes);
 </script>
 <script>
   $(document).ready(function () {
@@ -1277,6 +1498,43 @@ input[type=number] {
       }
     });
   });
+</script>
+<script>
+  function getDaySuffix(day) {
+    if (day > 3 && day < 21) return 'th';
+    switch (day % 10) {
+      case 1: return 'st';
+      case 2: return 'nd';
+      case 3: return 'rd';
+      default: return 'th';
+    }
+  }
+
+  function replaceDateShortcode() {
+    const today = new Date();
+
+    const day = today.getDate();
+    const suffix = getDaySuffix(day);
+
+    const formattedDate = `${day}${suffix} ${today.toLocaleString('en-IN', {
+      month: 'short'
+    })}, ${today.getFullYear()}`;
+
+    const elements = document.querySelectorAll(
+      'p, li, span, div, h1, h2, h3, h4, h5, h6'
+    );
+
+    elements.forEach(el => {
+      if (el.innerHTML.includes('[current_date]')) {
+        el.innerHTML = el.innerHTML.replaceAll(
+          '[current_date]',
+          formattedDate
+        );
+      }
+    });
+  }
+
+  document.addEventListener('DOMContentLoaded', replaceDateShortcode);
 </script>
 <script>
   // Full mapping from your Excel (state -> cities)
@@ -1508,6 +1766,44 @@ input[type=number] {
   });
 </script>
 
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const baseEl = document.querySelector('[data-base]');
+    if (!baseEl) return;
+
+    const todayRate = parseFloat(baseEl.getAttribute('data-base'));
+
+    const yesterdayRate = parseFloat(
+      "{{ section.settings.rate_yesterday | remove: '₹' | remove: ',' | strip }}"
+    );
+
+    if (!todayRate || !yesterdayRate) return;
+
+    const THRESHOLD = 500; // ₹500 range
+
+    const riseEl = document.getElementById('gold-rise');
+    const fallEl = document.getElementById('gold-fall');
+    const stableEl = document.getElementById('gold-stable');
+
+    // Hide all by default
+    [riseEl, fallEl, stableEl].forEach(el => el && (el.style.display = 'none'));
+
+    const diff = todayRate - yesterdayRate;
+
+    if (diff > THRESHOLD && riseEl) {
+      riseEl.style.display = 'block';
+    } 
+    else if (diff < -THRESHOLD && fallEl) {
+      fallEl.style.display = 'block';
+    } 
+    else if (stableEl) {
+      stableEl.style.display = 'block';
+    }
+  });
+</script>
+
+
+
 {% schema %}
 {
   "name": "Gold Rate Calculate",
@@ -1529,6 +1825,13 @@ input[type=number] {
       "id": "rate_today",
       "label": "Gold Rate Today (24 KT)",
       "default": "₹ 98,440"
+    },
+    {
+      "type": "text",
+      "id": "rate_yesterday",
+      "label": "Gold Rate Yesterday (24 KT)",
+      "default": "₹ 98,320",
+      "info": "Yesterday's 24KT gold price per 10 grams (T-1)"
     },
     {
       "type": "text",

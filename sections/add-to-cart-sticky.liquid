@@ -1,0 +1,465 @@
+{% if section.settings.enable_section and request.page_type == 'product' and product.available %}
+  {% liquid
+    assign current_variant = product.selected_or_first_available_variant
+    assign product_form_id = 'product-form-' | append: section.id
+    assign image = current_variant.image | default: product.featured_image
+    assign img_size = section.settings.img_width | append: 'x' | append: section.settings.img_height
+  %}
+
+  <style>
+    #md-sticky-atc{
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      z-index:99;
+      padding-top:{{ section.settings.pt }}rem;
+      padding-bottom:{{ section.settings.pb }}rem;
+      visibility:hidden;
+      opacity:0;
+      transform:translateY(-100%);
+      transition:all .15s ease-out;
+      border-bottom:.1rem solid rgba(var(--color-foreground),.08);
+      background:rgb(var(--color-background))
+    }
+    #md-sticky-atc.show{visibility:visible;opacity:1;transform:translateY(0); box-shadow: rgba(0, 0, 0, 0.04) 0px 3px 5px;}
+    #md-sticky-atc button.product-form__submit {width: 260px;}
+    #md-sticky-atc .product__title { word-break: break-word; margin-top: 0; margin-bottom: 6px; }
+    #md-sticky-atc .try-at-home-button, #md-sticky-atc .visit-store-home-button {max-width: max-content; padding: 0; border: 0; background: transparent; font-family: 'Futura Std', sans-serif;}
+    #md-sticky-atc .visit-store-home-button {display: block;}
+    #md-sticky-atc .product-form form {margin-right: 0;}
+
+    @media(min-width:990px){
+      #md-sticky-atc .page-width-inner{
+        display:grid;
+        grid-template-columns:1fr auto;
+        align-items:center
+      }
+    }
+    #md-sticky-atc .product-content{display:flex;align-items:center}
+    #md-sticky-atc .product-content img{margin-right:.75rem}
+    #md-sticky-atc .price-mirror .price{justify-content:flex-start}
+    #md-sticky-atc .price__regular {display: none;}
+    #md-sticky-atc .price__sale {display: block;}
+    #md-sticky-atc .price__sale .price-item--regular {font-size: 14px; font-weight: 500;}
+    #md-sticky-atc .try-at-home-button, #md-sticky-atc .visit-store-home-button{position:relative}
+    #md-sticky-atc .try-at-home-button::after, #md-sticky-atc .visit-store-home-button::after{content:attr(data-tooltip);position:absolute;top:110%;left:50%;transform:translateX(-50%);background:#000;color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:10;line-height: 1.3; font-size: 12px !important;}
+    #md-sticky-atc .try-at-home-button::before, #md-sticky-atc .visit-store-home-button::before{content:"";position:absolute;top:90%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#000;opacity:0;transition:opacity .2s ease}
+    #md-sticky-atc .try-at-home-button:hover::after, #md-sticky-atc .try-at-home-button:hover::before,#md-sticky-atc .visit-store-home-button:hover::after, #md-sticky-atc .visit-store-home-button:hover::before{opacity:1}
+    #md-sticky-atc .visit-store-home-button svg {display: block;}
+
+    @media(max-width:749px){
+      #md-sticky-atc{
+        display:none !important;
+      }
+    }
+  </style>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const stickyATC = document.querySelector('#md-sticky-atc');
+      if (!stickyATC) return;
+
+      const stickyImg = stickyATC.querySelector('.product-content img');
+      const stickyPriceContainer = stickyATC.querySelector('.price-mirror');
+      const stickyForm = stickyATC.querySelector('form');
+
+      const mainAtcBtn = document.querySelector('button[name="add"]');
+      
+      let threshold = 300;
+      
+      const updateThreshold = () => {
+        const offset = Number(stickyATC.dataset.offset) || 0;
+        
+        if (mainAtcBtn) {
+          const rect = mainAtcBtn.getBoundingClientRect();
+          const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+          threshold = rect.top + scrollTop + rect.height + offset;
+        }
+      };
+      
+      updateThreshold();
+
+      let ticking = false;
+      window.addEventListener('scroll', () => {
+        if (!ticking) {
+          window.requestAnimationFrame(() => {
+            stickyATC.classList.toggle('show', window.scrollY > threshold);
+            ticking = false;
+          });
+          ticking = true;
+        }
+      });
+
+      window.addEventListener('resize', () => {
+        updateThreshold();
+      });
+
+      if (window.MutationObserver) {
+        const observer = new MutationObserver(() => {
+          updateThreshold();
+        });
+        observer.observe(stickyATC, { attributes: true, attributeFilter: ['data-offset'] });
+      }
+
+      // Sync variant selection from main form to sticky form
+      const mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
+      if (mainForm && stickyForm) {
+        const mainVariantInput = mainForm.querySelector('input[name="id"], select[name="id"]');
+        const stickyVariantInput = stickyForm.querySelector('input[name="id"]');
+        
+        if (mainVariantInput && stickyVariantInput) {
+          // Listen for changes on main form
+          mainForm.addEventListener('change', (e) => {
+            if (e.target.name === 'id') {
+              stickyVariantInput.value = e.target.value;
+            }
+          });
+          
+          // Listen for variant:change event (Shopify theme specific)
+          document.addEventListener('variant:change', (e) => {
+            if (e.detail?.variant?.id) {
+              stickyVariantInput.value = e.detail.variant.id;
+            }
+          });
+        }
+      }
+
+      const mainPriceRoot =
+        document.querySelector('.product__info-container .no-js-hidden[role="status"]') ||
+        document.querySelector('.product__info-container .price');
+
+      const getMainImage = () => {
+        const img =
+          document.querySelector('.product__media-item.is-active img') ||
+          document.querySelector('.product__media-list img');
+        return img?.src || null;
+      };
+
+      if (mainPriceRoot && stickyPriceContainer) {
+        const sync = () => {
+          stickyPriceContainer.innerHTML = mainPriceRoot.innerHTML;
+          stickyPriceContainer.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          const newImg = getMainImage();
+          if (newImg && stickyImg) stickyImg.src = newImg;
+        };
+        sync();
+        new MutationObserver(sync).observe(mainPriceRoot, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+          characterData: true,
+        });
+      }
+    });
+  </script>
+
+  <div
+    id="md-sticky-atc"
+    class="color-{{ section.settings.color_scheme }}"
+    data-offset="{{ section.settings.offset }}"
+  >
+    <div class="page-width">
+      <div class="page-width-inner">
+        <div class="product-content">
+          {% if section.settings.show_img %}
+            <img
+              src="{{ image | img_url: img_size, crop: 'center' }}"
+              width="{{ section.settings.img_width }}"
+              height="{{ section.settings.img_height }}"
+              loading="lazy"
+            >
+          {% endif %}
+          <div>
+            <h3 class="product__title {{ section.settings.title_size }}">
+              {{ product.title }}
+            </h3>
+            <div class="no-js-hidden price-mirror" role="status">
+              {%- render 'price', product: product, use_variant: true, show_badges: true -%}
+            </div>
+          </div>
+        </div>
+
+        <product-form class="product-form">
+          <div class="product-form__error-message-wrapper" role="alert" hidden>
+            <svg aria-hidden="true" focusable="false" role="presentation" class="icon icon-error" viewBox="0 0 13 13">
+              <circle cx="6.5" cy="6.50049" r="5.5" stroke="white" stroke-width="2"/>
+              <circle cx="6.5" cy="6.5" r="5.5" fill="#EB001B" stroke="#EB001B" stroke-width="0.7"/>
+              <path d="M5.87413 3.52832L5.97439 7.57216H7.02713L7.12739 3.52832H5.87413ZM6.50076 9.66091C6.88091 9.66091 7.18169 9.37267 7.18169 9.00504C7.18169 8.63742 6.88091 8.34917 6.50076 8.34917C6.12061 8.34917 5.81982 8.63742 5.81982 9.00504C5.81982 9.37267 6.12061 9.66091 6.50076 9.66091Z" fill="white"/>
+            </svg>
+            <span class="product-form__error-message"></span>
+          </div>
+          {%- form 'product',
+            product,
+            id: product_form_id,
+            class: 'form',
+            novalidate: 'novalidate',
+            data-type: 'add-to-cart-form',
+            onsubmit: 'handleGTMAddToCartSubmit(event)'
+          -%}
+
+            {%- liquid
+                assign current_variant = product.selected_or_first_available_variant
+                assign config = current_variant.metafields['DI-GoldPrice'].variant_config.value
+                assign metal_rates = shop.metafields['DI-GoldPrice'].metal_prices.value
+                assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value
+                assign metal_color = 'Yellow'
+                assign variant_title_down = current_variant.title | downcase
+                if variant_title_down contains 'rose'
+                assign metal_color = 'Rose'
+                elsif variant_title_down contains 'white'
+                assign metal_color = 'White'
+                endif
+                assign purity_key = config.purity | downcase | prepend: 'gold_price_'
+                assign gold_rate = metal_rates[purity_key] | times: 100 
+                assign metal_cost = gold_rate | times: config.metal_weight
+                assign diamond_final = 0.0
+                assign diamond_pcs = 0
+                assign gemstone_final = 0.0
+
+                for stone_item in config.advanced_stone_config
+                assign slab_rate = 0
+                assign slab_discount = 0
+                assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first
+
+                if pricing_ref
+                    assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity
+                    for slab in pricing_ref.slabs
+                    if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight
+                        assign slab_rate = slab.price | times: 100
+                        assign slab_discount = slab.discount | default: 0
+                        break
+                    endif
+                    endfor
+                endif
+
+                assign item_base_cost = slab_rate | times: stone_item.stone_weight
+                assign applied_discount = 0
+                if stone_item.stone_type == 'diamond'
+                    assign applied_discount = config.diamond_discount | default: slab_discount
+                else
+                    assign applied_discount = slab_discount
+                endif
+                assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0
+                assign item_final_cost = item_base_cost | minus: discount_amount
+
+                if stone_item.stone_type == 'diamond'
+                    assign diamond_final = diamond_final | plus: item_final_cost
+                    assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity
+                else
+                    assign gemstone_final = gemstone_final | plus: item_final_cost
+                endif
+                endfor
+                assign mc_rate_original = config.making_charges | default: 0 | times: 100
+                assign mc_discount_percent = config.making_charges_discount | default: 0
+                assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0
+                assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt
+                assign mc_cost_final = mc_rate_final | times: config.metal_weight
+                assign subtotal = metal_cost | plus: diamond_final | plus: gemstone_final | plus: mc_cost_final
+                assign tax_amount = subtotal | times: metal_rates.default_tax | divided_by: 100.0
+                assign grand_total = subtotal | plus: tax_amount
+                assign val_gold_rate = gold_rate | divided_by: 100.0
+                assign val_metal_cost = metal_cost | divided_by: 100.0
+                assign val_mc_cost = mc_cost_final | divided_by: 100.0
+                assign val_diamond_cost = diamond_final | divided_by: 100.0
+                assign val_tax = tax_amount | divided_by: 100.0
+                assign val_total = grand_total | divided_by: 100.0
+                assign seconds_in_day = 86400
+                if current_variant.inventory_quantity > 0
+                assign days_to_add = 2
+                else
+                assign days_to_add = 15
+                endif
+                assign shipping_seconds = days_to_add | times: seconds_in_day
+                assign shipping_date = 'now' | date: '%s' | plus: shipping_seconds | date: '%d/%m/%Y'
+            -%}
+
+            {%- liquid
+                assign current_variant = product.selected_or_first_available_variant
+                if current_variant.available and current_variant.inventory_quantity > 0
+                assign days_to_add = 2
+                else
+                assign days_to_add = 15
+                endif
+                assign seconds_in_day = 86400
+                assign added_seconds = days_to_add | times: seconds_in_day
+                assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
+            -%}
+
+            <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date" value="{{ shipping_date }}">
+            <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
+            <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
+            <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
+
+            <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="{{ val_gold_rate }}">
+            <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
+            <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
+            <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="{{ val_mc_cost }}">
+            <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges" value="{{ val_diamond_cost }}">
+            <input type="hidden" name="properties[_GST]" id="prop-gst" value="{{ val_tax }}">
+            <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="{{ val_total }}">
+            <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs" value="{{ diamond_pcs }}">
+
+            <input
+            type="hidden"
+            name="id"
+            value="{{ product.selected_or_first_available_variant.id }}"
+            {% if product.selected_or_first_available_variant.available == false
+                or quantity_rule_soldout
+                or product.selected_or_first_available_variant == null
+            %}
+                disabled
+            {% endif %}
+            
+            >
+            <button
+              type="submit"
+              name="add"
+              class="product-form__submit button button--{{ section.settings.btn_style }} product-variant-id"
+              {% unless current_variant.available %}disabled{% endunless %} 
+            >
+              <span>
+                {% if current_variant.available %}
+                  {{ 'products.product.add_to_cart' | t }}
+                {% else %}
+                  {{ 'products.product.sold_out' | t }}
+                {% endif %}
+              </span>
+              <div class="loading__spinner hidden">
+                <svg aria-hidden="true" focusable="false" role="presentation" class="spinner" viewBox="0 0 66 66" xmlns="http://www.w3.org/2000/svg">
+                  <circle class="path" fill="none" stroke-width="6" cx="33" cy="33" r="30"></circle>
+                </svg>
+              </div>
+            </button>
+          {% endform %}
+          
+          {% assign has_instock_variant = false %}
+          {% for v in product.variants %}
+            {% if v.inventory_management and v.inventory_quantity > 0 %}
+              {% assign has_instock_variant = true %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+
+          {% if has_instock_variant %}
+            <a
+              class="try-at-home-button"
+              data-tooltip="Try at Home"
+              href="https://wa.me/919004435760?text=Hi,%20I%20want%20to%20try%20this%20product%20at%20home%20:%20{{ product.title | url_encode }}"
+              target="_blank"
+              rel="noopener"
+              style="padding: 0 !important; border: 0 !important; display: inline-flex;"
+            >
+              <svg width="47" height="47" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0.75" y="0.75" width="54.5" height="54.5" rx="11.25" stroke="#E266A7" stroke-width="1.5"/>
+                <path d="M31 37V29C31 28.7348 30.8946 28.4804 30.7071 28.2929C30.5196 28.1054 30.2652 28 30 28H26C25.7348 28 25.4804 28.1054 25.2929 28.2929C25.1054 28.4804 25 28.7348 25 29V37" stroke="#E266A7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M19 26C18.9999 25.7091 19.0633 25.4216 19.1858 25.1577C19.3082 24.8938 19.4868 24.6598 19.709 24.472L26.709 18.473C27.07 18.1679 27.5274 18.0005 28 18.0005C28.4726 18.0005 28.93 18.1679 29.291 18.473L36.291 24.472C36.5132 24.6598 36.6918 24.8938 36.8142 25.1577C36.9367 25.4216 37.0001 25.7091 37 26V35C37 35.5304 36.7893 36.0391 36.4142 36.4142C36.0391 36.7893 35.5304 37 35 37H21C20.4696 37 19.9609 36.7893 19.5858 36.4142C19.2107 36.0391 19 35.5304 19 35V26Z" stroke="#E266A7" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </a>
+            <button class="visit-store-home-button" data-tooltip="Visit our Store" onclick="openVisitStoreOverlay()">
+              <svg width="47" height="47" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="0.75" y="0.75" width="54.5" height="54.5" rx="11.25" stroke="#8D7BEF" stroke-width="1.5"/>
+                <path d="M31 37V32C31 31.7348 30.8946 31.4804 30.7071 31.2929C30.5196 31.1054 30.2652 31 30 31H26C25.7348 31 25.4804 31.1054 25.2929 31.2929C25.1054 31.4804 25 31.7348 25 32V37" stroke="#8D7BEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M33.774 26.31C33.5655 26.1104 33.288 25.999 32.9995 25.999C32.7109 25.999 32.4334 26.1104 32.225 26.31C31.76 26.7535 31.142 27.001 30.4995 27.001C29.8569 27.001 29.2389 26.7535 28.774 26.31C28.5655 26.1107 28.2883 25.9995 28 25.9995C27.7116 25.9995 27.4344 26.1107 27.226 26.31C26.7609 26.7538 26.1428 27.0014 25.5 27.0014C24.8571 27.0014 24.239 26.7538 23.774 26.31C23.5655 26.1104 23.288 25.999 22.9995 25.999C22.7109 25.999 22.4334 26.1104 22.225 26.31C21.7758 26.7386 21.1832 26.9848 20.5626 27.0005C19.9419 27.0163 19.3376 26.8006 18.8673 26.3954C18.3969 25.9901 18.0941 25.4244 18.0179 24.8082C17.9417 24.1921 18.0975 23.5696 18.455 23.062L21.344 18.878C21.5273 18.6075 21.774 18.3861 22.0627 18.233C22.3514 18.0799 22.6732 17.9999 23 18H33C33.3257 17.9999 33.6466 18.0793 33.9347 18.2315C34.2228 18.3836 34.4694 18.6039 34.653 18.873L37.548 23.065C37.9055 23.573 38.0611 24.196 37.9844 24.8124C37.9077 25.4289 37.6042 25.9947 37.1331 26.3997C36.662 26.8046 36.057 27.0197 35.436 27.0029C34.815 26.9861 34.2225 26.7388 33.774 26.309" stroke="#8D7BEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M20 26.95V35C20 35.5304 20.2107 36.0392 20.5858 36.4142C20.9609 36.7893 21.4696 37 22 37H34C34.5304 37 35.0391 36.7893 35.4142 36.4142C35.7893 36.0392 36 35.5304 36 35V26.95" stroke="#8D7BEF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </button>
+          {% endif %}
+        </product-form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{% schema %}
+{
+  "name": "Sticky ATC",
+  "settings": [
+    {
+      "type": "header",
+      "content": "General"
+    },
+    {
+      "type": "checkbox",
+      "id": "enable_section",
+      "label": "Enable \"Sticky ATC\"",
+      "default": true
+    },
+    {
+      "type": "color_scheme",
+      "id": "color_scheme",
+      "label": "Color scheme",
+      "default": "scheme-1"
+    },
+    {
+      "type": "select",
+      "id": "title_size",
+      "label": "Title Size",
+      "default": "h4",
+      "options": [
+        { "value": "h1", "label": "H1" },
+        { "value": "h2", "label": "H2" },
+        { "value": "h3", "label": "H3" },
+        { "value": "h4", "label": "H4" },
+        { "value": "h5", "label": "H5" },
+        { "value": "h6", "label": "H6" }
+      ]
+    },
+    {
+      "type": "checkbox",
+      "id": "show_img",
+      "default": true,
+      "label": "Show image"
+    },
+    {
+      "type": "text",
+      "id": "img_width",
+      "default": "80",
+      "label": "Image width (px)"
+    },
+    {
+      "type": "text",
+      "id": "img_height",
+      "default": "80",
+      "label": "Image height (px)"
+    },
+    {
+      "type": "select",
+      "id": "btn_style",
+      "options": [
+        { "value": "primary", "label": "Primary" },
+        { "value": "secondary", "label": "Secondary" }
+      ],
+      "default": "primary",
+      "label": "Add to cart button style"
+    },
+    {
+      "type": "range",
+      "id": "offset",
+      "label": "Offset",
+      "min": 0,
+      "max": 900,
+      "step": 10,
+      "default": 0
+    },
+    {
+      "type": "range",
+      "id": "pt",
+      "label": "Padding top",
+      "min": 0,
+      "max": 5,
+      "step": 0.5,
+      "default": 0.5
+    },
+    {
+      "type": "range",
+      "id": "pb",
+      "label": "Padding bottom",
+      "min": 0,
+      "max": 5,
+      "step": 0.5,
+      "default": 0.5
+    }
+  ]
+}
+{% endschema %}

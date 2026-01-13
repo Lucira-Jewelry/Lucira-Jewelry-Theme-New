@@ -169,6 +169,22 @@ if (!customElements.get('product-info')) {
           this.updateOptionValues(html);
           this.updateURL(productUrl, variant?.id);
           this.updateVariantInputs(variant?.id);
+          this.updateMetafields(html);
+          this.updateSku(html);
+          this.updatePriceBreakup(html);
+          this.updateComparison?.(html);
+          this.updateStickyATC({ html, variant });
+          const propInputs = html.querySelectorAll('input[id^="prop-"]');
+          propInputs.forEach((src) => {
+            const dest = document.getElementById(src.id);
+            if (dest && dest.value !== src.value) {
+              dest.value = src.value;
+
+              // Trigger input & change events so scripts using these fields react correctly
+              dest.dispatchEvent(new Event('input', { bubbles: true }));
+              dest.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+          });
 
           if (!variant) {
             this.setUnavailable();
@@ -176,6 +192,7 @@ if (!customElements.get('product-info')) {
           }
 
           this.updateMedia(html, variant?.featured_media?.id);
+          
 
           const updateSourceFromDestination = (id, shouldHide = (source) => false) => {
             const source = html.getElementById(`${id}-${this.sectionId}`);
@@ -191,6 +208,7 @@ if (!customElements.get('product-info')) {
           updateSourceFromDestination('Inventory', ({ innerText }) => innerText === '');
           updateSourceFromDestination('Volume');
           updateSourceFromDestination('Price-Per-Item', ({ classList }) => classList.contains('hidden'));
+          this.updateMetafields(html);
 
           this.updateQuantityRules(this.sectionId, html);
           this.querySelector(`#Quantity-Rules-${this.dataset.section}`)?.classList.remove('hidden');
@@ -219,6 +237,123 @@ if (!customElements.get('product-info')) {
           input.value = variantId ?? '';
           input.dispatchEvent(new Event('change', { bubbles: true }));
         });
+      }
+
+      updateMetafields(html) {
+        const sourceRoot = html.querySelector('product-info') || html;
+        const fieldElements = Array.from(sourceRoot.querySelectorAll('[data-field]'));
+        const gridIdElements = Array.from(
+          sourceRoot.querySelectorAll('.grid-information [id]')
+        );
+        const sourceElements = [...fieldElements, ...gridIdElements];
+        const seen = new Set();
+        sourceElements.forEach((srcEl) => {
+          try {
+            const id = srcEl.id;
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            const destEl = this.querySelector(`#${id}`);
+            if (!destEl) return;
+            destEl.innerHTML = srcEl.innerHTML;
+            if (srcEl.classList.contains('hidden')) destEl.classList.add('hidden');
+            else destEl.classList.remove('hidden');
+            Array.from(srcEl.attributes).forEach((attr) => {
+              if (attr.name === 'id') return;
+              if (attr.name.startsWith('data-') || attr.name.startsWith('aria-')) {
+                destEl.setAttribute(attr.name, attr.value);
+              }
+            });
+          } catch (e) {
+            console.error('updateMetafields error for id:', srcEl?.id, e);
+          }
+        });
+      }
+
+      updateSku(html) {
+        try {
+          const src = html.querySelector('#sku-content');
+          const dest = this.querySelector('#sku-content');
+          if (!src || !dest) return;
+          dest.innerHTML = src.innerHTML;
+          if (src.classList.contains('hidden')) dest.classList.add('hidden');
+          else dest.classList.remove('hidden');
+          Array.from(src.attributes).forEach((attr) => {
+            if (attr.name === 'id') return;
+            if (attr.name.startsWith('data-') || attr.name.startsWith('aria-')) {
+              dest.setAttribute(attr.name, attr.value);
+            }
+          });
+        } catch (e) {
+          console.error('updateSku error', e);
+        }
+      }
+
+      updatePriceBreakup(html) {
+        try {
+          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
+          const dest =
+            this.querySelector(`.pdp-price-breakup-tabs`) ||
+            this.querySelector(`#price-breakup-${this.dataset.section}`) ||
+            document.querySelector('.pdp-price-breakup-tabs');
+
+          if (!source || !dest) return;
+          dest.innerHTML = source.innerHTML;
+          const readMoreBtn = dest.querySelector('#readMoreBtn');
+          const readMoreContent = dest.querySelector('#readMoreContent');
+          if (readMoreBtn && readMoreContent) {
+            readMoreBtn.addEventListener('click', () => {
+              readMoreContent.classList.toggle('collapsed');
+              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+            });
+          }
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
+        } catch (e) {
+          console.error('updatePriceBreakup error', e);
+        }
+      }
+
+      updateComparison(html) {
+        try {
+          const source =
+            html.querySelector('.comp-container') ||
+            html.getElementById(`comp-container-${this.dataset.section}`);
+
+          const dest =
+            this.querySelector('.comp-container') ||
+            this.querySelector(`#comp-container-${this.dataset.section}`) ||
+            document.querySelector('.comp-container');
+
+          if (!source || !dest) return;
+          dest.innerHTML = source.innerHTML;
+          dest.querySelectorAll('.cw-info-wrapper').forEach((wrapper) => {
+            const infoIcon = wrapper.querySelector('.cw-info-icon');
+            const tooltip = wrapper.querySelector('.tooltip-box');
+            wrapper.replaceWith(wrapper.cloneNode(true));
+          });
+          const freshDest = this.querySelector('.comp-container') || document.querySelector('.comp-container');
+          if (!freshDest) return;
+          freshDest.querySelectorAll('.cw-info-wrapper').forEach((wrapper) => {
+            const tooltip = wrapper.querySelector('.tooltip-box');
+            const icon = wrapper.querySelector('.cw-info-icon');
+            if (!tooltip || !icon) return;
+            const show = () => tooltip.classList.add('visible');
+            const hide = () => tooltip.classList.remove('visible');
+            icon.addEventListener('mouseenter', show);
+            icon.addEventListener('mouseleave', hide);
+            icon.addEventListener('focus', show);
+            icon.addEventListener('blur', hide);
+            icon.addEventListener('click', (e) => {
+              e.preventDefault();
+              tooltip.classList.toggle('visible');
+            });
+            document.addEventListener('click', (e) => {
+              if (!wrapper.contains(e.target)) tooltip.classList.remove('visible');
+            });
+          });
+          publish?.(PUB_SUB_EVENTS.comparisonUpdate, { data: { section: this.sectionId } });
+        } catch (e) {
+          console.error('updateComparison error', e);
+        }
       }
 
       updateURL(url, variantId) {
@@ -309,6 +444,41 @@ if (!customElements.get('product-info')) {
         const newModalContent = html.querySelector(`product-modal .product-media-modal__content`);
         if (modalContent && newModalContent) modalContent.innerHTML = newModalContent.innerHTML;
       }
+
+      updateStickyATC({ html, variant }) {
+        const stickyATC = document.getElementById('md-sticky-atc');
+        if (!stickyATC || !variant) return;
+
+        const stickyVariantInput = stickyATC.querySelector('input[name="id"]');
+        if (stickyVariantInput) {
+          stickyVariantInput.value = variant.id;
+          stickyVariantInput.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        const sourcePrice =
+          html.querySelector(`#price-${this.sectionId}`) ||
+          html.querySelector('.price');
+
+        const stickyPrice = stickyATC.querySelector('.price-mirror');
+        if (sourcePrice && stickyPrice) {
+          stickyPrice.innerHTML = sourcePrice.innerHTML;
+          stickyPrice.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        }
+
+        const stickyImg = stickyATC.querySelector('.product-content img');
+        if (!stickyImg || !variant.featured_media?.id) return;
+
+        const variantMediaId = `${this.sectionId}-${variant.featured_media.id}`;
+        const sourceImg = html.querySelector(
+          `li[data-media-id="${variantMediaId}"] img`
+        );
+
+        if (sourceImg) {
+          stickyImg.src = sourceImg.src;
+          stickyImg.srcset = sourceImg.srcset || sourceImg.src;
+        }
+      }
+
 
       setQuantityBoundries() {
         const data = {
@@ -462,6 +632,3 @@ document.addEventListener("DOMContentLoaded", function () {
     drawerPriceEl.dataset.price = variant.price;
   });
 });
-
-
-
