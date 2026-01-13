@@ -326,19 +326,21 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductGridContainer(parsedHTML) {
     const container = document.getElementById('ProductGridContainer');
     const newContainer = parsedHTML.getElementById('ProductGridContainer');
-
+    
     if (!container || !newContainer) return;
-
+    
+    // Use morphdom-like approach for minimal DOM changes
     const currentProducts = Array.from(container.querySelectorAll('[data-product-id]'));
     const newProducts = Array.from(newContainer.querySelectorAll('[data-product-id]'));
-
-    const needsFullReplace =
-      currentProducts.length !== newProducts.length ||
-      !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
-
+    
+    // Quick check if we can do a simple replace
+    const needsFullReplace = currentProducts.length !== newProducts.length || 
+                            !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
+    
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
     } else {
+      // Update only changed elements (prices, availability, etc.)
       currentProducts.forEach((el, i) => {
         const newEl = newProducts[i];
         if (el.innerHTML !== newEl.innerHTML) {
@@ -346,15 +348,12 @@ class FacetFiltersForm extends HTMLElement {
         }
       });
     }
-
+    
+    // Cancel scroll animations
     container.querySelectorAll('.scroll-trigger').forEach((element) => {
       element.classList.add('scroll-trigger--cancel');
     });
-
-    // 🔹 Reinitialize iWish buttons AFTER grid update
-    reinitIwishButtons();
   }
-
 
   static renderProductCount(parsedHTML) {
     const newCount = parsedHTML.getElementById('ProductCount');
