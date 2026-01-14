@@ -1,3 +1,20 @@
+function initWishlist() {
+  try {
+    if (typeof iWish !== "undefined" && typeof iWish.init === "function") {
+      iWish.init();
+    }
+
+    document.dispatchEvent(new CustomEvent("iwish:reload"));
+    document.dispatchEvent(new CustomEvent("wishlist:init"));
+
+    if (typeof iWishCounter === "function") {
+      iWishCounter();
+    }
+  } catch (e) {
+    console.log("Wishlist init error", e);
+  }
+}
+
 function debounce(func, wait, immediate = false) {
   let timeout;
   return function executedFunction(...args) {
@@ -333,7 +350,9 @@ class FacetFiltersForm extends HTMLElement {
     
     const needsFullReplace =
       currentProducts.length !== newProducts.length || 
-      !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
+      !currentProducts.every(
+        (el, i) => el.dataset.productId === newProducts[i]?.dataset.productId
+      );
     
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
