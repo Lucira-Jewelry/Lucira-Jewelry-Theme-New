@@ -15,6 +15,8 @@ function initWishlist() {
   }
 }
 
+
+// Utility: Enhanced debounce with immediate option
 function debounce(func, wait, immediate = false) {
   let timeout;
   return function executedFunction(...args) {
@@ -375,12 +377,7 @@ class FacetFiltersForm extends HTMLElement {
       initWishlist();
     });
   }
-    
-    // Cancel scroll animations
-    container.querySelectorAll('.scroll-trigger').forEach((element) => {
-      element.classList.add('scroll-trigger--cancel');
-    });
-  }
+
 
   static renderProductCount(parsedHTML) {
     const newCount = parsedHTML.getElementById('ProductCount');
