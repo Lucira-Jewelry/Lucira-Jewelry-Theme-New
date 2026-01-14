@@ -276,3 +276,24 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }
 });
+
+document.addEventListener("DOMContentLoaded",()=>{
+
+  const toggle = document.getElementById("accountToggle");
+  const dropdown = document.getElementById("accountDropdown");
+
+  if(!toggle || !dropdown) return;
+
+  toggle.addEventListener("click",(e)=>{
+    e.preventDefault();
+    dropdown.classList.toggle("active");
+  });
+
+  // Close on outside click
+  document.addEventListener("click",(e)=>{
+    if(!toggle.contains(e.target) && !dropdown.contains(e.target)){
+      dropdown.classList.remove("active");
+    }
+  });
+
+});
