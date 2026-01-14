@@ -15,7 +15,6 @@ function initWishlist() {
   }
 }
 
-
 // Utility: Enhanced debounce with immediate option
 function debounce(func, wait, immediate = false) {
   let timeout;
@@ -754,9 +753,6 @@ window.addEventListener('DOMContentLoaded', function() {
   }
 });
 
-// ============================================
-// PERFORMANCE MONITORING (Optional)
-// ============================================
 if (window.performance && console.table) {
   const originalRenderPage = FacetFiltersForm.renderPage;
   FacetFiltersForm.renderPage = async function(...args) {
