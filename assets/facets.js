@@ -333,9 +333,7 @@ class FacetFiltersForm extends HTMLElement {
     
     const needsFullReplace =
       currentProducts.length !== newProducts.length || 
-      !currentProducts.every(
-        (el, i) => el.dataset.productId === newProducts[i]?.dataset.productId
-      );
+      !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
     
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
