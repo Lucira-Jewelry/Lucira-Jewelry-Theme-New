@@ -848,7 +848,7 @@
       });
     </script>
 
-    <script>
+    {% comment %} <script>
       document.addEventListener('DOMContentLoaded', function () {
         const productName = '{{ product.title }}';
         const sku = '{{ product.selected_or_first_available_variant.sku }}';
@@ -906,6 +906,78 @@
           }
         });
       });
+    </script> {% endcomment %}
+
+        <script>
+      document.addEventListener('DOMContentLoaded', function () {
+      const productName = '{{ product.title }}';
+      const sku = '{{ product.selected_or_first_available_variant.sku }}';
+      const totalSavings = '{{ total_savings | money }}'; // Get the total savings value
+
+      function pushTabClick(tabName, savingsAmount = null) {
+        let promoPosition = 'Product Details Section';
+        
+        // Update promo_position with savings amount if it's the Your Savings tab
+        if (tabName === 'Your Savings' && savingsAmount) {
+          promoPosition = `Product Details Section - Total Savings: ${savingsAmount}`;
+        }
+
+        const promoData = {
+          event: 'promoClick',
+          promoClick: {
+            promo_id: sku,
+            creative_name: tabName,
+            promo_position: promoPosition,
+            promo_name: productName,
+            location_id: "{{ product.selected_or_first_available_variant.id }}"
+          },
+        };
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(promoData);
+      }
+
+      function onTabClick(event) {
+        const switchItem = event.target.closest('.contained-switch');
+        if (!switchItem) return;
+        const wrapper = switchItem.closest('.pdp-tab-wrapper');
+        if (!wrapper) return;
+        const tabId = switchItem.getAttribute('data-tab');
+        
+        if (tabId === 'price-breakup') {
+          pushTabClick('Price Breakup');
+        } else if (tabId === 'comparison') {
+          pushTabClick('Your Savings', totalSavings);
+        }
+        
+        const allSwitches = wrapper.querySelectorAll('.contained-switch');
+        allSwitches.forEach((s) => s.classList.remove('active'));
+        switchItem.classList.add('active');
+        const index = Array.from(allSwitches).indexOf(switchItem);
+        if (switchItem.parentElement) {
+          switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
+        }
+        const allContents = wrapper.querySelectorAll('.tab-content');
+        allContents.forEach((content) => content.classList.remove('active'));
+        const activeContent = wrapper.querySelector(`#${tabId}`);
+        if (activeContent) {
+          activeContent.classList.add('active');
+        }
+      }
+
+      document.addEventListener('click', onTabClick);
+      document.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          const switchItem = e.target.closest('.contained-switch');
+          if (switchItem) {
+            e.preventDefault();
+            switchItem.click();
+          }
+        }
+      });
+    });
     </script>
+
+    
   {% endunless %}
 {% endif %}
