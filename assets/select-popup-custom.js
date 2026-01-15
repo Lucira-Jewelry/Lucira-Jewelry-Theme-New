@@ -153,39 +153,55 @@
         }) || null
       );
     }
-    function buildColorButtonsFromCard(productCard) {
+    function buildColorButtonsFromCard(productCard, preSelectedColor, skipInitialRender) {
       if (!popupColors) return;
       popupColors.innerHTML = '';
       if (!sel.carat) return;
       const grp = productCard.querySelector(`.color-group[data-carat="${sel.carat}"]`);
       if (!grp) return;
       const seen = new Set();
+      let matchingBtn = null;
+      
       grp.querySelectorAll('.color-option').forEach((srcBtn) => {
         const baseColor = srcBtn.dataset.color || srcBtn.title || srcBtn.textContent.trim();
         if (!baseColor || seen.has(baseColor)) return;
         seen.add(baseColor);
         const clone = srcBtn.cloneNode(true);
         clone.classList.remove('active');
+        
+        // Check if this is the pre-selected color
+        if (preSelectedColor && baseColor === preSelectedColor) {
+          matchingBtn = clone;
+        }
+        
         clone.addEventListener('click', () => {
-          popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
+         popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
           clone.classList.add('active');
           sel.color = baseColor;
+          sel.size = null; // Reset size when color changes
           buildSizeButtons(currentProduct);
           sel.variant = findVariant(currentProduct, sel);
           renderPrices(sel.variant);
           renderImage(sel.variant, currentProduct);
           saveVariantToLS(sel.variant);
-          setProceedUI(!!(sel.variant && sel.variant.id));
+          // Don't enable proceed button - only size selection should do that
+          setProceedUI(false);
         });
         popupColors.appendChild(clone);
       });
-      const first = popupColors.querySelector('.color-option');
-      if (first) {
-        first.classList.add('active');
-        sel.color = first.dataset.color || first.title || first.textContent.trim();
+      
+      // Activate the pre-selected color or fall back to first
+      const toActivate = matchingBtn || popupColors.querySelector('.color-option');
+      if (toActivate) {
+        toActivate.classList.add('active');
+        sel.color = toActivate.dataset.color || toActivate.title || toActivate.textContent.trim();
         sel.variant = findVariant(currentProduct, sel);
-        renderPrices(sel.variant);
-        renderImage(sel.variant, currentProduct);
+        
+        // Only render if not skipping (i.e., if we didn't already set the image/price from card)
+        if (!skipInitialRender) {
+          renderPrices(sel.variant);
+          renderImage(sel.variant, currentProduct);
+        }
       }
     }
 
@@ -266,6 +282,18 @@
         const productId = productCard && productCard.dataset.productId;
         const caratValue = (button.dataset.carat || '').toUpperCase();
 
+        // Get the currently active color from the card
+        const activeColorBtn = productCard.querySelector('.color-option.active');
+        const preSelectedColor = activeColorBtn ? (activeColorBtn.dataset.color || activeColorBtn.title || '') : null;
+        
+        // Get the current image and price from the card
+        const cardImg = productCard.querySelector('.product-img');
+        const preSelectedImage = cardImg ? cardImg.src : null;
+        const cardPrice = productCard.querySelector('.price-text');
+        const preSelectedPrice = cardPrice ? cardPrice.textContent : null;
+        const cardComparePrice = productCard.querySelector('.carat-comp_price');
+        const preSelectedComparePrice = cardComparePrice ? cardComparePrice.textContent : null;
+
         try {
           currentProduct = productId
             ? JSON.parse(document.getElementById('product-data-' + productId).textContent)
@@ -276,15 +304,40 @@
         }
 
         optionIndex = detectOptionIndexes(currentProduct || { options: [] });
-        sel = { carat: caratValue, color: null, size: null, variant: null };
+        sel = { carat: caratValue, color: preSelectedColor, size: null, variant: null };
 
         saveVariantToLS(null);
         setProceedUI(false);
         popup.classList.remove('proceed-active');
         popupTitle.textContent = currentProduct?.title || '';
-        renderImage(null, currentProduct);
-        renderPrices(null);
-        buildColorButtonsFromCard(productCard);
+        
+        // Set the popup image to the selected variant image from the card
+        if (popupImg && preSelectedImage) {
+          popupImg.src = preSelectedImage;
+          popupImg.alt = currentProduct?.title || 'Product image';
+          popupImg.style.display = '';
+        } else {
+          renderImage(null, currentProduct);
+        }
+        
+        // Set the popup price to the selected variant price from the card
+        if (popupPrice && preSelectedPrice) {
+          popupPrice.textContent = preSelectedPrice;
+        }
+        
+        // Set compare price if exists
+        if (popupCompare) {
+          if (preSelectedComparePrice) {
+            popupCompare.textContent = preSelectedComparePrice;
+            popupCompare.style.display = '';
+          } else {
+            popupCompare.textContent = '';
+            popupCompare.style.display = 'none';
+          }
+        }
+        
+        // Build color buttons but skip initial render since we already set image/price
+        buildColorButtonsFromCard(productCard, preSelectedColor, true);
         buildSizeButtons(currentProduct);
         popup.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -408,6 +461,12 @@ function closePopup() {
       if (caratValue) {
         label.insertAdjacentHTML('afterbegin', `<span class="carat-value">${caratValue}</span> `);
       }
+
+      // Filter charms by selected carat before showing them
+      if (window.filterCharmsBySelectedVariantCarat) {
+        window.filterCharmsBySelectedVariantCarat();
+      }
+
       document.querySelectorAll('.charms-grid-container.active .custom-charm-grid').forEach((each) => {
         const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
         const colorName = document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
