@@ -93,8 +93,6 @@
   </div>
 </div>
 
-
-
 <style>
     .otp-login-form-wrapper {background-color: #FFFEFC; padding: 20px; border-radius: 12px; box-shadow: 0 0 10px #0000004d; max-width: 850px; width: 90%; text-align: left; position: relative;}
      .login-pop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:9999999}
@@ -128,41 +126,86 @@
 </style>
 
 <script>
-function openloginPopup(id){
-  document.getElementById(id).style.display="flex";
-}
 
-/* Works for BOTH calls:
-   closeloginPopup('login-popup')
-   closeloginPopup(event,'login-popup')
-*/
-function closeloginPopup(e,id){
-
-  // If only one argument passed
-  if(typeof id === "undefined"){
-    id = e; // first param is id
+  function openloginPopup(id){
+    document.getElementById(id).style.display="flex";
   }
 
-  document.getElementById(id).style.display="none";
-}
+  function closeloginPopup(e,id){
+    if(typeof id==="undefined") id=e;
+    document.getElementById(id).style.display="none";
+  }
 
-/* Stop close when clicking inside popup */
-document.querySelectorAll(".otp-login-form-wrapper").forEach(el=>{
-  el.addEventListener("click",function(e){
-    e.stopPropagation();
+  document.querySelectorAll(".otp-login-form-wrapper").forEach(el=>{
+    el.addEventListener("click",e=>e.stopPropagation());
   });
-});
 
-function switchToSignup(){
-  closeloginPopup('login-popup');
-  openloginPopup('signup-popup');
+  function switchToSignup(){
+    closeloginPopup('login-popup');
+    openloginPopup('signup-popup');
+  }
+
+  function switchToLogin(){
+    closeloginPopup('signup-popup');
+    openloginPopup('login-popup');
+  }
+
+  const sendBtn=document.getElementById("sendOtp");
+
+  if(sendBtn){
+  sendBtn.addEventListener("click",async()=>{
+
+  const mobile=document.getElementById("login_mobile").value.trim();
+
+  if(!/^[6-9]\d{9}$/.test(mobile)){
+    alert("Enter valid number");
+    return;
+  }
+
+  const res=await fetch("/apps/otp/send.php",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({mobile})
+  });
+
+  const data=await res.json();
+
+    if(data.type==="success"){
+      document.getElementById("otpSection").style.display="block";
+      alert("OTP Sent");
+    }else{
+      alert(data.message||"Failed");
+    }
+  });
 }
 
-function switchToLogin(){
-  closeloginPopup('signup-popup');
-  openloginPopup('login-popup');
+const verifyBtn=document.getElementById("verifyOtp");
+if(verifyBtn){
+  verifyBtn.addEventListener("click",async()=>{
+
+    const otp=[...document.querySelectorAll(".otp-inputs input")]
+              .map(i=>i.value).join("");
+
+    if(otp.length!=6){
+      alert("Enter valid OTP");
+      return;
+    }
+
+    const res=await fetch("/apps/otp/verify.php",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({otp})
+    });
+
+    const data=await res.json();
+
+    if(data.type==="success"){
+      alert("OTP Verified 🎉");
+      window.location.href="/account";
+    }else{
+      alert("Invalid OTP");
+    }
+  });
 }
+
 </script>
-
-
-
