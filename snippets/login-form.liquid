@@ -124,30 +124,22 @@
     }
 </style>
 
+
 <script>
+
 function openloginPopup(id){
   document.getElementById(id).style.display="flex";
 }
 
-/* Works for BOTH calls:
-   closeloginPopup('login-popup')
-   closeloginPopup(event,'login-popup')
-*/
+/* Works for both */
 function closeloginPopup(e,id){
-
-  // If only one argument passed
-  if(typeof id === "undefined"){
-    id = e; // first param is id
-  }
-
+  if(typeof id==="undefined") id=e;
   document.getElementById(id).style.display="none";
 }
 
 /* Stop close when clicking inside popup */
 document.querySelectorAll(".otp-login-form-wrapper").forEach(el=>{
-  el.addEventListener("click",function(e){
-    e.stopPropagation();
-  });
+  el.addEventListener("click",e=>e.stopPropagation());
 });
 
 function switchToSignup(){
@@ -159,7 +151,70 @@ function switchToLogin(){
   closeloginPopup('signup-popup');
   openloginPopup('login-popup');
 }
+
+/* SEND OTP */
+const sendBtn=document.getElementById("sendOtp");
+
+if(sendBtn){
+sendBtn.addEventListener("click",async()=>{
+
+  const mobile=document.getElementById("login_mobile").value.trim();
+
+  if(!/^[6-9]\d{9}$/.test(mobile)){
+    alert("Enter valid number");
+    return;
+  }
+
+  const res=await fetch("/apps/otp/send.php",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({mobile})
+  });
+
+  const data=await res.json();
+
+  if(data.type==="success"){
+    document.getElementById("otpSection").style.display="block";
+    alert("OTP Sent");
+  }else{
+    alert(data.message||"Failed");
+  }
+});
+}
+
+/* VERIFY OTP */
+const verifyBtn=document.getElementById("verifyOtp");
+
+if(verifyBtn){
+verifyBtn.addEventListener("click",async()=>{
+
+  const otp=[...document.querySelectorAll(".otp-inputs input")]
+            .map(i=>i.value).join("");
+
+  if(otp.length!=6){
+    alert("Enter valid OTP");
+    return;
+  }
+
+  const res=await fetch("/apps/otp/verify.php",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({otp})
+  });
+
+  const data=await res.json();
+
+  if(data.type==="success"){
+    alert("OTP Verified 🎉");
+    window.location.href="/account";
+  }else{
+    alert("Invalid OTP");
+  }
+});
+}
+
 </script>
+
 
 
 
