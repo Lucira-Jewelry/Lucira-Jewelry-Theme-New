@@ -356,31 +356,29 @@ $(document).ready(function () {
     openloginPopup('login-popup');
   }
 
-  sendBtn.addEventListener("click", async () => {
+  const sendBtn = document.getElementById('sendOtp');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', async () => {
+      const mobile = document.getElementById('mobile').value.trim();
+      if (!/^[6-9]\d{9}$/.test(mobile)) {
+        alert('Enter valid number');
+        return;
+      }
+      const res = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mobile }),
+      });
+      const data = await res.json();
 
-  const mobile = document.getElementById("mobile").value.trim();
-
-    if (!/^[6-9]\d{9}$/.test(mobile)) {
-      alert("Enter valid number");
-      return;
-    }
-
-    const res = await fetch("https://login-otp-385594025448.asia-south1.run.app", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ mobile })   // ONLY mobile here
+      if (data.type === 'success') {
+        document.getElementById('otpSection').style.display = 'block';
+        alert('OTP Sent');
+      } else {
+        alert(data.message || 'Failed');
+      }
     });
-
-    const data = await res.json();
-
-    if (data.type === "success") {
-      document.getElementById("otpSection").style.display = "block";
-      alert("OTP Sent");
-    } else {
-      alert(data.message || "Failed");
-    }
-  });
-
+  }
 
   const verifyBtn = document.getElementById('verifyOtp');
   if (verifyBtn) {
