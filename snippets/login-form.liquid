@@ -12,7 +12,7 @@
           <span class="country-code">+91</span>
           <input
             type="tel"
-            id="signupMobile"
+            id="mobile"
             placeholder="Enter Phone Number"
             maxlength="10"
             required
@@ -132,41 +132,56 @@
     });
   }
   const verifyBtn = document.getElementById('verifyOtp');
-  if (verifyBtn) {
-    verifyBtn.addEventListener('click', async () => {
-      const otp = [...document.querySelectorAll('.otp-inputs input')]
-        .map(i => i.value)
-        .join('');
-      const mobile = document.getElementById('signupMobile')
-        .value.replace(/\s+/g,'').trim();
-      if (otp.length !== 4) {
-        alert('Enter valid OTP');
-        return;
+if (verifyBtn) {
+  verifyBtn.addEventListener('click', async () => {
+
+    const otp = [...document.querySelectorAll('.otp-inputs input')]
+      .map(i => i.value)
+      .join('');
+
+    const mobile = document.getElementById('signupMobile')
+      .value.replace(/\s+/g,'').trim();
+
+    if (otp.length !== 4) {
+      alert('Enter valid OTP');
+      return;
+    }
+
+    const res = await fetch(
+      'https://login-otp-385594025448.asia-south1.run.app/generate-token.php',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ otp, mobile })
       }
-      const res = await fetch(
-        'https://login-otp-385594025448.asia-south1.run.app/generate-token.php',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ otp, mobile })
-        }
-      );
-      const data = await res.json();
-      console.log(data);
-      if (data.type === 'success' && data.login_url) {
-        window.location.href = data.login_url;
-        return;
-      }
-      if (data.type === 'register') {
-        document.getElementById('otpSection').style.display = 'none';
-        document.querySelector('.signupSection').style.display = 'block';
-        document.getElementById('signupMobile').value = mobile;
-        document.getElementById('signupMobile').readOnly = true;
-        return;
-      }
-      alert(data.msg || 'Invalid OTP');
-    });
-  }
+    );
+
+    const data = await res.json();
+    console.log(data);
+
+    /* EXISTING USER */
+    if (data.type === 'success' && data.login_url) {
+      window.location.href = data.login_url;
+      return;
+    }
+
+    /* NEW USER */
+    if (data.type === 'register') {
+
+      document.getElementById('otpSection').style.display = 'none';
+      document.querySelector('.signupSection').style.display = 'block';
+
+      document.getElementById('signupMobile').value = mobile;
+      document.getElementById('signupMobile').readOnly = true;
+
+      return;
+    }
+
+    /* ERROR */
+    alert(data.msg || 'Invalid OTP');
+
+  });
+}
 
   const otpInputs = document.querySelectorAll('.otp-inputs input');
   otpInputs.forEach((input, index) => {
