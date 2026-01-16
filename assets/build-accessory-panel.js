@@ -950,20 +950,9 @@ _renderProductIfNeeded() {
   _computeSymmetricOrder(linearPts) {
     if (!linearPts.length) return [];
 
-    const midIndex = Math.floor((linearPts.length - 1) / 2);
-    const ordered = [];
-
-    ordered.push(linearPts[midIndex]);
-
-    for (let offset = 1; ordered.length < linearPts.length; offset++) {
-      const right = linearPts[midIndex + offset];
-      if (right) ordered.push(right);
-
-      const left = linearPts[midIndex - offset];
-      if (left && ordered.length < linearPts.length) ordered.push(left);
-    }
-
-    return ordered;
+    // Simply return points in left-to-right order (no alternating pattern)
+    // This will place charms sequentially from left to right
+    return linearPts;
   }
 
   async _placeCharmsSymmetric(charms) {
@@ -1001,33 +990,9 @@ _renderProductIfNeeded() {
       const chainX = geom.center.x + chainR * Math.cos(angleRad);
       const chainY = geom.center.y - chainR * Math.sin(angleRad);
       
-      // Position-based hang distance
-      let hangDistance;
-      if (i === centerIndex) {
-        hangDistance = size * 0.25; // Center charm hangs more below
-      } else if (i === 0 || i === count - 1) {
-        hangDistance = size * 0.08; // Side charms closer to chain
-      } else {
-        hangDistance = size * 0.12; // Medium distance
-      }
-      
-      // Position charm below chain with enhanced cropping prevention
+      // Position charm directly on chain - NO hang distance for any charm
       let x = chainX;
-      // Ensure all charms hang below the chain center, not above it
-      // Use the lower of chainY or chain center Y, then add hangDistance
-      const baseY = Math.max(chainY, geom.center.y);
-      let y = baseY + hangDistance;
-      
-      // Enhanced cropping prevention - check both individual charm and overall bounds
-      const charmBottom = y + (size / 2);
-      if (charmBottom > stageBottom) {
-        // Adjust position to prevent cropping
-        const maxAllowedY = stageBottom - (size / 2);
-        y = Math.min(y, maxAllowedY);
-        // Recalculate hang distance to maintain proper positioning
-        hangDistance = Math.max(y - baseY, size * 0.05);
-        y = baseY + hangDistance;
-      }
+      let y = chainY; // All charms positioned exactly on the chain arc
 
       try {
         const img = await this.createImage(c.image || '');
