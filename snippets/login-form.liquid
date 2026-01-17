@@ -85,6 +85,13 @@
   </div>
 </div>
 
+<form id="shopify-auto-login-form" action="/account/login" method="post" style="display:none;">
+  <input type="hidden" name="form_type" value="customer_login">
+  <input type="hidden" name="utf8" value="✓">
+  <input type="email" name="customer[email]" id="ShopifyEmail">
+  <input type="password" name="customer[password]" id="ShopifyPassword">
+</form>
+
 <script>
   function openloginPopup(id) {
     document.getElementById(id).style.display = 'flex';
@@ -104,10 +111,10 @@
     closeloginPopup('signup-popup');
     openloginPopup('login-popup');
   }
+
   const sendBtn = document.getElementById('sendOtp');
   if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
-
       const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
 
       const res = await fetch(
@@ -132,6 +139,7 @@
       }
     });
   }
+
   const verifyBtn = document.getElementById('verifyOtp');
   if (verifyBtn) {
     verifyBtn.addEventListener('click', async () => {
@@ -140,38 +148,64 @@
         .join('');
       const mobile = document.getElementById('loginMobile')
         .value.replace(/\s+/g,'').trim();
+      
       if (otp.length !== 4) {
         alert('Enter valid OTP');
         return;
       }
-      const res = await fetch(
-        'https://otp-verification-385594025448.asia-south1.run.app',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ otp, mobile })
+
+      // Show loading state
+      const verifyButton = document.getElementById('verifyOtp');
+      const originalText = verifyButton.textContent;
+      verifyButton.textContent = 'Verifying...';
+      verifyButton.disabled = true;
+
+      try {
+        const res = await fetch(
+          'https://otp-verification-385594025448.asia-south1.run.app',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, mobile })
+          }
+        );
+
+        const data = await res.json();
+        console.log('OTP Verification Response:', data);
+
+        if (data.type === 'success' && data.credentials) {
+          console.log('Logging in automatically...');
+          
+          // Use the shopifyAutoLogin function
+          shopifyAutoLogin(data.credentials.email, data.credentials.password);
+          return;
         }
-      );
-      const data = await res.json();
-      console.log(data);
-      if (data.type === 'success' && data.login_url) {
-        window.location.href = data.login_url;
-        return;
+
+        if (data.type === 'register') {
+          document.getElementById('otpSection').style.display = 'none';
+          document.querySelector('.signupSection').style.display = 'block';
+          document.getElementById('signupMobile').value = mobile;
+          document.getElementById('signupMobile').readOnly = true;
+          verifyButton.textContent = originalText;
+          verifyButton.disabled = false;
+          return;
+        }
+
+        alert(data.msg || 'Invalid OTP');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
+
+      } catch (error) {
+        console.error('Error during verification:', error);
+        alert('Something went wrong. Please try again.');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
       }
-      if (data.type === 'register') {
-        document.getElementById('otpSection').style.display = 'none';
-        document.querySelector('.signupSection').style.display = 'block';
-        document.getElementById('signupMobile').value = mobile;
-        document.getElementById('signupMobile').readOnly = true;
-        return;
-      }
-      alert(data.msg || 'Invalid OTP');
     });
   }
 
   const otpInputs = document.querySelectorAll('.otp-inputs input');
   otpInputs.forEach((input, index) => {
-
     input.addEventListener('input', e => {
       const value = e.target.value.replace(/\D/g, '');
       e.target.value = value;
@@ -186,8 +220,8 @@
         otpInputs[index - 1].focus();
       }
     });
-
   });
+
   otpInputs[0].addEventListener('paste', e => {
     e.preventDefault();
     const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0,4);
@@ -196,6 +230,7 @@
     });
     otpInputs[paste.length - 1]?.focus();
   });
+
   let timer = 120;
   let timerInterval;
   function startTimer() {
@@ -218,6 +253,7 @@
       timer--;
     }, 1000);
   }
+
   async function resendOtp() {
     const mobile = document.getElementById('loginMobile').value.trim();
 
@@ -230,14 +266,12 @@
     document.getElementById('otp-timer').innerText = "Resend OTP in 02:00";
     startTimer();
   }
-  function shopifyAutoLogin(email,password){
 
+  function shopifyAutoLogin(email, password) {
+    console.log('Auto-login triggered for:', email);
     document.getElementById("ShopifyEmail").value = email;
     document.getElementById("ShopifyPassword").value = password;
-
-    document.getElementById("ShopifyEmail")
-      .closest("form")
-      .submit(); // 🚀 REAL SHOPIFY LOGIN
+    document.getElementById("shopify-auto-login-form").submit();
   }
 </script>
 
