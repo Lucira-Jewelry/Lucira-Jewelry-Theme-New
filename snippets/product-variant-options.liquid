@@ -588,7 +588,7 @@ data-option-swatch-focal-point="{{ swatch_focal_point }}"
 
 
 
- {%- liquid
+{%- liquid
 assign product_form_id = 'product-form-' | append: section.id
 -%}
 {%- if option.name == 'Size' -%}
@@ -602,6 +602,19 @@ assign product_form_id = 'product-form-' | append: section.id
 {%- assign kt18 = option.values -%}
 {%- assign sorted_values = kt09 | concat: kt14 | concat: kt18 | uniq -%}
 {%- endif -%}
+
+{%- comment -%} Pre-calculate stock status to avoid repeated loops {%- endcomment -%}
+{%- assign color_stock_map = '' -%}
+{%- if option.name == 'Color' -%}
+  {%- for value in sorted_values -%}
+    {%- assign has_stock = false -%}
+    {%- if value.variant.available and value.variant.inventory_quantity > 0 -%}
+      {%- assign has_stock = true -%}
+    {%- endif -%}
+    {%- assign color_stock_map = color_stock_map | append: value | append: ':' | append: has_stock | append: '|' -%}
+  {%- endfor -%}
+{%- endif -%}
+
 {%- for value in sorted_values -%}
 {%- liquid
 assign swatch_focal_point = null
@@ -690,19 +703,10 @@ onchange="updateSizeStockStatus(this)"
   {%- endif -%}
 
   {%- if option.name == 'Color' -%}
-    {%- comment -%} Use value.available for color stock check - scales for high variants {%- endcomment -%}
-    {% assign color_in_stock = false %}
-    {% if value.variant and value.variant.available and value.variant.inventory_quantity > 0 %}
-      {% assign color_in_stock = true %}
-    {% elsif value.available %}
-      {%- comment -%} Fallback: If any variant with this color is available {%- endcomment -%}
-      {% comment %} {% for variant in product.variants %}
-        {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
-          {% assign color_in_stock = true %}
-          {% break %}
-        {% endif %}
-      {% endfor %} {% endcomment %}
-    {% endif %}
+    {%- assign color_in_stock = false -%}
+    {%- if value.variant.available and value.variant.inventory_quantity > 0 -%}
+      {%- assign color_in_stock = true -%}
+    {%- endif -%}
 
     <span class="variant-text">
       {%- assign parts = value | split: ' ' -%}
@@ -720,22 +724,13 @@ onchange="updateSizeStockStatus(this)"
     </span>
 
   {%- elsif option.name == 'Size' -%}
-    {%- comment -%} Use value.variant for direct access to the specific variant {%- endcomment -%}
-    {% assign current_variant = value.variant %}
-    
-    {%- comment -%} Fallback for compatibility {%- endcomment -%}
-    {% unless current_variant %}
-      {% assign selected_color = product.selected_or_first_available_variant.option1 %}
-      {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
-    {% endunless %}
+    {%- assign current_variant = value.variant -%}
 
     <span class="variant-text" style="display: inline-block !important;">
       {{ value }}
       <span class="Variant_Stock_Status" data-size="{{ value }}">
-        {% if current_variant and current_variant.available %}
-          {% if current_variant.inventory_quantity > 0 %}
-            <span class="stock-active">In Stock</span>
-          {% endif %}
+        {% if current_variant.available and current_variant.inventory_quantity > 0 %}
+          <span class="stock-active">In Stock</span>
         {% endif %}
       </span>
       {{ label_unavailable }}
@@ -772,165 +767,193 @@ data-option-swatch-focal-point="{{ swatch_focal_point }}"
 {%- endif -%}
 {%- endfor -%}
 
-
-
 <script>
-  // ✅ Build initial variant stock data for currently loaded variants only
-  window.variantStockData = window.variantStockData || {};
+(function() {
+  'use strict';
+  
+  // ✅ Build variant stock data efficiently - only once
+  const stockData = {};
   {% for v in product.variants %}
-    window.variantStockData['{{ v.option1 | escape }}'] = window.variantStockData['{{ v.option1 | escape }}'] || {};
-    window.variantStockData['{{ v.option1 | escape }}']['{{ v.option2 | escape }}'] = {
-      available: {{ v.available | json }},
-      inventory: {{ v.inventory_quantity | default: 0 | json }}
-    };
+  const c{{ forloop.index }} = '{{ v.option1 | escape }}';
+  const s{{ forloop.index }} = '{{ v.option2 | escape }}';
+  stockData[c{{ forloop.index }}] = stockData[c{{ forloop.index }}] || {};
+  stockData[c{{ forloop.index }}][s{{ forloop.index }}] = {
+    a: {{ v.available | json }},
+    i: {{ v.inventory_quantity | default: 0 | json }}
+  };
   {% endfor %}
-
-  // ✅ Store section ID for Section Rendering API
+  
+  window.variantStockData = stockData;
   window.productSectionId = '{{ section.id }}';
 
-  // ✅ Update size stock status - enhanced to work with Section Rendering API
-  function updateSizeStockStatus(colorValue) {
-    document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(function(el) {
-      var size = el.getAttribute('data-size');
-      var stock = (window.variantStockData[colorValue] || {})[size];
-      
-      el.innerHTML = '';
+  // ✅ Cache DOM queries
+  let sizeElements = null;
+  let colorInputs = null;
 
-      if (stock && stock.available && Number(stock.inventory) > 0) {
+  function updateSizeStockStatus(colorValue) {
+    if (!sizeElements) {
+      sizeElements = document.querySelectorAll('.Variant_Stock_Status[data-size]');
+    }
+    
+    const colorStock = stockData[colorValue] || {};
+    
+    sizeElements.forEach(function(el) {
+      const size = el.dataset.size;
+      const stock = colorStock[size];
+      
+      if (stock && stock.a && stock.i > 0) {
         el.innerHTML = '<span class="stock-active">In Stock</span>';
+      } else {
+        el.innerHTML = '';
       }
     });
   }
 
-  // ✅ Fetch updated variant availability using Section Rendering API
+  // ✅ Debounced fetch for Section Rendering API
+  let fetchTimeout;
   function fetchUpdatedAvailability(optionValueElement) {
     if (!optionValueElement) return;
-
-    const sectionId = window.productSectionId || '{{ section.id }}';
-    const productUrl = optionValueElement.dataset.productUrl || window.location.pathname;
     
-    // Get all selected option value IDs
-    const selectedOptionValues = Array.from(
-      document.querySelectorAll('input[type="radio"][data-option-value-id]:checked')
-    ).map(input => input.dataset.optionValueId).filter(Boolean);
-
-    const params = selectedOptionValues.length > 0
-      ? `&option_values=${selectedOptionValues.join(',')}`
-      : '';
-
-    // Fetch updated section with new availability state
-    fetch(`${productUrl}?section_id=${sectionId}${params}`)
-      .then(response => response.text())
-      .then(responseText => {
-        const parser = new DOMParser();
-        const html = parser.parseFromString(responseText, 'text/html');
-        
-        // Update variant stock data from the refreshed section
-        const scriptContent = responseText.match(/window\.variantStockData\s*=\s*({[\s\S]*?});/);
-        if (scriptContent && scriptContent[1]) {
-          try {
-            const newStockData = JSON.parse(scriptContent[1].replace(/window\.variantStockData\s*\|\|\s*/, ''));
-            window.variantStockData = Object.assign(window.variantStockData, newStockData);
-          } catch (e) {
-            console.warn('Could not parse updated stock data:', e);
-          }
+    clearTimeout(fetchTimeout);
+    fetchTimeout = setTimeout(function() {
+      const sectionId = window.productSectionId;
+      const productUrl = optionValueElement.dataset.productUrl || window.location.pathname;
+      
+      if (!colorInputs) {
+        colorInputs = document.querySelectorAll('input[type="radio"][data-option-value-id]');
+      }
+      
+      const selectedIds = [];
+      colorInputs.forEach(function(input) {
+        if (input.checked && input.dataset.optionValueId) {
+          selectedIds.push(input.dataset.optionValueId);
         }
-
-        // Update the stock status display
-        const colorValue = optionValueElement.value;
-        updateSizeStockStatus(colorValue);
-
-        // Normalize text after update
-        if (typeof normalizeVariantText === 'function') {
-          normalizeVariantText(document.body);
-        }
-      })
-      .catch(error => {
-        console.warn('Could not fetch updated availability:', error);
-        // Fallback to current data
-        updateSizeStockStatus(optionValueElement.value);
       });
+
+      const params = selectedIds.length ? '&option_values=' + selectedIds.join(',') : '';
+
+      fetch(productUrl + '?section_id=' + sectionId + params)
+        .then(function(res) { return res.text(); })
+        .then(function(text) {
+          const match = text.match(/const stockData = ({[\s\S]*?});/);
+          if (match && match[1]) {
+            try {
+              const newData = JSON.parse(match[1]);
+              Object.assign(stockData, newData);
+            } catch (e) {
+              console.warn('Parse error:', e);
+            }
+          }
+          
+          updateSizeStockStatus(optionValueElement.value);
+          
+          if (window.normalizeVariantText) {
+            window.normalizeVariantText(document.body);
+          }
+        })
+        .catch(function(err) {
+          console.warn('Fetch error:', err);
+          updateSizeStockStatus(optionValueElement.value);
+        });
+    }, 150);
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
+  // ✅ Efficient event delegation
+  function handleColorChange(e) {
+    const target = e.target;
+    if (target.type === 'radio' && target.name.indexOf('Color') === 0) {
+      if (target.dataset.optionValueId) {
+        fetchUpdatedAvailability(target);
+      } else {
+        updateSizeStockStatus(target.value);
+      }
+    }
+  }
+
+  // ✅ Single DOMContentLoaded handler
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  function init() {
     const initialColor = '{{ product.selected_or_first_available_variant.option1 | escape }}';
     updateSizeStockStatus(initialColor);
-
-    // Enhanced color change handler with Section Rendering API
-    document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
-      radio.addEventListener('change', function(){ 
-        // Use Section Rendering API for high-variant support
-        if (this.dataset.optionValueId) {
-          fetchUpdatedAvailability(this);
-        } else {
-          // Fallback to original method
-          updateSizeStockStatus(this.value);
-        }
-      });
-    });
-
-    // Listen to variant change events
-    document.addEventListener('variant:change', function (evt) {
+    
+    document.addEventListener('change', handleColorChange);
+    
+    document.addEventListener('variant:change', function(evt) {
       if (evt.detail && evt.detail.variant) {
         updateSizeStockStatus(evt.detail.variant.option1);
       }
     });
-  });
+  }
 
-  // ✅ TEXT NORMALIZATION: Keep your existing logic
-  (function () {
-    function normalizeVariantText(root = document) {
-      const walker = document.createTreeWalker(
-        root,
-        NodeFilter.SHOW_TEXT,
-        null,
-        false
-      );
-
+  // ✅ TEXT NORMALIZATION - Optimized
+  (function() {
+    const textCache = new WeakMap();
+    
+    function normalizeVariantText(root) {
+      if (!root) return;
+      if (textCache.has(root)) return;
+      
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
       let node;
+      
       while ((node = walker.nextNode())) {
-        let t = node.nodeValue;
-        t = t.replace(/\b0(\d+KT)\b/g, '$1');
-        node.nodeValue = t;
+        const original = node.nodeValue;
+        const normalized = original.replace(/\b0(\d+KT)\b/g, '$1');
+        if (original !== normalized) {
+          node.nodeValue = normalized;
+        }
       }
+      
+      textCache.set(root, true);
     }
 
-    // Make it globally available for the fetch callback
     window.normalizeVariantText = normalizeVariantText;
 
-    document.addEventListener('DOMContentLoaded', function () {
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        normalizeVariantText(document.body);
+      });
+    } else {
       normalizeVariantText(document.body);
-    });
+    }
 
-    document.addEventListener('click', function (e) {
+    document.addEventListener('click', function(e) {
       if (e.target.closest('#product_variant_drawer')) {
-        setTimeout(function () {
+        setTimeout(function() {
           const drawer = document.getElementById('variant-drawer');
           if (drawer) normalizeVariantText(drawer);
         }, 0);
       }
     });
 
-    document.addEventListener('variant:change', function () {
+    document.addEventListener('variant:change', function() {
       const drawer = document.getElementById('variant-drawer');
       if (drawer) {
-        setTimeout(() => normalizeVariantText(drawer), 0);
+        setTimeout(function() { normalizeVariantText(drawer); }, 0);
       }
     });
 
-    const observer = new MutationObserver(function (mutations) {
-      mutations.forEach(function (mutation) {
-        mutation.addedNodes.forEach(function (node) {
-          if (node.nodeType === 1 && node.closest && node.closest('#variant-drawer')) {
-            normalizeVariantText(node);
-          }
+    // ✅ Optimized MutationObserver with throttling
+    let observerTimeout;
+    const observer = new MutationObserver(function(mutations) {
+      clearTimeout(observerTimeout);
+      observerTimeout = setTimeout(function() {
+        mutations.forEach(function(mutation) {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && node.closest && node.closest('#variant-drawer')) {
+              normalizeVariantText(node);
+            }
+          });
         });
-      });
+      }, 100);
     });
 
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    observer.observe(document.body, { childList: true, subtree: true });
   })();
-</script> 
+})();
+</script>
