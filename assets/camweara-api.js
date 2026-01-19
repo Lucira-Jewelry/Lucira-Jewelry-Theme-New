@@ -903,50 +903,66 @@ function checkSkuLocation(tryonSkusJson, psku) {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+  console.log('[VTO] DOM loaded');
 
   const wrapper = document.querySelector('.virtual-try-on-wrapper');
-  if (!wrapper) return;
+  if (!wrapper) {
+    console.warn('[VTO] Wrapper not found');
+    return;
+  }
+  console.log('[VTO] Wrapper found', wrapper);
 
   // Update SKU data if variant changes
   const productForm = document.querySelector('form[data-product-form]');
   function updateWrapperSku(sku) {
+    console.log('[VTO] Updating wrapper SKU to:', sku);
     wrapper.dataset.productSku = sku;
     checkVirtualTryOn(sku);
   }
 
   // Check if current SKU is allowed
   function checkVirtualTryOn(sku) {
+    console.log('[VTO] Checking Virtual Try-On for SKU:', sku);
+
     if (typeof getSkusListWithTryOn !== 'function') {
+      console.warn('[VTO] getSkusListWithTryOn not defined yet, retrying...');
       setTimeout(() => checkVirtualTryOn(sku), 200); // Retry until function exists
       return;
     }
 
     getSkusListWithTryOn({ companyName: 'luciraonline' })
       .then((allowedSkus) => {
-        if (Array.isArray(allowedSkus) && allowedSkus.includes(sku)) {
-          wrapper.style.display = 'block';
-        } else {
-          wrapper.style.display = 'none';
-        }
+        console.log('[VTO] Allowed SKUs from JSON:', allowedSkus);
+
+        // Normalize SKUs for safe comparison
+        const normalizedSku = sku.trim().toLowerCase();
+        const isAllowed = Array.isArray(allowedSkus) && allowedSkus.some(skuItem => skuItem.trim().toLowerCase() === normalizedSku);
+        console.log(`[VTO] SKU "${sku}" allowed?`, isAllowed);
+
+        wrapper.style.display = isAllowed ? 'block' : 'none';
       })
       .catch((err) => {
-        console.error('Error fetching try-on SKUs:', err);
+        console.error('[VTO] Error fetching try-on SKUs:', err);
       });
   }
 
   // Initial check
   const initialSku = wrapper.dataset.productSku;
+  console.log('[VTO] Initial SKU:', initialSku);
   checkVirtualTryOn(initialSku);
 
   // Listen to variant changes (for Dawn or most themes)
   if (productForm) {
+    console.log('[VTO] Listening for variant changes on product form');
     productForm.addEventListener('change', (e) => {
       const selectedVariant = e.target.closest('form')?.querySelector('[name="id"]');
       if (selectedVariant) {
         updateWrapperSku(selectedVariant.value);
+      } else {
+        console.warn('[VTO] Selected variant not found on change event');
       }
     });
+  } else {
+    console.warn('[VTO] Product form not found');
   }
-
 });
-
