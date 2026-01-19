@@ -1,5 +1,7 @@
+<!-- LOGIN POPUP -->
 <div id="login-popup" class="login-pop-overlay" onclick="closeloginPopup('login-popup')">
   <div class="otp-login-form-wrapper">
+
     <button class="close-button" onclick="closeloginPopup('login-popup')">
       {{- 'icon-login-close.svg' | inline_asset_content -}}
     </button>
@@ -14,7 +16,7 @@
         <label>Phone Number</label>
         <div class="mobile-wrap">
           <span class="country-code">+91</span>
-          <input id="loginMobile" maxlength="10" required>
+          <input id="loginMobile" maxlength="10" placeholder="Enter mobile" required>
         </div>
       </div>
 
@@ -25,6 +27,7 @@
       <!-- OTP -->
       <div id="otpSection" style="display:none">
         <label>Enter OTP</label>
+
         <div class="otp-inputs">
           <input maxlength="1">
           <input maxlength="1">
@@ -43,16 +46,16 @@
       <div class="signupSection" style="display:none">
 
         <label>First Name</label>
-        <input id="regFirst" required>
+        <input id="regFirst" placeholder="First name" required>
 
         <label>Last Name</label>
-        <input id="regLast" required>
+        <input id="regLast" placeholder="Last name" required>
 
         <label>Email</label>
-        <input id="regEmail" type="email" required>
+        <input id="regEmail" type="email" placeholder="Email" required>
 
         <label>Phone</label>
-        <input id="signupMobile" readonly required>
+        <input id="signupMobile" readonly>
 
         <button type="button" id="registerBtn" class="btn-primary">
           CREATE ACCOUNT
@@ -73,17 +76,26 @@
 </form>
 
 <script>
+/* CONFIG */
+const OTP_API   = "https://login-otp-385594025448.asia-south1.run.app";
+const VERIFY_API= "https://otp-verification-385594025448.asia-south1.run.app";
+
+/* POPUP */
 function closeloginPopup(id){
   document.getElementById(id).style.display="none";
 }
 
-const API = "https://otp-verification-385594025448.asia-south1.run.app";
-
 /* SEND OTP */
 sendOtp.onclick = async () => {
+
   const mobile = loginMobile.value.trim();
 
-  const res = await fetch(API.replace("otp-verification","login-otp"),{
+  if(mobile.length!==10){
+    alert("Enter valid number");
+    return;
+  }
+
+  const res = await fetch(OTP_API,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({mobile})
@@ -96,6 +108,8 @@ sendOtp.onclick = async () => {
     sendOtp.style.display="none";
     otpSection.style.display="block";
     startTimer();
+  }else{
+    alert(data.msg || "OTP failed");
   }
 };
 
@@ -107,18 +121,26 @@ verifyOtp.onclick = async () => {
 
   const mobile = loginMobile.value.trim();
 
-  const res = await fetch(API,{
+  if(otp.length!==4){
+    alert("Invalid OTP");
+    return;
+  }
+
+  const res = await fetch(VERIFY_API,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({otp,mobile})
   });
 
   const data = await res.json();
+  console.log(data);
 
+  /* EXISTING USER */
   if(data.type==="success"){
     shopifyAutoLogin(data.credentials.email,data.credentials.password);
   }
 
+  /* NEW USER */
   if(data.type==="register"){
     otpSection.style.display="none";
     document.querySelector(".signupSection").style.display="block";
@@ -136,18 +158,24 @@ registerBtn.onclick = async () => {
     mobile    : signupMobile.value.trim()
   };
 
-  const res = await fetch(API,{
+  if(!payload.first_name || !payload.last_name || !payload.email){
+    alert("All fields required");
+    return;
+  }
+
+  const res = await fetch(VERIFY_API,{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify(payload)
   });
 
   const data = await res.json();
+  console.log(data);
 
   if(data.type==="success"){
     shopifyAutoLogin(data.credentials.email,data.credentials.password);
   }else{
-    alert(data.msg);
+    alert(data.msg || "Registration failed");
   }
 };
 
@@ -158,20 +186,25 @@ function shopifyAutoLogin(email,password){
   document.getElementById("shopify-auto-login-form").submit();
 }
 
-/* TIMER */
-let timer=30;
+/* OTP TIMER */
+let timer=120;
 function startTimer(){
+
   const i=setInterval(()=>{
+
     let m=Math.floor(timer/60);
     let s=timer%60;
-    otp-timer.innerText=`Resend OTP in ${m}:${s<10?'0'+s:s}`;
+
+    document.getElementById("otp-timer").innerText =
+      `Resend OTP in ${m}:${s<10?'0'+s:s}`;
+
     timer--;
+
     if(timer<0) clearInterval(i);
+
   },1000);
 }
 </script>
-
-
 
 <style>
   .otp-login-form-wrapper {background-color: #FFFEFC; padding: 20px; border-radius: 12px; box-shadow: 0 0 10px #0000004d; max-width: 850px; width: 90%; text-align: left; position: relative;}
