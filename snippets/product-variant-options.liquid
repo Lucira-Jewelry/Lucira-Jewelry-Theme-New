@@ -319,7 +319,7 @@
 
 
 
-{%- liquid
+{% comment %} {%- liquid
 assign product_form_id = 'product-form-' | append: section.id
 -%}
 {%- if option.name == 'Size' -%}
@@ -549,6 +549,355 @@ data-option-swatch-focal-point="{{ swatch_focal_point }}"
         node.nodeValue = t;
       }
     }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      normalizeVariantText(document.body);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#product_variant_drawer')) {
+        setTimeout(function () {
+          const drawer = document.getElementById('variant-drawer');
+          if (drawer) normalizeVariantText(drawer);
+        }, 0);
+      }
+    });
+
+    document.addEventListener('variant:change', function () {
+      const drawer = document.getElementById('variant-drawer');
+      if (drawer) {
+        setTimeout(() => normalizeVariantText(drawer), 0);
+      }
+    });
+
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1 && node.closest && node.closest('#variant-drawer')) {
+            normalizeVariantText(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  })();
+</script> {% endcomment %}
+
+
+
+{%- liquid
+assign product_form_id = 'product-form-' | append: section.id
+-%}
+{%- if option.name == 'Size' -%}
+{%- assign sorted_values = option.values | sort -%}
+{%- else -%}
+{%- assign sorted_values = option.values -%}
+{%- endif -%}
+{%- if option.name == 'Color' -%}
+{%- assign kt09 = option.values -%}
+{%- assign kt14 = option.values -%}
+{%- assign kt18 = option.values -%}
+{%- assign sorted_values = kt09 | concat: kt14 | concat: kt18 | uniq -%}
+{%- endif -%}
+{%- for value in sorted_values -%}
+{%- liquid
+assign swatch_focal_point = null
+if value.swatch.image
+assign image_url = value.swatch.image | image_url: width: 50
+assign swatch_value = 'url(' | append: image_url | append: ')'
+assign swatch_focal_point = value.swatch.image.presentation.focal_point
+elsif value.swatch.color
+assign swatch_value = 'rgb(' | append: value.swatch.color.rgb | append: ')'
+else
+assign swatch_value = null
+endif
+assign option_disabled = true
+if value.available
+  assign option_disabled = false
+endif
+-%}
+{%- capture input_id -%}
+{{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
+{%- endcapture -%}
+{%- capture input_name -%}
+{{ option.name }}-{{ option.position }}
+{%- endcapture -%}
+{%- capture input_dataset -%}
+data-product-url="{{ value.product_url }}"
+data-option-value-id="{{ value.id }}"
+{%- endcapture -%}
+{%- capture label_unavailable -%}
+<span class="visually-hidden label-unavailable">
+{{- 'products.product.variant_sold_out_or_unavailable' | t -}}
+</span>
+{%- endcapture -%}
+{%- assign is_default_selected = false -%}
+{%- if value == '12' and option.selected_value == blank -%}
+{%- assign is_default_selected = true -%}
+{%- endif -%}
+{%- if picker_type == 'swatch' -%}
+{%- capture help_text -%}
+<span class="visually-hidden">{{ value | escape }}</span>
+{{ label_unavailable }}
+{%- endcapture -%}
+{%
+render 'swatch-input',
+id: input_id,
+name: input_name,
+value: value | escape,
+swatch: value.swatch,
+product_form_id: product_form_id,
+checked: value.selected or is_default_selected,
+visually_disabled: option_disabled,
+shape: block.settings.swatch_shape,
+help_text: help_text,
+additional_props: input_dataset
+%}
+{%- elsif picker_type == 'button' -%}
+<input
+type="radio"
+id="{{ input_id }}"
+name="{{ input_name | escape }}"
+value="{{ value | escape }}"
+form="{{ product_form_id }}"
+{% if value.selected or is_default_selected %}
+checked
+{% endif %}
+{% if option_disabled %}
+class="disabled"
+{% endif %}
+{{ input_dataset }}
+{% if option.name == 'Color' %}
+onchange="updateSizeStockStatus(this)"
+{% endif %}
+>
+<label for="{{ input_id }}" class="variant-label">
+  {%- assign v = value | downcase -%}
+
+  {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+    <span class="variant-swatch" aria-hidden="true">
+      {%- if v contains 'yellow' -%}
+        {{- 'yellow-color.svg' | inline_asset_content -}}
+      {%- elsif v contains 'rose' or v contains 'rose gold' -%}
+        {{- 'rose-color.svg' | inline_asset_content -}}
+      {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
+        {{- 'silver-color.svg' | inline_asset_content -}}
+      {%- endif -%}
+    </span>
+  {%- endif -%}
+
+  {%- if option.name == 'Color' -%}
+    {%- comment -%} Use value.available for color stock check - scales for high variants {%- endcomment -%}
+    {% assign color_in_stock = false %}
+    {% if value.variant and value.variant.available and value.variant.inventory_quantity > 0 %}
+      {% assign color_in_stock = true %}
+    {% elsif value.available %}
+      {%- comment -%} Fallback: If any variant with this color is available {%- endcomment -%}
+      {% for variant in product.variants %}
+        {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
+          {% assign color_in_stock = true %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+    {% endif %}
+
+    <span class="variant-text">
+      {%- assign parts = value | split: ' ' -%}
+      <span class="variant-karat">{{ parts[0] }}</span>
+      {{ parts[1] }}
+      {{ parts[2] }}
+      <span class="Variant_Stock_Status" data-color="{{ value }}">
+        {% if color_in_stock %}
+          <span class="stock-active">In Stock</span>
+        {% else %}
+          Made to Order
+        {% endif %}
+      </span>
+      {{ label_unavailable }}
+    </span>
+
+  {%- elsif option.name == 'Size' -%}
+    {%- comment -%} Use value.variant for direct access to the specific variant {%- endcomment -%}
+    {% assign current_variant = value.variant %}
+    
+    {%- comment -%} Fallback for compatibility {%- endcomment -%}
+    {% unless current_variant %}
+      {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+      {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+    {% endunless %}
+
+    <span class="variant-text" style="display: inline-block !important;">
+      {{ value }}
+      <span class="Variant_Stock_Status" data-size="{{ value }}">
+        {% if current_variant and current_variant.available %}
+          {% if current_variant.inventory_quantity > 0 %}
+            <span class="stock-active">In Stock</span>
+          {% endif %}
+        {% endif %}
+      </span>
+      {{ label_unavailable }}
+    </span>
+
+  {%- else -%}
+    <span class="variant-text">
+      {{ value }}
+      {{ label_unavailable }}
+    </span>
+  {%- endif -%}
+</label>
+{%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
+<option
+id="{{ input_id }}"
+value="{{ value | escape }}"
+{% if value.selected or is_default_selected %}
+selected="selected"
+{% endif %}
+{% if swatch_value and picker_type == 'swatch_dropdown' %}
+data-option-swatch-value="{{ swatch_value }}"
+{% if swatch_focal_point %}
+data-option-swatch-focal-point="{{ swatch_focal_point }}"
+{% endif %}
+{% endif %}
+{{ input_dataset }}
+>
+{% if option_disabled -%}
+{{- 'products.product.value_unavailable' | t: option_value: value -}}
+{%- else -%}
+{{- value -}}
+{%- endif %}
+</option>
+{%- endif -%}
+{%- endfor -%}
+
+
+
+<script>
+  // ✅ Build initial variant stock data for currently loaded variants only
+  window.variantStockData = window.variantStockData || {};
+  {% for v in product.variants %}
+    window.variantStockData['{{ v.option1 | escape }}'] = window.variantStockData['{{ v.option1 | escape }}'] || {};
+    window.variantStockData['{{ v.option1 | escape }}']['{{ v.option2 | escape }}'] = {
+      available: {{ v.available | json }},
+      inventory: {{ v.inventory_quantity | default: 0 | json }}
+    };
+  {% endfor %}
+
+  // ✅ Store section ID for Section Rendering API
+  window.productSectionId = '{{ section.id }}';
+
+  // ✅ Update size stock status - enhanced to work with Section Rendering API
+  function updateSizeStockStatus(colorValue) {
+    document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(function(el) {
+      var size = el.getAttribute('data-size');
+      var stock = (window.variantStockData[colorValue] || {})[size];
+      
+      el.innerHTML = '';
+
+      if (stock && stock.available && Number(stock.inventory) > 0) {
+        el.innerHTML = '<span class="stock-active">In Stock</span>';
+      }
+    });
+  }
+
+  // ✅ Fetch updated variant availability using Section Rendering API
+  function fetchUpdatedAvailability(optionValueElement) {
+    if (!optionValueElement) return;
+
+    const sectionId = window.productSectionId || '{{ section.id }}';
+    const productUrl = optionValueElement.dataset.productUrl || window.location.pathname;
+    
+    // Get all selected option value IDs
+    const selectedOptionValues = Array.from(
+      document.querySelectorAll('input[type="radio"][data-option-value-id]:checked')
+    ).map(input => input.dataset.optionValueId).filter(Boolean);
+
+    const params = selectedOptionValues.length > 0
+      ? `&option_values=${selectedOptionValues.join(',')}`
+      : '';
+
+    // Fetch updated section with new availability state
+    fetch(`${productUrl}?section_id=${sectionId}${params}`)
+      .then(response => response.text())
+      .then(responseText => {
+        const parser = new DOMParser();
+        const html = parser.parseFromString(responseText, 'text/html');
+        
+        // Update variant stock data from the refreshed section
+        const scriptContent = responseText.match(/window\.variantStockData\s*=\s*({[\s\S]*?});/);
+        if (scriptContent && scriptContent[1]) {
+          try {
+            const newStockData = JSON.parse(scriptContent[1].replace(/window\.variantStockData\s*\|\|\s*/, ''));
+            window.variantStockData = Object.assign(window.variantStockData, newStockData);
+          } catch (e) {
+            console.warn('Could not parse updated stock data:', e);
+          }
+        }
+
+        // Update the stock status display
+        const colorValue = optionValueElement.value;
+        updateSizeStockStatus(colorValue);
+
+        // Normalize text after update
+        if (typeof normalizeVariantText === 'function') {
+          normalizeVariantText(document.body);
+        }
+      })
+      .catch(error => {
+        console.warn('Could not fetch updated availability:', error);
+        // Fallback to current data
+        updateSizeStockStatus(optionValueElement.value);
+      });
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const initialColor = '{{ product.selected_or_first_available_variant.option1 | escape }}';
+    updateSizeStockStatus(initialColor);
+
+    // Enhanced color change handler with Section Rendering API
+    document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
+      radio.addEventListener('change', function(){ 
+        // Use Section Rendering API for high-variant support
+        if (this.dataset.optionValueId) {
+          fetchUpdatedAvailability(this);
+        } else {
+          // Fallback to original method
+          updateSizeStockStatus(this.value);
+        }
+      });
+    });
+
+    // Listen to variant change events
+    document.addEventListener('variant:change', function (evt) {
+      if (evt.detail && evt.detail.variant) {
+        updateSizeStockStatus(evt.detail.variant.option1);
+      }
+    });
+  });
+
+  // ✅ TEXT NORMALIZATION: Keep your existing logic
+  (function () {
+    function normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+        node.nodeValue = t;
+      }
+    }
+
+    // Make it globally available for the fetch callback
+    window.normalizeVariantText = normalizeVariantText;
 
     document.addEventListener('DOMContentLoaded', function () {
       normalizeVariantText(document.body);
