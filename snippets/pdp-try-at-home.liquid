@@ -9,6 +9,8 @@
 
 <section class="try-at-home-section">
   <div class="grid-row">
+
+    <!-- Virtual Try-On -->
     <div class="grid-column">
       <div
         class="virtual-try-on-wrapper"
@@ -45,6 +47,7 @@
     </div>
 
     {% if show_try_at_home %}
+      <!-- Visit Store -->
       <div class="grid-column">
         <div class="visit-store-content">
           <img
@@ -67,6 +70,7 @@
         </div>
       </div>
 
+      <!-- Try at Home -->
       <div class="grid-column">
         <div class="try-at-home-content">
           <img
@@ -84,14 +88,12 @@
               </div>
               <p class="description-store-visit">Try your selected pieces from the comfort of your home</p>
             </div>
-            {% comment %} <button class="try-at-home-button" onclick="openTryAtHomeOverlay()">Try at Home</button> {% endcomment %}
             <a
               class="try-at-home-button"
               href="https://wa.me/919004435760?text=Hi,%20I%20want%20to%20try%20this%20product%20at%20home%20:%20{{ product.title | url_encode }}"
               target="_blank"
               rel="noopener"
-              >Try at Home</a
-            >
+            >Try at Home</a>
           </div>
         </div>
       </div>
@@ -100,25 +102,53 @@
 </section>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const wrapper = document.querySelector('.virtual-try-on-wrapper');
-    if (!wrapper) return;
+document.addEventListener('DOMContentLoaded', function () {
 
-    const productSku = wrapper.dataset.productSku;
+  const wrapper = document.querySelector('.virtual-try-on-wrapper');
+  if (!wrapper) return;
 
-    // Call your async function correctly
-    if (typeof getSkusListWithTryOn === 'function') {
-      getSkusListWithTryOn({ companyName: 'luciraonline' })
-        .then((allowedSkus) => {
-          if (Array.isArray(allowedSkus) && allowedSkus.includes(productSku)) {
-            wrapper.style.display = 'block';
-          }
-        })
-        .catch((err) => {
-          console.error('Error fetching try-on SKUs:', err);
-        });
+  // Update SKU data if variant changes
+  const productForm = document.querySelector('form[data-product-form]');
+  function updateWrapperSku(sku) {
+    wrapper.dataset.productSku = sku;
+    checkVirtualTryOn(sku);
+  }
+
+  // Check if current SKU is allowed
+  function checkVirtualTryOn(sku) {
+    if (typeof getSkusListWithTryOn !== 'function') {
+      setTimeout(() => checkVirtualTryOn(sku), 200); // Retry until function exists
+      return;
     }
-  });
+
+    getSkusListWithTryOn({ companyName: 'luciraonline' })
+      .then((allowedSkus) => {
+        if (Array.isArray(allowedSkus) && allowedSkus.includes(sku)) {
+          wrapper.style.display = 'block';
+        } else {
+          wrapper.style.display = 'none';
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching try-on SKUs:', err);
+      });
+  }
+
+  // Initial check
+  const initialSku = wrapper.dataset.productSku;
+  checkVirtualTryOn(initialSku);
+
+  // Listen to variant changes (for Dawn or most themes)
+  if (productForm) {
+    productForm.addEventListener('change', (e) => {
+      const selectedVariant = e.target.closest('form')?.querySelector('[name="id"]');
+      if (selectedVariant) {
+        updateWrapperSku(selectedVariant.value);
+      }
+    });
+  }
+
+});
 </script>
 
 <style>
