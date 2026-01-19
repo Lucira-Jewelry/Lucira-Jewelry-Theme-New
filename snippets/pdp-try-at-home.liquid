@@ -102,127 +102,88 @@
 </section>
 
 <script>
-// Add this debug line at the very beginning
-console.log('[VTO] Script loaded');
+console.log('[VTO] Script loaded - Step 1');
 
-document.addEventListener('DOMContentLoaded', function () {
-  console.log('[VTO] DOM loaded');
+// Try multiple initialization methods
+function initializeAll() {
+  console.log('[VTO] initializeAll called');
   
-  // Add a small delay to ensure all elements are ready
-  setTimeout(initializeVirtualTryOn, 100);
+  // Method 1: Direct initialization after timeout
+  setTimeout(() => {
+    console.log('[VTO] Timeout executed');
+    initializeVirtualTryOn();
+  }, 1000);
+}
+
+// Try initializing when window loads
+window.addEventListener('load', function() {
+  console.log('[VTO] window.load event fired');
+  initializeAll();
 });
 
-function initializeVirtualTryOn() {
-  console.log('[VTO] Initializing...');
-  
-  const wrapper = document.querySelector('.virtual-try-on-wrapper');
-  console.log('[VTO] Wrapper element:', wrapper);
-  
-  if (!wrapper) {
-    console.error('[VTO] ERROR: Wrapper not found!');
-    console.log('[VTO] Available .virtual-try-on-wrapper elements:', 
-                document.querySelectorAll('.virtual-try-on-wrapper').length);
-    return;
-  }
-  
-  const initialSku = wrapper.dataset.productSku;
-  console.log('[VTO] Initial SKU from data attribute:', initialSku);
-  console.log('[VTO] Wrapper display style:', wrapper.style.display);
-  
-  // Check if function exists immediately
-  console.log('[VTO] getSkusListWithTryOn exists?', 
-              typeof getSkusListWithTryOn === 'function');
-  
-  // Check current product variant
-  const variantSelect = document.querySelector('[name="id"]');
-  console.log('[VTO] Variant select element:', variantSelect);
-  if (variantSelect) {
-    console.log('[VTO] Current variant ID:', variantSelect.value);
-  }
-  
-  // Modified checkVirtualTryOn function with better error handling
-  function checkVirtualTryOn(sku) {
-    console.log('[VTO] checkVirtualTryOn called with SKU:', sku);
-    
-    if (!sku) {
-      console.warn('[VTO] No SKU provided');
-      wrapper.style.display = 'none';
-      return;
-    }
-    
-    if (typeof getSkusListWithTryOn !== 'function') {
-      console.warn('[VTO] Function not available yet, will retry...');
-      setTimeout(() => checkVirtualTryOn(sku), 500);
-      return;
-    }
-    
-    try {
-      getSkusListWithTryOn({ companyName: 'luciraonline' })
-        .then((allowedSkus) => {
-          console.log('[VTO] Received allowed SKUs:', allowedSkus);
-          console.log('[VTO] Type of allowedSkus:', typeof allowedSkus);
-          console.log('[VTO] Is array?', Array.isArray(allowedSkus));
-          
-          if (!Array.isArray(allowedSkus)) {
-            console.error('[VTO] ERROR: allowedSkus is not an array:', allowedSkus);
-            wrapper.style.display = 'none';
-            return;
-          }
-          
-          const normalizedSku = sku.toString().trim().toLowerCase();
-          const isAllowed = allowedSkus.some(skuItem => 
-            skuItem.toString().trim().toLowerCase() === normalizedSku
-          );
-          
-          console.log(`[VTO] SKU "${sku}" is allowed: ${isAllowed}`);
-          wrapper.style.display = isAllowed ? 'block' : 'none';
-        })
-        .catch((err) => {
-          console.error('[VTO] Error in promise:', err);
-          wrapper.style.display = 'none';
-        });
-    } catch (error) {
-      console.error('[VTO] Exception in checkVirtualTryOn:', error);
-      wrapper.style.display = 'none';
-    }
-  }
-  
-  // Initial check
-  checkVirtualTryOn(initialSku);
-  
-  // Listen to variant changes with better event handling
-  const productForm = document.querySelector('form[data-product-form]') || 
-                      document.querySelector('form.product-form');
-  console.log('[VTO] Product form found:', productForm);
-  
-  if (productForm) {
-    // Listen to input changes
-    productForm.addEventListener('change', (e) => {
-      console.log('[VTO] Form change detected:', e.target);
-      
-      // Try multiple ways to get the variant ID
-      const variantId = e.target.value || 
-                       e.target.closest('form')?.querySelector('[name="id"]')?.value ||
-                       document.querySelector('[name="id"]')?.value;
-      
-      console.log('[VTO] Variant changed to:', variantId);
-      
-      if (variantId) {
-        wrapper.dataset.productSku = variantId;
-        checkVirtualTryOn(variantId);
-      }
-    });
-    
-    // Also listen for custom variant change events (common in Shopify themes)
-    document.addEventListener('variant:change', (event) => {
-      console.log('[VTO] variant:change event:', event.detail);
-      if (event.detail && event.detail.variant) {
-        wrapper.dataset.productSku = event.detail.variant.sku || event.detail.variant.id;
-        checkVirtualTryOn(wrapper.dataset.productSku);
-      }
-    });
-  }
+// Also try DOMContentLoaded
+document.addEventListener('DOMContentLoaded', function() {
+  console.log('[VTO] DOMContentLoaded fired');
+  initializeAll();
+});
+
+// And try immediately with a check
+if (document.readyState === 'loading') {
+  console.log('[VTO] Document is still loading');
+  document.addEventListener('DOMContentLoaded', initializeAll);
+} else {
+  console.log('[VTO] Document already loaded, initializing now');
+  initializeAll();
 }
+
+function initializeVirtualTryOn() {
+  console.log('[VTO] initializeVirtualTryOn started');
+  
+  // Add a visible marker to see if script runs
+  const marker = document.createElement('div');
+  marker.style.cssText = 'position: fixed; top: 10px; right: 10px; background: red; color: white; padding: 10px; z-index: 999999;';
+  marker.textContent = 'VTO Script Running';
+  document.body.appendChild(marker);
+  
+  console.log('[VTO] Marker added to page');
+  
+  // Rest of your initialization code...
+  const wrapper = document.querySelector('.virtual-try-on-wrapper');
+  console.log('[VTO] Wrapper found:', !!wrapper);
+  
+  if (wrapper) {
+    console.log('[VTO] Wrapper SKU:', wrapper.dataset.productSku);
+    wrapper.style.border = '3px solid green';
+  }
+  
+  // Check if Shopify variant selector exists
+  const variantSelectors = [
+    '[name="id"]',
+    '.product-form__input input[type="radio"]',
+    '.product-variant-picker',
+    'variant-radios',
+    'variant-selects'
+  ];
+  
+  variantSelectors.forEach(selector => {
+    const elements = document.querySelectorAll(selector);
+    if (elements.length) {
+      console.log(`[VTO] Found ${elements.length} elements with selector: ${selector}`);
+    }
+  });
+}
+
+// Add error handler to catch any issues
+window.addEventListener('error', function(e) {
+  console.error('[VTO] Global error:', e.message, 'at', e.filename, e.lineno);
+});
+
+// Also log any promise rejections
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('[VTO] Unhandled promise rejection:', e.reason);
+});
+
+console.log('[VTO] Script execution complete - Step 2');
 </script>
 <style>
   .try-at-home-section .grid-row { display: grid ; grid-template-columns: repeat(1, 1fr); gap: 14px; }
