@@ -397,9 +397,7 @@ class="disabled"
 {% endif %}
 {{ input_dataset }}
 {% if option.name == 'Color' %}
-data-variant-option-index="0"
-{% elsif option.name == 'Size' %}
-data-variant-option-index="1"
+onchange="updateSizeStockStatus(this.value)"
 {% endif %}
 >
 <label for="{{ input_id }}" class="variant-label">
@@ -418,26 +416,41 @@ data-variant-option-index="1"
   {%- endif -%}
 
   {%- if option.name == 'Color' -%}
+    {% assign color_in_stock = false %}
+    {% for variant in product.variants %}
+      {% if variant.option1 == value and variant.available and variant.inventory_quantity > 0 %}
+        {% assign color_in_stock = true %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+
     <span class="variant-text">
       {%- assign parts = value | split: ' ' -%}
       <span class="variant-karat">{{ parts[0] }}</span>
       {{ parts[1] }}
       {{ parts[2] }}
-      <span class="Variant_Stock_Status" data-color="{{ value | escape }}">
-        {%- if value.available -%}
+      <span class="Variant_Stock_Status">
+        {% if color_in_stock %}
           <span class="stock-active">In Stock</span>
-        {%- else -%}
+        {% else %}
           Made to Order
-        {%- endif -%}
+        {% endif %}
       </span>
       {{ label_unavailable }}
     </span>
 
   {%- elsif option.name == 'Size' -%}
+    {% assign selected_color = product.selected_or_first_available_variant.option1 %}
+    {% assign current_variant = product.variants | where: 'option1', selected_color | where: 'option2', value | first %}
+
     <span class="variant-text" style="display: inline-block !important;">
       {{ value }}
-      <span class="Variant_Stock_Status" data-size="{{ value }}" data-stock-pending>
-        Loading...
+      <span class="Variant_Stock_Status" data-size="{{ value }}">
+        {% if current_variant and current_variant.available %}
+          {% if current_variant.inventory_quantity > 0 %}
+            <span class="stock-active">In Stock</span>
+          {% endif %}
+        {% endif %}
       </span>
       {{ label_unavailable }}
     </span>
@@ -473,105 +486,45 @@ data-option-swatch-focal-point="{{ swatch_focal_point }}"
 {%- endif -%}
 {%- endfor -%}
 <script>
-  // OPTIMIZED: Only store initial variant data, not all 90 variants
-  window.variantSelector = window.variantSelector || {};
-  window.variantSelector.sectionId = '{{ section.id }}';
-  window.variantSelector.productUrl = '{{ product.url }}';
-  window.variantSelector.formId = '{{ product_form_id }}';
+  // ✅ KEEP YOUR ORIGINAL LOGIC: Build variant stock data
+  window.variantStockData = window.variantStockData || {};
+  {% for v in product.variants %}
+    window.variantStockData['{{ v.option1 | escape }}'] = window.variantStockData['{{ v.option1 | escape }}'] || {};
+    window.variantStockData['{{ v.option1 | escape }}']['{{ v.option2 | escape }}'] = {
+      available: {{ v.available | json }},
+      inventory: {{ v.inventory_quantity | default: 0 | json }}
+    };
+  {% endfor %}
 
-  // Store ONLY the currently selected variant
-  window.variantSelector.currentVariant = {
-    id: {{ product.selected_or_first_available_variant.id }},
-    option1: '{{ product.selected_or_first_available_variant.option1 | escape }}',
-    option2: '{{ product.selected_or_first_available_variant.option2 | escape }}',
-    available: {{ product.selected_or_first_available_variant.available | json }},
-    inventory: {{ product.selected_or_first_available_variant.inventory_quantity | default: 0 | json }}
-  };
+  // ✅ YOUR EXACT FUNCTION: Updates size stock status
+  function updateSizeStockStatus(colorValue) {
+    document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(function(el) {
+      var size = el.getAttribute('data-size');
+      var stock = (window.variantStockData[colorValue] || {})[size];
+      
+      el.innerHTML = '';
 
-  /**
-   * OPTIMIZED: Fetch size availability for selected color via AJAX
-   * Instead of storing all 90 variants, fetch only what's needed
-   */
-  function fetchSizeAvailability(colorValue) {
-    const sectionId = window.variantSelector.sectionId;
-    const productUrl = window.variantSelector.productUrl;
-    
-    // Use Shopify's option_values parameter to fetch only relevant variants
-    const optionValueId = document.querySelector(
-      `input[name^="Color"][value="${colorValue}"]`
-    )?.dataset.optionValueId;
-    
-    if (!optionValueId) return;
-
-    // Show loading state
-    document.querySelectorAll('.Variant_Stock_Status[data-stock-pending]').forEach(el => {
-      el.innerHTML = '<span class="stock-loading">Loading...</span>';
+      if (stock && stock.available && Number(stock.inventory) > 0) {
+        el.innerHTML = '<span class="stock-active">In Stock</span>';
+      }
     });
-
-    const fetchUrl = `${productUrl}?section_id=${sectionId}&option_values=${optionValueId}`;
-
-    fetch(fetchUrl)
-      .then(response => response.text())
-      .then(html => {
-        const parser = new DOMParser();
-        const newDoc = parser.parseFromString(html, 'text/html');
-        
-        // Extract size availability data from the new section
-        const sizeStocks = {};
-        newDoc.querySelectorAll('input[name^="Size"]').forEach(input => {
-          const size = input.value;
-          const stockEl = input.closest('label').querySelector('[data-size]');
-          const isAvailable = !input.classList.contains('disabled');
-          
-          sizeStocks[size] = { available: isAvailable };
-        });
-
-        // Update all size stock indicators
-        document.querySelectorAll('.Variant_Stock_Status[data-size]').forEach(el => {
-          const size = el.getAttribute('data-size');
-          const stock = sizeStocks[size];
-          
-          if (stock) {
-            el.innerHTML = stock.available 
-              ? '<span class="stock-active">In Stock</span>'
-              : '<span class="stock-unavailable">Unavailable</span>';
-            el.removeAttribute('data-stock-pending');
-          }
-        });
-      })
-      .catch(error => {
-        console.error('Error fetching size availability:', error);
-        document.querySelectorAll('.Variant_Stock_Status[data-stock-pending]').forEach(el => {
-          el.innerHTML = '<span class="stock-error">Error loading</span>';
-        });
-      });
   }
 
   document.addEventListener('DOMContentLoaded', function () {
-    // Initial render based on currently selected color
-    const selectedColor = document.querySelector('input[name^="Color"]:checked');
-    if (selectedColor) {
-      fetchSizeAvailability(selectedColor.value);
-    }
+    updateSizeStockStatus('{{ product.selected_or_first_available_variant.option1 | escape }}');
 
-    // Update when color changes (radio buttons)
-    document.querySelectorAll('input[name^="Color"]').forEach(radio => {
-      radio.addEventListener('change', function() {
-        fetchSizeAvailability(this.value);
-      });
+    document.querySelectorAll('input[name^="Color"]').forEach(function(radio){
+      radio.addEventListener('change', function(){ updateSizeStockStatus(this.value); });
     });
 
-    // React to Shopify variant:change event
     document.addEventListener('variant:change', function (evt) {
-      if (evt.detail && evt.detail.variant && evt.detail.variant.option1) {
-        fetchSizeAvailability(evt.detail.variant.option1);
+      if (evt.detail && evt.detail.variant) {
+        updateSizeStockStatus(evt.detail.variant.option1);
       }
     });
   });
 
-  /**
-   * TEXT NORMALIZATION: Keep your existing normalization logic
-   */
+  // ✅ TEXT NORMALIZATION: Keep your existing logic
   (function () {
     function normalizeVariantText(root = document) {
       const walker = document.createTreeWalker(
