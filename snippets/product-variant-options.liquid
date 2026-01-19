@@ -314,6 +314,12 @@
   })();
 </script> {% endcomment %}
 
+
+
+
+{% comment %} 
+important working with instock logic
+
 {%- liquid
 assign product_form_id = 'product-form-' | append: section.id
 -%}
@@ -559,6 +565,339 @@ data-option-swatch-focal-point="{{ swatch_focal_point }}"
       const drawer = document.getElementById('variant-drawer');
       if (drawer) {
         setTimeout(() => normalizeVariantText(drawer), 0);
+      }
+    });
+
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        mutation.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1 && node.closest && node.closest('#variant-drawer')) {
+            normalizeVariantText(node);
+          }
+        });
+      });
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  })();
+</script> {% endcomment %}
+
+{%- liquid
+assign product_form_id = 'product-form-' | append: section.id
+-%}
+{%- if option.name == 'Size' -%}
+{%- assign sorted_values = option.values | sort -%}
+{%- else -%}
+{%- assign sorted_values = option.values -%}
+{%- endif -%}
+{%- if option.name == 'Color' -%}
+{%- assign kt09 = option.values -%}
+{%- assign kt14 = option.values -%}
+{%- assign kt18 = option.values -%}
+{%- assign sorted_values = kt09 | concat: kt14 | concat: kt18 | uniq -%}
+{%- endif -%}
+{%- for value in sorted_values -%}
+{%- liquid
+assign swatch_focal_point = null
+if value.swatch.image
+assign image_url = value.swatch.image | image_url: width: 50
+assign swatch_value = 'url(' | append: image_url | append: ')'
+assign swatch_focal_point = value.swatch.image.presentation.focal_point
+elsif value.swatch.color
+assign swatch_value = 'rgb(' | append: value.swatch.color.rgb | append: ')'
+else
+assign swatch_value = null
+endif
+assign option_disabled = true
+if value.available
+  assign option_disabled = false
+endif
+-%}
+{%- capture input_id -%}
+{{ section.id }}-{{ option.position }}-{{ forloop.index0 -}}
+{%- endcapture -%}
+{%- capture input_name -%}
+{{ option.name }}-{{ option.position }}
+{%- endcapture -%}
+{%- capture input_dataset -%}
+data-option-value-id="{{ value.id }}"
+data-option-value-available="{{ value.available }}"
+{%- endcapture -%}
+{%- capture label_unavailable -%}
+<span class="visually-hidden label-unavailable">
+{{- 'products.product.variant_sold_out_or_unavailable' | t -}}
+</span>
+{%- endcapture -%}
+{%- assign is_default_selected = false -%}
+{%- if value == '12' and option.selected_value == blank -%}
+{%- assign is_default_selected = true -%}
+{%- endif -%}
+{%- if picker_type == 'swatch' -%}
+{%- capture help_text -%}
+<span class="visually-hidden">{{ value | escape }}</span>
+{{ label_unavailable }}
+{%- endcapture -%}
+{%
+render 'swatch-input',
+id: input_id,
+name: input_name,
+value: value | escape,
+swatch: value.swatch,
+product_form_id: product_form_id,
+checked: value.selected or is_default_selected,
+visually_disabled: option_disabled,
+shape: block.settings.swatch_shape,
+help_text: help_text,
+additional_props: input_dataset
+%}
+{%- elsif picker_type == 'button' -%}
+<input
+type="radio"
+id="{{ input_id }}"
+name="{{ input_name | escape }}"
+value="{{ value | escape }}"
+form="{{ product_form_id }}"
+{% if value.selected or is_default_selected %}
+checked
+{% endif %}
+{% if option_disabled %}
+disabled
+{% endif %}
+{{ input_dataset }}
+>
+<label for="{{ input_id }}" class="variant-label">
+  {%- assign v = value | downcase -%}
+
+  {%- if v contains 'yellow' or v contains 'rose' or v contains 'white' or v contains 'silver' -%}
+    <span class="variant-swatch" aria-hidden="true">
+      {%- if v contains 'yellow' -%}
+        {{- 'yellow-color.svg' | inline_asset_content -}}
+      {%- elsif v contains 'rose' or v contains 'rose gold' -%}
+        {{- 'rose-color.svg' | inline_asset_content -}}
+      {%- elsif v contains 'white' or v contains 'silver' or v contains 'white gold' -%}
+        {{- 'silver-color.svg' | inline_asset_content -}}
+      {%- endif -%}
+    </span>
+  {%- endif -%}
+
+  {%- if option.name == 'Color' -%}
+    <span class="variant-text">
+      {%- assign parts = value | split: ' ' -%}
+      <span class="variant-karat">{{ parts[0] }}</span>
+      {{ parts[1] }}
+      {{ parts[2] }}
+      <span class="Variant_Stock_Status" data-stock-color="{{ value | escape }}">
+        {%- if value.available -%}
+          <span class="stock-active">In Stock</span>
+        {%- else -%}
+          Made to Order
+        {%- endif -%}
+      </span>
+      {{ label_unavailable }}
+    </span>
+
+  {%- elsif option.name == 'Size' -%}
+    <span class="variant-text" style="display: inline-block !important;">
+      {{ value }}
+      <span class="Variant_Stock_Status" data-stock-size="{{ value | escape }}" data-available="{{ value.available }}">
+        {%- if value.available -%}
+          <span class="stock-active">In Stock</span>
+        {%- else -%}
+          <span class="stock-pending">—</span>
+        {%- endif -%}
+      </span>
+      {{ label_unavailable }}
+    </span>
+
+  {%- else -%}
+    <span class="variant-text">
+      {{ value }}
+      {{ label_unavailable }}
+    </span>
+  {%- endif -%}
+</label>
+{%- elsif picker_type == 'dropdown' or picker_type == 'swatch_dropdown' -%}
+<option
+id="{{ input_id }}"
+value="{{ value | escape }}"
+{% if value.selected or is_default_selected %}
+selected="selected"
+{% endif %}
+{% if swatch_value and picker_type == 'swatch_dropdown' %}
+data-option-swatch-value="{{ swatch_value }}"
+{% if swatch_focal_point %}
+data-option-swatch-focal-point="{{ swatch_focal_point }}"
+{% endif %}
+{% endif %}
+{{ input_dataset }}
+>
+{% if option_disabled -%}
+{{- 'products.product.value_unavailable' | t: option_value: value -}}
+{%- else -%}
+{{- value -}}
+{%- endif %}
+</option>
+{%- endif -%}
+{%- endfor -%}
+<script>
+  /**
+   * SHOPIFY HIGH-VARIANT COMPLIANT
+   * 
+   * ✅ Uses value.available (server-calculated)
+   * ✅ No product.variants loop
+   * ✅ No window.variantStockData
+   * ✅ Deferred loading via Section Rendering API
+   * ✅ Top-down availability model
+   */
+
+  class RingVariantSelector {
+    constructor() {
+      this.sectionId = '{{ section.id }}';
+      this.productUrl = window.location.pathname;
+      this.selectedOptionValues = [];
+      this.init();
+    }
+
+    init() {
+      document.addEventListener('DOMContentLoaded', () => {
+        this.attachEventListeners();
+        this.initializeSelectedValues();
+      });
+    }
+
+    attachEventListeners() {
+      const inputs = document.querySelectorAll('input[name^="Color"], input[name^="Size"]');
+      inputs.forEach(input => {
+        input.addEventListener('change', (e) => this.handleOptionChange(e));
+      });
+    }
+
+    initializeSelectedValues() {
+      const checked = document.querySelectorAll('input[type="radio"]:checked');
+      checked.forEach(input => {
+        this.selectedOptionValues.push(input.dataset.optionValueId);
+      });
+    }
+
+    handleOptionChange(event) {
+      const optionValueId = event.target.dataset.optionValueId;
+      const optionName = event.target.name;
+
+      // Update selected values array
+      const index = this.selectedOptionValues.findIndex(id => {
+        const input = document.querySelector(`input[data-option-value-id="${id}"]`);
+        return input && input.name === optionName;
+      });
+
+      if (index !== -1) {
+        this.selectedOptionValues[index] = optionValueId;
+      } else {
+        this.selectedOptionValues.push(optionValueId);
+      }
+
+      // Fetch updated option picker with new availability state
+      this.fetchUpdatedOptions();
+    }
+
+    fetchUpdatedOptions() {
+      const params = new URLSearchParams();
+      params.append('section_id', this.sectionId);
+      
+      if (this.selectedOptionValues.length > 0) {
+        params.append('option_values', this.selectedOptionValues.join(','));
+      }
+
+      const fetchUrl = `${this.productUrl}?${params.toString()}`;
+
+      fetch(fetchUrl)
+        .then(response => response.text())
+        .then(html => this.updateOptionPicker(html))
+        .catch(error => console.error('Variant fetch error:', error));
+    }
+
+    updateOptionPicker(html) {
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, 'text/html');
+      
+      // Find the variant wrapper in the new response
+      const newOptions = newDoc.querySelector(
+        `[data-section="${this.sectionId}"]`
+      );
+
+      if (newOptions) {
+        const currentOptions = document.querySelector(
+          `[data-section="${this.sectionId}"]`
+        );
+        
+        if (currentOptions) {
+          // Replace with updated options (availability recalculated by server)
+          currentOptions.innerHTML = newOptions.innerHTML;
+          
+          // Re-attach listeners to new elements
+          this.attachEventListeners();
+          
+          // Re-initialize selected values
+          this.initializeSelectedValues();
+          
+          // Apply text normalization
+          this.normalizeVariantText();
+        }
+      }
+    }
+
+    normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+        node.nodeValue = t;
+      }
+    }
+  }
+
+  // Initialize variant selector
+  new RingVariantSelector();
+
+  /**
+   * TEXT NORMALIZATION: 09KT → 9KT
+   */
+  (function () {
+    function normalizeVariantText(root = document) {
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_TEXT,
+        null,
+        false
+      );
+
+      let node;
+      while ((node = walker.nextNode())) {
+        let t = node.nodeValue;
+        t = t.replace(/\b0(\d+KT)\b/g, '$1');
+        node.nodeValue = t;
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      normalizeVariantText(document.body);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('#product_variant_drawer')) {
+        setTimeout(function () {
+          const drawer = document.getElementById('variant-drawer');
+          if (drawer) normalizeVariantText(drawer);
+        }, 0);
       }
     });
 
