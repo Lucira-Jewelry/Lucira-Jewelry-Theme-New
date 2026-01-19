@@ -12,24 +12,37 @@
     <div class="grid-row">
 
 
-        <div class="grid-column">
-            <div class="virtual-try-on-content">
-                <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/DSC_1888_1_1.png?v=1763643718" width="100%" height="auto">
-                <div class="virtual-try-on-content-wrapper">
-                    <div class="virtual-try-on-content-wrap">
-                        <div class="icon-title-wrap">
-                            <div class="svg-icon">
-                                {{- 'virtual-try-on.svg' | inline_asset_content -}}
-                            </div>
-                            <h3 class="virtual-try-on-title">Virtual Try on</h3>
-                            
-                        </div>
-                        <p class="description-virtual-try-on">This is a feature to test virtual try on, to look how it looks on you.</p>
-                    </div>
-                    <button class="virtual-try-on-button" onclick="onTryonClick('{{product.selected_or_first_available_variant.sku}}', 'luciraonline')">Try Virtual</button>
-                </div>
-            </div>
+<div class="grid-column virtual-try-on-wrapper" style="display:none;">
+  <div class="virtual-try-on-content">
+    <img 
+      src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/DSC_1888_1_1.png?v=1763643718"
+      width="100%"
+      height="auto"
+    >
+
+    <div class="virtual-try-on-content-wrapper">
+      <div class="virtual-try-on-content-wrap">
+        <div class="icon-title-wrap">
+          <div class="svg-icon">
+            {{- 'virtual-try-on.svg' | inline_asset_content -}}
+          </div>
+          <h3 class="virtual-try-on-title">Virtual Try on</h3>
         </div>
+
+        <p class="description-virtual-try-on">
+          This is a feature to test virtual try on, to look how it looks on you.
+        </p>
+      </div>
+
+      <button
+        class="virtual-try-on-button"
+        onclick="onTryonClick('{{ product.selected_or_first_available_variant.sku }}', 'luciraonline')"
+      >
+        Try Virtual
+      </button>
+    </div>
+  </div>
+</div>
 
         {% if show_try_at_home %}
         <div class="grid-column">
@@ -76,6 +89,54 @@
 </section>
 
 
+<script>
+  (function () {
+    const productSku = "{{ product.selected_or_first_available_variant.sku }}";
+    const tryOnWrapper = document.querySelector('.virtual-try-on-wrapper');
+
+    console.log('[Virtual Try On] Product SKU:', productSku);
+
+    function checkTryOnAvailability() {
+      if (typeof getSkusListWithTryOn !== 'function') {
+        console.warn('[Virtual Try On] getSkusListWithTryOn() not loaded yet');
+        return;
+      }
+
+      const skuList = getSkusListWithTryOn();
+
+      console.log('[Virtual Try On] Camera API SKU list:', skuList);
+
+      if (
+        productSku &&
+        Array.isArray(skuList) &&
+        skuList.includes(productSku)
+      ) {
+        console.log('[Virtual Try On] SKU supported → Showing Try On');
+        tryOnWrapper.style.display = 'block';
+      } else {
+        console.log('[Virtual Try On] SKU NOT supported → Hiding Try On');
+        tryOnWrapper.style.display = 'none';
+      }
+    }
+
+    /**
+     * Camera API JS loads async
+     * So we poll until function is available
+     */
+    let retries = 0;
+    const interval = setInterval(function () {
+      if (typeof getSkusListWithTryOn === 'function') {
+        clearInterval(interval);
+        checkTryOnAvailability();
+      }
+
+      if (retries++ > 20) {
+        clearInterval(interval);
+        console.warn('[Virtual Try On] Camera API not detected');
+      }
+    }, 300);
+  })();
+</script>
 
 
 <style>
