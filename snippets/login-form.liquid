@@ -202,6 +202,71 @@
     });
   }
 
+  const signupForm = document.querySelector('.signupSection form');
+  if (signupForm) {
+    signupForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const formData = new FormData(e.target);
+      const firstName = formData.get('customer[first_name]').trim();
+      const lastName = formData.get('customer[last_name]').trim();
+      const email = formData.get('customer[email]').trim();
+      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
+      
+      // Get OTP from inputs
+      const otp = [...document.querySelectorAll('.otp-inputs input')]
+        .map(i => i.value)
+        .join('');
+      
+      if (!firstName || !email || otp.length !== 4) {
+        alert('Please fill all required fields');
+        return;
+      }
+      
+      // Show loading state
+      const submitButton = signupForm.querySelector('.btn-primary');
+      const originalText = submitButton.textContent;
+      submitButton.textContent = 'Creating Account...';
+      submitButton.disabled = true;
+      
+      try {
+        const res = await fetch(
+          'https://otp-verification-385594025448.asia-south1.run.app',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              otp, 
+              mobile,
+              firstName,
+              lastName,
+              email
+            })
+          }
+        );
+        
+        const data = await res.json();
+        console.log('Registration Response:', data);
+        
+        if (data.type === 'success' && data.credentials) {
+          console.log('Account created! Logging in...');
+          shopifyAutoLogin(data.credentials.email, data.credentials.password);
+          return;
+        }
+        
+        alert(data.msg || 'Registration failed. Please try again.');
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+        
+      } catch (error) {
+        console.error('Error during registration:', error);
+        alert('Something went wrong. Please try again.');
+        submitButton.textContent = originalText;
+        submitButton.disabled = false;
+      }
+    });
+  }  
+
   const otpInputs = document.querySelectorAll('.otp-inputs input');
   otpInputs.forEach((input, index) => {
     input.addEventListener('input', e => {
