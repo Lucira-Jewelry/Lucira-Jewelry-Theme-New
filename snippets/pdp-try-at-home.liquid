@@ -102,7 +102,128 @@
 </section>
 
 <script>
+// Add this debug line at the very beginning
+console.log('[VTO] Script loaded');
 
+document.addEventListener('DOMContentLoaded', function () {
+  console.log('[VTO] DOM loaded');
+  
+  // Add a small delay to ensure all elements are ready
+  setTimeout(initializeVirtualTryOn, 100);
+});
+
+function initializeVirtualTryOn() {
+  console.log('[VTO] Initializing...');
+  
+  const wrapper = document.querySelector('.virtual-try-on-wrapper');
+  console.log('[VTO] Wrapper element:', wrapper);
+  
+  if (!wrapper) {
+    console.error('[VTO] ERROR: Wrapper not found!');
+    console.log('[VTO] Available .virtual-try-on-wrapper elements:', 
+                document.querySelectorAll('.virtual-try-on-wrapper').length);
+    return;
+  }
+  
+  const initialSku = wrapper.dataset.productSku;
+  console.log('[VTO] Initial SKU from data attribute:', initialSku);
+  console.log('[VTO] Wrapper display style:', wrapper.style.display);
+  
+  // Check if function exists immediately
+  console.log('[VTO] getSkusListWithTryOn exists?', 
+              typeof getSkusListWithTryOn === 'function');
+  
+  // Check current product variant
+  const variantSelect = document.querySelector('[name="id"]');
+  console.log('[VTO] Variant select element:', variantSelect);
+  if (variantSelect) {
+    console.log('[VTO] Current variant ID:', variantSelect.value);
+  }
+  
+  // Modified checkVirtualTryOn function with better error handling
+  function checkVirtualTryOn(sku) {
+    console.log('[VTO] checkVirtualTryOn called with SKU:', sku);
+    
+    if (!sku) {
+      console.warn('[VTO] No SKU provided');
+      wrapper.style.display = 'none';
+      return;
+    }
+    
+    if (typeof getSkusListWithTryOn !== 'function') {
+      console.warn('[VTO] Function not available yet, will retry...');
+      setTimeout(() => checkVirtualTryOn(sku), 500);
+      return;
+    }
+    
+    try {
+      getSkusListWithTryOn({ companyName: 'luciraonline' })
+        .then((allowedSkus) => {
+          console.log('[VTO] Received allowed SKUs:', allowedSkus);
+          console.log('[VTO] Type of allowedSkus:', typeof allowedSkus);
+          console.log('[VTO] Is array?', Array.isArray(allowedSkus));
+          
+          if (!Array.isArray(allowedSkus)) {
+            console.error('[VTO] ERROR: allowedSkus is not an array:', allowedSkus);
+            wrapper.style.display = 'none';
+            return;
+          }
+          
+          const normalizedSku = sku.toString().trim().toLowerCase();
+          const isAllowed = allowedSkus.some(skuItem => 
+            skuItem.toString().trim().toLowerCase() === normalizedSku
+          );
+          
+          console.log(`[VTO] SKU "${sku}" is allowed: ${isAllowed}`);
+          wrapper.style.display = isAllowed ? 'block' : 'none';
+        })
+        .catch((err) => {
+          console.error('[VTO] Error in promise:', err);
+          wrapper.style.display = 'none';
+        });
+    } catch (error) {
+      console.error('[VTO] Exception in checkVirtualTryOn:', error);
+      wrapper.style.display = 'none';
+    }
+  }
+  
+  // Initial check
+  checkVirtualTryOn(initialSku);
+  
+  // Listen to variant changes with better event handling
+  const productForm = document.querySelector('form[data-product-form]') || 
+                      document.querySelector('form.product-form');
+  console.log('[VTO] Product form found:', productForm);
+  
+  if (productForm) {
+    // Listen to input changes
+    productForm.addEventListener('change', (e) => {
+      console.log('[VTO] Form change detected:', e.target);
+      
+      // Try multiple ways to get the variant ID
+      const variantId = e.target.value || 
+                       e.target.closest('form')?.querySelector('[name="id"]')?.value ||
+                       document.querySelector('[name="id"]')?.value;
+      
+      console.log('[VTO] Variant changed to:', variantId);
+      
+      if (variantId) {
+        wrapper.dataset.productSku = variantId;
+        checkVirtualTryOn(variantId);
+      }
+    });
+    
+    // Also listen for custom variant change events (common in Shopify themes)
+    document.addEventListener('variant:change', (event) => {
+      console.log('[VTO] variant:change event:', event.detail);
+      if (event.detail && event.detail.variant) {
+        wrapper.dataset.productSku = event.detail.variant.sku || event.detail.variant.id;
+        checkVirtualTryOn(wrapper.dataset.productSku);
+      }
+    });
+  }
+}
+</script>
 document.addEventListener('DOMContentLoaded', function () {
   console.log('[VTO] DOM loaded');
 
