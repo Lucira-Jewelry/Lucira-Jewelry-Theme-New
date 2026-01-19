@@ -153,7 +153,7 @@
         }) || null
       );
     }
-    function buildColorButtonsFromCard(productCard, preSelectedColor, skipInitialRender) {
+   function buildColorButtonsFromCard(productCard, preSelectedColor, skipInitialRender) {
       if (!popupColors) return;
       popupColors.innerHTML = '';
       if (!sel.carat) return;
@@ -169,42 +169,65 @@
         const clone = srcBtn.cloneNode(true);
         clone.classList.remove('active');
         
-        // Check if this is the pre-selected color
         if (preSelectedColor && baseColor === preSelectedColor) {
           matchingBtn = clone;
         }
         
         clone.addEventListener('click', () => {
-         popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
+          popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
           clone.classList.add('active');
-          sel.color = baseColor;
-          sel.size = null; // Reset size when color changes
-          buildSizeButtons(currentProduct);
-          sel.variant = findVariant(currentProduct, sel);
+          
+          // 1. पुराने साइज को याद रखें
+          const currentSize = sel.size; 
+          sel.color = baseColor; 
+          
+          // 2. वेरिएंट ढूंढें (Image/Price दिखाने के लिए)
+          // अगर साइज नहीं है, तो findVariant 'null' साइज के साथ भी डिफॉल्ट वेरिएंट लौटा सकता है (जो ठीक है इमेज के लिए)
+          let potentialVariant = findVariant(currentProduct, sel);
+
+          // 3. चेक करें कि क्या पुराना साइज नए कलर में मौजूद है?
+          // अगर हमने साइज चुना था (currentSize), लेकिन नए कलर में वो वेरिएंट नहीं मिला (potentialVariant अलग साइज का है या null है)
+          // तो हमें साइज को null करना होगा ताकि यूजर गलत साइज न ऑर्डर कर दे।
+          if (currentSize) {
+             // दोबारा चेक करें कि क्या findVariant ने जो वेरिएंट दिया है, उसका साइज वही है जो हमें चाहिए था?
+             const variantSize = potentialVariant?.options?.[optionIndex.size];
+             
+             if (potentialVariant && variantSize === currentSize) {
+                 sel.variant = potentialVariant; // सब ठीक है, साइज वही है
+             } else {
+                 sel.size = null; // साइज उपलब्ध नहीं है, इसे हटा दें
+                 // इमेज दिखाने के लिए बिना साइज के दोबारा ढूंढें
+                 sel.variant = findVariant(currentProduct, { ...sel, size: null });
+             }
+          } else {
+             // अगर पहले से कोई साइज नहीं था, तो बस इमेज के लिए वेरिएंट सेट करें
+             sel.variant = potentialVariant;
+          }
+
+          buildSizeButtons(currentProduct); 
           renderPrices(sel.variant);
           renderImage(sel.variant, currentProduct);
           saveVariantToLS(sel.variant);
-          // Don't enable proceed button - only size selection should do that
-          setProceedUI(false);
+          
+          // --- MAIN FIX IS HERE ---
+          // Proceed तभी Enable करें जब Variant हो और विशेष रूप से SIZE भी चुना गया हो
+          setProceedUI(!!(sel.size && sel.variant && sel.variant.id));
         });
         popupColors.appendChild(clone);
       });
       
-      // Activate the pre-selected color or fall back to first
       const toActivate = matchingBtn || popupColors.querySelector('.color-option');
       if (toActivate) {
         toActivate.classList.add('active');
         sel.color = toActivate.dataset.color || toActivate.title || toActivate.textContent.trim();
         sel.variant = findVariant(currentProduct, sel);
         
-        // Only render if not skipping (i.e., if we didn't already set the image/price from card)
         if (!skipInitialRender) {
           renderPrices(sel.variant);
           renderImage(sel.variant, currentProduct);
         }
       }
     }
-
     function buildSizeButtons(product) {
       if (!popupSizes) return;
       popupSizes.innerHTML = '';
@@ -228,16 +251,25 @@
       Array.from(sizeSet).forEach((size) => {
         const sizeBtn = document.createElement('button');
         sizeBtn.className = 'size-btn';
+        
+        // Active class logic
+        if (sel.size && sel.size === size) {
+            sizeBtn.classList.add('active');
+        }
+
         sizeBtn.innerHTML = `<span class="size-subtext">princess</span><span class="size-number">${size}</span>`;
         sizeBtn.addEventListener('click', () => {
           popupSizes.querySelectorAll('.size-btn').forEach((b) => b.classList.remove('active'));
           sizeBtn.classList.add('active');
-          sel.size = size;
+          sel.size = size; // साइज सेट हुआ
           sel.variant = findVariant(product, sel);
           renderPrices(sel.variant);
           renderImage(sel.variant, product);
           saveVariantToLS(sel.variant);
-          setProceedUI(!!(sel.variant && sel.variant.id)); // triggers mobile hide when true
+          
+          // --- MAIN FIX ---
+          // यहाँ भी sel.size का होना जरूरी है
+          setProceedUI(!!(sel.size && sel.variant && sel.variant.id)); 
         });
         popupSizes.appendChild(sizeBtn);
       });
