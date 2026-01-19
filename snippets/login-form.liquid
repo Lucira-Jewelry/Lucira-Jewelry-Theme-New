@@ -37,11 +37,11 @@
       </div>
 
       <div class="signupSection" style="display:none">
-        {%- form 'create_customer', novalidate: 'novalidate' -%}
+        <div class="registration-form-inputs">
           <label>First Name</label>
           <input
             type="text"
-            name="customer[first_name]"
+            id="regFirstName" 
             placeholder="First Name"
             class="field-input"
             required
@@ -49,7 +49,7 @@
           <label>Last Name</label>
           <input
             type="text"
-            name="customer[last_name]"
+            id="regLastName"
             placeholder="Last Name"
             class="field-input"
             required
@@ -57,7 +57,7 @@
           <label>Email Address</label>
           <input
             type="email"
-            name="customer[email]"
+            id="regEmail"
             placeholder="Email"
             class="field-input"
             required
@@ -67,19 +67,19 @@
             <span class="country-code">+91</span>
             <input
               type="tel"
-              name="customer[phone]"
               id="signupMobile"
               placeholder="Enter Phone Number"
-              maxlength="10"
-              required
+              readonly
             >
           </div>
-          <button class="btn-primary">CREATE ACCOUNT</button>
+          
+          <button type="button" id="completeRegistration" class="btn-primary">CREATE ACCOUNT</button>
+          
           <p class="switch-link">
             Already a member?
             <a href="javascript:void(0)" onclick="switchToLogin()">LOGIN</a>
           </p>
-        {%- endform -%}
+        </div>
       </div>
     </form>
   </div>
@@ -197,6 +197,72 @@
         alert('Something went wrong. Please try again.');
         verifyButton.textContent = originalText;
         verifyButton.disabled = false;
+      }
+    });
+  }
+
+  /* --- NEW: HANDLE REGISTRATION SUBMISSION --- */
+  const regBtn = document.getElementById('completeRegistration');
+  if (regBtn) {
+    regBtn.addEventListener('click', async () => {
+      
+      // 1. Gather Data
+      const firstName = document.getElementById('regFirstName').value.trim();
+      const lastName = document.getElementById('regLastName').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const mobile = document.getElementById('signupMobile').value.trim();
+      
+      // We need the OTP again to pass security check in backend
+      const otp = [...document.querySelectorAll('.otp-inputs input')]
+        .map(i => i.value)
+        .join('');
+
+      // Simple Validation
+      if (!firstName || !lastName || !email) {
+        alert('Please fill in all fields.');
+        return;
+      }
+
+      // UI Feedback
+      const originalText = regBtn.textContent;
+      regBtn.textContent = 'Creating Account...';
+      regBtn.disabled = true;
+
+      try {
+        // 2. Send to PHP Backend (Same URL as Verification)
+        const res = await fetch(
+          'https://otp-verification-385594025448.asia-south1.run.app', 
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mobile: mobile,
+              otp: otp,
+              email: email,
+              first_name: firstName,
+              last_name: lastName
+            })
+          }
+        );
+
+        const data = await res.json();
+        console.log('Registration Response:', data);
+
+        // 3. Handle Success -> Auto Login
+        if (data.type === 'success' && data.credentials) {
+           // Optional: Track 'Complete Registration' event here for Analytics
+           shopifyAutoLogin(data.credentials.email, data.credentials.password);
+        } else {
+           alert(data.msg || 'Registration failed. Please try again.');
+           regBtn.textContent = originalText;
+           regBtn.disabled = false;
+        }
+
+      } catch (error) {
+        console.error('Registration Error:', error);
+        alert('Something went wrong. Please check your connection.');
+        regBtn.textContent = originalText;
+        regBtn.disabled = false;
       }
     });
   }
