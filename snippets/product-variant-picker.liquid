@@ -1,4 +1,4 @@
-{% comment %}
+{% comment %} {% comment %}
   Renders product variant-picker
 
   Accepts:
@@ -143,4 +143,155 @@ document.addEventListener('DOMContentLoaded', function () {
     attributeFilter: ['value'] 
   });
 });
+</script> {% endcomment %}
+
+
+
+{% comment %}
+  OPTIMIZED: Renders product variant-picker for high-variant products (90+ variants)
+  Removes inline product.variants | json which loads all variants
+  
+  Accepts:
+  - product: {Object} product object.
+  - block: {Object} passing the block information.
+  - product_form_id: {String} Id of the product form to which the variant picker is associated.
+  
+  Usage:
+  {% render 'product-variant-picker', product: product, block: block, product_form_id: product_form_id %}
+{% endcomment %}
+
+{% assign variant_parts = product.selected_or_first_available_variant.title |
+  split: '/' %}
+<div class="size-and-customization-section"  id="variant-selects-{{ section.id }}" data-section="{{ section.id }}">
+  {%- unless product.has_only_default_variant -%}
+    <variant-selects
+      id="variant-selects-{{ section.id }}"
+      data-section="{{ section.id }}"
+      {{ block.shopify_attributes }}
+    >
+      <div class="size-and-customization-title-wrapper">
+        <div class="size_customization_title">
+          <h4 class="customization_title">
+            SIZE & CUSTOMIZATION
+          </h4>
+        </div>
+
+        {% assign show_size_guide = false %}
+
+        {% for c in product.collections %}
+          {% if c.handle == 'all-rings' %}
+            {% assign show_size_guide = true %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        {% if show_size_guide %}
+          <span
+            id="size_drawer"
+            class="size-guide-button"
+            onclick="
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                event: 'promoClick',
+                promoClick: {
+                  promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+                  promo_name: '{{ product.title }}',
+                  creative_name: 'Size Guide Clicked'
+                }
+              });
+            "
+          >
+            Size Guide
+          </span>
+        {% endif %}
+
+      </div>
+      <div class="size-and-customization-wrapper">
+        <div class="customization-wrapper">
+            <div class="customization-item">
+              {% assign metal = variant_parts[0] | downcase %}
+              <div id="customization-metal-color-circle" style="display: inline-block; vertical-align: middle;">
+                {% if metal contains 'yellow' %}
+                  {{- 'yellow-color.svg' | inline_asset_content -}}
+                {% elsif metal contains 'rose' %}
+                  {{- 'rose-color.svg' | inline_asset_content -}}
+                {% else %}
+                  {{- 'silver-color.svg' | inline_asset_content -}}
+                {% endif %}
+              </div>
+    
+              {% assign image_url = '' %} 
+              
+              {% assign bg_color = '' %}
+    
+              {% if variant_parts contains 'Yellow Gold' %}
+                {% assign bg_color = '' %}
+                {{- 'yellow-color.svg' | inline_asset_content -}}
+              {% elsif variant_parts contains 'Rose Gold' %}
+                {% assign bg_color = '' %}
+                {{- 'rose-color.svg' | inline_asset_content -}}
+              {% elsif variant_parts contains 'White Gold' %}
+                {% assign bg_color = '#f8f8f8' %}
+                {{- 'silver-color.svg' | inline_asset_content -}}
+              {% endif %}
+    
+              <div class="customization-item-div" id="customization-metal-color">
+                {{ variant_parts[0] }}
+              </div>
+            </div>
+            {% if variant_parts[1] %}
+            <div class="customization-item">
+              <div class="label">Size :</div>
+              <div class="customization-item-div size-customization-item">
+                <span id="customization-size">{{ variant_parts[1] }}</span> {% unless product.tags contains 'Bracelets' %}IND{% endunless %}
+              </div>
+            </div>
+            {% endif %}
+          </div>
+          <span class="customize-button" id="product_variant_drawer">CUSTOMIZE</span>
+      </div>
+    </variant-selects>
+  {%- endunless -%}
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    window.dataLayer = window.dataLayer || [];
+
+    const drawer = document.getElementById('variant-drawer');
+    if (!drawer) return;
+
+    let lastFiredVariantId = null;
+
+    const idInput = document.querySelector('form[action*="/cart/add"] input[name="id"]');
+    if (!idInput) return;
+
+    const observer = new MutationObserver(function() {
+      const variantId = Number(idInput.value);
+      
+      // OPTIMIZED: Don't iterate all variants, just check if ID changed
+      if (variantId === lastFiredVariantId) return;
+      
+      lastFiredVariantId = variantId;
+
+      // Get variant info from the ID only (Shopify provides this via form data)
+      const selectedVariantTitle = document.querySelector('span[data-selected-value]')?.textContent || '';
+      const selectedColor = selectedVariantTitle.split('/')[0] || '';
+      const selectedSize = selectedVariantTitle.split('/')[1] || '';
+
+      window.dataLayer.push({
+        event: "pdp_customize",
+        pageType: {
+          shopify_product_id: {{ product.id }},
+          shopify_variant_id: variantId,
+          shopify_sku: document.querySelector('form[action*="/cart/add"] input[name="id"]')?.value || ''
+        }
+      });
+    });
+
+    observer.observe(idInput, { 
+      attributes: true, 
+      attributeFilter: ['value'] 
+    });
+  });
 </script>
