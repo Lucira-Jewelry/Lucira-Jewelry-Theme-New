@@ -3,56 +3,60 @@
     <button class="close-button" onclick="closeloginPopup('login-popup')">
       {{- 'icon-login-close.svg' | inline_asset_content -}}
     </button>
+
     <div id="otp-login-form" class="otp-form-wrapper">
+
       <h2>WELCOME TO LUCIRA</h2>
-      <p>Welcome To The Jewelry World Of Lucira! Find Exclusive Designs At Unbelievable Prices.</p>
+      <p>Welcome To The Jewelry World Of Lucira!</p>
+
+      <!-- MOBILE -->
       <div class="otp-number-wrapper">
         <label>Phone Number</label>
         <div class="mobile-wrap">
           <span class="country-code">+91</span>
-          <input
-            type="tel"
-            id="loginMobile"
-            placeholder="Enter Phone Number"
-            maxlength="10"
-            required
-          >
+          <input id="loginMobile" maxlength="10" required>
         </div>
       </div>
-      <button type="button" id="sendOtp" class="btn-primary">REQUEST OTP</button>
 
+      <button type="button" id="sendOtp" class="btn-primary">
+        REQUEST OTP
+      </button>
+
+      <!-- OTP -->
       <div id="otpSection" style="display:none">
         <label>Enter OTP</label>
-
         <div class="otp-inputs">
-          <input maxlength="1" inputmode="numeric">
-          <input maxlength="1" inputmode="numeric">
-          <input maxlength="1" inputmode="numeric">
-          <input maxlength="1" inputmode="numeric">
+          <input maxlength="1">
+          <input maxlength="1">
+          <input maxlength="1">
+          <input maxlength="1">
         </div>
 
-        <button type="button" id="verifyOtp" class="btn-primary">VERIFY OTP</button>
+        <button type="button" id="verifyOtp" class="btn-primary">
+          VERIFY OTP
+        </button>
 
         <p id="otp-timer">Resend OTP in 02:00</p>
       </div>
 
+      <!-- REGISTER -->
       <div class="signupSection" style="display:none">
 
-          <label>First Name</label>
-          <input name="customer[first_name]" required>
+        <label>First Name</label>
+        <input id="regFirst" required>
 
-          <label>Last Name</label>
-          <input name="customer[last_name]" required>
+        <label>Last Name</label>
+        <input id="regLast" required>
 
-          <label>Email</label>
-          <input type="email" name="customer[email]" required>
+        <label>Email</label>
+        <input id="regEmail" type="email" required>
 
-          <label>Phone</label>
-          <input name="customer[phone]" id="signupMobile" readonly required>
+        <label>Phone</label>
+        <input id="signupMobile" readonly required>
 
-          <button type="button" id="registerBtn" class="btn-primary">
-            CREATE ACCOUNT
-          </button>
+        <button type="button" id="registerBtn" class="btn-primary">
+          CREATE ACCOUNT
+        </button>
 
       </div>
 
@@ -60,231 +64,113 @@
   </div>
 </div>
 
+<!-- AUTO LOGIN FORM -->
 <form id="shopify-auto-login-form" action="/account/login" method="post" style="display:none;">
-  <input type="hidden" name="form_type" value="customer_login">
-  <input type="hidden" name="utf8" value="✓">
-  <input type="email" name="customer[email]" id="ShopifyEmail">
-  <input type="password" name="customer[password]" id="ShopifyPassword">
+  <input name="form_type" value="customer_login">
+  <input name="utf8" value="✓">
+  <input name="customer[email]" id="ShopifyEmail">
+  <input name="customer[password]" id="ShopifyPassword">
 </form>
 
 <script>
-  function openloginPopup(id) {
-    document.getElementById(id).style.display = 'flex';
-  }
-  function closeloginPopup(e, id) {
-    if (typeof id === 'undefined') id = e;
-    document.getElementById(id).style.display = 'none';
-  }
-  document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
-    el.addEventListener('click', (e) => e.stopPropagation());
-  });
-  function switchToSignup() {
-    closeloginPopup('login-popup');
-    openloginPopup('signup-popup');
-  }
-  function switchToLogin() {
-    closeloginPopup('signup-popup');
-    openloginPopup('login-popup');
-  }
+function closeloginPopup(id){
+  document.getElementById(id).style.display="none";
+}
 
-  const sendBtn = document.getElementById('sendOtp');
-  if (sendBtn) {
-    sendBtn.addEventListener('click', async () => {
-      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
+const API = "https://otp-verification-385594025448.asia-south1.run.app";
 
-      const res = await fetch(
-        'https://login-otp-385594025448.asia-south1.run.app',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ mobile })
-        }
-      );
+/* SEND OTP */
+sendOtp.onclick = async () => {
+  const mobile = loginMobile.value.trim();
 
-      const data = await res.json();
-
-      if (data.type === 'success') {
-        document.querySelector('.otp-number-wrapper').style.display = 'none';
-        document.getElementById('sendOtp').style.display = 'none';
-        document.getElementById('otpSection').style.display = 'block';
-        startTimer();
-        alert('OTP Sent');
-      } else {
-        alert(data.message || 'Failed');
-      }
-    });
-  }
-
-  const verifyBtn = document.getElementById('verifyOtp');
-  if (verifyBtn) {
-    verifyBtn.addEventListener('click', async () => {
-      const otp = [...document.querySelectorAll('.otp-inputs input')]
-        .map(i => i.value)
-        .join('');
-      const mobile = document.getElementById('loginMobile')
-        .value.replace(/\s+/g,'').trim();
-      
-      if (otp.length !== 4) {
-        alert('Enter valid OTP');
-        return;
-      }
-
-      const verifyButton = document.getElementById('verifyOtp');
-      const originalText = verifyButton.textContent;
-      verifyButton.textContent = 'Verifying...';
-      verifyButton.disabled = true;
-
-      try {
-        const res = await fetch(
-          'https://otp-verification-385594025448.asia-south1.run.app',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ otp, mobile })
-          }
-        );
-
-        const data = await res.json();
-        console.log('OTP Verification Response:', data);
-
-        if (data.type === 'success' && data.credentials) {
-          console.log('Logging in automatically...');
-          shopifyAutoLogin(data.credentials.email, data.credentials.password);
-          return;
-        }
-
-        if (data.type === 'register') {
-          document.getElementById('otpSection').style.display = 'none';
-          document.querySelector('.signupSection').style.display = 'block';
-          document.getElementById('signupMobile').value = mobile;
-          document.getElementById('signupMobile').readOnly = true;
-          verifyButton.textContent = originalText;
-          verifyButton.disabled = false;
-          return;
-        }
-
-        alert(data.msg || 'Invalid OTP');
-        verifyButton.textContent = originalText;
-        verifyButton.disabled = false;
-
-      } catch (error) {
-        console.error('Error during verification:', error);
-        alert('Something went wrong. Please try again.');
-        verifyButton.textContent = originalText;
-        verifyButton.disabled = false;
-      }
-    });
-  }
-
-  const otpInputs = document.querySelectorAll('.otp-inputs input');
-  otpInputs.forEach((input, index) => {
-    input.addEventListener('input', e => {
-      const value = e.target.value.replace(/\D/g, '');
-      e.target.value = value;
-
-      if (value && index < otpInputs.length - 1) {
-        otpInputs[index + 1].focus();
-      }
-    });
-
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Backspace' && !e.target.value && index > 0) {
-        otpInputs[index - 1].focus();
-      }
-    });
+  const res = await fetch(API.replace("otp-verification","login-otp"),{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({mobile})
   });
 
-  otpInputs[0].addEventListener('paste', e => {
-    e.preventDefault();
-    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0,4);
-    paste.split('').forEach((num, i) => {
-      if (otpInputs[i]) otpInputs[i].value = num;
-    });
-    otpInputs[paste.length - 1]?.focus();
-  });
+  const data = await res.json();
 
-  let timer = 120;
-  let timerInterval;
-  function startTimer() {
-    timer = 120;
-    clearInterval(timerInterval);
-
-    timerInterval = setInterval(() => {
-      let min = Math.floor(timer / 60);
-      let sec = timer % 60;
-
-      document.getElementById('otp-timer').innerText =
-        `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
-
-      if (timer <= 0) {
-        clearInterval(timerInterval);
-        document.getElementById('otp-timer').innerHTML =
-          `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
-      }
-
-      timer--;
-    }, 1000);
-  }
-
-  async function resendOtp() {
-    const mobile = document.getElementById('loginMobile').value.trim();
-
-    await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mobile })
-    });
-
-    document.getElementById('otp-timer').innerText = "Resend OTP in 02:00";
+  if(data.type==="success"){
+    document.querySelector(".otp-number-wrapper").style.display="none";
+    sendOtp.style.display="none";
+    otpSection.style.display="block";
     startTimer();
   }
+};
 
-  function shopifyAutoLogin(email, password) {
-    console.log('Auto-login triggered for:', email);
-    document.getElementById("ShopifyEmail").value = email;
-    document.getElementById("ShopifyPassword").value = password;
-    document.getElementById("shopify-auto-login-form").submit();
-  }
-</script>
+/* VERIFY OTP */
+verifyOtp.onclick = async () => {
 
-<script>
-  document.getElementById("registerBtn").addEventListener("click", async () => {
+  const otp = [...document.querySelectorAll(".otp-inputs input")]
+              .map(i=>i.value).join("");
 
-    const first_name = document.querySelector('[name="customer[first_name]"]').value.trim();
-    const last_name  = document.querySelector('[name="customer[last_name]"]').value.trim();
-    const email      = document.querySelector('[name="customer[email]"]').value.trim();
-    const mobile     = document.getElementById("signupMobile").value.trim();
+  const mobile = loginMobile.value.trim();
 
-    if(!first_name || !last_name || !email){
-      alert("All fields required");
-      return;
-    }
-
-    const res = await fetch(
-      "https://otp-verification-385594025448.asia-south1.run.app",
-      {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({
-          first_name,
-          last_name,
-          email,
-          mobile
-        })
-      }
-    );
-
-    const data = await res.json();
-    console.log("Register API:", data);
-
-    if(data.type === "success"){
-      shopifyAutoLogin(data.credentials.email, data.credentials.password);
-    } else {
-      alert(data.msg || "Registration failed");
-    }
-
+  const res = await fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({otp,mobile})
   });
+
+  const data = await res.json();
+
+  if(data.type==="success"){
+    shopifyAutoLogin(data.credentials.email,data.credentials.password);
+  }
+
+  if(data.type==="register"){
+    otpSection.style.display="none";
+    document.querySelector(".signupSection").style.display="block";
+    signupMobile.value = mobile;
+  }
+};
+
+/* REGISTER */
+registerBtn.onclick = async () => {
+
+  const payload = {
+    first_name: regFirst.value.trim(),
+    last_name : regLast.value.trim(),
+    email     : regEmail.value.trim(),
+    mobile    : signupMobile.value.trim()
+  };
+
+  const res = await fetch(API,{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if(data.type==="success"){
+    shopifyAutoLogin(data.credentials.email,data.credentials.password);
+  }else{
+    alert(data.msg);
+  }
+};
+
+/* AUTO LOGIN */
+function shopifyAutoLogin(email,password){
+  ShopifyEmail.value=email;
+  ShopifyPassword.value=password;
+  document.getElementById("shopify-auto-login-form").submit();
+}
+
+/* TIMER */
+let timer=30;
+function startTimer(){
+  const i=setInterval(()=>{
+    let m=Math.floor(timer/60);
+    let s=timer%60;
+    otp-timer.innerText=`Resend OTP in ${m}:${s<10?'0'+s:s}`;
+    timer--;
+    if(timer<0) clearInterval(i);
+  },1000);
+}
 </script>
+
 
 
 <style>
