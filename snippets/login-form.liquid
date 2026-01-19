@@ -3,50 +3,85 @@
     <button class="close-button" onclick="closeloginPopup('login-popup')">
       {{- 'icon-login-close.svg' | inline_asset_content -}}
     </button>
-    <div id="otp-login-form" class="otp-form-wrapper">
+    <form id="otp-login-form" class="otp-form-wrapper">
       <h2>WELCOME TO LUCIRA</h2>
       <p>Welcome To The Jewelry World Of Lucira! Find Exclusive Designs At Unbelievable Prices.</p>
-      
-      <div id="step-mobile">
-          <div class="otp-number-wrapper">
-            <label>Phone Number</label>
-            <div class="mobile-wrap">
-              <span class="country-code">+91</span>
-              <input type="tel" id="loginMobile" placeholder="Enter Phone Number" maxlength="10">
-            </div>
-          </div>
-          <button type="button" id="sendOtp" class="btn-primary">REQUEST OTP</button>
-      </div>
-
-      <div id="step-otp" style="display:none">
-        <label>Enter OTP</label>
-        <div class="otp-inputs">
-          <input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric"><input maxlength="1" inputmode="numeric">
+      <div class="otp-number-wrapper">
+        <label>Phone Number</label>
+        <div class="mobile-wrap">
+          <span class="country-code">+91</span>
+          <input
+            type="tel"
+            id="loginMobile"
+            placeholder="Enter Phone Number"
+            maxlength="10"
+            required
+          >
         </div>
+      </div>
+      <button type="button" id="sendOtp" class="btn-primary">REQUEST OTP</button>
+
+      <div id="otpSection" style="display:none">
+        <label>Enter OTP</label>
+
+        <div class="otp-inputs">
+          <input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric">
+          <input maxlength="1" inputmode="numeric">
+        </div>
+
         <button type="button" id="verifyOtp" class="btn-primary">VERIFY OTP</button>
+
         <p id="otp-timer">Resend OTP in 02:00</p>
       </div>
 
-      <div id="step-register" class="signupSection" style="display:none">
+      <div class="signupSection" style="display:none">
+        {%- form 'create_customer', novalidate: 'novalidate' -%}
           <label>First Name</label>
-          <input type="text" id="regFirstName" class="field-input" placeholder="First Name">
-          
+          <input
+            type="text"
+            name="customer[first_name]"
+            placeholder="First Name"
+            class="field-input"
+            required
+          >
           <label>Last Name</label>
-          <input type="text" id="regLastName" class="field-input" placeholder="Last Name">
-          
+          <input
+            type="text"
+            name="customer[last_name]"
+            placeholder="Last Name"
+            class="field-input"
+            required
+          >
           <label>Email Address</label>
-          <input type="email" id="regEmail" class="field-input" placeholder="Email">
-          
+          <input
+            type="email"
+            name="customer[email]"
+            placeholder="Email"
+            class="field-input"
+            required
+          >
           <label>Phone Number</label>
           <div class="mobile-wrap">
             <span class="country-code">+91</span>
-            <input type="tel" id="regMobile" readonly style="background:#f0f0f0;">
+            <input
+              type="tel"
+              name="customer[phone]"
+              id="signupMobile"
+              placeholder="Enter Phone Number"
+              maxlength="10"
+              required
+            >
           </div>
-          
-          <button type="button" id="btnCompleteRegister" class="btn-primary">CREATE ACCOUNT</button>
+          <button class="btn-primary">CREATE ACCOUNT</button>
+          <p class="switch-link">
+            Already a member?
+            <a href="javascript:void(0)" onclick="switchToLogin()">LOGIN</a>
+          </p>
+        {%- endform -%}
       </div>
-      
-    </div>
+    </form>
   </div>
 </div>
 
@@ -58,127 +93,183 @@
 </form>
 
 <script>
-  // --- CONFIG ---
-  const API_URL = 'https://login-otp-385594025448.asia-south1.run.app'; // Your PHP URL
-  
-  // --- HELPERS ---
-  function openloginPopup(id) { document.getElementById(id).style.display = 'flex'; }
-  function closeloginPopup(id) { document.getElementById(id).style.display = 'none'; }
-  document.querySelector('.otp-login-form-wrapper').addEventListener('click', e => e.stopPropagation());
+  function openloginPopup(id) {
+    document.getElementById(id).style.display = 'flex';
+  }
+  function closeloginPopup(e, id) {
+    if (typeof id === 'undefined') id = e;
+    document.getElementById(id).style.display = 'none';
+  }
+  document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
+    el.addEventListener('click', (e) => e.stopPropagation());
+  });
+  function switchToSignup() {
+    closeloginPopup('login-popup');
+    openloginPopup('signup-popup');
+  }
+  function switchToLogin() {
+    closeloginPopup('signup-popup');
+    openloginPopup('login-popup');
+  }
 
-  // --- 1. SEND OTP ---
-  document.getElementById('sendOtp').addEventListener('click', async () => {
+  const sendBtn = document.getElementById('sendOtp');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', async () => {
+      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
+
+      const res = await fetch(
+        'https://login-otp-385594025448.asia-south1.run.app',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile })
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.type === 'success') {
+        document.querySelector('.otp-number-wrapper').style.display = 'none';
+        document.getElementById('sendOtp').style.display = 'none';
+        document.getElementById('otpSection').style.display = 'block';
+        startTimer();
+        alert('OTP Sent');
+      } else {
+        alert(data.message || 'Failed');
+      }
+    });
+  }
+
+  const verifyBtn = document.getElementById('verifyOtp');
+  if (verifyBtn) {
+    verifyBtn.addEventListener('click', async () => {
+      const otp = [...document.querySelectorAll('.otp-inputs input')]
+        .map(i => i.value)
+        .join('');
+      const mobile = document.getElementById('loginMobile')
+        .value.replace(/\s+/g,'').trim();
+      
+      if (otp.length !== 4) {
+        alert('Enter valid OTP');
+        return;
+      }
+
+      const verifyButton = document.getElementById('verifyOtp');
+      const originalText = verifyButton.textContent;
+      verifyButton.textContent = 'Verifying...';
+      verifyButton.disabled = true;
+
+      try {
+        const res = await fetch(
+          'https://otp-verification-385594025448.asia-south1.run.app',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, mobile })
+          }
+        );
+
+        const data = await res.json();
+        console.log('OTP Verification Response:', data);
+
+        if (data.type === 'success' && data.credentials) {
+          console.log('Logging in automatically...');
+          shopifyAutoLogin(data.credentials.email, data.credentials.password);
+          return;
+        }
+
+        if (data.type === 'register') {
+          document.getElementById('otpSection').style.display = 'none';
+          document.querySelector('.signupSection').style.display = 'block';
+          document.getElementById('signupMobile').value = mobile;
+          document.getElementById('signupMobile').readOnly = true;
+          verifyButton.textContent = originalText;
+          verifyButton.disabled = false;
+          return;
+        }
+
+        alert(data.msg || 'Invalid OTP');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
+
+      } catch (error) {
+        console.error('Error during verification:', error);
+        alert('Something went wrong. Please try again.');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
+      }
+    });
+  }
+
+  const otpInputs = document.querySelectorAll('.otp-inputs input');
+  otpInputs.forEach((input, index) => {
+    input.addEventListener('input', e => {
+      const value = e.target.value.replace(/\D/g, '');
+      e.target.value = value;
+
+      if (value && index < otpInputs.length - 1) {
+        otpInputs[index + 1].focus();
+      }
+    });
+
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Backspace' && !e.target.value && index > 0) {
+        otpInputs[index - 1].focus();
+      }
+    });
+  });
+
+  otpInputs[0].addEventListener('paste', e => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0,4);
+    paste.split('').forEach((num, i) => {
+      if (otpInputs[i]) otpInputs[i].value = num;
+    });
+    otpInputs[paste.length - 1]?.focus();
+  });
+
+  let timer = 120;
+  let timerInterval;
+  function startTimer() {
+    timer = 120;
+    clearInterval(timerInterval);
+
+    timerInterval = setInterval(() => {
+      let min = Math.floor(timer / 60);
+      let sec = timer % 60;
+
+      document.getElementById('otp-timer').innerText =
+        `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
+
+      if (timer <= 0) {
+        clearInterval(timerInterval);
+        document.getElementById('otp-timer').innerHTML =
+          `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
+      }
+
+      timer--;
+    }, 1000);
+  }
+
+  async function resendOtp() {
     const mobile = document.getElementById('loginMobile').value.trim();
-    if(mobile.length < 10) return alert("Please enter valid number");
 
-    try {
-        const res = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: mobile })
-        });
-        const data = await res.json();
-        
-        if (data.type === 'success') {
-            document.getElementById('step-mobile').style.display = 'none';
-            document.getElementById('step-otp').style.display = 'block';
-            startTimer();
-        } else {
-            alert(data.msg || "Error sending OTP");
-        }
-    } catch(e) { console.error(e); }
-  });
+    await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mobile })
+    });
 
-  // --- 2. VERIFY OTP ---
-  document.getElementById('verifyOtp').addEventListener('click', async () => {
-    const otp = [...document.querySelectorAll('.otp-inputs input')].map(i => i.value).join('');
-    const mobile = document.getElementById('loginMobile').value.trim();
-    
-    if(otp.length !== 4) return alert("Enter valid OTP");
-    
-    document.getElementById('verifyOtp').innerText = "Verifying...";
+    document.getElementById('otp-timer').innerText = "Resend OTP in 02:00";
+    startTimer();
+  }
 
-    try {
-        const res = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: mobile, otp: otp, action: 'verify_otp' })
-        });
-        const data = await res.json();
-        document.getElementById('verifyOtp').innerText = "VERIFY OTP";
-
-        if (data.type === 'success') {
-            // LOGIN SUCCESS
-            shopifyAutoLogin(data.credentials.email, data.credentials.password);
-        } 
-        else if (data.type === 'register') {
-            // USER NEEDS TO REGISTER
-            document.getElementById('step-otp').style.display = 'none';
-            document.getElementById('step-register').style.display = 'block';
-            document.getElementById('regMobile').value = mobile; // Pre-fill mobile
-        } 
-        else {
-            alert(data.msg || "Invalid OTP");
-        }
-    } catch(e) { console.error(e); }
-  });
-
-  // --- 3. COMPLETE REGISTRATION ---
-  document.getElementById('btnCompleteRegister').addEventListener('click', async () => {
-    const firstName = document.getElementById('regFirstName').value;
-    const lastName = document.getElementById('regLastName').value;
-    const email = document.getElementById('regEmail').value;
-    const mobile = document.getElementById('regMobile').value;
-
-    if(!firstName || !email) return alert("Please fill all fields");
-
-    const btn = document.getElementById('btnCompleteRegister');
-    btn.innerText = "Creating Account...";
-
-    try {
-        const res = await fetch(API_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                action: 'register_customer',
-                first_name: firstName,
-                last_name: lastName,
-                email: email,
-                mobile: mobile
-            })
-        });
-        const data = await res.json();
-
-        if (data.type === 'success') {
-            shopifyAutoLogin(data.credentials.email, data.credentials.password);
-        } else {
-            alert(data.msg || "Registration Failed");
-            btn.innerText = "CREATE ACCOUNT";
-        }
-    } catch(e) { console.error(e); }
-  });
-
-  // --- UTILS (Timer, Input logic, AutoLogin) ---
   function shopifyAutoLogin(email, password) {
+    console.log('Auto-login triggered for:', email);
     document.getElementById("ShopifyEmail").value = email;
     document.getElementById("ShopifyPassword").value = password;
     document.getElementById("shopify-auto-login-form").submit();
   }
-
-  // (Include your existing Input handling and Timer logic here...)
-  let timer = 120;
-  function startTimer() { /* ... your existing timer code ... */ }
-  
-  // Input auto-focus logic
-  const inputs = document.querySelectorAll('.otp-inputs input');
-  inputs.forEach((input, i) => {
-    input.addEventListener('input', e => {
-        if(e.target.value) inputs[i+1]?.focus();
-    });
-    input.addEventListener('keydown', e => {
-        if(e.key === 'Backspace' && !e.target.value) inputs[i-1]?.focus();
-    });
-  });
 </script>
 
 <style>
