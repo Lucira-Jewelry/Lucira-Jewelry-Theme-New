@@ -901,3 +901,22 @@ function checkSkuLocation(tryonSkusJson, psku) {
     console.error('Error fetching JSON data:', error);
   }
 }
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof getSkusListWithTryOn !== 'function') return;
+
+    const allowedSkus = getSkusListWithTryOn(); // array of SKUs
+    const wrapper = document.querySelector('.virtual-try-on-wrapper');
+    console.log("allowedSkus===", allowedSkus);
+    console.log("wrapper==", wrapper);
+
+    if (!wrapper || !Array.isArray(allowedSkus)) return;
+
+    const productSku = wrapper.dataset.productSku;
+
+    if (allowedSkus.includes(productSku)) {
+      wrapper.style.display = 'block';
+    }
+  });
+</script>
