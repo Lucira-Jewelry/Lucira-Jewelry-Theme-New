@@ -1,0 +1,72 @@
+{% assign is_product_available = product.available %}
+{% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
+
+<script>
+    var productSKUTryOn = '{{ sku_tryon_pdp }}';
+
+  function onTryOnBuynowclick(skuReceived){
+    console.log("buynow clicked");
+     if (skuReceived === productSKUTryOn){
+        //buynow clicked for first product
+        document.querySelector('.button button--secondary main-product_atc-btn').click();   
+      }else{
+        //go to pdp
+          getProductUrlFromSearch(skuReceived).then(handle => {
+            if (!handle) return;
+            const url = `${window.location.origin}/products/${handle}`;
+            window.location.href = url;
+          });
+      }
+  }
+
+  async function getProductUrlFromSearch(sku) {
+      const res = await fetch(
+        `/search?type=product&q=${encodeURIComponent(sku)}&options[prefix]=last`
+      );
+
+      const html = await res.text();
+
+      // 1. Parse HTML
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      // 2. Find script containing `var meta`
+      const scripts = Array.from(doc.querySelectorAll("script"));
+      const metaScript = scripts.find(s => s.textContent.includes("var meta"));
+
+      if (!metaScript) return null;
+      
+      // 3. Extract object text
+      const match = metaScript.textContent.match(
+        /var\s+meta\s*=\s*({[\s\S]*?});/
+      );
+
+      if (!match) return null;
+
+      // 4. Parse JSON
+      const meta = JSON.parse(match[1]);
+
+      // 5. Extract first product handle
+      return meta?.products?.[0]?.handle || null;
+}
+</script>
+
+
+<script onload="loadTryOnButton({
+    psku:'{{ sku_tryon_pdp }}',
+    page:'product',
+    regionId:'2',
+    company:'luciraonline',
+    prependButton:{class:'product__media-list contains-media grid grid--peek list-unstyled'},
+    MBprependButton:{class:'product__media-list contains-media grid grid--peek list-unstyled'},
+    styles:{
+    tryonbutton:{backgroundColor:'#e2f4f2',color:'black',border:'0px solid #d16c6c',
+  borderRadius:'5px', margin:'10px 10px', left:'0%', position:'absolute', zIndex:'22', width:'150px'},
+    MBtryonbutton:{width:'148px', margin:'10px 0%', left:'10px'}
+    },
+    prodRecommendation:'true',
+    buynowCallback: 'onTryOnBuynowclick',
+    tryonButtonData:{text:'Virtual Try On',faIcon:'fa fa-camera'},
+    buynow:{enable:'{{ is_product_available }}'},
+    });"
+    src="{{ 'camweara-api.js' | asset_url }}" async>
+</script>    
