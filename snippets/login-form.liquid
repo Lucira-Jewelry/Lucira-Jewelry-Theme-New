@@ -37,27 +37,49 @@
       </div>
 
       <div class="signupSection" style="display:none">
+        {%- form 'create_customer', novalidate: 'novalidate' -%}
           <label>First Name</label>
-          <input type="text" id="regFirstName" placeholder="First Name" class="field-input" required>
-          
+          <input
+            type="text"
+            name="customer[first_name]"
+            placeholder="First Name"
+            class="field-input"
+            required
+          >
           <label>Last Name</label>
-          <input type="text" id="regLastName" placeholder="Last Name" class="field-input" required>
-          
+          <input
+            type="text"
+            name="customer[last_name]"
+            placeholder="Last Name"
+            class="field-input"
+            required
+          >
           <label>Email Address</label>
-          <input type="email" id="regEmail" placeholder="Email" class="field-input" required>
-          
+          <input
+            type="email"
+            name="customer[email]"
+            placeholder="Email"
+            class="field-input"
+            required
+          >
           <label>Phone Number</label>
           <div class="mobile-wrap">
-              <span class="country-code">+91</span>
-              <input type="tel" id="signupMobile" placeholder="Enter Phone Number" maxlength="10" readonly style="background: #f4f4f4;">
+            <span class="country-code">+91</span>
+            <input
+              type="tel"
+              name="customer[phone]"
+              id="signupMobile"
+              placeholder="Enter Phone Number"
+              maxlength="10"
+              required
+            >
           </div>
-          
-          <button type="button" id="btnCompleteRegister" class="btn-primary">CREATE ACCOUNT</button>
-          
+          <button class="btn-primary">CREATE ACCOUNT</button>
           <p class="switch-link">
-              Already a member?
-              <a href="javascript:void(0)" onclick="switchToLogin()">LOGIN</a>
+            Already a member?
+            <a href="javascript:void(0)" onclick="switchToLogin()">LOGIN</a>
           </p>
+        {%- endform -%}
       </div>
     </form>
   </div>
@@ -71,44 +93,41 @@
 </form>
 
 <script>
-  /**
-   * 1. POPUP UI CONTROLS
-   */
   function openloginPopup(id) {
     document.getElementById(id).style.display = 'flex';
   }
-
   function closeloginPopup(e, id) {
     if (typeof id === 'undefined') id = e;
     document.getElementById(id).style.display = 'none';
   }
-
   document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
     el.addEventListener('click', (e) => e.stopPropagation());
   });
-
+  function switchToSignup() {
+    closeloginPopup('login-popup');
+    openloginPopup('signup-popup');
+  }
   function switchToLogin() {
-    document.querySelector('.signupSection').style.display = 'none';
-    document.querySelector('.otp-number-wrapper').style.display = 'block';
-    document.getElementById('sendOtp').style.display = 'block';
+    closeloginPopup('signup-popup');
+    openloginPopup('login-popup');
   }
 
-  /**
-   * 2. SEND OTP LOGIC
-   */
   const sendBtn = document.getElementById('sendOtp');
   if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
-      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g, '').trim();
-      if (mobile.length < 10) return alert("Enter valid mobile number");
+      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
 
-      const res = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mobile })
-      });
+      const res = await fetch(
+        'https://login-otp-385594025448.asia-south1.run.app',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile })
+        }
+      );
 
       const data = await res.json();
+
       if (data.type === 'success') {
         document.querySelector('.otp-number-wrapper').style.display = 'none';
         document.getElementById('sendOtp').style.display = 'none';
@@ -116,154 +135,140 @@
         startTimer();
         alert('OTP Sent');
       } else {
-        alert(data.message || 'Failed to send OTP');
+        alert(data.message || 'Failed');
       }
     });
   }
 
-  /**
-   * 3. VERIFY OTP LOGIC
-   */
   const verifyBtn = document.getElementById('verifyOtp');
   if (verifyBtn) {
     verifyBtn.addEventListener('click', async () => {
-      const otp = [...document.querySelectorAll('.otp-inputs input')].map(i => i.value).join('');
-      const mobile = document.getElementById('loginMobile').value.replace(/\s+/g, '').trim();
+      const otp = [...document.querySelectorAll('.otp-inputs input')]
+        .map(i => i.value)
+        .join('');
+      const mobile = document.getElementById('loginMobile')
+        .value.replace(/\s+/g,'').trim();
+      
+      if (otp.length !== 4) {
+        alert('Enter valid OTP');
+        return;
+      }
 
-      if (otp.length !== 4) return alert('Enter valid 4-digit OTP');
-
-      verifyBtn.textContent = 'Verifying...';
-      verifyBtn.disabled = true;
+      const verifyButton = document.getElementById('verifyOtp');
+      const originalText = verifyButton.textContent;
+      verifyButton.textContent = 'Verifying...';
+      verifyButton.disabled = true;
 
       try {
-        const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ otp, mobile, action: 'verify_otp' })
-        });
+        const res = await fetch(
+          'https://otp-verification-385594025448.asia-south1.run.app',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ otp, mobile })
+          }
+        );
 
         const data = await res.json();
+        console.log('OTP Verification Response:', data);
 
         if (data.type === 'success' && data.credentials) {
-          // Case: Existing Customer -> Log in immediately
+          console.log('Logging in automatically...');
           shopifyAutoLogin(data.credentials.email, data.credentials.password);
-        } 
-        else if (data.type === 'register') {
-          // Case: New Customer -> Show Registration Form
+          return;
+        }
+
+        if (data.type === 'register') {
           document.getElementById('otpSection').style.display = 'none';
           document.querySelector('.signupSection').style.display = 'block';
           document.getElementById('signupMobile').value = mobile;
           document.getElementById('signupMobile').readOnly = true;
-        } 
-        else {
-          alert(data.msg || 'Invalid OTP');
-          verifyBtn.textContent = 'VERIFY OTP';
-          verifyBtn.disabled = false;
+          verifyButton.textContent = originalText;
+          verifyButton.disabled = false;
+          return;
         }
+
+        alert(data.msg || 'Invalid OTP');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
+
       } catch (error) {
-        alert('Error during verification.');
-        verifyBtn.disabled = false;
+        console.error('Error during verification:', error);
+        alert('Something went wrong. Please try again.');
+        verifyButton.textContent = originalText;
+        verifyButton.disabled = false;
       }
     });
   }
 
-  /**
-   * 4. REGISTRATION & AUTO-LOGIN LOGIC
-   */
-  // Intercept the registration button
-  const registerSubmitBtn = document.querySelector('.signupSection .btn-primary');
-  if (registerSubmitBtn) {
-    registerSubmitBtn.addEventListener('click', async (e) => {
-      e.preventDefault();
-
-      const firstName = document.querySelector('input[name="customer[first_name]"]').value.trim();
-      const lastName = document.querySelector('input[name="customer[last_name]"]').value.trim();
-      const email = document.querySelector('input[name="customer[email]"]').value.trim();
-      const mobile = document.getElementById('signupMobile').value.trim();
-
-      if (!firstName || !email) return alert("Please fill Name and Email");
-
-      registerSubmitBtn.textContent = 'Creating Account...';
-      registerSubmitBtn.disabled = true;
-
-      try {
-        // Send data to PHP to create customer and get back credentials
-        const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'register_customer',
-            first_name: firstName,
-            last_name: lastName,
-            email: email,
-            mobile: mobile
-          })
-        });
-
-        const data = await res.json();
-
-        if (data.type === 'success' && data.credentials) {
-          // SUCCESS: Registration done, auto-login now
-          shopifyAutoLogin(data.credentials.email, data.credentials.password);
-        } else {
-          alert(data.msg || "Registration failed. Email/Phone might be in use.");
-          registerSubmitBtn.textContent = 'CREATE ACCOUNT';
-          registerSubmitBtn.disabled = false;
-        }
-      } catch (error) {
-        alert("Registration error. Try again.");
-        registerSubmitBtn.disabled = false;
-      }
-    });
-  }
-
-  /**
-   * 5. AUTO-LOGIN SUBMISSION
-   */
-  function shopifyAutoLogin(email, password) {
-    document.getElementById("ShopifyEmail").value = email;
-    document.getElementById("ShopifyPassword").value = password;
-    document.getElementById("shopify-auto-login-form").submit();
-  }
-
-  /**
-   * 6. UTILS (Timer & OTP Input Focus)
-   */
   const otpInputs = document.querySelectorAll('.otp-inputs input');
   otpInputs.forEach((input, index) => {
     input.addEventListener('input', e => {
       const value = e.target.value.replace(/\D/g, '');
       e.target.value = value;
-      if (value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
+
+      if (value && index < otpInputs.length - 1) {
+        otpInputs[index + 1].focus();
+      }
     });
+
     input.addEventListener('keydown', e => {
-      if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index - 1].focus();
+      if (e.key === 'Backspace' && !e.target.value && index > 0) {
+        otpInputs[index - 1].focus();
+      }
     });
   });
 
+  otpInputs[0].addEventListener('paste', e => {
+    e.preventDefault();
+    const paste = e.clipboardData.getData('text').replace(/\D/g, '').slice(0,4);
+    paste.split('').forEach((num, i) => {
+      if (otpInputs[i]) otpInputs[i].value = num;
+    });
+    otpInputs[paste.length - 1]?.focus();
+  });
+
+  let timer = 120;
   let timerInterval;
   function startTimer() {
-    let timer = 120;
+    timer = 120;
     clearInterval(timerInterval);
+
     timerInterval = setInterval(() => {
       let min = Math.floor(timer / 60);
       let sec = timer % 60;
-      document.getElementById('otp-timer').innerText = `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
-      if (timer-- <= 0) {
+
+      document.getElementById('otp-timer').innerText =
+        `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
+
+      if (timer <= 0) {
         clearInterval(timerInterval);
-        document.getElementById('otp-timer').innerHTML = `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
+        document.getElementById('otp-timer').innerHTML =
+          `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
       }
+
+      timer--;
     }, 1000);
   }
 
   async function resendOtp() {
     const mobile = document.getElementById('loginMobile').value.trim();
+
     await fetch('https://login-otp-385594025448.asia-south1.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ mobile })
     });
+
+    document.getElementById('otp-timer').innerText = "Resend OTP in 02:00";
     startTimer();
+  }
+
+  function shopifyAutoLogin(email, password) {
+    console.log('Auto-login triggered for:', email);
+    document.getElementById("ShopifyEmail").value = email;
+    document.getElementById("ShopifyPassword").value = password;
+    document.getElementById("shopify-auto-login-form").submit();
   }
 </script>
 
