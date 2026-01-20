@@ -435,3 +435,47 @@ $(document).ready(function () {
     });
   }
 });
+
+document.addEventListener("DOMContentLoaded", function() {
+  // Use querySelectorAll to find the toggle regardless of which Liquid branch is active
+  const accountToggles = document.querySelectorAll('#accountToggle');
+  
+  accountToggles.forEach(toggle => {
+    toggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const isMobile = window.innerWidth < 769;
+
+      if (isMobile) {
+        /* MOBILE BEHAVIOR */
+        if (isUserLoggedIn) {
+          // If logged in, go to account page
+          window.location.href = accountUrl;
+        } else {
+          // If logged out, open popup
+          openloginPopup('login-popup');
+        }
+      } else {
+        /* DESKTOP BEHAVIOR */
+        // Find the specific dropdown related to the clicked toggle
+        const dropdown = this.closest('#accountWrapper').querySelector('#accountDropdown');
+        if (dropdown) {
+          dropdown.classList.toggle('active');
+        }
+      }
+    });
+  });
+
+  /* Close dropdown when clicking outside (Desktop only) */
+  document.addEventListener('click', function(event) {
+    if (window.innerWidth >= 769) {
+      const allDropdowns = document.querySelectorAll('#accountDropdown');
+      allDropdowns.forEach(dw => {
+        if (!dw.closest('#accountWrapper').contains(event.target)) {
+          dw.classList.remove('active');
+        }
+      });
+    }
+  });
+});
