@@ -60,6 +60,185 @@
 </style>
 
 
+<script>
+(function(){
+
+/* --- HELPERS --- */
+function showErrorPage(id,msg){
+ let el=document.getElementById(id);
+ el.innerText=msg;
+ el.style.display="block";
+}
+function hideErrorPage(id){
+ document.getElementById(id).style.display="none";
+}
+function validateMobilePage(m){
+ if(!m) return "enter mobile";
+ if(m.length!=10) return "10 digits required";
+ if(!/^\d+$/.test(m)) return "only numbers";
+ return null;
+}
+
+/* --- SEND OTP --- */
+const sendBtn=document.getElementById('sendOtpPage');
+
+if(sendBtn){
+sendBtn.addEventListener('click',async()=>{
+
+ let mobile=loginMobilePage.value.trim();
+
+ let err=validateMobilePage(mobile);
+ if(err){showErrorPage('mobileErrorPage',err);return;}
+ hideErrorPage('mobileErrorPage');
+
+ let res=await fetch(
+ 'https://login-otp-385594025448.asia-south1.run.app',
+ {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({mobile})
+ }
+ );
+ let data=await res.json();
+
+ if(data.type=='success'){
+   document.querySelector('.otp-number-wrapper').style.display="none";
+   sendBtn.style.display="none";
+   otpSectionPage.style.display="block";
+   otpMobilePage.value=mobile;
+   startTimerPage();
+ }
+});
+}
+
+/* --- OTP INPUT UX --- */
+let otpInputs=[...document.querySelectorAll(
+ '#otpSectionPage .otp-inputs input'
+)];
+
+otpInputs.forEach((input,i)=>{
+ input.addEventListener('input',e=>{
+  e.target.value=e.target.value.replace(/\D/g,'');
+  if(e.target.value && i<3) otpInputs[i+1].focus();
+ });
+
+ input.addEventListener('keydown',e=>{
+  if(e.key=='Backspace'&&!e.target.value&&i>0)
+   otpInputs[i-1].focus();
+ });
+});
+
+/* --- VERIFY OTP --- */
+verifyOtpPage?.addEventListener('click',async()=>{
+
+ let otp=otpInputs.map(i=>i.value).join('');
+ let mobile=otpMobilePage.value.trim();
+
+ if(otp.length!=4){
+  showErrorPage('otpErrorPage',"invalid otp");
+  return;
+ }
+ hideErrorPage('otpErrorPage');
+
+ verifyOtpPage.innerText="verifying...";
+ verifyOtpPage.disabled=true;
+
+ let res=await fetch(
+ 'https://otp-verification-385594025448.asia-south1.run.app',
+ {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({otp,mobile})
+ }
+ );
+ let data=await res.json();
+
+ if(data.type=='success' && data.credentials){
+  shopifyAutoLoginPage(
+   data.credentials.email,
+   data.credentials.password
+  );
+  return;
+ }
+
+ showErrorPage('otpErrorPage',data.msg||"wrong otp");
+ verifyOtpPage.innerText="verify otp";
+ verifyOtpPage.disabled=false;
+});
+
+/* --- EDIT MOBILE --- */
+editMobilePage?.addEventListener('click',()=>{
+ otpSectionPage.style.display="none";
+ document.querySelector('.otp-number-wrapper').style.display="block";
+ sendBtn.style.display="block";
+ clearInterval(timerPage);
+ otpInputs.forEach(i=>i.value='');
+});
+
+/* --- TIMER --- */
+let timerPage=30;
+let timerInt;
+
+function startTimerPage(){
+ timerPage=30;
+ clearInterval(timerInt);
+
+ timerInt=setInterval(()=>{
+  let sec=timerPage%60;
+  otpTimerPage.innerText=
+  `Resend OTP in 00:${sec<10?'0'+sec:sec}`;
+
+  if(timerPage<=0){
+   clearInterval(timerInt);
+   otpTimerPage.innerHTML=
+   `<a href="javascript:void(0)" id="resendOtpPage">
+     resend otp
+    </a>`;
+   document
+    .getElementById('resendOtpPage')
+    .onclick=resendOtpPage;
+  }
+  timerPage--;
+ },1000);
+}
+
+/* --- RESEND --- */
+async function resendOtpPage(){
+ let mobile=otpMobilePage.value.trim();
+
+ await fetch(
+ 'https://login-otp-385594025448.asia-south1.run.app',
+ {
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify({mobile})
+ }
+ );
+ startTimerPage();
+}
+
+/* --- AUTO LOGIN --- */
+function shopifyAutoLoginPage(email,password){
+
+ let f=document.createElement('form');
+ f.method="post";
+ f.action="/account/login";
+
+ f.innerHTML=`
+ <input name="form_type" value="customer_login">
+ <input name="utf8" value="✓">
+ <input name="customer[email]" value="${email}">
+ <input name="customer[password]" value="${password}">
+ `;
+
+ document.body.appendChild(f);
+ f.submit();
+}
+
+})();
+</script>
+
+
 {% schema %}
 {
   "name": "t:sections.main-login.name",
