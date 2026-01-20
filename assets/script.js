@@ -406,3 +406,32 @@ $(document).ready(function () {
       }
     });
   }
+
+  document.addEventListener("DOMContentLoaded", function() {
+  const accountToggle = document.getElementById('accountToggle');
+  const accountDropdown = document.getElementById('accountDropdown');
+  const accountWrapper = document.getElementById('accountWrapper');
+
+  if (accountToggle && accountDropdown) {
+    accountToggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (window.innerWidth < 769) {
+        if (isUserLoggedIn) {
+          window.location.href = accountUrl;
+        } else {
+          openloginPopup('login-popup');
+        }
+      } else {
+        accountDropdown.classList.toggle('active');
+      }
+    });
+
+    document.addEventListener('click', function(event) {
+      if (!accountWrapper.contains(event.target)) {
+        accountDropdown.classList.remove('active');
+      }
+    });
+  }
+});
