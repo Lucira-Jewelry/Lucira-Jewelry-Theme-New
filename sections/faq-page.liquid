@@ -15,45 +15,46 @@
               </div>
             {% endif %}
 
-            {% assign faq_items = block.settings.faq_items | split: '||' %}
-            {% if faq_items.size > 0 %}
-              <div class="accordion accordion-{{ forloop.index }}">
-                {% for faq_item in faq_items %}
-                  {% assign item_parts = faq_item | split: '{{SEPARATOR}}' %}
-                  {% if item_parts.size == 2 %}
+            <div class="accordion accordion-block-{{ forloop.index }}">
+              {% for i in (1..10) %}
+                {% capture question_key %}faq_question_{{ i }}{% endcapture %}
+                {% capture answer_key %}faq_answer_{{ i }}{% endcapture %}
+                
+                {% if block.settings[question_key] != blank and block.settings[answer_key] != blank %}
+                  <div
+                    itemscope
+                    itemprop="mainEntity"
+                    itemtype="https://schema.org/Question"
+                    class="accordion-item"
+                  >
+                    <h3
+                      itemprop="name"
+                      class="accordion-title"
+                      onclick="toggleAccordion(this, event)"
+                      role="button"
+                      tabindex="0"
+                    >
+                      {{ block.settings[question_key] }}
+                      <span class="accordion-icon">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                          <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                      </span>
+                    </h3>
                     <div
                       itemscope
-                      itemprop="mainEntity"
-                      itemtype="https://schema.org/Question"
-                      class="accordion-item"
+                      itemprop="acceptedAnswer"
+                      itemtype="https://schema.org/Answer"
+                      class="accordion-content"
                     >
-                      <h3
-                        itemprop="name"
-                        class="accordion-title"
-                        onclick="toggleAccordion(this, event)"
-                      >
-                        {{ item_parts[0] | strip }}
-                        <span class="accordion-icon">
-                          <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                            <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                          </svg>
-                        </span>
-                      </h3>
-                      <div
-                        itemscope
-                        itemprop="acceptedAnswer"
-                        itemtype="https://schema.org/Answer"
-                        class="accordion-content"
-                      >
-                        <div itemprop="text" class="accordion-text">
-                          {{ item_parts[1] | strip }}
-                        </div>
+                      <div itemprop="text" class="accordion-text">
+                        {{ block.settings[answer_key] }}
                       </div>
                     </div>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
           </div>
         </div>
     {% endcase %}
@@ -137,10 +138,17 @@
     transition: all 0.3s ease;
     color: #333;
     text-align: left;
+    width: 100%;
+    text-align: left;
   }
 
   .accordion-title:hover {
     color: #000;
+  }
+
+  .accordion-title:focus {
+    outline: 2px solid #333;
+    outline-offset: 2px;
   }
 
   .accordion-icon {
@@ -152,6 +160,7 @@
     flex-shrink: 0;
     transition: transform 0.3s ease;
     color: #999;
+    margin-left: 12px;
   }
 
   .accordion-title.active .accordion-icon {
@@ -167,7 +176,7 @@
   }
 
   .accordion-content.active {
-    max-height: 500px;
+    max-height: 1000px;
   }
 
   .accordion-text {
@@ -204,6 +213,15 @@
     color: #000;
   }
 
+  .accordion-text strong {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .accordion-text em {
+    font-style: italic;
+  }
+
   /* Mobile Styles */
   @media (max-width: 768px) {
     .faq-block-wrapper {
@@ -230,7 +248,7 @@
     }
 
     .accordion-content.active {
-      max-height: 800px;
+      max-height: 1200px;
     }
 
     .accordion-text {
@@ -260,12 +278,13 @@
     .accordion-title {
       padding: 14px 0;
       font-size: 13px;
-      gap: 12px;
+      gap: 8px;
     }
 
     .accordion-icon {
       width: 18px;
       height: 18px;
+      margin-left: 8px;
     }
   }
 </style>
@@ -281,13 +300,17 @@
     accordion.querySelectorAll('.accordion-title').forEach(item => {
       if (item !== element) {
         item.classList.remove('active');
-        item.nextElementSibling.classList.remove('active');
+        if (item.nextElementSibling) {
+          item.nextElementSibling.classList.remove('active');
+        }
       }
     });
 
     // Toggle current accordion
     element.classList.toggle('active');
-    content.classList.toggle('active');
+    if (content) {
+      content.classList.toggle('active');
+    }
 
     // Google Analytics event (optional)
     if (window.dataLayer) {
@@ -336,11 +359,114 @@
           "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
         },
         {
-          "type": "textarea",
-          "id": "faq_items",
-          "label": "FAQ Items",
-          "info": "Enter FAQ items in format: Question {{SEPARATOR}} Answer||Question {{SEPARATOR}} Answer",
-          "default": "Can i see multiple pieces of jewelry during the video call?{{SEPARATOR}}<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>||Is the video call secure and private?{{SEPARATOR}}<p>Yes, all our video consultations are encrypted and secure. Your privacy is our top priority.</p>||Can I make a purchase directly during the video call?{{SEPARATOR}}<p>Absolutely! You can complete your purchase during the video call for a seamless experience.</p>"
+          "type": "text",
+          "id": "faq_question_1",
+          "label": "Question 1",
+          "default": "Can i see multiple pieces of jewelry during the video call?"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_1",
+          "label": "Answer 1",
+          "default": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_2",
+          "label": "Question 2",
+          "default": "Is the video call secure and private?"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_2",
+          "label": "Answer 2",
+          "default": "<p>Yes, all our video consultations are encrypted and secure. Your privacy is our top priority.</p>"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_3",
+          "label": "Question 3",
+          "default": "Can I make a purchase directly during the video call?"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_3",
+          "label": "Answer 3",
+          "default": "<p>Absolutely! You can complete your purchase during the video call for a seamless experience.</p>"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_4",
+          "label": "Question 4",
+          "default": "What if I lose connection during the call?"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_4",
+          "label": "Answer 4",
+          "default": "<p>Don't worry! We'll reconnect within minutes. Just refresh the call or contact our support team.</p>"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_5",
+          "label": "Question 5",
+          "default": "Can I reschedule or cancel my video call appointment?"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_5",
+          "label": "Answer 5",
+          "default": "<p>Yes, you can reschedule or cancel up to 24 hours before your scheduled appointment without any penalty.</p>"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_6",
+          "label": "Question 6"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_6",
+          "label": "Answer 6"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_7",
+          "label": "Question 7"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_7",
+          "label": "Answer 7"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_8",
+          "label": "Question 8"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_8",
+          "label": "Answer 8"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_9",
+          "label": "Question 9"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_9",
+          "label": "Answer 9"
+        },
+        {
+          "type": "text",
+          "id": "faq_question_10",
+          "label": "Question 10"
+        },
+        {
+          "type": "richtext",
+          "id": "faq_answer_10",
+          "label": "Answer 10"
         }
       ]
     }
@@ -354,7 +480,16 @@
           "settings": {
             "block_heading": "ABOUT LGD DIAMONDS",
             "block_description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-            "faq_items": "Can i see multiple pieces of jewelry during the video call?{{SEPARATOR}}<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>||Is the video call secure and private?{{SEPARATOR}}<p>Yes, all our video consultations are encrypted and secure. Your privacy is our top priority.</p>||Can I make a purchase directly during the video call?{{SEPARATOR}}<p>Absolutely! You can complete your purchase during the video call for a seamless experience.</p>||What if I lose connection during the call?{{SEPARATOR}}<p>Don't worry! We'll reconnect within minutes. Just refresh the call or contact our support team immediately.</p>||Can I reschedule or cancel my video call appointment?{{SEPARATOR}}<p>Yes, you can reschedule or cancel up to 24 hours before your scheduled appointment without any penalty.</p>"
+            "faq_question_1": "Can i see multiple pieces of jewelry during the video call?",
+            "faq_answer_1": "<p>Yes, you can request to see multiple pieces of jewelry during your video consultation. Our experts will showcase different items based on your preferences.</p>",
+            "faq_question_2": "Is the video call secure and private?",
+            "faq_answer_2": "<p>Yes, all our video consultations are encrypted and secure. Your privacy is our top priority and we never share personal information.</p>",
+            "faq_question_3": "Can I make a purchase directly during the video call?",
+            "faq_answer_3": "<p>Absolutely! You can complete your purchase during the video call for a seamless experience. We accept all major payment methods.</p>",
+            "faq_question_4": "Who will I be speaking with on the video call?",
+            "faq_answer_4": "<p>You will be speaking with our certified jewelry experts who have years of experience and can answer all your questions.</p>",
+            "faq_question_5": "What if I lose connection during the call?",
+            "faq_answer_5": "<p>Don't worry! We'll automatically reconnect within minutes. Just refresh the page or contact our support team immediately.</p>"
           }
         },
         {
@@ -362,7 +497,16 @@
           "settings": {
             "block_heading": "MY ORDER",
             "block_description": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-            "faq_items": "Can i see multiple pieces of jewelry during the video call?{{SEPARATOR}}<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>||How long does shipping take?{{SEPARATOR}}<p>Standard shipping takes 3-5 business days. Express shipping is available for 1-2 business days.</p>||Do you ship internationally?{{SEPARATOR}}<p>Yes, we ship to most countries worldwide. International shipping rates vary by location.</p>||What is your return policy?{{SEPARATOR}}<p>We offer a 30-day return policy for all unused items in their original packaging.</p>||Can I track my order?{{SEPARATOR}}<p>Yes! You'll receive a tracking number via email as soon as your order ships.</p>"
+            "faq_question_1": "How long does shipping take?",
+            "faq_answer_1": "<p>Standard shipping takes 3-5 business days. Express shipping is available for 1-2 business days delivery.</p>",
+            "faq_question_2": "Do you ship internationally?",
+            "faq_answer_2": "<p>Yes, we ship to most countries worldwide. International shipping rates vary by location and are calculated at checkout.</p>",
+            "faq_question_3": "What is your return policy?",
+            "faq_answer_3": "<p>We offer a 30-day return policy for all unused items in their original packaging. Returns are free within the USA.</p>",
+            "faq_question_4": "Can I track my order?",
+            "faq_answer_4": "<p>Yes! You'll receive a tracking number via email as soon as your order ships. You can track it anytime on our website.</p>",
+            "faq_question_5": "Can I reschedule or cancel my video call appointment?",
+            "faq_answer_5": "<p>Yes, you can reschedule or cancel up to 24 hours before your scheduled appointment without any penalty or fees.</p>"
           }
         }
       ]
