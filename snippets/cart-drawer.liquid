@@ -141,6 +141,19 @@
                     {%- for item in cart.items -%}
 
                       {% if item.parent_relationship.parent == null %}
+                      {% assign children_total_price = 0 %}
+                            {% assign has_children = false %}
+
+                            {% for child in cart.items %}
+                              {% if child.parent_relationship.parent != null
+                                and child.parent_relationship.parent.key == item.key %}
+                                {% assign has_children = true %}
+                                {% assign children_total_price = children_total_price | plus: child.final_line_price %}
+                              {% endif %}
+                            {% endfor %}
+
+                            {% assign combined_total_price = item.final_line_price | plus: children_total_price %}
+
                         <tr id="CartDrawer-Item-{{ item.index | plus: 1 }}" class="cart-item parent_item{% if item.product.title contains 'Jewelry Insurance' %} insurance-item-cart-item{% endif %}" role="row" data-cart-item>
                           <td class="cart-item__media" role="cell" headers="CartDrawer-ColumnProductImage">
                             {% if item.image %}
@@ -228,62 +241,18 @@
                           <td class="cart-item__totals right" role="cell" headers="CartDrawer-ColumnTotal">
                             {%- render 'loading-spinner' -%}
                             <div class="cart-item__price-wrapper">
-                              {%- if item.original_line_price != item.final_line_price -%}
-                                <div class="cart-item__discounted-prices">
-                                  <span class="visually-hidden">
-                                    {{ 'products.product.price.regular_price' | t }}
-                                  </span>
-                                  <s class="cart-item__old-price price price--end">
-                                    {{ item.original_line_price | money }}
-                                  </s>
-                                  <span class="visually-hidden">
-                                    {{ 'products.product.price.sale_price' | t }}
-                                  </span>
-                                  <span class="price price--end">
-                                    {{ item.final_line_price | money }}
-                                  </span>
-                                </div>
-                              {%- else -%}
-                                <span class="price price--end">
-                                  {{ item.original_line_price | money }}
-                                </span>
-                               {% if item.variant.compare_at_price > 0 %}
-  <span class="original-price-cut-off">
-    {{ item.variant.compare_at_price | times: item.quantity | money }}
-  </span>
-{% endif %}
+  {% if has_children %}
+    <span class="price price--end">
+      {{ combined_total_price | money }}
+    </span>
+  {% else %}
+    <span class="price price--end">
+      {{ item.final_line_price | money }}
+    </span>
+  {% endif %}
+</div>
 
-                              {%- endif -%}
-                              {% assign total_compare_price = item.variant.compare_at_price | times: item.quantity %}
-                              {% assign total_actual_price = item.final_line_price %}
-                              {% assign savings = total_compare_price | minus: total_actual_price %}
-
-                              {%- if item.variant.available and item.unit_price_measurement -%}
-                                <div class="unit-price caption">
-                                  <span class="visually-hidden">{{ 'products.product.price.unit_price' | t }}</span>
-                                  {{ item.unit_price | money }}
-                                  <span aria-hidden="true">/</span>
-                                  <span class="visually-hidden"
-                                    >&nbsp;{{ 'accessibility.unit_price_separator' | t }}&nbsp;</span
-                                  >
-                                  {%- if item.unit_price_measurement.reference_value != 1 -%}
-                                    {{- item.unit_price_measurement.reference_value -}}
-                                  {%- endif -%}
-                                  {{ item.unit_price_measurement.reference_unit }}
-                                </div>
-                              {%- endif -%}
-                            </div>
-                            {% comment %} {% if savings > 0 %}
-                              <div class="savings-label">
-                                <span class="label-text"
-                                  >YOU<br>
-                                  SAVE</span
-                                >
-                                <span class="label-amount">
-                                  {{ savings | money }}
-                                </span>
-                              </div>
-                            {% endif %} {% endcomment %}
+                           
                           </td>
 
                           {%- liquid
@@ -328,13 +297,7 @@
                               <div class="delivery-date-expected">
                                 Dispatch by: <span>{{ delivery_date }}</span>
                               </div>
-                              {% assign has_children = false %}
-                              {% for child in cart.items %}
-                                {% if child.parent_relationship.parent != null and child.parent_relationship.parent.key == item.key %}
-                                  {% assign has_children = true %}
-                                  {% break %}
-                                {% endif %}
-                              {% endfor %}
+                              
                             <div class="view_cart_product">
                               {% if has_children %}
                                 <p
@@ -579,6 +542,10 @@
                                     <a href="{{ child.url }}" class="cart-item__name h4 break mobile-show">
                                       {{- child.product.title | escape | truncate: 32 -}}
                                     </a>
+                                      <span class="child-quantity">
+    x{{ child.quantity }}
+  </span>
+
 
                                     {%- if child.product.has_only_default_variant == false
                                       or child.properties.size != 0
@@ -933,7 +900,6 @@ document.addEventListener('click', function (e) {
 });
 </script>
 
-
 <script>
 document.addEventListener('click', async function (e) {
   const btn = e.target.closest('.parent-remove-btn');
@@ -945,40 +911,52 @@ document.addEventListener('click', async function (e) {
   const parentKey = btn.dataset.parentKey;
   if (!parentKey) return;
 
+  // 🔹 Smooth animation first
+  const row = btn.closest('.cart-item');
+  if (row) row.classList.add('is-removing');
+
   try {
-    // Build updates
+    // 1️⃣ Get cart
     const cartRes = await fetch('/cart.js');
     const cart = await cartRes.json();
 
+    // 2️⃣ Build updates (parent + children)
     const updates = {};
     cart.items.forEach(item => {
       if (
         item.key === parentKey ||
-        (
-          item.parent_relationship &&
-          item.parent_relationship.parent &&
-          item.parent_relationship.parent.key === parentKey
-        )
+        item.parent_relationship?.parent?.key === parentKey
       ) {
         updates[item.key] = 0;
       }
     });
 
-    // Update cart
-    const res = await fetch('/cart/update.js', {
+    // 3️⃣ Update cart
+    const updateRes = await fetch('/cart/update.js', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates })
     });
 
-    const updatedCart = await res.json();
+    const updatedCart = await updateRes.json();
 
-    // 🔥 DAWN INTERNAL UI UPDATE (THIS FIXES EVERYTHING)
-    if (window.Shopify?.theme?.cartDrawer?.renderContents) {
-      window.Shopify.theme.cartDrawer.renderContents(updatedCart);
+    // 4️⃣ 🔥 Refresh cart drawer HTML (NO refresh)
+    const sectionRes = await fetch(
+      `${window.location.pathname}?sections=cart-drawer`
+    );
+    const sections = await sectionRes.json();
+
+    const parser = new DOMParser();
+    const html = parser.parseFromString(sections['cart-drawer'], 'text/html');
+
+    const newDrawer = html.querySelector('cart-drawer');
+    const oldDrawer = document.querySelector('cart-drawer');
+
+    if (newDrawer && oldDrawer) {
+      oldDrawer.replaceWith(newDrawer);
     }
 
-    // 🔥 UPDATE CART ICON BUBBLE
+    // 5️⃣ 🔔 UPDATE CART BUBBLE (THIS WAS MISSING)
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         bubbles: true,
@@ -987,10 +965,11 @@ document.addEventListener('click', async function (e) {
     );
 
   } catch (err) {
-    console.error('Failed to update cart', err);
+    console.error('Remove failed', err);
   }
 });
 </script>
+
 
 
 
