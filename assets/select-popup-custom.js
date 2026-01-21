@@ -515,11 +515,11 @@ function closePopup() {
       function resizeKonvaCanvas() {
         if(window.innerWidth > 768){
           const baseScreen = 1920;   
-          const baseSize = 500;     
+          const baseSize = 550;     
 
           let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
-          canvasSize = Math.max(300, Math.min(canvasSize, 650));
+          canvasSize = Math.max(350, Math.min(canvasSize, 700));
           document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
             each.style.width = canvasSize + 'px';
             each.style.height = canvasSize + 'px';
@@ -530,11 +530,11 @@ function closePopup() {
           document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         } else {
           const baseScreen = 768;   
-          const baseSize = 350;     
+          const baseSize = 400;     
 
           let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
-          canvasSize = Math.max(150, Math.min(canvasSize, 500));
+          canvasSize = Math.max(180, Math.min(canvasSize, 550));
           document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
             each.style.width = canvasSize + 'px';
             each.style.height = canvasSize + 'px';

@@ -764,18 +764,18 @@ window.MainBaseCharm = function () {
       if (!container) return;
 
       const rect = container.getBoundingClientRect();
-      const size = Math.max(
-        300,
-        Math.floor(Math.min(rect.width || 400, rect.height || 400))
-      );
-      this.stageSize = size;
+      const width = Math.max(300, rect.width || 400);
+      const height = width * 1.08;
+      
+      this.stageWidth = width;
+      this.stageHeight = height;
 
       if (this.stage) this.stage.destroy();
       this._productRendered = false;
       this.stage = new Konva.Stage({
         container: this.containerId,
-        width: this.stageSize,
-        height: this.stageSize,
+        width: this.stageWidth,
+        height: this.stageHeight,
         draggable: false,
       });
       this.stage.on('wheel', (e) => {
