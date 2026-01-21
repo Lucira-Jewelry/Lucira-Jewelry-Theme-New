@@ -329,7 +329,7 @@ if (!customElements.get('media-gallery')) {
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides || isReordering) return;
     
-    isSwiping = true; // Flag that we are programmatically scrolling
+    isSwiping = true; // Lock scroll sync
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
@@ -337,12 +337,23 @@ if (!customElements.get('media-gallery')) {
     updateDots();
 
     const targetSlide = visibleSlides[currentSlide];
-    if (targetSlide) {
-      targetSlide.scrollIntoView({
-        behavior: 'smooth',
-        inline: 'center'
+    
+    if (targetSlide && mediaList) {
+      // FIX: Use scrollTo on the container instead of scrollIntoView
+      // This calculates the center position manually to avoid page jumping
+      const slideLeft = targetSlide.offsetLeft;
+      const slideWidth = targetSlide.clientWidth;
+      const containerWidth = mediaList.clientWidth;
+      
+      // Calculate position to center the image
+      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
+
+      mediaList.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
       });
 
+      // Handle video autoplay
       const activeVideo = targetSlide.querySelector('video');
       if (activeVideo) {
         activeVideo.loop = true;
