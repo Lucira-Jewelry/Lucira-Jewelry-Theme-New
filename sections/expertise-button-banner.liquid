@@ -238,25 +238,42 @@
     }
   } {% endcomment %}
 
-  /* Mobile Styles - UPDATED */
+ /* Mobile Styles */
 @media (max-width: 768px) {
+  .sustainable-section-{{ section.id }} {
+    overflow: visible !important;
+  }
+
   .feature-container-{{ section.id }} {
-    min-height: 500px; /* Reduced from 600px */
+    min-height: 500px;
+    position: relative;
+    overflow: visible !important;
   }
 
   .feature-content-{{ section.id }} {
     flex-direction: column;
     align-items: flex-start;
     gap: 20px;
-    top: 20px; /* Changed from bottom: 20px */
+    top: 20px;
     left: 20px;
     right: 20px;
-    bottom: auto; /* Remove bottom positioning */
+    bottom: auto;
+    height: auto;
+    min-height: auto;
   }
 
   .text-content-{{ section.id }} {
     max-width: 100%;
     position: static;
+    margin-bottom: 10px;
+    opacity: 0;
+    transform: translateY(-20px);
+    transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+  }
+
+  .text-content-{{ section.id }}.active {
+    opacity: 1;
+    transform: translateY(0);
   }
 
   .feature-title-{{ section.id }} {
@@ -267,61 +284,84 @@
   .feature-description-{{ section.id }} {
     font-size: 13px;
     line-height: 1.5;
+    margin-bottom: 20px;
   }
 
+  /* Button container - fixed visibility */
   .feature-buttons-{{ section.id }} {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     gap: 12px;
     flex-wrap: wrap;
     margin-left: 0;
     width: 100%;
     position: relative;
     z-index: 20;
-    margin-top: 20px; /* Added spacing from text */
+    padding-top: 10px;
+    margin-top: 10px;
   }
 
+  /* Individual buttons */
   .feature-btn-{{ section.id }} {
-    width: 50px;
-    height: 50px;
+    width: 60px !important;
+    height: 60px !important;
     border-width: 3px;
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    position: relative;
+    z-index: 25;
   }
 
   .feature-btn-{{ section.id }} img {
-    width: 24px;
-    height: 24px;
+    width: 28px !important;
+    height: 28px !important;
   }
 
-  /* Fix progress ring positioning */
+  /* Progress ring */
   .progress-ring-{{ section.id }} {
     position: absolute;
-    top: -2px;
-    left: -2px;
-    width: 54px;
-    height: 54px;
+    top: -3px;
+    left: -3px;
+    width: 66px !important;
+    height: 66px !important;
     z-index: 1;
+    display: block !important;
+    visibility: visible !important;
   }
 
   .progress-ring-circle-{{ section.id }} {
-    cx: 27;
-    cy: 27;
-    r: 24;
+    cx: 33;
+    cy: 33;
+    r: 30;
   }
 
-  /* Fix percentage label positioning */
+  /* Percentage label */
   .percentage-label-{{ section.id }} {
     position: absolute;
-    top: -25px;
+    top: -30px;
     left: 50%;
     transform: translateX(-50%);
-    font-size: 10px;
+    font-size: 11px;
     font-weight: 600;
     white-space: nowrap;
-    background: rgba(0, 0, 0, 0.7);
-    padding: 2px 6px;
-    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 3px 8px;
+    border-radius: 4px;
     z-index: 30;
     pointer-events: none;
+    display: block !important;
+    visibility: visible !important;
+  }
+
+  /* Ensure images are properly displayed */
+  .feature-image-{{ section.id }} {
+    height: 500px;
+    object-position: center;
   }
 }
+
 </style>
 
 <div class="sustainable-section-{{ section.id }}">
@@ -467,6 +507,12 @@
 <script>
 (function() {
   const sectionId = '{{ section.id }}';
+  let isMobile = window.innerWidth <= 768;
+  
+  // Update mobile detection on resize
+  function updateMobileDetection() {
+    isMobile = window.innerWidth <= 768;
+  }
   
   function switchFeature(blockId) {
     // Update images
@@ -489,66 +535,120 @@
       if (isActive) {
         const progress = btn.dataset.progress;
         // Calculate circumference based on screen size
-        const radius = window.innerWidth <= 768 ? 24 : 33;
+        const radius = isMobile ? 30 : 33; // 30 for mobile, 33 for desktop
         const circumference = 2 * Math.PI * radius;
         const offset = circumference - (circumference * progress / 100);
+        circle.style.strokeDasharray = circumference;
         circle.style.strokeDashoffset = offset;
       } else {
         // Reset non-active buttons
-        const radius = window.innerWidth <= 768 ? 24 : 33;
+        const radius = isMobile ? 30 : 33;
         const circumference = 2 * Math.PI * radius;
+        circle.style.strokeDasharray = circumference;
         circle.style.strokeDashoffset = circumference;
       }
+    });
+  }
+
+  // Initialize progress rings with correct dimensions
+  function initializeProgressRings() {
+    const radius = isMobile ? 30 : 33;
+    const circumference = 2 * Math.PI * radius;
+    
+    document.querySelectorAll(`.progress-ring-circle-${sectionId}`).forEach(circle => {
+      circle.setAttribute('cx', radius);
+      circle.setAttribute('cy', radius);
+      circle.setAttribute('r', radius);
+      circle.style.strokeDasharray = circumference;
+      circle.style.strokeDashoffset = circumference;
     });
   }
 
   // Add click event listeners to buttons
   function initializeButtons() {
     document.querySelectorAll(`.feature-btn-${sectionId}`).forEach(btn => {
-      btn.addEventListener('click', function() {
-        switchFeature(this.dataset.blockId);
-      });
+      // Remove existing listeners to avoid duplicates
+      btn.removeEventListener('click', handleButtonClick);
+      btn.removeEventListener('touchstart', handleButtonTouch);
       
-      // Add touch events for mobile
-      btn.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        switchFeature(this.dataset.blockId);
-      }, { passive: false });
+      // Add new listeners
+      btn.addEventListener('click', handleButtonClick);
+      btn.addEventListener('touchstart', handleButtonTouch, { passive: true });
     });
-  }
-
-  // Handle responsive adjustments
-  function handleResize() {
-    const activeBtn = document.querySelector(`.feature-btn-${sectionId}.active`);
-    if (activeBtn) {
-      switchFeature(activeBtn.dataset.blockId);
+    
+    function handleButtonClick() {
+      switchFeature(this.dataset.blockId);
+    }
+    
+    function handleButtonTouch(e) {
+      e.preventDefault();
+      switchFeature(this.dataset.blockId);
     }
   }
 
-  // Initialize on page load
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      initializeButtons();
-      // Activate first feature
-      const firstBtn = document.querySelector(`.feature-btn-${sectionId}.active`);
-      if (firstBtn) {
-        switchFeature(firstBtn.dataset.blockId);
-      }
+  // Force button visibility (debug/fallback)
+  function ensureButtonVisibility() {
+    if (isMobile) {
+      document.querySelectorAll(`.feature-btn-${sectionId}`).forEach(btn => {
+        btn.style.display = 'flex';
+        btn.style.visibility = 'visible';
+        btn.style.opacity = '1';
+      });
       
-      // Add resize listener
-      window.addEventListener('resize', handleResize);
-    });
-  } else {
+      document.querySelectorAll(`.feature-buttons-${sectionId}`).forEach(container => {
+        container.style.display = 'flex';
+        container.style.visibility = 'visible';
+        container.style.opacity = '1';
+      });
+    }
+  }
+
+  // Initialize everything
+  function initializeFeatureSection() {
+    updateMobileDetection();
+    initializeProgressRings();
     initializeButtons();
+    ensureButtonVisibility();
+    
     // Activate first feature
     const firstBtn = document.querySelector(`.feature-btn-${sectionId}.active`);
     if (firstBtn) {
       switchFeature(firstBtn.dataset.blockId);
     }
     
-    // Add resize listener
+    console.log('Sustainable Features initialized - Mobile:', isMobile);
+  }
+
+  // Handle responsive adjustments
+  function handleResize() {
+    const wasMobile = isMobile;
+    updateMobileDetection();
+    
+    if (wasMobile !== isMobile) {
+      initializeProgressRings();
+      
+      const activeBtn = document.querySelector(`.feature-btn-${sectionId}.active`);
+      if (activeBtn) {
+        switchFeature(activeBtn.dataset.blockId);
+      }
+    }
+  }
+
+  // Initialize on page load
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      initializeFeatureSection();
+      window.addEventListener('resize', handleResize);
+    });
+  } else {
+    initializeFeatureSection();
     window.addEventListener('resize', handleResize);
   }
+
+  // Add a small delay to ensure everything is properly rendered
+  setTimeout(() => {
+    ensureButtonVisibility();
+  }, 100);
 })();
 </script>
 
