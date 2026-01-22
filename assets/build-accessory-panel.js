@@ -410,7 +410,6 @@ window.MainBaseCharm = function () {
               : 'none';
         });
 
-      // Apply KT filtering immediately after collection switch
       filterCharmsBySelectedVariantCarat();
     }, 500);
 
@@ -479,8 +478,6 @@ window.MainBaseCharm = function () {
 
     const changeQty = (variantId, delta, metalPerUnit, diamondPerUnit) => {
       const cart = loadCart();
-
-      // ✅ ENSURE STRUCTURE
       cart.items = cart.items || {};
       cart.sequence = cart.sequence || [];
 
@@ -495,20 +492,14 @@ window.MainBaseCharm = function () {
       let newQty = parseInt(existing.qty || 0, 10) + delta;
       if (newQty < 0) newQty = 0;
 
-      // ================================
-      // ✅ SEQUENCE LOGIC (CORE FIX)
-      // ================================
       if (delta === 1) {
-        // ➕ ADD → store order
         cart.sequence.push(String(variantId));
       }
 
       if (delta === -1) {
-        // ➖ REMOVE → remove last occurrence
         const idx = cart.sequence.lastIndexOf(String(variantId));
         if (idx > -1) cart.sequence.splice(idx, 1);
       }
-      // ================================
 
       if (newQty === 0) {
         delete items[variantId];
@@ -842,11 +833,9 @@ window.MainBaseCharm = function () {
     _resetToBaseView(animate = true) {
       const stage = this.stage;
       if (!stage) return;
-
-      // Adjust center position to account for charm positioning
       const center = {
         x: this.stageSize / 2,
-        y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05), // Slightly higher to show charms better
+        y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05), 
       };
 
       const posX = center.x - center.x * 1;
@@ -977,27 +966,16 @@ window.MainBaseCharm = function () {
         const c = charms[i];
         const basePt = pts[i] || pts[0];
         const angleRad = (basePt.angle * Math.PI) / 180;
-
-        // Calculate chain attachment point
         const chainX = geom.center.x + chainR * Math.cos(angleRad);
         const chainY = geom.center.y - chainR * Math.sin(angleRad);
 
-        // --- NEW FIX APPLIED HERE ---
-        // 1. Increased Base overlap from 0.15 to 0.28 to lift middle charm onto the chain
         const baseOverlap = 0.28;
-        
-        // 2. Added Curvature correction: The outer charms needed more lift than the middle one.
-        //    This calculates distance from center index and adds extra lift per step.
         const distFromCenter = Math.abs(i - centerIndex);
         const curveCorrection = distFromCenter * 0.04; 
-
-        // Total offset moves the charm UP
         const totalOverlap = baseOverlap + curveCorrection;
 
         let x = chainX;
         let y = chainY + (size / 2) - (size * totalOverlap); 
-        // ---------------------------
-
         try {
           const img = await this.createImage(c.image || '');
           const kimg = new Konva.Image({
@@ -1010,23 +988,19 @@ window.MainBaseCharm = function () {
             offsetX: size / 2,
             offsetY: size / 2,
           });
-
-          // Calculate rotation based on position
           let rotation = 0;
           if (i !== centerIndex) {
             const chainAngleDeg = basePt.angle;
             if (chainAngleDeg > 270) {
-              rotation = -((chainAngleDeg - 270) * 0.8); // Left tilt
+              rotation = -((chainAngleDeg - 270) * 0.8); 
             } else if (chainAngleDeg < 270) {
-              rotation = (270 - chainAngleDeg) * 0.8; // Right tilt
+              rotation = (270 - chainAngleDeg) * 0.8;
             }
             rotation = Math.max(-30, Math.min(30, rotation));
           }
 
           kimg.rotation(rotation);
           kimg._productId = c.id;
-
-          // Hover effects
           kimg.on('mouseenter', () => {
             document.body.style.cursor = 'pointer';
             kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
@@ -1142,8 +1116,6 @@ window.MainBaseCharm = function () {
       const boxH = Math.max(1, maxY - minY);
       const boxCenterX = minX + boxW / 2;
       const boxCenterY = minY + boxH / 2;
-
-      // Improved fraction for better visibility without cropping
       const desiredFraction = 0.5; // Increased from 0.42 for better view
       const scaleX = (this.stageSize * desiredFraction) / boxW;
       const scaleY = (this.stageSize * desiredFraction) / boxH;
@@ -1335,7 +1307,6 @@ window.MainBaseCharm = function () {
         if (normalized.includes('9KT') || normalized.includes('9')) return '9KT';
       }
 
-      // Fallback to variant data if Carat-value is not available
       const saved = readSavedVariantFromLS();
       if (!saved) return null;
 
@@ -1344,8 +1315,6 @@ window.MainBaseCharm = function () {
 
       const resolved = resolveVariantFromPage(vid);
       if (!resolved) return null;
-
-      // Extract carat from variant title or options
       const variantText = `${resolved.title || ''} ${resolved.option1 || ''} ${resolved.option2 || ''} ${resolved.option3 || ''}`.toUpperCase();
 
       if (variantText.includes('18KT') || variantText.includes('18 KT')) return '18KT';
@@ -1357,15 +1326,12 @@ window.MainBaseCharm = function () {
       return null;
     }
   }
-
-  // Track if counts have been initialized to prevent unnecessary updates
   let countsInitialized = false;
 
   function filterCharmsBySelectedVariantCarat() {
     const caratValue = localStorage.getItem('Carat-value');
     if (!caratValue) {
       console.log('No Carat-value found in localStorage - showing all charms');
-      // Update counts even when no KT filter is applied
       if (!countsInitialized) {
         setTimeout(() => {
           updateCountsUI();
@@ -1381,20 +1347,13 @@ window.MainBaseCharm = function () {
     let hiddenCount = 0;
     let shownCount = 0;
     let debugCount = 0;
-
-    // Simple KT-only filtering - don't break existing color functionality
     document.querySelectorAll('.charm-card').forEach((card) => {
-      // Skip if card is already hidden by other filters (color, etc.)
       const wasAlreadyHidden = card.style.display === 'none';
       if (wasAlreadyHidden) return;
 
       const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
       const cardCarats = (card.dataset.carat || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
-
-      // Check if this charm variant matches the selected KT
       let shouldShow = false;
-
-      // Method 1: Check data-carat attribute
       if (cardCarats.length > 0) {
         shouldShow = cardCarats.some(carat => {
           const normalizedCarat = carat.replace(/\s+/g, '');
@@ -1406,21 +1365,16 @@ window.MainBaseCharm = function () {
         });
       }
 
-      // Method 2: Check title if data-carat is empty or didn't match
       if (!shouldShow && cardTitle) {
         const titleUpper = cardTitle.toUpperCase();
         shouldShow = (selectedKT.includes('14') && titleUpper.includes('14KT')) ||
           (selectedKT.includes('18') && titleUpper.includes('18KT')) ||
           titleUpper.includes(selectedKT);
       }
-
-      // Debug first few cards
       if (debugCount < 5) {
         console.log(`Card ${debugCount + 1}: "${cardTitle.substring(0, 30)}...", Carats: [${cardCarats.join(', ')}], Should show: ${shouldShow}`);
         debugCount++;
       }
-
-      // Apply KT filtering (only hide, don't show if already hidden by color filter)
       if (!shouldShow) {
         card.style.display = 'none';
         hiddenCount++;
@@ -1431,16 +1385,12 @@ window.MainBaseCharm = function () {
 
     console.log(`✅ KT filtering complete: ${shownCount} shown, ${hiddenCount} hidden by KT filter`);
 
-    // Update the color filter label to show the selected carat
     const colorNameEl = document.getElementById('lf-color-name');
     if (colorNameEl) {
       const currentText = colorNameEl.textContent;
       const cleanText = currentText.replace(/^\d+KT\s*/, ''); // Remove existing KT prefix
       colorNameEl.textContent = `${selectedKT} ${cleanText}`;
     }
-
-    // IMPORTANT: Update collection counts AFTER KT filtering is complete
-    // But only if counts haven't been initialized yet
     if (!countsInitialized) {
       setTimeout(() => {
         updateCountsUI();
@@ -1515,10 +1465,8 @@ window.MainBaseCharm = function () {
       buildSwatchDots();
       toggleZoomBar();
 
-      // Apply KT filtering when panel first opens
       setTimeout(() => {
         filterCharmsBySelectedVariantCarat();
-        // Force count update for all collections on panel open
         setTimeout(() => {
           updateCountsUI();
           countsInitialized = true;
@@ -2094,8 +2042,6 @@ window.MainBaseCharm = function () {
     if (!wrap) return;
 
     wrap.innerHTML = '';
-
-    // Use the selected variant's carat if available, otherwise fall back to localStorage
     const selectedVariantCarat = getSelectedVariantCarat();
     if (selectedVariantCarat) {
       currentCarat = selectedVariantCarat;
@@ -2126,8 +2072,6 @@ window.MainBaseCharm = function () {
         dot.classList.add('active');
 
         setActiveLabel(color);
-
-        // Apply KT filtering after color filtering
         setTimeout(() => {
           filterCharmsBySelectedVariantCarat();
         }, 50);
@@ -2141,7 +2085,6 @@ window.MainBaseCharm = function () {
     applyColorFilter(currentColorLabel);
     setActiveLabel(currentColorLabel);
 
-    // Apply KT filtering after building color dots
     setTimeout(() => {
       filterCharmsBySelectedVariantCarat();
     }, 100);
@@ -2221,12 +2164,8 @@ window.MainBaseCharm = function () {
 
   window.luciraOpenAccessory = openPanel;
   window.luciraCloseAccessory = closePanel;
-
-  // Expose the filtering function globally
   window.filterCharmsBySelectedVariantCarat = filterCharmsBySelectedVariantCarat;
   window.getSelectedVariantCarat = getSelectedVariantCarat;
-
-  // Debug function to test filtering
   window.debugCaratFiltering = function () {
     const caratValue = localStorage.getItem('Carat-value');
 
@@ -2247,7 +2186,7 @@ window.MainBaseCharm = function () {
       if (isVisible) visibleCount++;
       else hiddenCount++;
 
-      if (index < 10) { // Show first 10 for debugging
+      if (index < 10) { 
         console.log(`Card ${index + 1}: 
           Title: "${cardTitle}"
           data-carat: "${cardCarats}"
@@ -2260,15 +2199,12 @@ window.MainBaseCharm = function () {
 
     return { caratValue, totalCards: charmCards.length, visibleCount, hiddenCount };
   };
-
-  // Manual filter trigger for testing
   window.testCaratFilter = function () {
     console.log('Manually triggering carat filter...');
     filterCharmsBySelectedVariantCarat();
     return debugCaratFiltering();
   };
 
-  // Test combined color and KT filtering
   window.testCombinedFilter = function (color = null) {
     const caratValue = localStorage.getItem('Carat-value');
     const testColor = color || currentColorLabel || 'All';
@@ -2288,7 +2224,6 @@ window.MainBaseCharm = function () {
     return { caratValue, testColor, visible, hidden };
   };
 
-  // Debug collection counts
   window.debugCollectionCounts = function () {
     const caratValue = localStorage.getItem('Carat-value');
     console.log('=== COLLECTION COUNTS DEBUG ===');
@@ -2306,7 +2241,6 @@ window.MainBaseCharm = function () {
         console.log(`   Total charm cards: ${allCards.length}`);
         console.log(`   Visible after filtering: ${visibleCards.length}`);
 
-        // Sample first few cards
         allCards.forEach((card, index) => {
           if (index < 3) {
             const title = card.dataset.title || 'No title';
@@ -2321,13 +2255,11 @@ window.MainBaseCharm = function () {
     console.log('=== END DEBUG ===');
   };
 
-  // Debug charm rotations
   window.debugCharmRotations = function () {
     console.log('=== CHARM ROTATIONS DEBUG ===');
     const charmImages = document.querySelectorAll('.konvajs-content canvas');
     if (charmImages.length > 0) {
       console.log(`Found ${charmImages.length} Konva canvases`);
-      // Check if we can access Konva objects
       if (window.bv && window.bv.charmLayer) {
         const charms = window.bv.charmLayer.children;
         charms.forEach((charm, index) => {
@@ -2339,8 +2271,6 @@ window.MainBaseCharm = function () {
     }
     console.log('=== END DEBUG ===');
   };
-
-  // Debug canvas bounds
   window.debugCanvasBounds = function () {
     console.log('=== CANVAS BOUNDS DEBUG ===');
     if (window.bv && window.bv.stage) {
@@ -2358,7 +2288,7 @@ window.MainBaseCharm = function () {
         });
       }
     }
-    console.log('=== END DEBUG ===');
+    // console.log('=== END DEBUG ===');
   };
 
 };
@@ -2492,7 +2422,6 @@ function computeCountsSimple() {
     let selectedQty = 0;
 
     cards.forEach((card) => {
-      // 👉 SAME KT LOGIC AS ACTIVE GRID
       const carats = (card.dataset.carat || '')
         .split(',')
         .map(v => v.toUpperCase().replace(/\s+/g, ''))
@@ -2516,7 +2445,6 @@ function computeCountsSimple() {
       }
     });
 
-    // 👉 UPDATE ONLY THIS TILE
     const tile = document.querySelector(
       `.collection-tile[data-target="${containerId}"]`
     );
@@ -2562,7 +2490,6 @@ function scheduleUpdateCounts() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Don't update counts immediately - wait for KT filtering
   console.log('DOM loaded - counts will be updated after KT filtering');
 });
 

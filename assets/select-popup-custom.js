@@ -176,31 +176,20 @@
         clone.addEventListener('click', () => {
           popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
           clone.classList.add('active');
-          
-          // 1. पुराने साइज को याद रखें
           const currentSize = sel.size; 
           sel.color = baseColor; 
           
-          // 2. वेरिएंट ढूंढें (Image/Price दिखाने के लिए)
-          // अगर साइज नहीं है, तो findVariant 'null' साइज के साथ भी डिफॉल्ट वेरिएंट लौटा सकता है (जो ठीक है इमेज के लिए)
           let potentialVariant = findVariant(currentProduct, sel);
-
-          // 3. चेक करें कि क्या पुराना साइज नए कलर में मौजूद है?
-          // अगर हमने साइज चुना था (currentSize), लेकिन नए कलर में वो वेरिएंट नहीं मिला (potentialVariant अलग साइज का है या null है)
-          // तो हमें साइज को null करना होगा ताकि यूजर गलत साइज न ऑर्डर कर दे।
           if (currentSize) {
-             // दोबारा चेक करें कि क्या findVariant ने जो वेरिएंट दिया है, उसका साइज वही है जो हमें चाहिए था?
              const variantSize = potentialVariant?.options?.[optionIndex.size];
              
              if (potentialVariant && variantSize === currentSize) {
-                 sel.variant = potentialVariant; // सब ठीक है, साइज वही है
+                 sel.variant = potentialVariant; 
              } else {
-                 sel.size = null; // साइज उपलब्ध नहीं है, इसे हटा दें
-                 // इमेज दिखाने के लिए बिना साइज के दोबारा ढूंढें
+                 sel.size = null; 
                  sel.variant = findVariant(currentProduct, { ...sel, size: null });
              }
           } else {
-             // अगर पहले से कोई साइज नहीं था, तो बस इमेज के लिए वेरिएंट सेट करें
              sel.variant = potentialVariant;
           }
 
@@ -208,9 +197,7 @@
           renderPrices(sel.variant);
           renderImage(sel.variant, currentProduct);
           saveVariantToLS(sel.variant);
-          
-          // --- MAIN FIX IS HERE ---
-          // Proceed तभी Enable करें जब Variant हो और विशेष रूप से SIZE भी चुना गया हो
+        
           setProceedUI(!!(sel.size && sel.variant && sel.variant.id));
         });
         popupColors.appendChild(clone);
@@ -251,9 +238,7 @@
       Array.from(sizeSet).forEach((size) => {
         const sizeBtn = document.createElement('button');
         sizeBtn.className = 'size-btn';
-        
-        // Active class logic
-        if (sel.size && sel.size === size) {
+                if (sel.size && sel.size === size) {
             sizeBtn.classList.add('active');
         }
 
@@ -261,14 +246,11 @@
         sizeBtn.addEventListener('click', () => {
           popupSizes.querySelectorAll('.size-btn').forEach((b) => b.classList.remove('active'));
           sizeBtn.classList.add('active');
-          sel.size = size; // साइज सेट हुआ
+          sel.size = size; 
           sel.variant = findVariant(product, sel);
           renderPrices(sel.variant);
           renderImage(sel.variant, product);
           saveVariantToLS(sel.variant);
-          
-          // --- MAIN FIX ---
-          // यहाँ भी sel.size का होना जरूरी है
           setProceedUI(!!(sel.size && sel.variant && sel.variant.id)); 
         });
         popupSizes.appendChild(sizeBtn);
@@ -313,13 +295,9 @@
         const productCard = button.closest('.carat-item');
         const productId = productCard && productCard.dataset.productId;
         const caratValue = (button.dataset.carat || '').toUpperCase();
-
-        // Get the currently active color from the card
         const activeColorBtn = productCard.querySelector('.color-option.active');
         const preSelectedColor = activeColorBtn ? (activeColorBtn.dataset.color || activeColorBtn.title || '') : null;
-        
-        // Get the current image and price from the card
-        const cardImg = productCard.querySelector('.product-img');
+                const cardImg = productCard.querySelector('.product-img');
         const preSelectedImage = cardImg ? cardImg.src : null;
         const cardPrice = productCard.querySelector('.price-text');
         const preSelectedPrice = cardPrice ? cardPrice.textContent : null;
@@ -342,23 +320,17 @@
         setProceedUI(false);
         popup.classList.remove('proceed-active');
         popupTitle.textContent = currentProduct?.title || '';
-        
-        // Set the popup image to the selected variant image from the card
-        if (popupImg && preSelectedImage) {
+                if (popupImg && preSelectedImage) {
           popupImg.src = preSelectedImage;
           popupImg.alt = currentProduct?.title || 'Product image';
           popupImg.style.display = '';
         } else {
           renderImage(null, currentProduct);
         }
-        
-        // Set the popup price to the selected variant price from the card
-        if (popupPrice && preSelectedPrice) {
+                if (popupPrice && preSelectedPrice) {
           popupPrice.textContent = preSelectedPrice;
         }
-        
-        // Set compare price if exists
-        if (popupCompare) {
+                if (popupCompare) {
           if (preSelectedComparePrice) {
             popupCompare.textContent = preSelectedComparePrice;
             popupCompare.style.display = '';
@@ -367,9 +339,7 @@
             popupCompare.style.display = 'none';
           }
         }
-        
-        // Build color buttons but skip initial render since we already set image/price
-        buildColorButtonsFromCard(productCard, preSelectedColor, true);
+                buildColorButtonsFromCard(productCard, preSelectedColor, true);
         buildSizeButtons(currentProduct);
         popup.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -494,7 +464,6 @@ function closePopup() {
         label.insertAdjacentHTML('afterbegin', `<span class="carat-value">${caratValue}</span> `);
       }
 
-      // Filter charms by selected carat before showing them
       if (window.filterCharmsBySelectedVariantCarat) {
         window.filterCharmsBySelectedVariantCarat();
       }
