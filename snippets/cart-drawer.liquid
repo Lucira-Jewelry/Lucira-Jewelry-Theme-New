@@ -140,13 +140,16 @@
                   <tbody role="rowgroup">
                     {%- for item in cart.items -%}
 
-                      {% if item.parent_relationship.parent == null %}
+                     {% if item.properties._bundle_type == 'base' %}
+
                       {% assign children_total_price = 0 %}
                             {% assign has_children = false %}
 
                             {% for child in cart.items %}
-                              {% if child.parent_relationship.parent != null
-                                and child.parent_relationship.parent.key == item.key %}
+                             {% if
+                                    child.properties._bundle_id == item.properties._bundle_id
+                                    and child.properties._bundle_type == 'charm'
+                                  %}
                                 {% assign has_children = true %}
                                 {% assign children_total_price = children_total_price | plus: child.final_line_price %}
                               {% endif %}
@@ -301,10 +304,12 @@
                             <div class="view_cart_product">
                               {% if has_children %}
                                 <p
-                                class="toggle-children-btn"
-                                data-parent-key="{{ item.key }}"
-                                aria-expanded="false"
-                              >
+  class="toggle-children-btn"
+  data-parent-key="{{ item.key }}"
+  data-bundle-id="{{ item.properties._bundle_id }}"
+  aria-expanded="false"
+>
+
                                 <span class="toggle-text">View Breakup</span>
                                 <span class="toggle-arrow">
                                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none">
@@ -322,6 +327,8 @@
   class="parent-remove-btn"
   data-parent-key="{{ item.key }}"
   aria-label="Remove product"
+  data-bundle-id="{{ item.properties._bundle_id }}"
+
 >
   ✕
 </button>
@@ -517,11 +524,15 @@
   headers="CartItem-Components"
   class="cart-item_components"
   data-parent-key="{{ item.key }}"
+  data-bundle-id="{{ item.properties._bundle_id }}"
 >
 
+
                           {% for child in cart.items %}
-                            {% if child.parent_relationship.parent != null and child.parent_relationship.parent.key == item.key %}
-                              <div class="component_item">
+{% if
+    child.properties._bundle_id == item.properties._bundle_id
+    and child.properties._bundle_type == 'charm'
+  %}                              <div class="component_item">
                                 <div class="commponent_item_image">
                                   {% if child.image %}
                                     <img
@@ -883,21 +894,23 @@ document.addEventListener('click', function (e) {
   const btn = e.target.closest('.toggle-children-btn');
   if (!btn) return;
 
-  e.preventDefault(); // important for SVG clicks
+  e.preventDefault();
 
-  const parentKey = btn.dataset.parentKey;
+  const bundleId = btn.dataset.bundleId;
+  if (!bundleId) return;
+
   const childContainer = document.querySelector(
-    '.cart-item_components[data-parent-key="' + parentKey + '"]'
+    '.cart-item_components[data-bundle-id="' + bundleId + '"]'
   );
 
   if (!childContainer) return;
 
   const isOpen = btn.getAttribute('aria-expanded') === 'true';
 
-  // Toggle
   btn.setAttribute('aria-expanded', String(!isOpen));
   childContainer.style.display = isOpen ? 'none' : 'block';
 });
+
 </script>
 
 <script>
@@ -908,8 +921,8 @@ document.addEventListener('click', async function (e) {
   e.preventDefault();
   e.stopPropagation();
 
-  const parentKey = btn.dataset.parentKey;
-  if (!parentKey) return;
+  const bundleId = btn.dataset.bundleId;
+  if (!bundleId) return;
 
   // 🔹 Smooth animation first
   const row = btn.closest('.cart-item');
@@ -920,13 +933,10 @@ document.addEventListener('click', async function (e) {
     const cartRes = await fetch('/cart.js');
     const cart = await cartRes.json();
 
-    // 2️⃣ Build updates (parent + children)
+    // 2️⃣ Build updates (remove whole bundle)
     const updates = {};
     cart.items.forEach(item => {
-      if (
-        item.key === parentKey ||
-        item.parent_relationship?.parent?.key === parentKey
-      ) {
+      if (item.properties?._bundle_id === bundleId) {
         updates[item.key] = 0;
       }
     });
@@ -940,7 +950,7 @@ document.addEventListener('click', async function (e) {
 
     const updatedCart = await updateRes.json();
 
-    // 4️⃣ 🔥 Refresh cart drawer HTML (NO refresh)
+    // 4️⃣ Refresh cart drawer HTML
     const sectionRes = await fetch(
       `${window.location.pathname}?sections=cart-drawer`
     );
@@ -956,7 +966,7 @@ document.addEventListener('click', async function (e) {
       oldDrawer.replaceWith(newDrawer);
     }
 
-    // 5️⃣ 🔔 UPDATE CART BUBBLE (THIS WAS MISSING)
+    // 5️⃣ Update cart bubble
     document.dispatchEvent(
       new CustomEvent('cart:change', {
         bubbles: true,
@@ -968,6 +978,7 @@ document.addEventListener('click', async function (e) {
     console.error('Remove failed', err);
   }
 });
+
 </script>
 
 
