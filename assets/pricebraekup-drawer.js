@@ -167,12 +167,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function openDrawer(){
     backdrop.style.display = 'flex';
+    document.body.classList.add('drawer-open');
     setTimeout(() => drawer.classList.add('open'), 20);
     setTimeout(populate, 30);
   }
 
   function closeDrawer(){
     drawer.classList.remove('open');
+    document.body.classList.remove('drawer-open');
     setTimeout(() => backdrop.style.display='none', 280);
   }
 
