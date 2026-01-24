@@ -300,10 +300,8 @@ if (!customElements.get('media-gallery')) {
       const diffX = startX - e.changedTouches[0].clientX;
       const diffY = startY - e.changedTouches[0].clientY;
       
-      // Ignore vertical scrolls
       if (Math.abs(diffY) > Math.abs(diffX) || Math.abs(diffX) < 40) return;
       
-      // Loop forward or backward
       diffX > 0 ? moveSlide(1) : moveSlide(-1);
     }, { passive: true });
   }
@@ -314,31 +312,21 @@ if (!customElements.get('media-gallery')) {
     if (isMobile()) {
       mediaList.style.overflowX = 'hidden';
       mediaList.style.display = 'flex';
-      mediaList.style.gap = '0';
       mediaList.style.scrollSnapType = 'none';
-      mediaList.style.touchAction = 'pan-y pinch-zoom';
 
-      const slides = getVisibleSlides();
-      slides.forEach(slide => {
+      // Refresh slide widths
+      visibleSlides = getVisibleSlides();
+      visibleSlides.forEach(slide => {
         slide.style.minWidth = '100%';
         slide.style.width = '100%';
-        slide.style.margin = '0';
         slide.style.flexShrink = '0';
       });
       createDotsNavigation();
     } else {
-      mediaList.style.overflowX = '';
       mediaList.style.display = '';
-      mediaList.style.gap = '';
-      mediaList.style.scrollSnapType = '';
-      mediaList.style.touchAction = '';
-      
-      const slides = Array.from(mediaList.querySelectorAll('.product__media-item'));
-      slides.forEach(slide => {
-        slide.style.minWidth = '';
-        slide.style.width = '';
-        slide.style.margin = '';
-        slide.style.flexShrink = '';
+      const allSlides = Array.from(mediaList.querySelectorAll('.product__media-item'));
+      allSlides.forEach(slide => {
+        slide.style.minWidth = ''; slide.style.width = '';
       });
       if (dotsContainer) dotsContainer.remove();
     }
@@ -348,11 +336,21 @@ if (!customElements.get('media-gallery')) {
   function safeReorderByColor(targetColor) {
     if (isReordering || !mediaList) return;
     isReordering = true;
+
     reorderByColor(targetColor);
+    
     currentSlide = 0;
+    visibleSlides = getVisibleSlides();
+    totalSlides = visibleSlides.length;
+
     initSliderNavigation();
+    updateDots();
+
+    if (isMobile()) {
+      mediaList.scrollLeft = 0; 
+    }
+
     setTimeout(() => {
-      if (mediaList && isMobile()) mediaList.scrollTo({ left: 0 });
       isReordering = false;
     }, 150);
   }
