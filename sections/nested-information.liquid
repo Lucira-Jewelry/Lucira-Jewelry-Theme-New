@@ -1,0 +1,714 @@
+{% comment %}
+Nested Information Page Section with Multi-level Tabs
+Full schema-driven customization for Shopify
+Flat block structure (no nested blocks)
+{% endcomment %}
+
+<div class="nested-info-wrapper" data-section-id="{{ section.id }}">
+  <!-- BANNER SECTION -->
+  <div class="banner-container">
+    <!-- Desktop Banner -->
+    <picture class="banner-image banner-desktop">
+      {% if section.settings.banner_image_desktop %}
+        {{ section.settings.banner_image_desktop | image_url: width: 1920 | image_tag: loading: 'lazy', alt: section.settings.banner_alt_text }}
+      {% else %}
+        <div class="placeholder">Desktop Banner</div>
+      {% endif %}
+    </picture>
+
+    <!-- Mobile Banner -->
+    <picture class="banner-image banner-mobile">
+      {% if section.settings.banner_image_mobile %}
+        {{ section.settings.banner_image_mobile | image_url: width: 768 | image_tag: loading: 'lazy', alt: section.settings.banner_alt_text }}
+      {% else %}
+        <div class="placeholder">Mobile Banner</div>
+      {% endif %}
+    </picture>
+
+    <!-- Primary Tabs (Bottom of Banner) -->
+    <div class="primary-tabs-container">
+      <div class="primary-tabs">
+        {% for block in section.blocks %}
+          {% if block.type == 'primary_tab' %}
+            <button 
+              class="primary-tab-btn {% if forloop.first %}active{% endif %}" 
+              data-tab-name="{{ block.settings.tab_name | escape }}"
+              data-tab-index="{{ forloop.index0 }}"
+            >
+              {{ block.settings.tab_name }}
+            </button>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- CONTENT SECTION -->
+  <div class="content-wrapper">
+    {% for block in section.blocks %}
+      {% if block.type == 'primary_tab' %}
+        <div class="primary-tab-content {% if forloop.first %}active{% endif %}" data-primary-tab="{{ block.settings.tab_name | escape }}">
+          
+          <!-- Secondary Tabs (Info Tabs) -->
+          {% if block.settings.show_secondary_tabs %}
+            {% assign info_tabs_for_primary = '' %}
+            {% for sub_block in section.blocks %}
+              {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
+                {% if info_tabs_for_primary == '' %}
+                  {% assign info_tabs_for_primary = sub_block.settings.info_tab_name %}
+                {% else %}
+                  {% assign info_tabs_for_primary = info_tabs_for_primary | append: '|' | append: sub_block.settings.info_tab_name %}
+                {% endif %}
+              {% endif %}
+            {% endfor %}
+
+            {% if info_tabs_for_primary != '' %}
+              <div class="secondary-tabs">
+                {% for sub_block in section.blocks %}
+                  {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
+                    <button 
+                      class="secondary-tab-btn {% if forloop.first %}active{% endif %}" 
+                      data-info-tab="{{ sub_block.settings.info_tab_name | escape }}"
+                    >
+                      {{ sub_block.settings.info_tab_name }}
+                    </button>
+                  {% endif %}
+                {% endfor %}
+              </div>
+            {% endif %}
+          {% endif %}
+
+          <!-- Info Tabs Content -->
+          {% for sub_block in section.blocks %}
+            {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
+              <div class="info-tab-content {% if forloop.first %}active{% endif %}" data-info-content="{{ sub_block.settings.info_tab_name | escape }}">
+                
+                <div class="info-layout">
+                  <!-- Image Column -->
+                  <div class="info-image-col">
+                    {% if sub_block.settings.info_image %}
+                      {{ sub_block.settings.info_image | image_url: width: 500 | image_tag: loading: 'lazy', alt: sub_block.settings.info_image_alt }}
+                    {% else %}
+                      <div class="placeholder info-placeholder">Image</div>
+                    {% endif %}
+
+                    <!-- Info Tab Button -->
+                    {% if sub_block.settings.button_text %}
+                      <a href="{{ sub_block.settings.button_link }}" class="info-btn">
+                        {{ sub_block.settings.button_text }}
+                      </a>
+                    {% endif %}
+                  </div>
+
+                  <!-- Content Column -->
+                  <div class="info-content-col">
+                    <h2 class="info-header">{{ sub_block.settings.info_header }}</h2>
+                    <div class="info-description">{{ sub_block.settings.info_description }}</div>
+
+                    <!-- Related Topics Section -->
+                    {% if sub_block.settings.show_related_topics %}
+                      {% assign related_blogs = '' %}
+                      {% for rel_block in section.blocks %}
+                        {% if rel_block.type == 'related_blog' and rel_block.settings.parent_info_tab_name == sub_block.settings.info_tab_name %}
+                          {% if related_blogs == '' %}
+                            {% assign related_blogs = 'found' %}
+                          {% endif %}
+                        {% endif %}
+                      {% endfor %}
+
+                      {% if related_blogs == 'found' %}
+                        <div class="related-topics">
+                          <h3>Related Topics</h3>
+                          <div class="topics-list">
+                            {% for rel_block in section.blocks %}
+                              {% if rel_block.type == 'related_blog' and rel_block.settings.parent_info_tab_name == sub_block.settings.info_tab_name %}
+                                <div class="topic-item">
+                                  <a href="{{ rel_block.settings.blog_link }}">
+                                    {{ rel_block.settings.blog_title }}
+                                  </a>
+                                </div>
+                              {% endif %}
+                            {% endfor %}
+                          </div>
+                        </div>
+                      {% endif %}
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+  .nested-info-wrapper {
+    width: 100%;
+  }
+
+  /* Banner Styles */
+  .banner-container {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .banner-image {
+    width: 100%;
+    display: block;
+  }
+
+  .banner-desktop {
+    display: block;
+  }
+
+  .banner-mobile {
+    display: none;
+  }
+
+  .banner-image img {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  .placeholder {
+    background: #f0f0f0;
+    height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #999;
+    font-size: 18px;
+  }
+
+  /* Primary Tabs */
+  .primary-tabs-container {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 0;
+    position: relative;
+  }
+
+  .primary-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .primary-tab-btn {
+    padding: 16px 24px;
+    background: transparent;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+  }
+
+  .primary-tab-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .primary-tab-btn.active {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Content Area */
+  .content-wrapper {
+    background: #fff;
+  }
+
+  .primary-tab-content {
+    display: none;
+    padding: 60px 40px;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .primary-tab-content.active {
+    display: block;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Secondary Tabs (Info Tabs) */
+  .secondary-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 40px;
+    border-bottom: 1px solid #e5e5e5;
+    padding-bottom: 0;
+  }
+
+  .secondary-tab-btn {
+    padding: 12px 20px;
+    background: transparent;
+    border: none;
+    color: #999;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+  }
+
+  .secondary-tab-btn:hover {
+    color: #666;
+  }
+
+  .secondary-tab-btn.active {
+    color: #000;
+    border-bottom-color: #000;
+  }
+
+  /* Info Tab Content */
+  .info-tab-content {
+    display: none;
+  }
+
+  .info-tab-content.active {
+    display: block;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .info-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: flex-start;
+  }
+
+  .info-image-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .info-image-col img {
+    width: 100%;
+    height: auto;
+  }
+
+  .info-placeholder {
+    aspect-ratio: 4/5;
+    background: #f0f0f0;
+    border-radius: 4px;
+  }
+
+  .info-btn {
+    display: inline-block;
+    padding: 12px 32px;
+    background: #8b7b7b;
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-radius: 4px;
+    transition: background 0.3s ease;
+    cursor: pointer;
+    border: none;
+  }
+
+  .info-btn:hover {
+    background: #6d5f5f;
+  }
+
+  .info-content-col {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .info-header {
+    font-size: 28px;
+    font-weight: 600;
+    color: #000;
+    margin: 0;
+  }
+
+  .info-description {
+    font-size: 14px;
+    line-height: 1.8;
+    color: #333;
+    margin: 0;
+  }
+
+  .info-description p {
+    margin: 0;
+  }
+
+  /* Related Topics */
+  .related-topics {
+    margin-top: 30px;
+    padding-top: 30px;
+    border-top: 1px solid #e5e5e5;
+  }
+
+  .related-topics h3 {
+    font-size: 14px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #000;
+    margin: 0 0 20px 0;
+  }
+
+  .topics-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .topic-item {
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .topic-item a {
+    color: #333;
+    text-decoration: none;
+    font-size: 13px;
+    transition: color 0.3s ease;
+  }
+
+  .topic-item a:hover {
+    color: #666;
+  }
+
+  .topic-item:last-child {
+    border-bottom: none;
+  }
+
+  /* Mobile Responsive */
+  @media (max-width: 768px) {
+    .banner-desktop {
+      display: none;
+    }
+
+    .banner-mobile {
+      display: block;
+    }
+
+    .primary-tabs {
+      justify-content: flex-start;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .primary-tab-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .content-wrapper {
+      padding: 30px 20px;
+    }
+
+    .primary-tab-content {
+      padding: 30px 0;
+    }
+
+    .secondary-tabs {
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 30px;
+    }
+
+    .info-layout {
+      grid-template-columns: 1fr;
+      gap: 30px;
+    }
+
+    .info-header {
+      font-size: 22px;
+    }
+
+    .secondary-tab-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    const wrapper = document.querySelector('[data-section-id="{{ section.id }}"]');
+    
+    if (!wrapper) return;
+
+    // Primary Tab Click Handler
+    const primaryTabBtns = wrapper.querySelectorAll('.primary-tab-btn');
+    primaryTabBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const tabName = this.dataset.tabName;
+        
+        // Remove active from all primary tabs and content
+        primaryTabBtns.forEach(b => b.classList.remove('active'));
+        wrapper.querySelectorAll('.primary-tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Add active to clicked tab
+        this.classList.add('active');
+        wrapper.querySelector(`[data-primary-tab="${tabName}"]`).classList.add('active');
+        
+        // Reset secondary tabs to first
+        resetSecondaryTabs(tabName);
+      });
+    });
+
+    // Secondary Tab (Info Tab) Click Handler
+    const secondaryTabBtns = wrapper.querySelectorAll('.secondary-tab-btn');
+    secondaryTabBtns.forEach(btn => {
+      btn.addEventListener('click', function() {
+        const infoTabName = this.dataset.infoTab;
+        const parent = this.closest('.primary-tab-content');
+        
+        if (!parent) return;
+        
+        // Remove active from all secondary tabs and content in this section
+        parent.querySelectorAll('.secondary-tab-btn').forEach(b => {
+          b.classList.remove('active');
+        });
+        parent.querySelectorAll('.info-tab-content').forEach(content => {
+          content.classList.remove('active');
+        });
+        
+        // Add active to clicked tab
+        this.classList.add('active');
+        parent.querySelector(`[data-info-content="${infoTabName}"]`).classList.add('active');
+      });
+    });
+
+    function resetSecondaryTabs(primaryTabName) {
+      const parent = wrapper.querySelector(`[data-primary-tab="${primaryTabName}"]`);
+      if (parent) {
+        const firstSecondaryBtn = parent.querySelector('.secondary-tab-btn');
+        if (firstSecondaryBtn) {
+          firstSecondaryBtn.click();
+        }
+      }
+    }
+
+    // Click first tab on load
+    if (primaryTabBtns.length > 0) {
+      primaryTabBtns[0].click();
+    }
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Nested Information Page",
+  "settings": [
+    {
+      "type": "image_picker",
+      "id": "banner_image_desktop",
+      "label": "Banner Image - Desktop"
+    },
+    {
+      "type": "image_picker",
+      "id": "banner_image_mobile",
+      "label": "Banner Image - Mobile"
+    },
+    {
+      "type": "text",
+      "id": "banner_alt_text",
+      "label": "Banner Image Alt Text",
+      "default": "Banner"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "primary_tab",
+      "name": "Primary Tab",
+      "settings": [
+        {
+          "type": "text",
+          "id": "tab_name",
+          "label": "Primary Tab Name",
+          "default": "New Tab"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_secondary_tabs",
+          "label": "Show Information Sub-tabs",
+          "default": true
+        }
+      ]
+    },
+    {
+      "type": "info_tab",
+      "name": "Information Tab",
+      "settings": [
+        {
+          "type": "text",
+          "id": "parent_tab_name",
+          "label": "Parent Primary Tab Name",
+          "info": "Enter the exact name of the primary tab this belongs to (e.g., 'Engagement')",
+          "default": "Primary Tab"
+        },
+        {
+          "type": "text",
+          "id": "info_tab_name",
+          "label": "Information Tab Name",
+          "default": "Style"
+        },
+        {
+          "type": "image_picker",
+          "id": "info_image",
+          "label": "Product/Feature Image"
+        },
+        {
+          "type": "text",
+          "id": "info_image_alt",
+          "label": "Image Alt Text",
+          "default": "Product"
+        },
+        {
+          "type": "text",
+          "id": "info_header",
+          "label": "Information Header",
+          "default": "SOLITAIRE"
+        },
+        {
+          "type": "richtext",
+          "id": "info_description",
+          "label": "Information Description",
+          "default": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>"
+        },
+        {
+          "type": "text",
+          "id": "button_text",
+          "label": "Button Text",
+          "default": "EXPLORE MORE"
+        },
+        {
+          "type": "url",
+          "id": "button_link",
+          "label": "Button Link"
+        },
+        {
+          "type": "checkbox",
+          "id": "show_related_topics",
+          "label": "Show Related Topics Section",
+          "default": true
+        }
+      ]
+    },
+    {
+      "type": "related_blog",
+      "name": "Related Blog/Topic",
+      "settings": [
+        {
+          "type": "text",
+          "id": "parent_info_tab_name",
+          "label": "Parent Info Tab Name",
+          "info": "Enter the exact name of the information tab this belongs to (e.g., 'Style')",
+          "default": "Style"
+        },
+        {
+          "type": "text",
+          "id": "blog_title",
+          "label": "Blog/Topic Title",
+          "default": "Related Topic"
+        },
+        {
+          "type": "url",
+          "id": "blog_link",
+          "label": "Blog/Topic Link"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Nested Information Page",
+      "settings": {
+        "banner_alt_text": "Banner"
+      },
+      "blocks": [
+        {
+          "type": "primary_tab",
+          "settings": {
+            "tab_name": "Lab Grown Diamonds",
+            "show_secondary_tabs": true
+          }
+        },
+        {
+          "type": "primary_tab",
+          "settings": {
+            "tab_name": "Engagement",
+            "show_secondary_tabs": true
+          }
+        },
+        {
+          "type": "info_tab",
+          "settings": {
+            "parent_tab_name": "Engagement",
+            "info_tab_name": "Style",
+            "info_header": "SOLITAIRE",
+            "info_description": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>",
+            "button_text": "EXPLORE MORE",
+            "show_related_topics": true
+          }
+        },
+        {
+          "type": "info_tab",
+          "settings": {
+            "parent_tab_name": "Engagement",
+            "info_tab_name": "Settings",
+            "info_header": "SETTINGS",
+            "info_description": "<p>Explore different settings and their characteristics.</p>",
+            "button_text": "VIEW SETTINGS",
+            "show_related_topics": true
+          }
+        },
+        {
+          "type": "related_blog",
+          "settings": {
+            "parent_info_tab_name": "Style",
+            "blog_title": "Why Solitaires Remain the Most Loved Diamond Style",
+            "blog_link": "#"
+          }
+        },
+        {
+          "type": "related_blog",
+          "settings": {
+            "parent_info_tab_name": "Style",
+            "blog_title": "5 Hidden Solitaire Ring Details You Should Never Ignore",
+            "blog_link": "#"
+          }
+        },
+        {
+          "type": "related_blog",
+          "settings": {
+            "parent_info_tab_name": "Settings",
+            "blog_title": "Guide to Diamond Settings",
+            "blog_link": "#"
+          }
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
