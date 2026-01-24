@@ -248,86 +248,78 @@
   }
 
   const verifyBtn = document.getElementById('verifyOtp');
-  if (verifyBtn) {
+if (verifyBtn) {
     verifyBtn.addEventListener('click', async () => {
-      const otp = [...document.querySelectorAll('.otp-inputs input')]
+        const otp = [...document.querySelectorAll('.otp-inputs input')]
         .map(i => i.value)
         .join('');
-      const mobile = document.getElementById('otpMobile')
-        .value.replace(/\s+/g,'').trim();
-      
-      if (otp.length !== 4) {
+
+        const mobile = document.getElementById('otpMobile')
+        .value.replace(/\s+/g,'')
+        .trim();
+
+        if (otp.length !== 4) {
         showError('otpError', 'Please enter a valid 4-digit OTP');
-        document.querySelectorAll('.otp-inputs input').forEach(input => {
-          input.style.border = '1px solid red';
-        });
         return;
-      }
-      hideError('otpError');
-      document.querySelectorAll('.otp-inputs input').forEach(input => {
-        input.style.border = '';
-      });
+        }
 
-      const verifyButton = document.getElementById('verifyOtp');
-      const originalText = verifyButton.textContent;
-      verifyButton.textContent = 'Verifying...';
-      verifyButton.disabled = true;
+        hideError('otpError');
 
-      try {
+        verifyBtn.textContent = 'Verifying...';
+        verifyBtn.disabled = true;
+
+        try {
         const res = await fetch(
-          'https://otp-verification-385594025448.asia-south1.run.app',
-          {
+            'https://otp-verification-385594025448.asia-south1.run.app',
+            {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ otp, mobile })
-          }
+            }
         );
 
         const data = await res.json();
-        console.log('OTP Verification Response:', data);
 
+        /* 🔐 EXISTING USER → AUTO LOGIN */
         if (data.type === 'success' && data.credentials) {
-
-          window.dataLayer = window.dataLayer || [];
-          dataLayer.push({
+            window.dataLayer = window.dataLayer || [];
+            dataLayer.push({
             event: 'login',
             User: {
-              email: data.credentials.email,
-              mobile: mobile,
-              source: new URLSearchParams(window.location.search).get('utm_source') || '',
-              medium: new URLSearchParams(window.location.search).get('utm_medium') || '',
-              campaign: new URLSearchParams(window.location.search).get('utm_campaign') || ''
+                email: data.credentials.email,
+                mobile: mobile
             }
-          });
+            });
 
-          console.log('Logging in automatically...');
-          shopifyAutoLogin(data.credentials.email, data.credentials.password);
-          return;
+            shopifyAutoLogin(
+            data.credentials.email,
+            data.credentials.password
+            );
+            return;
         }
 
-
+        /* 🆕 NEW USER → SHOW SIGNUP + SPIN */
         if (data.type === 'register') {
-          document.getElementById('otpSection').style.display = 'none';
-          document.querySelector('.signupSection').style.display = 'block';
-          document.getElementById('signupMobile').value = mobile;
-          document.getElementById('signupMobile').readOnly = true;
-          verifyButton.textContent = originalText;
-          verifyButton.disabled = false;
-          return;
+            document.getElementById('signupMobile').value = mobile;
+            showSignupWithSpinWheel();
+
+            verifyBtn.textContent = 'VERIFY OTP';
+            verifyBtn.disabled = false;
+            return;
         }
 
-        showError('otpError', data.msg || 'Invalid OTP. Please try again.');
-        verifyButton.textContent = originalText;
-        verifyButton.disabled = false;
+        showError('otpError', data.msg || 'Invalid OTP');
 
-      } catch (error) {
-        console.error('Error during verification:', error);
-        showError('otpError', 'Something went wrong. Please try again.');
-        verifyButton.textContent = originalText;
-        verifyButton.disabled = false;
-      }
+        } catch (err) {
+        console.error(err);
+        showError('otpError', 'Something went wrong');
+        }
+
+        verifyBtn.textContent = 'VERIFY OTP';
+        verifyBtn.disabled = false;
     });
-  }
+    }
+
 
   const regBtn = document.getElementById('completeRegistration');
   if (regBtn) {
