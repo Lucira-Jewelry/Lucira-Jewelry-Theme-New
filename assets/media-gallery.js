@@ -459,15 +459,9 @@ if (!customElements.get('media-gallery')) {
     if (sliderButtons) sliderButtons.style.display = 'none';
 
     createDotsNavigation();
-
-    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
-    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
     if (!isMobile) {
       setupSwipeDetection();
     }
-
-    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
-    // This was previously inside the !isMobile check, causing dots to fail on mobile.
     setupScrollSync();
   }
 
