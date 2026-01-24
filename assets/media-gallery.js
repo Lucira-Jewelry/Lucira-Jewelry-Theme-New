@@ -118,7 +118,6 @@ if (!customElements.get('media-gallery')) {
   let totalSlides = 0;
   let dotsContainer = null;
   let mediaList = null;
-  let observer = null;
   let isReordering = false;
   let visibleSlides = [];
   let isSwiping = false;
@@ -167,8 +166,6 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
-      } else {
-        item.style.display = 'none';
       }
     });
     return { buckets, allItems: items };
@@ -192,7 +189,6 @@ if (!customElements.get('media-gallery')) {
     }
     Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
     buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
-    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
     return ordered;
   }
 
@@ -201,9 +197,25 @@ if (!customElements.get('media-gallery')) {
     const ordered = buildRepeatedPattern(buckets);
     const container = allItems[0]?.parentNode;
     if (!container) return;
+
+    // FIX 1: Hide all items immediately to prevent "wrong" images showing during move
+    allItems.forEach(item => item.style.display = 'none');
+
+    // FIX 2: Set high priority on the new first image
+    if (ordered.length > 0) {
+      const firstImg = ordered[0].querySelector('img');
+      if (firstImg) {
+        firstImg.setAttribute('loading', 'eager');
+        firstImg.setAttribute('fetchpriority', 'high');
+      }
+      ordered.forEach(node => node.style.display = 'block');
+    }
+
+    // FIX 3: Atomic reorder using DocumentFragment
     const fragment = document.createDocumentFragment();
     ordered.forEach(node => fragment.appendChild(node));
     container.appendChild(fragment);
+    
     return ordered;
   }
 
@@ -249,7 +261,6 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // Boundary check is still important, but moveSlide handles the wrap-around
     if (index < 0 || index >= totalSlides || isReordering || isSwiping || !isMobile()) return;
     
     isSwiping = true;
@@ -260,26 +271,15 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     if (targetSlide && mediaList) {
       const targetScrollLeft = targetSlide.offsetLeft - (mediaList.clientWidth / 2) + (targetSlide.clientWidth / 2);
-      
-      mediaList.scrollTo({ 
-        left: targetScrollLeft, 
-        behavior: 'smooth' 
-      });
+      mediaList.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
     }
-
-    // Delay to unlock swiping
     setTimeout(() => { isSwiping = false; }, 500);
   }
 
   function moveSlide(direction) {
     let nextIndex = currentSlide + direction;
-    
-    if (nextIndex < 0) {
-      nextIndex = totalSlides - 1; // Go to last slide
-    } else if (nextIndex >= totalSlides) {
-      nextIndex = 0; // Go back to first slide
-    }
-    
+    if (nextIndex < 0) nextIndex = totalSlides - 1;
+    else if (nextIndex >= totalSlides) nextIndex = 0;
     goToSlide(nextIndex);
   }
 
@@ -299,18 +299,13 @@ if (!customElements.get('media-gallery')) {
       isTouching = false;
       const diffX = startX - e.changedTouches[0].clientX;
       const diffY = startY - e.changedTouches[0].clientY;
-      
-      // Ignore vertical scrolls
       if (Math.abs(diffY) > Math.abs(diffX) || Math.abs(diffX) < 40) return;
-      
-      // Loop forward or backward
       diffX > 0 ? moveSlide(1) : moveSlide(-1);
     }, { passive: true });
   }
 
   function initSliderNavigation() {
     if (!mediaList) return;
-
     if (isMobile()) {
       mediaList.style.overflowX = 'hidden';
       mediaList.style.display = 'flex';
@@ -331,14 +326,9 @@ if (!customElements.get('media-gallery')) {
       mediaList.style.display = '';
       mediaList.style.gap = '';
       mediaList.style.scrollSnapType = '';
-      mediaList.style.touchAction = '';
-      
       const slides = Array.from(mediaList.querySelectorAll('.product__media-item'));
       slides.forEach(slide => {
-        slide.style.minWidth = '';
-        slide.style.width = '';
-        slide.style.margin = '';
-        slide.style.flexShrink = '';
+        slide.style.minWidth = ''; slide.style.width = ''; slide.style.margin = ''; slide.style.flexShrink = '';
       });
       if (dotsContainer) dotsContainer.remove();
     }
@@ -381,10 +371,8 @@ if (!customElements.get('media-gallery')) {
     if (!mediaList) return;
     currentSelectedColor = getSelectedColor();
     safeReorderByColor(currentSelectedColor);
-    
     document.addEventListener('variant:change', debouncedHandleColorChange);
     window.addEventListener('resize', debounce(initSliderNavigation, 200));
-    
     isInitialized = true;
   }
   
