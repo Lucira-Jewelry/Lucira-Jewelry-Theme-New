@@ -386,7 +386,7 @@ if (!customElements.get('media-gallery')) {
     
     isInitialized = true;
   }
-
+  
   document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', initialize) : initialize();
 })();
 
