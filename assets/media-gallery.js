@@ -122,7 +122,6 @@ if (!customElements.get('media-gallery')) {
   let visibleSlides = [];
   let isSwiping = false;
 
-  // --- HELPER: CHECK IF MOBILE ---
   const isMobile = () => window.innerWidth < 750;
 
   function cacheDOMElements() {
@@ -214,7 +213,7 @@ if (!customElements.get('media-gallery')) {
 
   function createDotsNavigation() {
     if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
-    if (!mediaList || !isMobile()) return; // ONLY ON MOBILE
+    if (!mediaList || !isMobile()) return;
 
     visibleSlides = getVisibleSlides();
     totalSlides = visibleSlides.length;
@@ -249,7 +248,9 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
+    // Boundary check is still important, but moveSlide handles the wrap-around
     if (index < 0 || index >= totalSlides || isReordering || isSwiping || !isMobile()) return;
+    
     isSwiping = true;
     currentSlide = index;
     visibleSlides = getVisibleSlides();
@@ -258,13 +259,26 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     if (targetSlide && mediaList) {
       const targetScrollLeft = targetSlide.offsetLeft - (mediaList.clientWidth / 2) + (targetSlide.clientWidth / 2);
-      mediaList.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+      
+      mediaList.scrollTo({ 
+        left: targetScrollLeft, 
+        behavior: 'smooth' 
+      });
     }
+
+    // Delay to unlock swiping
     setTimeout(() => { isSwiping = false; }, 500);
   }
 
   function moveSlide(direction) {
-    let nextIndex = Math.max(0, Math.min(totalSlides - 1, currentSlide + direction));
+    let nextIndex = currentSlide + direction;
+    
+    if (nextIndex < 0) {
+      nextIndex = totalSlides - 1; // Go to last slide
+    } else if (nextIndex >= totalSlides) {
+      nextIndex = 0; // Go back to first slide
+    }
+    
     goToSlide(nextIndex);
   }
 
@@ -274,7 +288,8 @@ if (!customElements.get('media-gallery')) {
 
     mediaList.addEventListener('touchstart', (e) => {
       if (isSwiping || !isMobile()) return;
-      startX = e.touches[0].clientX; startY = e.touches[0].clientY;
+      startX = e.touches[0].clientX; 
+      startY = e.touches[0].clientY;
       isTouching = true;
     }, { passive: true });
 
@@ -283,7 +298,11 @@ if (!customElements.get('media-gallery')) {
       isTouching = false;
       const diffX = startX - e.changedTouches[0].clientX;
       const diffY = startY - e.changedTouches[0].clientY;
+      
+      // Ignore vertical scrolls
       if (Math.abs(diffY) > Math.abs(diffX) || Math.abs(diffX) < 40) return;
+      
+      // Loop forward or backward
       diffX > 0 ? moveSlide(1) : moveSlide(-1);
     }, { passive: true });
   }
