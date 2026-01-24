@@ -32,8 +32,9 @@ if (!customElements.get('media-gallery')) {
         const activeMedia =
           this.elements.viewer.querySelector(`[data-media-id="${mediaId}"]`) ||
           this.elements.viewer.querySelector('[data-media-id]');
-        if (!activeMedia) return;
-        
+        if (!activeMedia) {
+          return;
+        }
         this.elements.viewer.querySelectorAll('[data-media-id]').forEach((element) => {
           element.classList.remove('is-active');
         });
