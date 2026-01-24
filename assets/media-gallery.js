@@ -602,7 +602,6 @@ if (!customElements.get('media-gallery')) {
 })();
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Target modal openers that open video media
   const openers = document.querySelectorAll('.product__modal-opener--video, modal-opener[data-modal]');
 
   openers.forEach(opener => {
