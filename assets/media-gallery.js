@@ -436,7 +436,6 @@ if (!customElements.get('media-gallery')) {
     let closestIndex = currentSlide;
     let closestDistance = Infinity;
 
-    // Determine which slide is closest to center
     slides.forEach((slide, index) => {
       const rect = slide.getBoundingClientRect();
       const center = rect.left + rect.width / 2;
@@ -452,7 +451,6 @@ if (!customElements.get('media-gallery')) {
       currentSlide = closestIndex;
       setActiveSlide(currentSlide);
       updateDots();
-      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
     }
   }
 
