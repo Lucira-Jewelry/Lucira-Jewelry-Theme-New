@@ -160,7 +160,6 @@ if (!customElements.get('media-gallery')) {
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
-      // LOGIC PRESERVED: Sorting by alt tags
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mq")) buckets.codes.mq.push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
@@ -169,48 +168,31 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
-        // We hide these, but we don't do it yet to avoid flicker
+        item.style.display = 'none';
       }
     });
     return { buckets, allItems: items };
   }
 
-  function reorderByColor(targetColor) {
-    const { buckets, allItems } = classifyItemsByColor(targetColor);
-    const ordered = buildRepeatedPattern(buckets);
-    const container = allItems[0]?.parentNode;
-    if (!container) return;
-
-    const orderedSet = new Set(ordered);
-
-    // 1. Hide unwanted items first (doesn't move them, so no flicker yet)
-    allItems.forEach(item => {
-      if (!orderedSet.has(item)) {
-        item.style.display = 'none';
-      } else {
-        item.style.display = 'block';
-      }
-    });
-
-    // 2. FIX: Prepare the first image to show INSTANTLY
-    if (ordered.length > 0) {
-      const firstImg = ordered[0].querySelector('img');
-      if (firstImg) {
-        // Tell browser: "Load this immediately, it's a priority"
-        firstImg.setAttribute('loading', 'eager');
-        firstImg.setAttribute('fetchpriority', 'high'); 
-        if (firstImg.complete) {
-            firstImg.style.opacity = '1';
-        }
-      }
+  function takeColor(buckets) { return buckets.color.length ? buckets.color.shift() : null; }
+  function takeCode(buckets) {
+    for (const key of ALWAYS_SHOW_CODES) {
+      const k = key === "360v" ? "v360" : key;
+      if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
+    return null;
+  }
 
-    // 3. Re-insert items into the DOM using a DocumentFragment
-    // This makes the move happen in one single "frame" instead of one-by-one
-    const fragment = document.createDocumentFragment();
-    ordered.forEach(node => fragment.appendChild(node));
-    container.appendChild(fragment);
-
+  function buildRepeatedPattern(buckets) {
+    const slotPattern = ["color", "code", "code", "color", "color", "code", "code", "color", "color", "code", "code", "color"];
+    const ordered = [];
+    for (const slot of slotPattern) {
+      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+      if (node) { node.style.display = 'block'; ordered.push(node); }
+    }
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
+    buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
+    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
     return ordered;
   }
 
