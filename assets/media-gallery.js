@@ -311,7 +311,6 @@ if (!customElements.get('media-gallery')) {
     if (!mediaList) return;
 
     if (isMobile()) {
-      // --- MOBILE: FORCE SLIDE BEHAVIOR ---
       mediaList.style.overflowX = 'hidden';
       mediaList.style.display = 'flex';
       mediaList.style.gap = '0';
@@ -327,7 +326,6 @@ if (!customElements.get('media-gallery')) {
       });
       createDotsNavigation();
     } else {
-      // --- DESKTOP: RESET TO THEME DEFAULT ---
       mediaList.style.overflowX = '';
       mediaList.style.display = '';
       mediaList.style.gap = '';
@@ -343,7 +341,6 @@ if (!customElements.get('media-gallery')) {
       });
       if (dotsContainer) dotsContainer.remove();
     }
-
     setupSwipeDetection();
   }
 
