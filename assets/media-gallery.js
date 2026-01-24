@@ -118,7 +118,6 @@ if (!customElements.get('media-gallery')) {
   let totalSlides = 0;
   let dotsContainer = null;
   let mediaList = null;
-  let observer = null;
   let isReordering = false;
   let visibleSlides = [];
   let isSwiping = false;
@@ -158,7 +157,7 @@ if (!customElements.get('media-gallery')) {
       const img = item.querySelector("img");
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
-      const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
+      const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c.toLowerCase()));
 
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mq")) buckets.codes.mq.push(item);
@@ -167,6 +166,7 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
+        item.style.display = 'block'; // Ensure matched items are visible
       } else {
         item.style.display = 'none';
       }
@@ -188,22 +188,22 @@ if (!customElements.get('media-gallery')) {
     const ordered = [];
     for (const slot of slotPattern) {
       let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-      if (node) { node.style.display = 'block'; ordered.push(node); }
+      if (node) { ordered.push(node); }
     }
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { node.style.display = 'block'; ordered.push(node); }));
-    buckets.color.forEach(node => { node.style.display = 'block'; ordered.push(node); });
-    buckets.extras.forEach(node => { node.style.display = 'block'; ordered.push(node); });
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => ordered.push(node)));
+    buckets.color.forEach(node => ordered.push(node));
     return ordered;
   }
 
   function reorderByColor(targetColor) {
-    const { buckets, allItems } = classifyItemsByColor(targetColor);
+    const { buckets } = classifyItemsByColor(targetColor);
     const ordered = buildRepeatedPattern(buckets);
-    const container = allItems[0]?.parentNode;
-    if (!container) return;
+    
+    if (!mediaList || ordered.length === 0) return;
+
     const fragment = document.createDocumentFragment();
     ordered.forEach(node => fragment.appendChild(node));
-    container.appendChild(fragment);
+    mediaList.appendChild(fragment); // Moves existing nodes to new order
     return ordered;
   }
 
