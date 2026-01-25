@@ -128,10 +128,10 @@ if (!customElements.get('media-gallery')) {
   let isReordering = false;
   let visibleSlides = [];
   
-  // --- NEW FLAGS FOR LOCKING ---
-  let isSwiping = false; // Blocks rapid clicks/taps
-  let isTouching = false; // Blocks scroll sync during drag
-  
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
+
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
   }
@@ -287,6 +287,12 @@ if (!customElements.get('media-gallery')) {
 
       if (isVideo) {
         const videoIcon = document.createElement('span');
+        videoIcon.className = 'slider-dot__video-icon';
+        videoIcon.innerHTML = `
+          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" focusable="false">
+            <path d="M4 2v20l18-10L4 2z" fill="currentColor"/>
+          </svg>
+        `;
         dot.appendChild(videoIcon);
       }
 
@@ -300,7 +306,9 @@ if (!customElements.get('media-gallery')) {
 
   function updateDots() {
     if (!dotsContainer) return;
+
     const dots = dotsContainer.querySelectorAll('.slider-dot');
+
     dots.forEach((dot, i) => {
       const isActive = i === currentSlide;
       dot.classList.toggle('active', isActive);
@@ -319,11 +327,10 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // 1. Strict Guard: Stop if already swiping or out of bounds (though moveSlide handles bounds)
+    // Added isSwiping check to prevent multiple rapid fires
     if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
     
-    // 2. Lock: Prevent new inputs
-    isSwiping = true;
+    isSwiping = true; // Lock
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
@@ -333,13 +340,10 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     
     if (targetSlide && mediaList) {
-      // 3. MOMENTUM KILLER: Temporarily hide overflow. 
-      // This stops any native inertial scrolling instantly.
-      mediaList.style.overflowX = 'hidden';
-
       const slideLeft = targetSlide.offsetLeft;
       const slideWidth = targetSlide.clientWidth;
       const containerWidth = mediaList.clientWidth;
+      
       const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
       mediaList.scrollTo({
@@ -355,47 +359,43 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
-    // 4. Unlock: Restore overflow and input after animation
+    // Unlock after 500ms so only one slide can happen at a time
     setTimeout(() => {
-        mediaList.style.overflowX = ''; // Restore native scroll capability
         isSwiping = false;
     }, 500);
   }
 
   function moveSlide(direction) {
     let nextIndex = currentSlide + direction;
-    // Infinite Loop Logic
-    if (nextIndex < 0) nextIndex = totalSlides - 1;
-    if (nextIndex >= totalSlides) nextIndex = 0;
-    
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
     goToSlide(nextIndex);
   }
 
-  // --- UPDATED SWIPE DETECTION ---
-  function setupSwipeDetection() {
+function setupSwipeDetection() {
     if (!mediaList) return;
 
     let startX = 0;
+    let isTouchingLocal = false; // Internal flag to track the start of a touch
 
     mediaList.addEventListener('touchstart', (e) => {
-      // If we are currently animating (isSwiping), ignore new touches
-      if (isSwiping) return; 
-      
-      // Set flag to BLOCK scroll sync
-      isTouching = true;
+      // If the slider is currently moving/locking, ignore the new touch entirely
+      if (isSwiping) {
+        isTouchingLocal = false;
+        return;
+      }
+
       startX = e.touches[0].clientX;
+      isTouchingLocal = true;
     }, { passive: true });
 
     mediaList.addEventListener('touchend', (e) => {
-      // If we blocked the touchstart, exit
-      if (!isTouching) return;
-      
+      if (!isTouchingLocal || isSwiping) return; 
+      isTouchingLocal = false;
+
       const endX = e.changedTouches[0].clientX;
       const diff = startX - endX;
       const threshold = 40;
-
-      // Reset touch flag immediately so scroll sync can work again later
-      isTouching = false; 
 
       if (Math.abs(diff) < threshold) return;
 
@@ -406,201 +406,6 @@ if (!customElements.get('media-gallery')) {
       }
     }, { passive: true });
   }
-
-  // --- UPDATED SCROLL SYNC ---
-  function setupScrollSync() {
-    if (!mediaList) return;
-    
-    let isScrolling = false;
-
-    mediaList.addEventListener('scroll', () => {
-      // IMPORTANT: Ignore scroll updates if Reordering, Swiping (Animation), or Touching (Dragging)
-      if (isReordering || isSwiping || isTouching) return;
-      
-      if (!isScrolling) {
-        window.requestAnimationFrame(() => {
-          syncSlideFromScroll();
-          isScrolling = false;
-        });
-        isScrolling = true;
-      }
-    }, { passive: true });
-  }
-
-  function syncSlideFromScroll() {
-    if (!mediaList || isReordering) return;
-
-    const slides = getVisibleSlides();
-    if (!slides.length) return;
-
-    const containerRect = mediaList.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-
-    let closestIndex = currentSlide;
-    let closestDistance = Infinity;
-
-    slides.forEach((slide, index) => {
-      const rect = slide.getBoundingClientRect();
-      const center = rect.left + rect.width / 2;
-      const dist = Math.abs(center - containerCenter);
-
-      if (dist < closestDistance) {
-        closestDistance = dist;
-        closestIndex = index;
-      }
-    });
-
-    if (closestIndex !== currentSlide) {
-      currentSlide = closestIndex;
-      setActiveSlide(currentSlide);
-      updateDots();
-    }
-  }
-
-  function initSliderNavigation() {
-    if (!mediaList) return;
-
-    const isMobile = window.innerWidth < 750;
-
-    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) sliderButtons.style.display = 'none';
-
-    createDotsNavigation();
-
-    // Setup swipe detection (needed for Mobile loop logic)
-    setupSwipeDetection();
-
-    // Setup scroll sync (keeps dots valid during manual slow scroll)
-    setupScrollSync();
-  }
-
-  function playAllVideos() {
-    if (!mediaList) return;
-    const videos = mediaList.querySelectorAll('video');
-    videos.forEach(video => {
-      video.loop = true;
-      video.muted = true;
-      video.play().catch(() => {});
-    });
-  }
-
-  function safeReorderByColor(targetColor) {
-    if (isReordering) return;
-    isReordering = true;
-
-    if (!mediaList) { 
-      isReordering = false; 
-      return; 
-    }
-
-    reorderByColor(targetColor);
-    
-    currentSlide = 0;
-    
-    initSliderNavigation();
-    
-    setTimeout(() => {
-      goToSlide(currentSlide);
-      playAllVideos();
-      isReordering = false;
-    }, 150);
-
-    mediaList.setAttribute('data-media-reordered', 'true');
-  }
-
-  function getSelectedColor() {
-    const colorInputs = document.querySelectorAll(
-      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
-    );
-    for (const input of colorInputs) {
-      if (input.checked || input.tagName === 'SELECT') {
-        const color = getColorFromAlt(input.value);
-        if (color) return color;
-      }
-    }
-    const selectedVariants = document.querySelectorAll(
-      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
-    );
-    for (const element of selectedVariants) {
-      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
-      const color = getColorFromAlt(text);
-      if (color) return color;
-    }
-    const urlParams = new URLSearchParams(window.location.search);
-    const colorParam = urlParams.get('color') || urlParams.get('Color');
-    if (colorParam) return getColorFromAlt(colorParam);
-    return "yellow";
-  }
-
-  const debouncedHandleColorChange = debounce(function () {
-    const selectedColor = getSelectedColor();
-    if (!selectedColor || selectedColor === currentSelectedColor) return;
-
-    currentSelectedColor = selectedColor;
-    safeReorderByColor(selectedColor);
-  }, 100);
-
-  function setupVariantChangeListeners() {
-    document.addEventListener('change', debouncedHandleColorChange);
-    document.addEventListener('variant:change', debouncedHandleColorChange);
-    document.addEventListener('variant:selected', debouncedHandleColorChange);
-    window.addEventListener('popstate', debouncedHandleColorChange);
-
-    if (mediaList) {
-      if (observer) observer.disconnect();
-      observer = new MutationObserver(() => {
-        if (!isReordering) {
-          safeReorderByColor(currentSelectedColor);
-        }
-      });
-      observer.observe(mediaList, { childList: true, subtree: true });
-    }
-  }
-
-  function cleanup() {
-    if (observer) observer.disconnect();
-    document.removeEventListener('change', debouncedHandleColorChange);
-    document.removeEventListener('variant:change', debouncedHandleColorChange);
-    document.removeEventListener('variant:selected', debouncedHandleColorChange);
-    window.removeEventListener('popstate', debouncedHandleColorChange);
-  }
-
-  function initialize() {
-    if (isInitialized) return;
-    
-    cacheDOMElements();
-    if (!mediaList) return;
-
-    currentSelectedColor = getSelectedColor();
-    
-    const wrapper = mediaList.closest('.media-gallery-wrapper');
-    if (wrapper) {
-      wrapper.classList.add('loaded');
-    }
-
-    safeReorderByColor(currentSelectedColor);
-    playAllVideos();
-    setupVariantChangeListeners();
-    isInitialized = true;
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-  } else {
-    initialize();
-  }
-
-  if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', () => { 
-      cleanup(); 
-      isInitialized = false; 
-      initialize(); 
-    });
-    document.addEventListener('theme:loaded', initialize);
-  }
-
-  window.addEventListener('beforeunload', cleanup);
-})();
 
 
 document.addEventListener('DOMContentLoaded', () => {
