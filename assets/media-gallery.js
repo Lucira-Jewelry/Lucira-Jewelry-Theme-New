@@ -327,43 +327,34 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // 1. Guard: If already swiping, ignore the input
-    if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
-    
-    isSwiping = true; 
+    if (isReordering || totalSlides === 0) return;
+
+    index = (index + totalSlides) % totalSlides;
     currentSlide = index;
+
     visibleSlides = getVisibleSlides();
-    
     setActiveSlide(currentSlide);
     updateDots();
 
     const targetSlide = visibleSlides[currentSlide];
-    
-    if (targetSlide && mediaList) {
-      const slideLeft = targetSlide.offsetLeft;
-      const slideWidth = targetSlide.clientWidth;
-      const containerWidth = mediaList.clientWidth;
-      
-      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
+    if (!targetSlide) return;
 
-      mediaList.scrollTo({
-        left: targetScrollLeft,
-        behavior: 'smooth'
-      });
+    disableSnap(); // 🔴 KEY
 
-      const activeVideo = targetSlide.querySelector('video');
-      if (activeVideo) {
-        activeVideo.loop = true;
-        activeVideo.muted = true;
-        activeVideo.play().catch(() => {});
-      }
-    }
-    
-    // 2. Lock Duration: Increase to 600ms to ensure momentum has stopped
+    const slideLeft = targetSlide.offsetLeft;
+    const slideWidth = targetSlide.clientWidth;
+    const containerWidth = mediaList.clientWidth;
+
+    mediaList.scrollTo({
+      left: slideLeft - containerWidth / 2 + slideWidth / 2,
+      behavior: 'smooth'
+    });
+
     setTimeout(() => {
-        isSwiping = false;
+      enableSnap(); // 🟢 restore snap
     }, 600);
   }
+
 
   function setupSwipeDetection() {
     if (!mediaList) return;
