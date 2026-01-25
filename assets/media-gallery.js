@@ -421,11 +421,25 @@ if (!customElements.get('media-gallery')) {
   }
 
   function moveSlide(direction) {
+    if (isSwiping || totalSlides <= 1) return;
+
     let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+
+    // LOOP
+    if (nextIndex < 0) nextIndex = totalSlides - 1;
+    if (nextIndex >= totalSlides) nextIndex = 0;
+
+    // 🔒 lock scroll sync
+    isSwiping = true;
+
     goToSlide(nextIndex);
+
+    // 🔓 unlock AFTER snap settles
+    setTimeout(() => {
+      isSwiping = false;
+    }, 700);
   }
+
 
   function setupSwipeDetection() {
     if (!mediaList) return;
