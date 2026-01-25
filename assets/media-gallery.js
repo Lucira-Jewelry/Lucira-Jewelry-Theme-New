@@ -425,7 +425,7 @@ if (!customElements.get('media-gallery')) {
   }
 
   function syncSlideFromScroll() {
-    if (!mediaList || isReordering) return;
+    if (!mediaList || isReordering || isUserScrolling) return;
 
     const slides = getVisibleSlides();
     if (!slides.length) return;
