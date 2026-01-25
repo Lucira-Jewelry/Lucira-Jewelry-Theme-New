@@ -422,10 +422,17 @@ if (!customElements.get('media-gallery')) {
 
   function moveSlide(direction) {
     let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+
+    // LOOPING LOGIC
+    if (nextIndex < 0) {
+      nextIndex = totalSlides - 1; // first → last
+    } else if (nextIndex >= totalSlides) {
+      nextIndex = 0; // last → first
+    }
+
     goToSlide(nextIndex);
   }
+
 
   function setupSwipeDetection() {
     if (!mediaList) return;
