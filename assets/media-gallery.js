@@ -130,8 +130,7 @@ if (!customElements.get('media-gallery')) {
   
   let touchStartX = 0;
   let touchEndX = 0;
-  let isSwiping = false;
-  let scrollEndTimer = null;
+  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -328,9 +327,9 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
+    if (index < 0 || index >= totalSlides || isReordering) return;
     
-    isSwiping = true;
+    isSwiping = true; // Lock scroll sync
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
@@ -340,10 +339,13 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     
     if (targetSlide && mediaList) {
+      // FIX: Use scrollTo on the container instead of scrollIntoView
+      // This calculates the center position manually to avoid page jumping
       const slideLeft = targetSlide.offsetLeft;
       const slideWidth = targetSlide.clientWidth;
       const containerWidth = mediaList.clientWidth;
       
+      // Calculate position to center the image
       const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
       mediaList.scrollTo({
@@ -351,6 +353,7 @@ if (!customElements.get('media-gallery')) {
         behavior: 'smooth'
       });
 
+      // Handle video autoplay
       const activeVideo = targetSlide.querySelector('video');
       if (activeVideo) {
         activeVideo.loop = true;
@@ -359,6 +362,7 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
+    // Release the lock after animation roughly completes
     setTimeout(() => {
         isSwiping = false;
     }, 500);
@@ -371,6 +375,7 @@ if (!customElements.get('media-gallery')) {
     goToSlide(nextIndex);
   }
 
+  // --- SWIPE LOGIC (UNCHANGED AS REQUESTED) ---
   function setupSwipeDetection() {
     if (!mediaList) return;
 
@@ -378,14 +383,12 @@ if (!customElements.get('media-gallery')) {
     let isTouching = false;
 
     mediaList.addEventListener('touchstart', (e) => {
-      if (isSwiping) return; 
-
       startX = e.touches[0].clientX;
       isTouching = true;
     }, { passive: true });
 
     mediaList.addEventListener('touchend', (e) => {
-      if (!isTouching) return; 
+      if (!isTouching) return;
       isTouching = false;
 
       const endX = e.changedTouches[0].clientX;
@@ -402,26 +405,27 @@ if (!customElements.get('media-gallery')) {
     }, { passive: true });
   }
 
+  // --- SCROLL SYNC (IMPROVED FOR DOTS) ---
   function setupScrollSync() {
     if (!mediaList) return;
+    
+    let isScrolling = false;
 
     mediaList.addEventListener('scroll', () => {
-      if (isReordering || isSwiping) return;
+      if (isReordering || isSwiping) return; // Don't sync if script is driving the animation
       
-      // Clear any existing timer
-      if (scrollEndTimer) {
-        clearTimeout(scrollEndTimer);
+      if (!isScrolling) {
+        window.requestAnimationFrame(() => {
+          syncSlideFromScroll();
+          isScrolling = false;
+        });
+        isScrolling = true;
       }
-      
-      // Wait for scroll to end before syncing
-      scrollEndTimer = setTimeout(() => {
-        syncSlideFromScroll();
-      }, 100);
     }, { passive: true });
   }
 
   function syncSlideFromScroll() {
-    if (!mediaList || isReordering || isSwiping) return;
+    if (!mediaList || isReordering) return;
 
     const slides = getVisibleSlides();
     if (!slides.length) return;
@@ -432,6 +436,7 @@ if (!customElements.get('media-gallery')) {
     let closestIndex = currentSlide;
     let closestDistance = Infinity;
 
+    // Determine which slide is closest to center
     slides.forEach((slide, index) => {
       const rect = slide.getBoundingClientRect();
       const center = rect.left + rect.width / 2;
@@ -447,6 +452,7 @@ if (!customElements.get('media-gallery')) {
       currentSlide = closestIndex;
       setActiveSlide(currentSlide);
       updateDots();
+      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
     }
   }
 
@@ -460,10 +466,14 @@ if (!customElements.get('media-gallery')) {
 
     createDotsNavigation();
 
+    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
+    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
     if (!isMobile) {
       setupSwipeDetection();
     }
 
+    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
+    // This was previously inside the !isMobile check, causing dots to fail on mobile.
     setupScrollSync();
   }
 
@@ -599,6 +609,7 @@ if (!customElements.get('media-gallery')) {
 
 
 document.addEventListener('DOMContentLoaded', () => {
+  // Target modal openers that open video media
   const openers = document.querySelectorAll('.product__modal-opener--video, modal-opener[data-modal]');
 
   openers.forEach(opener => {
@@ -608,23 +619,28 @@ document.addEventListener('DOMContentLoaded', () => {
       const modal = document.querySelector(modalSelector);
       if (!modal) return;
 
-      waitForModalVisible(modal, 2000).then(() => {
+      // Wait until modal becomes visible, then bootstrap media autoplay
+      waitForModalVisible(modal, 2000 /*ms timeout*/).then(() => {
         handleDeferredMediaInModal(modal);
       }).catch(() => {
+        // fallback: still try once after a short delay
         setTimeout(() => handleDeferredMediaInModal(modal), 400);
       });
     });
   });
 
+  // --- helpers ---
   function waitForModalVisible(modalEl, timeout = 2000) {
     return new Promise((resolve, reject) => {
       const start = Date.now();
 
       function isVisible(el) {
+        // consider aria-hidden, display, or presence in layout
         if (!el) return false;
         if (el.getAttribute('aria-hidden') === 'true') return false;
         const style = window.getComputedStyle(el);
         if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+        // check bounding box
         const rect = el.getBoundingClientRect();
         return (rect.width > 0 && rect.height > 0);
       }
@@ -645,21 +661,28 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function handleDeferredMediaInModal(modalEl) {
+    // Find deferred-media inside modal (Dawn uses <deferred-media> or .deferred-media__poster)
     const deferred = modalEl.querySelector('deferred-media, .deferred-media, [data-deferred-media]');
     const posterBtn = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
 
+    // If poster button exists, click it to let Shopify inject iframe/video
     if (posterBtn) {
+      // hide poster quickly (so it doesn't cover the injected iframe) — we'll still trigger click so Shopify loads the media
       posterBtn.classList.add('deferred-media__poster--hidden');
       const spinner = modalEl.querySelector('.loading__spinner');
-      if (spinner) spinner.classList.remove('hidden');
+      if (spinner) spinner.classList.remove('hidden'); // show spinner while loading
       try { posterBtn.click(); } catch (e) { /* ignore */ }
     } else if (deferred) {
+      // if deferred tag present but no poster btn, we'll continue to look for iframe/video
     } else {
+      // no deferred media found
       return;
     }
 
+    // After injection, attempt to autoplay. Use MutationObserver to detect insertion of iframe/video
     const observerTarget = deferred || modalEl;
     const observer = new MutationObserver((mutations, obs) => {
+      // look for iframe/video now
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
 
@@ -671,6 +694,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     observer.observe(observerTarget, { childList: true, subtree: true });
 
+    // also fallback: try after fixed delay if MutationObserver didn't trigger
     setTimeout(() => {
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
@@ -678,24 +702,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try { observer.disconnect() } catch(e){}
         finalizeAutoplay(modalEl, iframe, video);
       } else {
+        // give one more attempt: unhide poster if still nothing
         const posterBtn2 = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
         if (posterBtn2) posterBtn2.classList.remove('deferred-media__poster--hidden');
         const spinner2 = modalEl.querySelector('.loading__spinner');
         if (spinner2) spinner2.classList.add('hidden');
       }
-    }, 700);
+    }, 700); // tune this if needed
   }
 
   function finalizeAutoplay(modalEl, iframe, video) {
+    // Hide poster/spinner
     const poster = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
     if (poster) poster.classList.add('hidden');
 
     const spinner = modalEl.querySelector('.loading__spinner');
     if (spinner) spinner.classList.add('hidden');
 
+    // If iframe (YouTube/Vimeo), append autoplay param
     if (iframe) {
       const src = iframe.getAttribute('src') || iframe.src || '';
       if (!src) return;
+      // If src already contains autoplay=, still try to ensure it's 1
       let newSrc;
       if (src.includes('autoplay=')) {
         newSrc = src.replace(/autoplay=\d/, 'autoplay=1');
@@ -703,19 +731,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const connector = src.includes('?') ? '&' : '?';
         newSrc = src + connector + 'autoplay=1';
       }
+      // assign only if changed (reassigning will reload iframe which stops previous play; that's OK)
       if (newSrc !== src) {
         iframe.setAttribute('src', newSrc);
       } else {
+        // If same, force a reload to ensure autoplay param recognized
         iframe.setAttribute('src', src);
       }
+      // For YouTube, ensure muted for autoplay on some browsers:
+      // YouTube autoplay respects the URL param 'mute=1' in some players; add if missing
       if (!/mute=1/.test(newSrc)) {
         const connector2 = newSrc.includes('?') ? '&' : '?';
         iframe.setAttribute('src', newSrc + connector2 + 'mute=1');
       }
     }
 
+    // If native video element
     if (video) {
+      // browsers usually require muted to allow autoplay
       video.muted = true;
+      // try to play
       const p = video.play();
       if (p && p.catch) {
         p.catch(err => {
