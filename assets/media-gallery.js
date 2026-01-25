@@ -327,7 +327,7 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // PREVENT MULTI-SLIDE: If we are already moving, ignore new requests
+    // 1. Guard: If already swiping, ignore the input
     if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
     
     isSwiping = true; 
@@ -359,10 +359,65 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
-    // Lock duration: 500ms allows the smooth scroll and CSS snap to settle
+    // 2. Lock Duration: Increase to 600ms to ensure momentum has stopped
     setTimeout(() => {
         isSwiping = false;
-    }, 500);
+    }, 600);
+  }
+
+  function setupSwipeDetection() {
+    if (!mediaList) return;
+
+    let startX = 0;
+    let isTouchActive = false; 
+
+    mediaList.addEventListener('touchstart', (e) => {
+      // Ignore new swipes while one is in progress
+      if (isSwiping) {
+        isTouchActive = false;
+        return;
+      }
+      startX = e.touches[0].clientX;
+      isTouchActive = true;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchend', (e) => {
+      if (!isTouchActive || isSwiping) return; 
+      isTouchActive = false;
+
+      const endX = e.changedTouches[0].clientX;
+      const diff = startX - endX;
+      const threshold = 30; // Slightly lower threshold for better mobile response
+
+      if (Math.abs(diff) < threshold) return;
+
+      // Move exactly ONE slide
+      if (diff > 0) {
+        moveSlide(1); 
+      } else {
+        moveSlide(-1); 
+      }
+    }, { passive: true });
+  }
+
+  function setupScrollSync() {
+    if (!mediaList) return;
+    
+    let isScrolling = false;
+
+    mediaList.addEventListener('scroll', () => {
+      // 3. IMPORTANT: If the script is sliding (isSwiping), 
+      // do NOT let the scroll event update the dots or index.
+      if (isReordering || isSwiping) return;
+      
+      if (!isScrolling) {
+        window.requestAnimationFrame(() => {
+          syncSlideFromScroll();
+          isScrolling = false;
+        });
+        isScrolling = true;
+      }
+    }, { passive: true });
   }
 
   function moveSlide(direction) {
