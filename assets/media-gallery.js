@@ -448,13 +448,6 @@ if (!customElements.get('media-gallery')) {
       }
     });
 
-    // Only allow moving one slide at a time to prevent skipping during fast swipes
-    const maxJump = 1;
-    if (Math.abs(closestIndex - currentSlide) > maxJump) {
-      // Limit the jump to one slide in the direction of movement
-      closestIndex = currentSlide + (closestIndex > currentSlide ? maxJump : -maxJump);
-    }
-
     if (closestIndex !== currentSlide) {
       currentSlide = closestIndex;
       setActiveSlide(currentSlide);
