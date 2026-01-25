@@ -421,16 +421,72 @@ if (!customElements.get('media-gallery')) {
   }
 
   function moveSlide(direction) {
+    // 1. Get the absolute latest count of visible slides
+    const slides = getVisibleSlides();
+    const count = slides.length;
+    if (count <= 1) return;
+
     let nextIndex = currentSlide + direction;
 
-    // LOOPING LOGIC
-    if (nextIndex < 0) {
-      nextIndex = totalSlides - 1; // first → last
-    } else if (nextIndex >= totalSlides) {
-      nextIndex = 0; // last → first
+    // 2. LOOP LOGIC:
+    // If we go past the last slide, reset to 0 (first)
+    if (nextIndex >= count) {
+      nextIndex = 0;
+    } 
+    // If we go before the first slide, jump to count - 1 (last)
+    else if (nextIndex < 0) {
+      nextIndex = count - 1;
     }
-
+    
+    // 3. Execute the move
     goToSlide(nextIndex);
+  }
+
+  function goToSlide(index) {
+    // Safety check for reordering or current animation lock
+    if (isReordering || isSwiping) return;
+    
+    visibleSlides = getVisibleSlides();
+    totalSlides = visibleSlides.length;
+    
+    // Double check index bounds
+    if (index < 0) index = totalSlides - 1;
+    if (index >= totalSlides) index = 0;
+
+    isSwiping = true; 
+    currentSlide = index;
+    
+    setActiveSlide(currentSlide);
+    updateDots();
+
+    const targetSlide = visibleSlides[currentSlide];
+    
+    if (targetSlide && mediaList) {
+      const slideLeft = targetSlide.offsetLeft;
+      const slideWidth = targetSlide.clientWidth;
+      const containerWidth = mediaList.clientWidth;
+      
+      // Calculate center position for the scroll
+      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
+
+      mediaList.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
+      });
+
+      // Handle video autoplay for the new active slide
+      const activeVideo = targetSlide.querySelector('video');
+      if (activeVideo) {
+        activeVideo.loop = true;
+        activeVideo.muted = true;
+        activeVideo.play().catch(() => {});
+      }
+    }
+    
+    // The "Cooldown": Match this to your CSS transition speed
+    setTimeout(() => {
+        isSwiping = false;
+    }, 600);
   }
 
 
