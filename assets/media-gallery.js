@@ -327,34 +327,43 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    if (isReordering || totalSlides === 0) return;
-
-    index = (index + totalSlides) % totalSlides;
+    // 1. Guard: If already swiping, ignore the input
+    if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
+    
+    isSwiping = true; 
     currentSlide = index;
-
     visibleSlides = getVisibleSlides();
+    
     setActiveSlide(currentSlide);
     updateDots();
 
     const targetSlide = visibleSlides[currentSlide];
-    if (!targetSlide) return;
+    
+    if (targetSlide && mediaList) {
+      const slideLeft = targetSlide.offsetLeft;
+      const slideWidth = targetSlide.clientWidth;
+      const containerWidth = mediaList.clientWidth;
+      
+      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
-    disableSnap(); // 🔴 KEY
+      mediaList.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
+      });
 
-    const slideLeft = targetSlide.offsetLeft;
-    const slideWidth = targetSlide.clientWidth;
-    const containerWidth = mediaList.clientWidth;
-
-    mediaList.scrollTo({
-      left: slideLeft - containerWidth / 2 + slideWidth / 2,
-      behavior: 'smooth'
-    });
-
+      const activeVideo = targetSlide.querySelector('video');
+      if (activeVideo) {
+        activeVideo.loop = true;
+        activeVideo.muted = true;
+        activeVideo.play().catch(() => {});
+      }
+    }
+    
+    // 2. Lock Duration: Increase to 600ms to ensure momentum has stopped
     setTimeout(() => {
-      enableSnap(); // 🟢 restore snap
+        isSwiping = false;
     }, 600);
   }
-
 
   function setupSwipeDetection() {
     if (!mediaList) return;
@@ -412,25 +421,11 @@ if (!customElements.get('media-gallery')) {
   }
 
   function moveSlide(direction) {
-    if (isSwiping || totalSlides <= 1) return;
-
     let nextIndex = currentSlide + direction;
-
-    // LOOP
-    if (nextIndex < 0) nextIndex = totalSlides - 1;
-    if (nextIndex >= totalSlides) nextIndex = 0;
-
-    // 🔒 lock scroll sync
-    isSwiping = true;
-
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
     goToSlide(nextIndex);
-
-    // 🔓 unlock AFTER snap settles
-    setTimeout(() => {
-      isSwiping = false;
-    }, 700);
   }
-
 
   function setupSwipeDetection() {
     if (!mediaList) return;
