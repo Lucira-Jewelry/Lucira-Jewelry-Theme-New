@@ -422,8 +422,13 @@ if (!customElements.get('media-gallery')) {
 
   function moveSlide(direction) {
     let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+    if (nextIndex >= totalSlides) {
+      nextIndex = 0;
+    } 
+    // LOOP BACKWARD: If we go before the first slide, jump to the last one
+    else if (nextIndex < 0) {
+      nextIndex = totalSlides - 1;
+    }
     goToSlide(nextIndex);
   }
 
