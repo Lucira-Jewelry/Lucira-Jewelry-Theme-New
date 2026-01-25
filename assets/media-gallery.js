@@ -128,10 +128,10 @@ if (!customElements.get('media-gallery')) {
   let isReordering = false;
   let visibleSlides = [];
   
-  let touchStartX = 0;
-  let touchEndX = 0;
-  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
-
+  // --- NEW FLAGS FOR LOCKING ---
+  let isSwiping = false; // Blocks rapid clicks/taps
+  let isTouching = false; // Blocks scroll sync during drag
+  
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
   }
@@ -287,12 +287,6 @@ if (!customElements.get('media-gallery')) {
 
       if (isVideo) {
         const videoIcon = document.createElement('span');
-        videoIcon.className = 'slider-dot__video-icon';
-        videoIcon.innerHTML = `
-          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" focusable="false">
-            <path d="M4 2v20l18-10L4 2z" fill="currentColor"/>
-          </svg>
-        `;
         dot.appendChild(videoIcon);
       }
 
@@ -306,9 +300,7 @@ if (!customElements.get('media-gallery')) {
 
   function updateDots() {
     if (!dotsContainer) return;
-
     const dots = dotsContainer.querySelectorAll('.slider-dot');
-
     dots.forEach((dot, i) => {
       const isActive = i === currentSlide;
       dot.classList.toggle('active', isActive);
@@ -327,10 +319,11 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // UPDATED: Added '|| isSwiping' to prevent multiple rapid fires
+    // 1. Strict Guard: Stop if already swiping or out of bounds (though moveSlide handles bounds)
     if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
     
-    isSwiping = true; // Lock the slider immediately
+    // 2. Lock: Prevent new inputs
+    isSwiping = true;
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
@@ -340,10 +333,13 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     
     if (targetSlide && mediaList) {
+      // 3. MOMENTUM KILLER: Temporarily hide overflow. 
+      // This stops any native inertial scrolling instantly.
+      mediaList.style.overflowX = 'hidden';
+
       const slideLeft = targetSlide.offsetLeft;
       const slideWidth = targetSlide.clientWidth;
       const containerWidth = mediaList.clientWidth;
-      
       const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
       mediaList.scrollTo({
@@ -359,41 +355,47 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
-    // Release the lock after 500ms (enough time for smooth scroll to finish)
+    // 4. Unlock: Restore overflow and input after animation
     setTimeout(() => {
+        mediaList.style.overflowX = ''; // Restore native scroll capability
         isSwiping = false;
     }, 500);
   }
 
   function moveSlide(direction) {
     let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+    // Infinite Loop Logic
+    if (nextIndex < 0) nextIndex = totalSlides - 1;
+    if (nextIndex >= totalSlides) nextIndex = 0;
+    
     goToSlide(nextIndex);
   }
 
+  // --- UPDATED SWIPE DETECTION ---
   function setupSwipeDetection() {
     if (!mediaList) return;
 
     let startX = 0;
-    let isTouching = false;
 
     mediaList.addEventListener('touchstart', (e) => {
-      // UPDATED: Ignore touch start if an animation is currently happening
+      // If we are currently animating (isSwiping), ignore new touches
       if (isSwiping) return; 
-
-      startX = e.touches[0].clientX;
+      
+      // Set flag to BLOCK scroll sync
       isTouching = true;
+      startX = e.touches[0].clientX;
     }, { passive: true });
 
     mediaList.addEventListener('touchend', (e) => {
-      // If we blocked the touchstart, isTouching will be false, so this exits safely
-      if (!isTouching) return; 
-      isTouching = false;
-
+      // If we blocked the touchstart, exit
+      if (!isTouching) return;
+      
       const endX = e.changedTouches[0].clientX;
       const diff = startX - endX;
       const threshold = 40;
+
+      // Reset touch flag immediately so scroll sync can work again later
+      isTouching = false; 
 
       if (Math.abs(diff) < threshold) return;
 
@@ -405,14 +407,15 @@ if (!customElements.get('media-gallery')) {
     }, { passive: true });
   }
 
-  // --- SCROLL SYNC (IMPROVED FOR DOTS) ---
+  // --- UPDATED SCROLL SYNC ---
   function setupScrollSync() {
     if (!mediaList) return;
     
     let isScrolling = false;
 
     mediaList.addEventListener('scroll', () => {
-      if (isReordering || isSwiping) return; // Don't sync if script is driving the animation
+      // IMPORTANT: Ignore scroll updates if Reordering, Swiping (Animation), or Touching (Dragging)
+      if (isReordering || isSwiping || isTouching) return;
       
       if (!isScrolling) {
         window.requestAnimationFrame(() => {
@@ -436,7 +439,6 @@ if (!customElements.get('media-gallery')) {
     let closestIndex = currentSlide;
     let closestDistance = Infinity;
 
-    // Determine which slide is closest to center
     slides.forEach((slide, index) => {
       const rect = slide.getBoundingClientRect();
       const center = rect.left + rect.width / 2;
@@ -452,7 +454,6 @@ if (!customElements.get('media-gallery')) {
       currentSlide = closestIndex;
       setActiveSlide(currentSlide);
       updateDots();
-      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
     }
   }
 
@@ -466,14 +467,10 @@ if (!customElements.get('media-gallery')) {
 
     createDotsNavigation();
 
-    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
-    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
-    if (!isMobile) {
-      setupSwipeDetection();
-    }
+    // Setup swipe detection (needed for Mobile loop logic)
+    setupSwipeDetection();
 
-    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
-    // This was previously inside the !isMobile check, causing dots to fail on mobile.
+    // Setup scroll sync (keeps dots valid during manual slow scroll)
     setupScrollSync();
   }
 
@@ -496,8 +493,6 @@ if (!customElements.get('media-gallery')) {
       return; 
     }
 
-    const previousSlide = currentSlide;
-    
     reorderByColor(targetColor);
     
     currentSlide = 0;
