@@ -327,9 +327,10 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    if (index < 0 || index >= totalSlides || isReordering) return;
+    // UPDATED: Added '|| isSwiping' to prevent multiple rapid fires
+    if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
     
-    isSwiping = true; // Lock scroll sync
+    isSwiping = true; // Lock the slider immediately
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
@@ -339,13 +340,10 @@ if (!customElements.get('media-gallery')) {
     const targetSlide = visibleSlides[currentSlide];
     
     if (targetSlide && mediaList) {
-      // FIX: Use scrollTo on the container instead of scrollIntoView
-      // This calculates the center position manually to avoid page jumping
       const slideLeft = targetSlide.offsetLeft;
       const slideWidth = targetSlide.clientWidth;
       const containerWidth = mediaList.clientWidth;
       
-      // Calculate position to center the image
       const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
       mediaList.scrollTo({
@@ -353,7 +351,6 @@ if (!customElements.get('media-gallery')) {
         behavior: 'smooth'
       });
 
-      // Handle video autoplay
       const activeVideo = targetSlide.querySelector('video');
       if (activeVideo) {
         activeVideo.loop = true;
@@ -362,7 +359,7 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
-    // Release the lock after animation roughly completes
+    // Release the lock after 500ms (enough time for smooth scroll to finish)
     setTimeout(() => {
         isSwiping = false;
     }, 500);
@@ -375,7 +372,6 @@ if (!customElements.get('media-gallery')) {
     goToSlide(nextIndex);
   }
 
-  // --- SWIPE LOGIC (UNCHANGED AS REQUESTED) ---
   function setupSwipeDetection() {
     if (!mediaList) return;
 
@@ -383,12 +379,16 @@ if (!customElements.get('media-gallery')) {
     let isTouching = false;
 
     mediaList.addEventListener('touchstart', (e) => {
+      // UPDATED: Ignore touch start if an animation is currently happening
+      if (isSwiping) return; 
+
       startX = e.touches[0].clientX;
       isTouching = true;
     }, { passive: true });
 
     mediaList.addEventListener('touchend', (e) => {
-      if (!isTouching) return;
+      // If we blocked the touchstart, isTouching will be false, so this exits safely
+      if (!isTouching) return; 
       isTouching = false;
 
       const endX = e.changedTouches[0].clientX;
