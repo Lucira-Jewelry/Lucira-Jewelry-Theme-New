@@ -327,12 +327,17 @@ if (!customElements.get('media-gallery')) {
   }
 
   function goToSlide(index) {
-    // 1. Guard: If already swiping, ignore the input
-    if (index < 0 || index >= totalSlides || isReordering || isSwiping) return;
+    if (index < 0 || isReordering || isSwiping) return;
     
+    // Ensure we have the latest slide count
+    visibleSlides = getVisibleSlides();
+    totalSlides = visibleSlides.length;
+    
+    // Bounds check
+    if (index >= totalSlides) index = 0;
+
     isSwiping = true; 
     currentSlide = index;
-    visibleSlides = getVisibleSlides();
     
     setActiveSlide(currentSlide);
     updateDots();
@@ -344,6 +349,7 @@ if (!customElements.get('media-gallery')) {
       const slideWidth = targetSlide.clientWidth;
       const containerWidth = mediaList.clientWidth;
       
+      // Calculate center position
       const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
       mediaList.scrollTo({
@@ -351,6 +357,7 @@ if (!customElements.get('media-gallery')) {
         behavior: 'smooth'
       });
 
+      // Video handling
       const activeVideo = targetSlide.querySelector('video');
       if (activeVideo) {
         activeVideo.loop = true;
@@ -359,7 +366,7 @@ if (!customElements.get('media-gallery')) {
       }
     }
     
-    // 2. Lock Duration: Increase to 600ms to ensure momentum has stopped
+    // Lock for 600ms to allow the smooth scroll back to start/end to finish
     setTimeout(() => {
         isSwiping = false;
     }, 600);
@@ -421,9 +428,19 @@ if (!customElements.get('media-gallery')) {
   }
 
   function moveSlide(direction) {
+    // Refresh the count and list before calculating the next move
+    visibleSlides = getVisibleSlides();
+    totalSlides = visibleSlides.length;
+
     let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+
+    // LOOP LOGIC
+    if (nextIndex >= totalSlides) {
+      nextIndex = 0; // Go to first
+    } else if (nextIndex < 0) {
+      nextIndex = totalSlides - 1; // Go to last
+    }
+    
     goToSlide(nextIndex);
   }
 
