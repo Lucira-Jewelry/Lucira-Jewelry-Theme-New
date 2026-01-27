@@ -89,12 +89,13 @@
   <input type="password" name="customer[password]" id="ShopifyPassword">
 </form>
 <script>
+    // --- 1. CONFIGURATION: Define your Prizes and Percentages here ---
     const spinPrizes = [
-      { label: "5% OFF", value: "5_percent", chance: 20 },
-      { label: "10% OFF", value: "10_percent", chance: 10 },
-      { label: "15% OFF", value: "15_percent", chance: 5 },
-      { label: "Free Shipping", value: "free_shipping", chance: 15 },
-      { label: "No Prize", value: "no_prize", chance: 50 }
+      { label: "5% OFF", value: "5_percent", chance: 20 },      // 20% Chance
+      { label: "10% OFF", value: "10_percent", chance: 10 },    // 10% Chance
+      { label: "15% OFF", value: "15_percent", chance: 5 },     // 5% Chance
+      { label: "Free Shipping", value: "free_shipping", chance: 15 }, // 15% Chance
+      { label: "No Prize", value: "no_prize", chance: 50 }      // 50% Chance
     ];
 
     function openloginPopup(id) {
@@ -111,7 +112,6 @@
         el.addEventListener('click', (e) => e.stopPropagation());
     });
 
-    // ... (Helper functions: showError, hideError, validators remain the same) ...
     function showError(elementId, message) {
         const errorElement = document.getElementById(elementId);
         errorElement.textContent = message;
@@ -149,7 +149,6 @@
         return null;
     }
 
-    // ... (Event Listeners for Inputs remain the same) ...
     const emailInput = document.getElementById('regEmail');
     if (emailInput) {
         emailInput.addEventListener('input', (e) => {
@@ -157,7 +156,7 @@
         });
     }
 
-    // OTP LOGIC
+    // OTP SEND
     const sendBtn = document.getElementById('sendOtp');
     if (sendBtn) {
         sendBtn.addEventListener('click', async () => {
@@ -169,7 +168,6 @@
             }
             hideError('mobileError');
 
-            // API Call for OTP
             const res = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -190,7 +188,7 @@
         });
     }
 
-    // VERIFY OTP LOGIC
+    // OTP VERIFY
     const verifyBtn = document.getElementById('verifyOtp');
     if (verifyBtn) {
         verifyBtn.addEventListener('click', async () => {
@@ -214,13 +212,11 @@
 
                 const data = await res.json();
                 
-                // IF EXISTING USER -> LOGIN DIRECTLY
                 if (data.type === 'success' && data.credentials) {
                     shopifyAutoLogin(data.credentials.email, data.credentials.password);
                     return;
                 }
 
-                // IF NEW USER -> SHOW REGISTRATION & SPIN WHEEL
                 if (data.type === 'register') {
                     document.getElementById('signupMobile').value = mobile;
                     showSignupWithSpinWheel();
@@ -238,9 +234,7 @@
         });
     }
 
-    // --- REGISTRATION + SPIN LOGIC START ---
-    
-    // Helper to calculate weighted random prize
+    // --- SPIN LOGIC START ---
     function getWeightedPrize() {
         let totalChance = spinPrizes.reduce((sum, prize) => sum + prize.chance, 0);
         let random = Math.random() * totalChance;
@@ -251,14 +245,13 @@
             }
             random -= spinPrizes[i].chance;
         }
-        return { prize: spinPrizes[0], index: 0 }; // Fallback
+        return { prize: spinPrizes[0], index: 0 };
     }
 
     const regBtn = document.getElementById('completeRegistration');
     
     if (regBtn) {
         regBtn.addEventListener('click', async () => {
-            // 1. VALIDATE FORM
             const firstName = document.getElementById('regFirstName').value.trim();
             const lastName = document.getElementById('regLastName').value.trim();
             const email = document.getElementById('regEmail').value.trim();
@@ -270,33 +263,26 @@
 
             if (hasError) return;
 
-            // 2. PREPARE UI FOR SPIN
             regBtn.textContent = 'Spinning...';
             regBtn.disabled = true;
             
-            // NOTE: Determine winner immediately based on weights
             const result = getWeightedPrize();
             const prizeIndex = result.index;
             const wonPrize = result.prize;
 
-            // Save result to hidden field
             document.getElementById('spinResult').value = wonPrize.value;
 
-            // 3. TRIGGER SPIN ANIMATION
             const wheel = document.getElementById('spin-wheel-image');
             const slice = 360 / spinPrizes.length;
-            // Calculate rotation to land on the prize (360*6 gives 6 full rotations first)
-            const rotation = (360 * 6) + (slice * prizeIndex) + (slice / 2); // Adjust offset if needed based on wheel graphic
+            const rotation = (360 * 6) + (slice * prizeIndex) + (slice / 2);
 
             if (wheel) {
                 wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-                wheel.style.transform = `rotate(-${rotation}deg)`; // Negative for clockwise spin effect usually
+                // FIX IS HERE: Included translate(-50%, -50%)
+                wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
             }
 
-            // 4. WAIT FOR ANIMATION TO END (4 seconds), THEN SUBMIT
             setTimeout(async () => {
-                // Animation finished
-                // Call the actual registration API now
                 await processRegistration(firstName, lastName, email, wonPrize);
             }, 4200); 
         });
@@ -321,7 +307,7 @@
                         email: email,
                         first_name: firstName,
                         last_name: lastName,
-                        won_prize: prizeData.value, // Sending prize to backend
+                        won_prize: prizeData.value,
                         prize_label: prizeData.label
                     })
                 }
@@ -330,10 +316,7 @@
             const data = await res.json();
 
             if (data.type === 'success' && data.credentials) {
-                // Success: Alert Prize and Login
                 alert(`🎉 You won ${prizeData.label}! Account created.`);
-                
-                // Analytics
                 window.dataLayer = window.dataLayer || [];
                 dataLayer.push({
                     event: 'signup',
@@ -344,7 +327,6 @@
                         signupoffer: prizeData.label
                     }
                 });
-
                 shopifyAutoLogin(data.credentials.email, data.credentials.password);
             } else {
                 showError('emailError', data.msg || 'Registration failed.');
@@ -358,10 +340,7 @@
             regBtn.disabled = false;
         }
     }
-    // --- REGISTRATION + SPIN LOGIC END ---
 
-    // ... (Existing helpers: shopifyAutoLogin, showSignupWithSpinWheel, resetToLoginView, timer logic) ...
-    
     function shopifyAutoLogin(email, password) {
         var currentPath = window.location.pathname + window.location.search;
         document.getElementById("loginReturnTo").value = currentPath;
@@ -390,12 +369,11 @@
         document.getElementById('sendOtp')?.style.setProperty('display', 'block');
         document.getElementById('otpSection')?.style.setProperty('display', 'none');
         
-        // Reset Wheel
         const wheel = document.getElementById('spin-wheel-image');
-        if(wheel) wheel.style.transform = 'rotate(0deg)';
+        // FIX IS HERE: Included translate(-50%, -50%) for reset as well
+        if(wheel) wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
     }
     
-    // Input handling for OTP boxes
     const otpInputs = document.querySelectorAll('.otp-inputs input');
     otpInputs.forEach((input, index) => {
         input.addEventListener('input', e => {
@@ -408,7 +386,6 @@
         });
     });
 
-    // Timer Logic
     let timer = 30;
     let timerInterval;
     function startTimer() {
