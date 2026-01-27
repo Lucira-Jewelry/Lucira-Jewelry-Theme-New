@@ -1,725 +1,10 @@
-{% comment %} {% comment %}
-Nested Information Page Section with Multi-level Tabs
-Full schema-driven customization for Shopify
-Flat block structure (no nested blocks)
-{% endcomment %}
-
-<div class="nested-info-wrapper" data-section-id="{{ section.id }}">
-  <!-- BANNER SECTION -->
-  <div class="banner-container">
-    <!-- Desktop Banner -->
-    <picture class="banner-image banner-desktop">
-      {% if section.settings.banner_image_desktop %}
-        {{ section.settings.banner_image_desktop | image_url: width: 1920 | image_tag: loading: 'lazy', alt: section.settings.banner_alt_text }}
-      {% else %}
-        <div class="placeholder">Desktop Banner</div>
-      {% endif %}
-    </picture>
-
-    <!-- Mobile Banner -->
-    <picture class="banner-image banner-mobile">
-      {% if section.settings.banner_image_mobile %}
-        {{ section.settings.banner_image_mobile | image_url: width: 768 | image_tag: loading: 'lazy', alt: section.settings.banner_alt_text }}
-      {% else %}
-        <div class="placeholder">Mobile Banner</div>
-      {% endif %}
-    </picture>
-
-    <!-- Primary Tabs (Bottom of Banner) -->
-    <div class="primary-tabs-container">
-      <div class="primary-tabs">
-        {% for block in section.blocks %}
-          {% if block.type == 'primary_tab' %}
-            <button 
-              class="primary-tab-btn {% if forloop.first %}active{% endif %}" 
-              data-tab-name="{{ block.settings.tab_name | escape }}"
-              data-tab-index="{{ forloop.index0 }}"
-            >
-              {{ block.settings.tab_name }}
-            </button>
-          {% endif %}
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <!-- CONTENT SECTION -->
-  <div class="content-wrapper">
-    {% for block in section.blocks %}
-      {% if block.type == 'primary_tab' %}
-        <div class="primary-tab-content {% if forloop.first %}active{% endif %}" data-primary-tab="{{ block.settings.tab_name | escape }}">
-          
-          <!-- Secondary Tabs (Info Tabs) -->
-          {% if block.settings.show_secondary_tabs %}
-            {% assign info_tabs_for_primary = '' %}
-            {% for sub_block in section.blocks %}
-              {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
-                {% if info_tabs_for_primary == '' %}
-                  {% assign info_tabs_for_primary = sub_block.settings.info_tab_name %}
-                {% else %}
-                  {% assign info_tabs_for_primary = info_tabs_for_primary | append: '|' | append: sub_block.settings.info_tab_name %}
-                {% endif %}
-              {% endif %}
-            {% endfor %}
-
-            {% if info_tabs_for_primary != '' %}
-              <div class="secondary-tabs">
-                {% for sub_block in section.blocks %}
-                  {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
-                    <button 
-                      class="secondary-tab-btn {% if forloop.first %}active{% endif %}" 
-                      data-info-tab="{{ sub_block.settings.info_tab_name | escape }}"
-                    >
-                      {{ sub_block.settings.info_tab_name }}
-                    </button>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% endif %}
-          {% endif %}
-
-          <!-- Info Tabs Content -->
-          {% for sub_block in section.blocks %}
-            {% if sub_block.type == 'info_tab' and sub_block.settings.parent_tab_name == block.settings.tab_name %}
-              <div class="info-tab-content {% if forloop.first %}active{% endif %}" data-info-content="{{ sub_block.settings.info_tab_name | escape }}">
-                
-                <div class="info-layout">
-                  <!-- Image Column -->
-                  <div class="info-image-col">
-                    {% if sub_block.settings.info_image %}
-                      {{ sub_block.settings.info_image | image_url: width: 500 | image_tag: loading: 'lazy', alt: sub_block.settings.info_image_alt }}
-                    {% else %}
-                      <div class="placeholder info-placeholder">Image</div>
-                    {% endif %}
-
-                    <!-- Info Tab Button -->
-                    {% if sub_block.settings.button_text %}
-                      <a href="{{ sub_block.settings.button_link }}" class="info-btn">
-                        {{ sub_block.settings.button_text }}
-                      </a>
-                    {% endif %}
-                  </div>
-
-                  <!-- Content Column -->
-                  <div class="info-content-col">
-                    <h2 class="info-header">{{ sub_block.settings.info_header }}</h2>
-                    <div class="info-description">{{ sub_block.settings.info_description }}</div>
-
-                    <!-- Related Topics Section -->
-                    {% if sub_block.settings.show_related_topics %}
-                      {% assign related_blogs = '' %}
-                      {% for rel_block in section.blocks %}
-                        {% if rel_block.type == 'related_blog' and rel_block.settings.parent_info_tab_name == sub_block.settings.info_tab_name %}
-                          {% if related_blogs == '' %}
-                            {% assign related_blogs = 'found' %}
-                          {% endif %}
-                        {% endif %}
-                      {% endfor %}
-
-                      {% if related_blogs == 'found' %}
-                        <div class="related-topics">
-                          <h3>Related Topics</h3>
-                          <div class="topics-list">
-                            {% for rel_block in section.blocks %}
-                              {% if rel_block.type == 'related_blog' and rel_block.settings.parent_info_tab_name == sub_block.settings.info_tab_name %}
-                                <div class="topic-item">
-                                  <a href="{{ rel_block.settings.blog_link }}">
-                                    {{ rel_block.settings.blog_title }}
-                                  </a>
-                                </div>
-                              {% endif %}
-                            {% endfor %}
-                          </div>
-                        </div>
-                      {% endif %}
-                    {% endif %}
-                  </div>
-                </div>
-              </div>
-            {% endif %}
-          {% endfor %}
-        </div>
-      {% endif %}
-    {% endfor %}
-  </div>
-</div>
-
-<style>
-  .nested-info-wrapper {
-    width: 100%;
-  }
-
-  /* Banner Styles */
-  .banner-container {
-    position: relative;
-    overflow: hidden;
-  }
-
-  .banner-image {
-    width: 100%;
-    display: block;
-  }
-
-  .banner-desktop {
-    display: block;
-  }
-
-  .banner-mobile {
-    display: none;
-  }
-
-  .banner-image img {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  .placeholder {
-    background: #f0f0f0;
-    height: 400px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #999;
-    font-size: 18px;
-  }
-
-  /* Primary Tabs */
-  .primary-tabs-container {
-    background: rgba(0, 0, 0, 0.8);
-    padding: 0;
-    position: relative;
-  }
-
-  .primary-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 0;
-  }
-
-  .primary-tab-btn {
-    padding: 16px 24px;
-    background: transparent;
-    color: #fff;
-    border: none;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: all 0.3s ease;
-    border-bottom: 3px solid transparent;
-  }
-
-  .primary-tab-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .primary-tab-btn.active {
-    background: #fff;
-    color: #000;
-  }
-
-  /* Content Area */
-  .content-wrapper {
-    background: #fff;
-  }
-
-  .primary-tab-content {
-    display: none;
-    padding: 60px 40px;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .primary-tab-content.active {
-    display: block;
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  /* Secondary Tabs (Info Tabs) */
-  .secondary-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 40px;
-    border-bottom: 1px solid #e5e5e5;
-    padding-bottom: 0;
-  }
-
-  .secondary-tab-btn {
-    padding: 12px 20px;
-    background: transparent;
-    border: none;
-    color: #999;
-    cursor: pointer;
-    font-size: 13px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-    border-bottom: 3px solid transparent;
-    transition: all 0.3s ease;
-  }
-
-  .secondary-tab-btn:hover {
-    color: #666;
-  }
-
-  .secondary-tab-btn.active {
-    color: #000;
-    border-bottom-color: #000;
-  }
-
-  /* Info Tab Content */
-  .info-tab-content {
-    display: none;
-  }
-
-  .info-tab-content.active {
-    display: block;
-    animation: fadeIn 0.3s ease;
-  }
-
-  .info-layout {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 60px;
-    align-items: flex-start;
-  }
-
-  .info-image-col {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .info-image-col img {
-    width: 100%;
-    height: auto;
-  }
-
-  .info-placeholder {
-    aspect-ratio: 4/5;
-    background: #f0f0f0;
-    border-radius: 4px;
-  }
-
-  .info-btn {
-    display: inline-block;
-    padding: 12px 32px;
-    background: #8b7b7b;
-    color: #fff;
-    text-align: center;
-    text-decoration: none;
-    font-size: 13px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    border-radius: 4px;
-    transition: background 0.3s ease;
-    cursor: pointer;
-    border: none;
-  }
-
-  .info-btn:hover {
-    background: #6d5f5f;
-  }
-
-  .info-content-col {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-  }
-
-  .info-header {
-    font-size: 28px;
-    font-weight: 600;
-    color: #000;
-    margin: 0;
-  }
-
-  .info-description {
-    font-size: 14px;
-    line-height: 1.8;
-    color: #333;
-    margin: 0;
-  }
-
-  .info-description p {
-    margin: 0;
-  }
-
-  /* Related Topics */
-  .related-topics {
-    margin-top: 30px;
-    padding-top: 30px;
-    border-top: 1px solid #e5e5e5;
-  }
-
-  .related-topics h3 {
-    font-size: 14px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: #000;
-    margin: 0 0 20px 0;
-  }
-
-  .topics-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-  }
-
-  .topic-item {
-    padding: 12px 0;
-    border-bottom: 1px solid #f0f0f0;
-  }
-
-  .topic-item a {
-    color: #333;
-    text-decoration: none;
-    font-size: 13px;
-    transition: color 0.3s ease;
-  }
-
-  .topic-item a:hover {
-    color: #666;
-  }
-
-  .topic-item:last-child {
-    border-bottom: none;
-  }
-
-  /* Mobile Responsive */
-  @media (max-width: 768px) {
-    .banner-desktop {
-      display: none;
-    }
-
-    .banner-mobile {
-      display: block;
-    }
-
-    .primary-tabs {
-      justify-content: flex-start;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-
-    .primary-tab-btn {
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-
-    .content-wrapper {
-      padding: 30px 20px;
-    }
-
-    .primary-tab-content {
-      padding: 30px 0;
-    }
-
-    .secondary-tabs {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      margin-bottom: 30px;
-    }
-
-    .info-layout {
-      grid-template-columns: 1fr;
-      gap: 30px;
-    }
-
-    .info-header {
-      font-size: 22px;
-    }
-
-    .secondary-tab-btn {
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
-  }
-</style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    const wrapper = document.querySelector('[data-section-id="{{ section.id }}"]');
-    
-    if (!wrapper) return;
-
-    // Primary Tab Click Handler
-    const primaryTabBtns = wrapper.querySelectorAll('.primary-tab-btn');
-    primaryTabBtns.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const tabName = this.dataset.tabName;
-        
-        // Remove active from all primary tabs and content
-        primaryTabBtns.forEach(b => b.classList.remove('active'));
-        wrapper.querySelectorAll('.primary-tab-content').forEach(content => {
-          content.classList.remove('active');
-        });
-        
-        // Add active to clicked tab
-        this.classList.add('active');
-        wrapper.querySelector(`[data-primary-tab="${tabName}"]`).classList.add('active');
-        
-        // Reset secondary tabs to first
-        resetSecondaryTabs(tabName);
-      });
-    });
-
-    // Secondary Tab (Info Tab) Click Handler
-    const secondaryTabBtns = wrapper.querySelectorAll('.secondary-tab-btn');
-    secondaryTabBtns.forEach(btn => {
-      btn.addEventListener('click', function() {
-        const infoTabName = this.dataset.infoTab;
-        const parent = this.closest('.primary-tab-content');
-        
-        if (!parent) return;
-        
-        // Remove active from all secondary tabs and content in this section
-        parent.querySelectorAll('.secondary-tab-btn').forEach(b => {
-          b.classList.remove('active');
-        });
-        parent.querySelectorAll('.info-tab-content').forEach(content => {
-          content.classList.remove('active');
-        });
-        
-        // Add active to clicked tab
-        this.classList.add('active');
-        parent.querySelector(`[data-info-content="${infoTabName}"]`).classList.add('active');
-      });
-    });
-
-    function resetSecondaryTabs(primaryTabName) {
-      const parent = wrapper.querySelector(`[data-primary-tab="${primaryTabName}"]`);
-      if (parent) {
-        const firstSecondaryBtn = parent.querySelector('.secondary-tab-btn');
-        if (firstSecondaryBtn) {
-          firstSecondaryBtn.click();
-        }
-      }
-    }
-
-    // Click first tab on load
-    if (primaryTabBtns.length > 0) {
-      primaryTabBtns[0].click();
-    }
-  });
-</script>
-
-{% schema %}
-{
-  "name": "Nested Information Page",
-  "settings": [
-    {
-      "type": "image_picker",
-      "id": "banner_image_desktop",
-      "label": "Banner Image - Desktop"
-    },
-    {
-      "type": "image_picker",
-      "id": "banner_image_mobile",
-      "label": "Banner Image - Mobile"
-    },
-    {
-      "type": "text",
-      "id": "banner_alt_text",
-      "label": "Banner Image Alt Text",
-      "default": "Banner"
-    }
-  ],
-  "blocks": [
-    {
-      "type": "primary_tab",
-      "name": "Primary Tab",
-      "settings": [
-        {
-          "type": "text",
-          "id": "tab_name",
-          "label": "Primary Tab Name",
-          "default": "New Tab"
-        },
-        {
-          "type": "checkbox",
-          "id": "show_secondary_tabs",
-          "label": "Show Information Sub-tabs",
-          "default": true
-        }
-      ]
-    },
-    {
-      "type": "info_tab",
-      "name": "Information Tab",
-      "settings": [
-        {
-          "type": "text",
-          "id": "parent_tab_name",
-          "label": "Parent Primary Tab Name",
-          "info": "Enter the exact name of the primary tab this belongs to (e.g., 'Engagement')",
-          "default": "Primary Tab"
-        },
-        {
-          "type": "text",
-          "id": "info_tab_name",
-          "label": "Information Tab Name",
-          "default": "Style"
-        },
-        {
-          "type": "image_picker",
-          "id": "info_image",
-          "label": "Product/Feature Image"
-        },
-        {
-          "type": "text",
-          "id": "info_image_alt",
-          "label": "Image Alt Text",
-          "default": "Product"
-        },
-        {
-          "type": "text",
-          "id": "info_header",
-          "label": "Information Header",
-          "default": "SOLITAIRE"
-        },
-        {
-          "type": "richtext",
-          "id": "info_description",
-          "label": "Information Description",
-          "default": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit.</p>"
-        },
-        {
-          "type": "text",
-          "id": "button_text",
-          "label": "Button Text",
-          "default": "EXPLORE MORE"
-        },
-        {
-          "type": "url",
-          "id": "button_link",
-          "label": "Button Link"
-        },
-        {
-          "type": "checkbox",
-          "id": "show_related_topics",
-          "label": "Show Related Topics Section",
-          "default": true
-        }
-      ]
-    },
-    {
-      "type": "related_blog",
-      "name": "Related Blog/Topic",
-      "settings": [
-        {
-          "type": "text",
-          "id": "parent_info_tab_name",
-          "label": "Parent Info Tab Name",
-          "info": "Enter the exact name of the information tab this belongs to (e.g., 'Style')",
-          "default": "Style"
-        },
-        {
-          "type": "text",
-          "id": "blog_title",
-          "label": "Blog/Topic Title",
-          "default": "Related Topic"
-        },
-        {
-          "type": "url",
-          "id": "blog_link",
-          "label": "Blog/Topic Link"
-        }
-      ]
-    }
-  ],
-  "presets": [
-    {
-      "name": "Nested Information Page",
-      "settings": {
-        "banner_alt_text": "Banner"
-      },
-      "blocks": [
-        {
-          "type": "primary_tab",
-          "settings": {
-            "tab_name": "Lab Grown Diamonds",
-            "show_secondary_tabs": true
-          }
-        },
-        {
-          "type": "primary_tab",
-          "settings": {
-            "tab_name": "Engagement",
-            "show_secondary_tabs": true
-          }
-        },
-        {
-          "type": "info_tab",
-          "settings": {
-            "parent_tab_name": "Engagement",
-            "info_tab_name": "Style",
-            "info_header": "SOLITAIRE",
-            "info_description": "<p>Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>",
-            "button_text": "EXPLORE MORE",
-            "show_related_topics": true
-          }
-        },
-        {
-          "type": "info_tab",
-          "settings": {
-            "parent_tab_name": "Engagement",
-            "info_tab_name": "Settings",
-            "info_header": "SETTINGS",
-            "info_description": "<p>Explore different settings and their characteristics.</p>",
-            "button_text": "VIEW SETTINGS",
-            "show_related_topics": true
-          }
-        },
-        {
-          "type": "related_blog",
-          "settings": {
-            "parent_info_tab_name": "Style",
-            "blog_title": "Why Solitaires Remain the Most Loved Diamond Style",
-            "blog_link": "#"
-          }
-        },
-        {
-          "type": "related_blog",
-          "settings": {
-            "parent_info_tab_name": "Style",
-            "blog_title": "5 Hidden Solitaire Ring Details You Should Never Ignore",
-            "blog_link": "#"
-          }
-        },
-        {
-          "type": "related_blog",
-          "settings": {
-            "parent_info_tab_name": "Settings",
-            "blog_title": "Guide to Diamond Settings",
-            "blog_link": "#"
-          }
-        }
-      ]
-    }
-  ]
-}
-{% endschema %} {% endcomment %}
-
 {% comment %}
 Nested Information Page Section - Metaobject Version
 Scalable architecture with unlimited nested content
-Reference metaobject in section settings
+Fully compatible with metaobject structure
 {% endcomment %}
 
-{% assign nested_page = section.settings.nested_page_metaobject %}
+{% assign nested_page = shop.metaobjects.nested_info_page[section.settings.nested_page_metaobject] %}
 
 {% if nested_page %}
   <div class="nested-info-wrapper" data-section-id="{{ section.id }}">
@@ -728,8 +13,14 @@ Reference metaobject in section settings
       <!-- Desktop Banner -->
       <picture class="banner-image banner-desktop">
         {% if nested_page.banner_image_desktop %}
-          {% assign img_url = nested_page.banner_image_desktop | file_img_url: '1920x' %}
-          <img src="{{ img_url }}" alt="{{ nested_page.banner_alt_text }}" loading="lazy">
+          {% assign img_url = nested_page.banner_image_desktop | image_url: width: 1920 %}
+          <img 
+            src="{{ img_url }}" 
+            alt="{{ nested_page.banner_alt_text | default: 'Banner' }}" 
+            loading="lazy"
+            width="1920"
+            height="600"
+          >
         {% else %}
           <div class="placeholder">Desktop Banner (1920x600px)</div>
         {% endif %}
@@ -738,105 +29,134 @@ Reference metaobject in section settings
       <!-- Mobile Banner -->
       <picture class="banner-image banner-mobile">
         {% if nested_page.banner_image_mobile %}
-          {% assign img_url = nested_page.banner_image_mobile | file_img_url: '768x' %}
-          <img src="{{ img_url }}" alt="{{ nested_page.banner_alt_text }}" loading="lazy">
+          {% assign img_url = nested_page.banner_image_mobile | image_url: width: 768 %}
+          <img 
+            src="{{ img_url }}" 
+            alt="{{ nested_page.banner_alt_text | default: 'Banner' }}" 
+            loading="lazy"
+            width="768"
+            height="600"
+          >
         {% else %}
           <div class="placeholder">Mobile Banner (768x600px)</div>
         {% endif %}
       </picture>
 
       <!-- Primary Tabs (Bottom of Banner) -->
-      <div class="primary-tabs-container">
-        <div class="primary-tabs">
-          {% for primary_tab in nested_page.primary_tabs %}
-            <button 
-              class="primary-tab-btn {% if forloop.first %}active{% endif %}" 
-              data-tab-id="{{ forloop.index0 }}"
-            >
-              {{ primary_tab.tab_name }}
-            </button>
-          {% endfor %}
+      {% if nested_page.primary_tabs %}
+        <div class="primary-tabs-container">
+          <div class="primary-tabs">
+            {% for primary_tab in nested_page.primary_tabs %}
+              <button 
+                class="primary-tab-btn {% if forloop.first %}active{% endif %}" 
+                data-tab-id="{{ forloop.index0 }}"
+                type="button"
+              >
+                {{ primary_tab.tab_name }}
+              </button>
+            {% endfor %}
+          </div>
         </div>
-      </div>
+      {% endif %}
     </div>
 
     <!-- CONTENT SECTION -->
     <div class="content-wrapper">
-      {% for primary_tab in nested_page.primary_tabs %}
-        <div class="primary-tab-content {% if forloop.first %}active{% endif %}" data-primary-index="{{ forloop.index0 }}">
-          
-          <!-- Secondary Tabs (Info Tabs) -->
-          {% if primary_tab.show_secondary_tabs and primary_tab.information_tabs %}
-            <div class="secondary-tabs">
+      {% if nested_page.primary_tabs %}
+        {% for primary_tab in nested_page.primary_tabs %}
+          <div 
+            class="primary-tab-content {% if forloop.first %}active{% endif %}" 
+            data-primary-index="{{ forloop.index0 }}"
+          >
+            
+            <!-- Secondary Tabs (Info Tabs) -->
+            {% if primary_tab.show_secondary_tabs and primary_tab.information_tabs %}
+              <div class="secondary-tabs">
+                {% for info_tab in primary_tab.information_tabs %}
+                  <button 
+                    class="secondary-tab-btn {% if forloop.first %}active{% endif %}" 
+                    data-info-index="{{ forloop.index0 }}"
+                    type="button"
+                  >
+                    {{ info_tab.info_tab_name }}
+                  </button>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            <!-- Info Tabs Content -->
+            {% if primary_tab.information_tabs %}
               {% for info_tab in primary_tab.information_tabs %}
-                <button 
-                  class="secondary-tab-btn {% if forloop.first %}active{% endif %}" 
+                <div 
+                  class="info-tab-content {% if forloop.first %}active{% endif %}" 
                   data-info-index="{{ forloop.index0 }}"
                 >
-                  {{ info_tab.info_tab_name }}
-                </button>
-              {% endfor %}
-            </div>
-          {% endif %}
+                  
+                  <div class="info-layout">
+                    <!-- Image Column -->
+                    <div class="info-image-col">
+                      {% if info_tab.info_image %}
+                        {% assign img_url = info_tab.info_image | image_url: width: 500 %}
+                        <img 
+                          src="{{ img_url }}" 
+                          alt="{{ info_tab.info_image_alt | default: 'Product Image' }}" 
+                          loading="lazy"
+                          width="500"
+                          height="600"
+                        >
+                      {% else %}
+                        <div class="placeholder info-placeholder">Product Image (500x600px)</div>
+                      {% endif %}
 
-          <!-- Info Tabs Content -->
-          {% if primary_tab.information_tabs %}
-            {% for info_tab in primary_tab.information_tabs %}
-              <div class="info-tab-content {% if forloop.first %}active{% endif %}" data-info-index="{{ forloop.index0 }}">
-                
-                <div class="info-layout">
-                  <!-- Image Column -->
-                  <div class="info-image-col">
-                    {% if info_tab.info_image %}
-                      {% assign img_url = info_tab.info_image | file_img_url: '500x' %}
-                      <img src="{{ img_url }}" alt="{{ info_tab.info_image_alt }}" loading="lazy">
-                    {% else %}
-                      <div class="placeholder info-placeholder">Product Image (500x600px)</div>
-                    {% endif %}
+                      <!-- Info Tab Button -->
+                      {% if info_tab.button_text and info_tab.button_link %}
+                        <a href="{{ info_tab.button_link }}" class="info-btn">
+                          {{ info_tab.button_text }}
+                        </a>
+                      {% endif %}
+                    </div>
 
-                    <!-- Info Tab Button -->
-                    {% if info_tab.button_text %}
-                      <a href="{{ info_tab.button_link }}" class="info-btn">
-                        {{ info_tab.button_text }}
-                      </a>
-                    {% endif %}
-                  </div>
-
-                  <!-- Content Column -->
-                  <div class="info-content-col">
-                    <h2 class="info-header">{{ info_tab.info_header }}</h2>
-                    <div class="info-description">{{ info_tab.info_description }}</div>
-
-                    <!-- Related Topics Section -->
-                    {% if info_tab.show_related_topics and info_tab.related_topics %}
-                      <div class="related-topics">
-                        <h3>Related Topics</h3>
-                        <div class="topics-list">
-                          {% for topic in info_tab.related_topics %}
-                            <div class="topic-item">
-                              {% if topic.link_type == 'blog_post' and topic.blog_post %}
-                                <a href="{{ topic.blog_post.url }}">
-                                  {{ topic.topic_title }}
-                                </a>
-                              {% elsif topic.link_type == 'custom_url' and topic.custom_url %}
-                                <a href="{{ topic.custom_url }}">
-                                  {{ topic.topic_title }}
-                                </a>
-                              {% else %}
-                                <span>{{ topic.topic_title }}</span>
-                              {% endif %}
-                            </div>
-                          {% endfor %}
+                    <!-- Content Column -->
+                    <div class="info-content-col">
+                      <h2 class="info-header">{{ info_tab.info_header }}</h2>
+                      
+                      {% if info_tab.info_description %}
+                        <div class="info-description">
+                          {{ info_tab.info_description }}
                         </div>
-                      </div>
-                    {% endif %}
+                      {% endif %}
+
+                      <!-- Related Topics Section -->
+                      {% if info_tab.show_related_topics and info_tab.related_topics %}
+                        <div class="related-topics">
+                          <h3>Related Topics</h3>
+                          <div class="topics-list">
+                            {% for topic in info_tab.related_topics %}
+                              <div class="topic-item">
+                                {% if topic.link_type == 'blog_post' and topic.blog_post %}
+                                  <a href="{{ topic.blog_post.url }}">
+                                    {{ topic.topic_title }}
+                                  </a>
+                                {% elsif topic.link_type == 'custom_url' and topic.custom_url %}
+                                  <a href="{{ topic.custom_url }}" {% if topic.custom_url contains 'http' %}target="_blank" rel="noopener noreferrer"{% endif %}>
+                                    {{ topic.topic_title }}
+                                  </a>
+                                {% else %}
+                                  <span class="topic-text">{{ topic.topic_title }}</span>
+                                {% endif %}
+                              </div>
+                            {% endfor %}
+                          </div>
+                        </div>
+                      {% endif %}
+                    </div>
                   </div>
                 </div>
-              </div>
-            {% endfor %}
-          {% endif %}
-        </div>
-      {% endfor %}
+              {% endfor %}
+            {% endif %}
+          </div>
+        {% endfor %}
+      {% endif %}
     </div>
   </div>
 
@@ -854,6 +174,8 @@ Reference metaobject in section settings
     .banner-image {
       width: 100%;
       display: block;
+      margin: 0;
+      padding: 0;
     }
 
     .banner-desktop {
@@ -1001,6 +323,7 @@ Reference metaobject in section settings
     .info-image-col img {
       width: 100%;
       height: auto;
+      display: block;
     }
 
     .info-placeholder {
@@ -1054,6 +377,26 @@ Reference metaobject in section settings
       margin: 0;
     }
 
+    .info-description h1,
+    .info-description h2,
+    .info-description h3,
+    .info-description h4,
+    .info-description h5,
+    .info-description h6 {
+      margin: 16px 0 8px 0;
+      font-weight: 600;
+    }
+
+    .info-description ul,
+    .info-description ol {
+      margin: 12px 0;
+      padding-left: 20px;
+    }
+
+    .info-description li {
+      margin: 6px 0;
+    }
+
     /* Related Topics */
     .related-topics {
       margin-top: 30px;
@@ -1081,11 +424,12 @@ Reference metaobject in section settings
     }
 
     .topic-item a,
-    .topic-item span {
+    .topic-item .topic-text {
       color: #333;
       text-decoration: none;
       font-size: 13px;
       transition: color 0.3s ease;
+      display: block;
     }
 
     .topic-item a:hover {
@@ -1110,11 +454,14 @@ Reference metaobject in section settings
         justify-content: flex-start;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
+        padding: 0 10px;
       }
 
       .primary-tab-btn {
         white-space: nowrap;
         flex-shrink: 0;
+        padding: 14px 16px;
+        font-size: 12px;
       }
 
       .content-wrapper {
@@ -1130,6 +477,7 @@ Reference metaobject in section settings
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         margin-bottom: 30px;
+        padding: 0 0 8px 0;
       }
 
       .info-layout {
@@ -1144,6 +492,31 @@ Reference metaobject in section settings
       .secondary-tab-btn {
         white-space: nowrap;
         flex-shrink: 0;
+        padding: 10px 16px;
+        font-size: 12px;
+      }
+
+      .info-description {
+        font-size: 13px;
+        line-height: 1.6;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .primary-tab-content {
+        padding: 20px 0;
+      }
+
+      .content-wrapper {
+        padding: 20px 15px;
+      }
+
+      .info-header {
+        font-size: 18px;
+      }
+
+      .info-layout {
+        gap: 20px;
       }
     }
   </style>
@@ -1168,7 +541,10 @@ Reference metaobject in section settings
           
           // Add active to clicked tab
           this.classList.add('active');
-          wrapper.querySelector(`[data-primary-index="${tabIndex}"]`).classList.add('active');
+          const activeContent = wrapper.querySelector(`[data-primary-index="${tabIndex}"]`);
+          if (activeContent) {
+            activeContent.classList.add('active');
+          }
           
           // Reset secondary tabs to first
           resetSecondaryTabs(tabIndex);
@@ -1194,7 +570,10 @@ Reference metaobject in section settings
           
           // Add active to clicked tab
           this.classList.add('active');
-          parent.querySelector(`[data-info-index="${infoIndex}"]`).classList.add('active');
+          const activeInfoContent = parent.querySelector(`[data-info-index="${infoIndex}"]`);
+          if (activeInfoContent) {
+            activeInfoContent.classList.add('active');
+          }
         });
       });
 
@@ -1204,6 +583,12 @@ Reference metaobject in section settings
           const firstSecondaryBtn = parent.querySelector('.secondary-tab-btn');
           if (firstSecondaryBtn) {
             firstSecondaryBtn.click();
+          } else {
+            // If no secondary tabs, activate first info tab
+            const firstInfoTab = parent.querySelector('.info-tab-content');
+            if (firstInfoTab) {
+              firstInfoTab.classList.add('active');
+            }
           }
         }
       }
@@ -1215,28 +600,21 @@ Reference metaobject in section settings
     });
   </script>
 {% else %}
-  <div style="padding: 40px; background: #f9f9f9; text-align: center; border: 2px dashed #ddd; border-radius: 4px;">
-    <p style="color: #666; margin: 0;">Please select a Nested Information Page metaobject in section settings</p>
+  <div style="padding: 40px; background: #f9f9f9; text-align: center; border: 2px dashed #ddd; border-radius: 4px; margin: 20px;">
+    <p style="color: #666; margin: 0; font-size: 14px;">
+      ⚠️ Please select a <strong>Nested Information Page</strong> metaobject in section settings
+    </p>
   </div>
 {% endif %}
 
-
-{% comment %}
-ADD THIS SCHEMA TO THE BOTTOM OF YOUR nested-information-page.liquid FILE
-After closing all </script>, </style>, and other closing tags
-{% endcomment %}
-
-{% comment %} {% schema %}
+{% schema %}
 {
   "name": "Nested Information Page",
-  "description": "Scalable nested information page powered by metaobjects",
   "settings": [
     {
-      "type": "metaobject_reference",
+      "type": "text",
       "id": "nested_page_metaobject",
-      "name": "Nested Information Page",
-      "description": "Select the nested information page metaobject to display",
-      "metaobject_namespace": "nested_info_page"
+      "label": "Nested Information Page Handle"
     }
   ],
   "presets": [
@@ -1245,218 +623,4 @@ After closing all </script>, </style>, and other closing tags
     }
   ]
 }
-{% endschema %} {% endcomment %}
-
-{% comment %} {
-  "$schema": "https://shopify.dev/api/admin-rest/2024-01/metaobject_types.json",
-  "name": "Nested Information Page",
-  "type": "nested_info_page",
-  "displayNameKey": "page_title",
-  "description": "Scalable nested information page with unlimited tabs and content",
-  "fields": [
-    {
-      "name": "Page Title",
-      "key": "page_title",
-      "description": "Display name for this information page",
-      "type": "single_line_text_field",
-      "required": true
-    },
-    {
-      "name": "Banner Image - Desktop",
-      "key": "banner_image_desktop",
-      "description": "High-resolution banner for desktop (1920x600px recommended)",
-      "type": "file_reference",
-      "validations": {
-        "max_size": 20971520
-      }
-    },
-    {
-      "name": "Banner Image - Mobile",
-      "key": "banner_image_mobile",
-      "description": "Optimized banner for mobile (768x600px recommended)",
-      "type": "file_reference",
-      "validations": {
-        "max_size": 20971520
-      }
-    },
-    {
-      "name": "Banner Alt Text",
-      "key": "banner_alt_text",
-      "description": "SEO and accessibility text for banner image",
-      "type": "single_line_text_field"
-    },
-    {
-      "name": "Primary Tabs",
-      "key": "primary_tabs",
-      "description": "Main category tabs that appear at bottom of banner",
-      "type": "list",
-      "validations": {
-        "max_entries": 50
-      },
-      "reference": "nested_info_primary_tab"
-    }
-  ]
-}
-
-# METAOBJECT DEFINITION FILE
-# Save this as: metaobjects/nested_info_primary_tab.json
-
-{
-  "$schema": "https://shopify.dev/api/admin-rest/2024-01/metaobject_types.json",
-  "name": "Nested Info Primary Tab",
-  "type": "nested_info_primary_tab",
-  "displayNameKey": "tab_name",
-  "description": "Primary tab within nested information page",
-  "fields": [
-    {
-      "name": "Tab Name",
-      "key": "tab_name",
-      "description": "Display name for primary tab (e.g., 'Engagement', 'Lab Grown Diamonds')",
-      "type": "single_line_text_field",
-      "required": true
-    },
-    {
-      "name": "Show Secondary Tabs",
-      "key": "show_secondary_tabs",
-      "description": "Enable information sub-tabs for this primary tab",
-      "type": "boolean",
-      "default": true
-    },
-    {
-      "name": "Information Tabs",
-      "key": "information_tabs",
-      "description": "Sub-tabs with detailed information under this primary tab",
-      "type": "list",
-      "validations": {
-        "max_entries": 100
-      },
-      "reference": "nested_info_information_tab"
-    }
-  ]
-}
-
-# METAOBJECT DEFINITION FILE
-# Save this as: metaobjects/nested_info_information_tab.json
-
-{
-  "$schema": "https://shopify.dev/api/admin-rest/2024-01/metaobject_types.json",
-  "name": "Nested Info Information Tab",
-  "type": "nested_info_information_tab",
-  "displayNameKey": "info_tab_name",
-  "description": "Information tab with content and related topics",
-  "fields": [
-    {
-      "name": "Tab Name",
-      "key": "info_tab_name",
-      "description": "Display name for information tab (e.g., 'Style', 'Settings')",
-      "type": "single_line_text_field",
-      "required": true
-    },
-    {
-      "name": "Product/Feature Image",
-      "key": "info_image",
-      "description": "Main product or feature image (500x600px recommended)",
-      "type": "file_reference",
-      "validations": {
-        "max_size": 20971520
-      }
-    },
-    {
-      "name": "Image Alt Text",
-      "key": "info_image_alt",
-      "description": "SEO and accessibility text for product image",
-      "type": "single_line_text_field"
-    },
-    {
-      "name": "Information Header",
-      "key": "info_header",
-      "description": "Main heading for this information section",
-      "type": "single_line_text_field",
-      "required": true
-    },
-    {
-      "name": "Information Description",
-      "key": "info_description",
-      "description": "Detailed description with rich text formatting",
-      "type": "rich_text_field"
-    },
-    {
-      "name": "Button Text",
-      "key": "button_text",
-      "description": "CTA button label (leave blank to hide button)",
-      "type": "single_line_text_field"
-    },
-    {
-      "name": "Button Link",
-      "key": "button_link",
-      "description": "Where the button navigates to",
-      "type": "url"
-    },
-    {
-      "name": "Show Related Topics",
-      "key": "show_related_topics",
-      "description": "Display related topics/blogs section",
-      "type": "boolean",
-      "default": true
-    },
-    {
-      "name": "Related Topics/Blogs",
-      "key": "related_topics",
-      "description": "List of related blog posts or topics",
-      "type": "list",
-      "validations": {
-        "max_entries": 200
-      },
-      "reference": "nested_info_related_topic"
-    }
-  ]
-}
-
-# METAOBJECT DEFINITION FILE
-# Save this as: metaobjects/nested_info_related_topic.json
-
-{
-  "$schema": "https://shopify.dev/api/admin-rest/2024-01/metaobject_types.json",
-  "name": "Nested Info Related Topic",
-  "type": "nested_info_related_topic",
-  "displayNameKey": "topic_title",
-  "description": "Related blog post or topic link",
-  "fields": [
-    {
-      "name": "Topic Title",
-      "key": "topic_title",
-      "description": "Display text for the related topic",
-      "type": "single_line_text_field",
-      "required": true
-    },
-    {
-      "name": "Link Type",
-      "key": "link_type",
-      "description": "Choose between selecting a blog post or entering a custom URL",
-      "type": "single_line_text_field",
-      "validations": {
-        "choices": ["blog_post", "custom_url"]
-      }
-    },
-    {
-      "name": "Blog Post",
-      "key": "blog_post",
-      "description": "Select a blog post from your store (used when Link Type is 'blog_post')",
-      "type": "article_reference"
-    },
-    {
-      "name": "Custom URL",
-      "key": "custom_url",
-      "description": "Enter custom URL (used when Link Type is 'custom_url')",
-      "type": "url"
-    }
-  ]
-} {% endcomment %}
-
-# QUICK SETUP GUIDE
-# 1. Create metaobject types in Shopify Admin
-# 2. Go to Settings > Data > Metaobjects
-# 3. Create new metaobject type for each JSON definition above
-# 4. Match field names and types exactly
-# 5. Create metaobject entries in Admin
-# 6. Reference in Liquid section via metaobject handles
+{% endschema %}
