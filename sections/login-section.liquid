@@ -89,14 +89,15 @@
   <input type="password" name="customer[password]" id="ShopifyPassword">
 </form>
 <script>
-    
     const spinPrizes = [
-      { label: "₹1,000 OFF", value: "1000_off", chance: 30 }, // 🎯 POINTER (RIGHT)
-      { label: "₹1,500 OFF", value: "1500_off", chance: 25 },
-      { label: "Diamond Pendant", value: "diamond_pendant", chance: 0 },
-      { label: "₹750 OFF", value: "750_off", chance: 45 },
-      { label: "₹5,000 OFF", value: "5000_off", chance: 0 },
-      { label: "₹10,000 OFF", value: "10000_off", chance: 0 }
+      { label: "₹1,500 OFF", value: "1500_off", chance: 5 },
+      { label: "Mystery Cashback", value: "cashback_1", chance: 20 },
+      { label: "₹10,000 OFF", value: "10000_off", chance: 1 },
+      { label: "Bonus Voucher", value: "cashback_2", chance: 20 },
+      { label: "₹1,000 OFF", value: "1000_off", chance: 10 },
+      { label: "₹5,000 OFF", value: "5000_off", chance: 2 },
+      { label: "₹750 OFF", value: "750_off", chance: 41 },
+      { label: "Diamond Pendant", value: "diamond_pendant", chance: 1 } 
     ];
 
     function openloginPopup(id) {
@@ -235,55 +236,58 @@
         });
     }
 
+    // --- SPIN LOGIC START ---
     function getWeightedPrize() {
-      const validPrizes = spinPrizes.filter(p => p.chance > 0);
-      const totalChance = validPrizes.reduce((sum, p) => sum + p.chance, 0);
-      let random = Math.random() * totalChance;
-
-      for (let prize of validPrizes) {
-        if (random < prize.chance) return prize;
-        random -= prize.chance;
-      }
-      return validPrizes[0];
+        let totalChance = spinPrizes.reduce((sum, prize) => sum + prize.chance, 0);
+        let random = Math.random() * totalChance;
+        
+        for (let i = 0; i < spinPrizes.length; i++) {
+            if (random < spinPrizes[i].chance) {
+                return { prize: spinPrizes[i], index: i };
+            }
+            random -= spinPrizes[i].chance;
+        }
+        return { prize: spinPrizes[0], index: 0 };
     }
 
     const regBtn = document.getElementById('completeRegistration');
+    
     if (regBtn) {
-      regBtn.addEventListener('click', async () => {
-        const firstName = document.getElementById('regFirstName').value.trim();
-        const lastName  = document.getElementById('regLastName').value.trim();
-        const email     = document.getElementById('regEmail').value.trim();
+        regBtn.addEventListener('click', async () => {
+            const firstName = document.getElementById('regFirstName').value.trim();
+            const lastName = document.getElementById('regLastName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            
+            let hasError = false;
+            if (validateName(firstName, 'first name')) { showError('firstNameError', validateName(firstName, 'first name')); hasError = true; } else hideError('firstNameError');
+            if (validateName(lastName, 'last name')) { showError('lastNameError', validateName(lastName, 'last name')); hasError = true; } else hideError('lastNameError');
+            if (validateEmail(email)) { showError('emailError', validateEmail(email)); hasError = true; } else hideError('emailError');
 
-        if (!firstName || !lastName || !email) return;
+            if (hasError) return;
 
-        regBtn.textContent = 'Spinning...';
-        regBtn.disabled = true;
+            regBtn.textContent = 'Spinning...';
+            regBtn.disabled = true;
+            
+            const result = getWeightedPrize();
+            const prizeIndex = result.index;
+            const wonPrize = result.prize;
 
-        const wonPrize = getWeightedPrize();
+            document.getElementById('spinResult').value = wonPrize.value;
 
-        const prizeIndex = spinPrizes.findIndex(
-          p => p.value === wonPrize.value
-        );
+            const wheel = document.getElementById('spin-wheel-image');
+            const slice = 360 / spinPrizes.length;
+            const rotation = (360 * 6) + (slice * prizeIndex) + (slice / 2);
 
-        const wheel = document.getElementById('spin-wheel-image');
-        const totalSegments = spinPrizes.length; // 6
-        const sliceAngle = 360 / totalSegments;  // 60°
-        const extraSpins = 360 * 5;
+            if (wheel) {
+                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+                // FIX IS HERE: Included translate(-50%, -50%)
+                wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
+            }
 
-        const rotation =
-          extraSpins + (prizeIndex * sliceAngle);
-
-        wheel.style.transition =
-          'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-        wheel.style.transform =
-          `translate(-50%, -50%) rotate(-${rotation}deg)`;
-
-        /* ========== END SPIN ========== */
-        setTimeout(async () => {
-          document.getElementById('spinResult').value = wonPrize.value;
-          await processRegistration(firstName, lastName, email, wonPrize);
-        }, 4200);
-      });
+            setTimeout(async () => {
+                await processRegistration(firstName, lastName, email, wonPrize);
+            }, 4200); 
+        });
     }
 
     async function processRegistration(firstName, lastName, email, prizeData) {
@@ -314,8 +318,7 @@
             const data = await res.json();
 
             if (data.type === 'success' && data.credentials) {
-                alert(`🎉 Congratulations! You won ${prizeData.label}!`);
-                
+                alert(`🎉 You won ${prizeData.label}! Account created.`);
                 window.dataLayer = window.dataLayer || [];
                 dataLayer.push({
                     event: 'signup',
@@ -326,7 +329,6 @@
                         signupoffer: prizeData.label
                     }
                 });
-                
                 shopifyAutoLogin(data.credentials.email, data.credentials.password);
             } else {
                 showError('emailError', data.msg || 'Registration failed.');
@@ -363,7 +365,6 @@
     function resetToLoginView() {
         const wrapper = document.querySelector('.otp-login-form-wrapper');
         if (!wrapper) return;
-        
         wrapper.classList.remove('signup-active');
         document.querySelector('.signupSection')?.style.setProperty('display', 'none');
         document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
@@ -371,36 +372,8 @@
         document.getElementById('otpSection')?.style.setProperty('display', 'none');
         
         const wheel = document.getElementById('spin-wheel-image');
-        if (wheel) {
-            // Instantly reset without animation
-            wheel.style.transition = 'none';
-            wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-            
-            // Re-enable transition after a brief moment
-            setTimeout(() => {
-                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-            }, 50);
-        }
-        
-        // Clear all form inputs
-        document.getElementById('regFirstName').value = '';
-        document.getElementById('regLastName').value = '';
-        document.getElementById('regEmail').value = '';
-        document.querySelectorAll('.otp-inputs input').forEach(input => input.value = '');
-        
-        // Hide all errors
-        hideError('firstNameError');
-        hideError('lastNameError');
-        hideError('emailError');
-        hideError('mobileError');
-        hideError('otpError');
-        
-        // Reset button
-        const regBtn = document.getElementById('completeRegistration');
-        if (regBtn) {
-            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-            regBtn.disabled = false;
-        }
+        // FIX IS HERE: Included translate(-50%, -50%) for reset as well
+        if(wheel) wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
     }
     
     const otpInputs = document.querySelectorAll('.otp-inputs input');
