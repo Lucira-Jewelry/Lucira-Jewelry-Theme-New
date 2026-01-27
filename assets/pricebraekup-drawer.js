@@ -209,10 +209,9 @@ function sendToCart() {
     const items = [];
 
     const charm = JSON.parse(localStorage.getItem("charm_cart_v1") || "{}");
-    const variantTitle = localStorage.getItem("SelectedVariantTitle") || "";
     const baseObj = JSON.parse(localStorage.getItem("SelectedVariant") || "null");
 
- 
+    /* BASE PRODUCT – unchanged */
     if (baseObj) {
       items.push({
         id: Number(baseObj),
@@ -224,21 +223,28 @@ function sendToCart() {
       });
     }
 
-   
-    if (charm.items) {
-      Object.keys(charm.items).forEach((id) => {
-        const qty = parseInt(charm.items[id].qty || 0, 10);
+    if (Array.isArray(charm.sequence) && charm.items) {
+      const used = new Set();
 
-        if (qty > 0) {
-          items.push({
-            id: Number(id),
-            quantity: qty,
-            properties: {
-              _bundle_id: bundleId,
-              _bundle_type: 'charm'
-            }
-          });
-        }
+      charm.sequence.forEach((id) => {
+        if (used.has(id)) return;
+
+        const item = charm.items[id];
+        if (!item) return;
+
+        const qty = parseInt(item.qty || 0, 10);
+        if (qty <= 0) return;
+
+        items.push({
+          id: Number(id),
+          quantity: qty,
+          properties: {
+            _bundle_id: bundleId,
+            _bundle_type: 'charm'
+          }
+        });
+
+        used.add(id);
       });
     }
 
@@ -278,3 +284,4 @@ function sendToCart() {
     })
     .catch((err) => console.error("Add to cart error:", err));
 }
+
