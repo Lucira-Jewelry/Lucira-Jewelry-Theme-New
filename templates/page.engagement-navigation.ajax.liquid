@@ -1,0 +1,149 @@
+{% comment %}
+Template: page.engagement-navigation.ajax
+Description: AJAX response for tab navigation
+{% endcomment %}
+
+{% layout none %}
+
+{% assign current_slug = request.path | split: '/' | last %}
+{% assign main_tab_slug = request.path | split: '/' | last | default: 'engagement' %}
+
+{% comment %} Get main tab data {% endcomment %}
+{% assign main_tab = shop.metaobjects.navigation_tab.values 
+  | where: "slug", main_tab_slug 
+  | first 
+  | default: shop.metaobjects.navigation_tab.values 
+  | where: "slug", "engagement" 
+  | first %}
+
+{% comment %} Get sub-tabs for current main tab {% endcomment %}
+{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab.slug", main_tab_slug 
+  | where: "is_active", true 
+  | sort: "sort_order" %}
+
+<!-- Sub Tabs Navigation (only if exists) -->
+{% if sub_tabs.size > 0 %}
+  <nav class="sub-tabs-navigation" aria-label="Sub navigation">
+    <ul class="sub-tabs-list" id="sub-tabs">
+      {% for sub_tab in sub_tabs %}
+        {% assign content_page = shop.metaobjects.content_page.values 
+          | where: "slug", sub_tab.slug 
+          | where: "parent_tab.slug", main_tab_slug 
+          | first %}
+        
+        <li class="sub-tab-item {% if current_slug == sub_tab.slug %}active{% endif %}">
+          <a href="/pages/{{ main_tab_slug }}/{{ sub_tab.slug }}" 
+             class="sub-tab-link"
+             data-content-slug="{{ sub_tab.slug }}"
+             {% if content_page %}
+               data-banner-src="{{ content_page.banner_image | default: sub_tab.banner_image | image_url: width: 2000 }}"
+               data-banner-header="{{ content_page.content_header }}"
+               data-banner-description="{{ content_page.content_body | strip_html | truncate: 200 }}"
+               data-banner-cta-text="{{ content_page.cta_text }}"
+               data-banner-cta-link="{{ content_page.cta_link }}"
+             {% endif %}>
+            {{ sub_tab.title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+{% endif %}
+
+<!-- Content Area -->
+<div class="tab-content-area" id="content-area">
+  {% if current_slug != main_tab_slug %}
+    {% assign content_page = shop.metaobjects.content_page.values 
+      | where: "slug", current_slug 
+      | where: "parent_tab.slug", main_tab_slug 
+      | first %}
+    
+    {% if content_page %}
+      <article class="content-page">
+        <div class="content-page__header">
+          <h2>{{ content_page.content_header }}</h2>
+        </div>
+        
+        <div class="content-page__body rte">
+          {{ content_page.content_body }}
+        </div>
+        
+        {% if content_page.gallery_images.size > 0 %}
+          <div class="content-page__gallery">
+            <h3>Gallery</h3>
+            <div class="gallery-grid">
+              {% for image in content_page.gallery_images %}
+                <div class="gallery-item">
+                  <img src="{{ image | image_url: width: 600 }}" 
+                       alt="{{ content_page.content_header }} - Image {{ forloop.index }}"
+                       loading="lazy"
+                       width="600"
+                       height="400">
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      </article>
+    {% endif %}
+  {% else %}
+    <article class="default-content">
+      <div class="rte">
+        {{ page.content }}
+      </div>
+    </article>
+  {% endif %}
+</div>
+
+<!-- Related Topics Section -->
+<section class="related-topics-section">
+  <h3 class="related-topics__title">RELATED TOPICS</h3>
+  
+  {% assign related_articles = content_page.related_topics | default: main_tab.related_blogs %}
+  
+  {% if related_articles.size > 0 %}
+    <ul class="related-topics__list">
+      {% for article_ref in related_articles %}
+        {% assign article = article_ref %}
+        <li class="related-topic__item">
+          <a href="{{ article.url }}" class="related-topic__link">
+            {{ article.title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+</section>
+
+<!-- Explore More Section -->
+<section class="explore-more-section">
+  <h3 class="explore-more__title">EXPLORE MORE</h3>
+  
+  <div class="explore-more__grid">
+    {% assign related_content = shop.metaobjects.content_page.values 
+      | where: "parent_tab.slug", main_tab_slug 
+      | where: "slug", "!=", current_slug 
+      | limit: 3 %}
+    
+    {% for content in related_content %}
+      <div class="explore-card">
+        <a href="/pages/{{ main_tab_slug }}/{{ content.slug }}" class="explore-card__link">
+          {% if content.banner_image %}
+            <img src="{{ content.banner_image | image_url: width: 400 }}" 
+                 alt="{{ content.content_header }}"
+                 class="explore-card__image"
+                 loading="lazy"
+                 width="400"
+                 height="300">
+          {% endif %}
+          
+          <div class="explore-card__content">
+            <h4 class="explore-card__title">{{ content.content_header }}</h4>
+            <p class="explore-card__excerpt">{{ content.content_body | strip_html | truncate: 100 }}</p>
+          </div>
+        </a>
+      </div>
+    {% endfor %}
+  </div>
+</section>
