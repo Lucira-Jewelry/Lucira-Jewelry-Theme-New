@@ -1001,15 +1001,85 @@ window.MainBaseCharm = function () {
 
           kimg.rotation(rotation);
           kimg._productId = c.id;
-          kimg.on('mouseenter', () => {
+          kimg._charmIndex = i;
+          
+          const originalMouseEnter = () => {
             document.body.style.cursor = 'pointer';
             kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
-          });
+          };
 
-          kimg.on('mouseleave', () => {
+          const originalMouseLeave = () => {
             document.body.style.cursor = 'default';
             kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
+          };
+
+          kimg.on('mouseenter', originalMouseEnter);
+          kimg.on('mouseleave', originalMouseLeave);
+
+          kimg.draggable(true);
+          kimg._charmIndex = i; 
+          
+          let dragStartScale = 1;
+          let dragStartOpacity = 1;
+          
+          kimg.on('dragstart', (e) => {
+            dragStartScale = kimg.scaleX() || 1;
+            dragStartOpacity = kimg.opacity() || 1;
+            
+            kimg.to({
+              opacity: 0.7,
+              scaleX: dragStartScale * 1.15,
+              scaleY: dragStartScale * 1.15,
+              duration: 0.15,
+            });
+            
+            document.body.style.cursor = 'grabbing';
+            kimg.zIndex(this.charmLayer.children.length + 1);
+            this.charmLayer.draw();
           });
+          
+          kimg.on('dragend', (e) => {
+  kimg.to({
+    opacity: dragStartOpacity,
+    scaleX: dragStartScale,
+    scaleY: dragStartScale,
+    duration: 0.15,
+  });
+
+  document.body.style.cursor = 'default';
+
+  const allCharms = this.charmLayer.children || [];
+  const draggedIndex = kimg._charmIndex;
+
+  let swapIndex = null;
+
+  for (let j = 0; j < allCharms.length; j++) {
+    const other = allCharms[j];
+    if (other === kimg) continue;
+
+    const dx = kimg.x() - other.x();
+    const dy = kimg.y() - other.y();
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < size * 0.7) {
+      swapIndex = other._charmIndex;
+      break;
+    }
+  }
+
+  kimg.position({
+    x: this._placedCharmPositions[draggedIndex].x,
+    y: this._placedCharmPositions[draggedIndex].y
+  });
+
+  if (swapIndex !== null && swapIndex !== draggedIndex) {
+    this._swapCharmsInVisualiser(draggedIndex, swapIndex);
+  } else {
+    this.charmLayer.destroyChildren();
+    this._placeCharmsSymmetric(visualiser.charms).catch(() => {});
+  }
+});
+
 
           this.charmLayer.add(kimg);
           this._placedCharmPositions.push({ x, y, w: size, h: size });
@@ -1196,6 +1266,41 @@ window.MainBaseCharm = function () {
         this._updateZoomTrack && this._updateZoomTrack();
       }
       stage.draggable(scale > 1);
+    }
+
+    _swapCharmsInVisualiser(index1, index2) {
+      try {
+        // Swap in visualiser.charms array
+        if (visualiser.charms && index1 >= 0 && index2 >= 0 && 
+            index1 < visualiser.charms.length && index2 < visualiser.charms.length) {
+          const temp = visualiser.charms[index1];
+          visualiser.charms[index1] = visualiser.charms[index2];
+          visualiser.charms[index2] = temp;
+        }
+
+        // Swap in localStorage charm_cart_v1.sequence
+        try {
+          const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+          if (cart && Array.isArray(cart.sequence) && index1 >= 0 && index2 >= 0 &&
+              index1 < cart.sequence.length && index2 < cart.sequence.length) {
+            const tempSeq = cart.sequence[index1];
+            cart.sequence[index1] = cart.sequence[index2];
+            cart.sequence[index2] = tempSeq;
+            localStorage.setItem('charm_cart_v1', JSON.stringify(cart));
+          }
+        } catch (e) {
+          console.warn('Error swapping charms in localStorage:', e);
+        }
+
+        if (this.charmLayer) {
+          this.charmLayer.destroyChildren();
+        }
+        this._placedCharmPositions = [];
+
+        this._placeCharmsSymmetric(visualiser.charms).catch(() => {});
+      } catch (e) {
+        console.warn('Error swapping charms in visualiser:', e);
+      }
     }
 
   }
