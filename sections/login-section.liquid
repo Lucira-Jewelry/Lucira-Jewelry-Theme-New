@@ -10,6 +10,29 @@
             alt="Spin the Wheel"
             class="spin-wheel-image" id="spin-wheel-image" width="800" height="800"
         >
+        
+        <!-- HIDDEN DETECTION OVERLAY - POSITIONED IN FRONT OF WHEEL -->
+        <div id="wheel-detector-overlay" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 800px;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        ">
+            <div id="inner-wheel">
+                <div class="popup_sec sec" data-pos="Gold Coin"><span class="img_ico gc_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Gift"><span class="img_ico g_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Ring"><span class="img_ico r_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Voucher"><span class="img_ico gv_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Pendant"><span class="img_ico ico_pen"></span></div>
+                <div class="popup_sec sec" data-pos="Better Luck"><span class="img_ico b_l"></span></div>
+            </div>
+        </div>
+        
         <img 
             src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Spinner_1.png?v=1769229971" 
             alt="Spin CTA"
@@ -88,8 +111,7 @@
   <input type="email" name="customer[email]" id="ShopifyEmail">
   <input type="password" name="customer[password]" id="ShopifyPassword">
 </form>
-<script>
-    
+<script> 
     const spinPrizes = [
       { label: "₹1,500 OFF", value: "1500_off", chance: 15 },
       { label: "₹1,000 OFF", value: "1000_off", chance: 20 },
@@ -98,6 +120,16 @@
       { label: "₹5,000 OFF", value: "5000_off", chance: 22 },
       { label: "₹10,000 OFF", value: "10000_off", chance: 1 }
     ];
+    
+    // MAP YOUR WHEEL SEGMENTS TO PRIZES (adjust data-pos to match your actual segments)
+    const wheelSegmentMapping = {
+        "Gold Coin": { label: "₹1,500 OFF", value: "1500_off" },
+        "Gift": { label: "₹1,000 OFF", value: "1000_off" },
+        "Ring": { label: "₹750 OFF", value: "750_off" },
+        "Voucher": { label: "Diamond Pendant", value: "diamond_pendant" },
+        "Pendant": { label: "₹5,000 OFF", value: "5000_off" },
+        "Better Luck": { label: "₹10,000 OFF", value: "10000_off" }
+    };
 
     function openloginPopup(id) {
         document.getElementById(id).style.display = 'flex';
@@ -189,7 +221,6 @@
         });
     }
 
-    // OTP VERIFY
     const verifyBtn = document.getElementById('verifyOtp');
     if (verifyBtn) {
         verifyBtn.addEventListener('click', async () => {
@@ -247,6 +278,55 @@
         }
         return { prize: spinPrizes[0], index: 0 };
     }
+    
+    // DETECT WHICH SEGMENT THE POINTER IS ACTUALLY POINTING AT
+    function detectWheelResult() {
+        const wheel = document.getElementById('spin-wheel-image');
+        const detectorOverlay = document.getElementById('wheel-detector-overlay');
+        
+        if (!wheel || !detectorOverlay) return null;
+        
+        // Get the current rotation of the wheel
+        const transform = window.getComputedStyle(wheel).transform;
+        let rotation = 0;
+        
+        if (transform !== 'none') {
+            const values = transform.split('(')[1].split(')')[0].split(',');
+            const a = values[0];
+            const b = values[1];
+            rotation = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+        }
+        
+        // Normalize rotation to 0-360
+        rotation = ((rotation % 360) + 360) % 360;
+        
+        // Apply the same rotation to the detector overlay
+        detectorOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        
+        // Get all segments from the detector overlay
+        const segments = detectorOverlay.querySelectorAll('.popup_sec');
+        const totalSegments = segments.length;
+        const segmentAngle = 360 / totalSegments;
+        
+        // Pointer is at top (0 degrees), find which segment is there
+        // Account for pointer offset
+        const pointerAngle = 0; // Adjust if your pointer is not at exact top
+        
+        for (let i = 0; i < segments.length; i++) {
+            const segmentStartAngle = i * segmentAngle;
+            const segmentEndAngle = (i + 1) * segmentAngle;
+            
+            // Check if pointer angle falls within this segment
+            if (pointerAngle >= segmentStartAngle && pointerAngle < segmentEndAngle) {
+                const dataPos = segments[i].getAttribute('data-pos');
+                return wheelSegmentMapping[dataPos] || null;
+            }
+        }
+        
+        // Fallback: use first segment
+        const firstSegmentPos = segments[0]?.getAttribute('data-pos');
+        return wheelSegmentMapping[firstSegmentPos] || null;
+    }
 
     const regBtn = document.getElementById('completeRegistration');
     
@@ -268,19 +348,14 @@
             
             const result = getWeightedPrize();
             const prizeIndex = result.index;
-            const wonPrize = result.prize;
 
             const wheel = document.getElementById('spin-wheel-image');
             const totalSegments = 6; 
             const sliceAngle = 360 / totalSegments;
 
             const extraSpins = 360 * 5;
-
             const targetRotation = prizeIndex * sliceAngle;
-
-            // Adjust pointer alignment - your pointer appears to be pointing at the TOP
-            const pointerOffset = 30; // Fine-tune this value: try 30, 45, 0, -30
-
+            const pointerOffset = 30;
             const rotation = extraSpins + targetRotation + pointerOffset;
 
             if (wheel) {
@@ -289,6 +364,13 @@
             }
 
             setTimeout(async () => {
+                // DETECT THE ACTUAL RESULT FROM THE WHEEL POSITION
+                const detectedPrize = detectWheelResult();
+                const wonPrize = detectedPrize || result.prize;
+                
+                console.log('Calculated prize:', result.prize);
+                console.log('Detected prize from wheel:', wonPrize);
+                
                 document.getElementById('spinResult').value = wonPrize.value;
                 await processRegistration(firstName, lastName, email, wonPrize);
             }, 4200); 
@@ -381,7 +463,6 @@
         
         const wheel = document.getElementById('spin-wheel-image');
         if (wheel) {
-            // Instantly reset without animation
             wheel.style.transition = 'none';
             wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
             
@@ -401,7 +482,6 @@
         hideError('mobileError');
         hideError('otpError');
         
-        // Reset button
         const regBtn = document.getElementById('completeRegistration');
         if (regBtn) {
             regBtn.textContent = 'SPIN & CREATE ACCOUNT';
