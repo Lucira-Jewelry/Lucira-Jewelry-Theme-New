@@ -1,17 +1,6 @@
-{% comment %} Debug: Check metaobjects {% endcomment %}
-<p>Total Navigation Tabs: {{ shop.metaobjects.navigation_tab.values.size }}</p>
-<p>Total Content Pages: {{ shop.metaobjects.content_page.values.size }}</p>
-<p>Current Slug: {{ current_slug }}</p>
-<p>Main Tab Slug: {{ main_tab_slug }}</p>
-{% if main_tab %}
-  <p>Main Tab Found: {{ main_tab.title }}</p>
-{% else %}
-  <p>No Main Tab Found!</p>
-{% endif %}
-<p>Main Tabs Count: {{ main_tabs.size }}</p>
 
 
-
+{% comment %} 
 {{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
 
 {% comment %} Metaobjects logic {% endcomment %}
@@ -61,7 +50,95 @@
   {% assign page_description = main_tab.description | strip_html | truncate: 160 %}
 {% endif %}
 
-{% assign featured_image = current_content_page.banner_image | default: main_tab.banner_image %}
+{% assign featured_image = current_content_page.banner_image | default: main_tab.banner_image %} {% endcomment %}
+ {{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
+
+{% comment %} Metaobjects logic - FIXED VERSION {% endcomment %}
+{% assign current_path = canonical_url | split: shop.url | last %}
+{% assign path_segments = current_path | split: '/' %}
+{% assign current_slug = path_segments.last %}
+
+{% comment %} Determine main tab slug {% endcomment %}
+{% if path_segments.size >= 3 %}
+  {% assign main_tab_slug = path_segments[2] %}
+{% elsif path_segments.size == 2 %}
+  {% assign main_tab_slug = path_segments[1] %}
+{% else %}
+  {% assign main_tab_slug = 'engagement' %}
+{% endif %}
+
+{% comment %} Debug: Check what we're getting {% endcomment %}
+<div style="background: #f5f5f5; padding: 10px; margin-bottom: 20px; border: 1px solid #ddd; display: none;">
+  <p><strong>Debug Info:</strong></p>
+  <p>Canonical URL: {{ canonical_url }}</p>
+  <p>Current Path: {{ current_path }}</p>
+  <p>Path Segments: {{ path_segments | join: ', ' }}</p>
+  <p>Current Slug: {{ current_slug }}</p>
+  <p>Main Tab Slug: {{ main_tab_slug }}</p>
+</div>
+
+{% comment %} Get main tab data {% endcomment %}
+{% assign main_tab = nil %}
+{% if shop.metaobjects.navigation_tab.values.size > 0 %}
+  {% assign main_tab = shop.metaobjects.navigation_tab.values | where: "slug", main_tab_slug | first %}
+  
+  {% if main_tab == nil %}
+    {% comment %} Try to get engagement as fallback {% endcomment %}
+    {% assign main_tab = shop.metaobjects.navigation_tab.values | where: "slug", "engagement" | first %}
+  {% endif %}
+  
+  {% if main_tab == nil %}
+    {% comment %} Get the first available tab {% endcomment %}
+    {% assign main_tab = shop.metaobjects.navigation_tab.values | first %}
+  {% endif %}
+{% endif %}
+
+{% comment %} Get all main tabs (tabs without parent) {% endcomment %}
+{% assign main_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab", blank 
+  | sort: "sort_order" %}
+
+{% comment %} Get sub-tabs for current main tab {% endcomment %}
+{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab.slug", main_tab_slug 
+  | sort: "sort_order" %}
+
+{% comment %} Get current content page if sub-tab is selected {% endcomment %}
+{% assign current_content_page = nil %}
+{% if path_segments.size >= 4 %}
+  {% assign content_slug = path_segments[3] %}
+  {% assign current_content_page = shop.metaobjects.content_page.values 
+    | where: "slug", content_slug 
+    | where: "parent_tab.slug", main_tab_slug 
+    | first %}
+{% elsif path_segments.size == 3 %}
+  {% assign content_slug = path_segments[2] %}
+  {% if content_slug != main_tab_slug %}
+    {% assign current_content_page = shop.metaobjects.content_page.values 
+      | where: "slug", content_slug 
+      | where: "parent_tab.slug", main_tab_slug 
+      | first %}
+  {% endif %}
+{% endif %}
+
+{% comment %} Set meta information {% endcomment %}
+{% if current_content_page %}
+  {% assign page_title = current_content_page.meta_title | default: current_content_page.content_header %}
+  {% assign page_description = current_content_page.meta_description | default: current_content_page.content_body | strip_html | truncate: 160 %}
+{% elsif main_tab %}
+  {% assign page_title = main_tab.title %}
+  {% assign page_description = main_tab.description | strip_html | truncate: 160 %}
+{% else %}
+  {% assign page_title = page.title %}
+  {% assign page_description = page.content | strip_html | truncate: 160 %}
+{% endif %}
+
+{% assign featured_image = nil %}
+{% if current_content_page and current_content_page.banner_image %}
+  {% assign featured_image = current_content_page.banner_image %}
+{% elsif main_tab and main_tab.banner_image %}
+  {% assign featured_image = main_tab.banner_image %}
+{% endif %}
 
 {% comment %} Update page title and description {% endcomment %}
 <script type="application/javascript">
