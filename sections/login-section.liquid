@@ -91,12 +91,13 @@
 <script>
     
     const spinPrizes = [
-      { label: "₹1,000 OFF", value: "1000_off", chance: 30 }, // 🎯 POINTER (RIGHT)
-      { label: "₹1,500 OFF", value: "1500_off", chance: 25 },
-      { label: "Diamond Pendant", value: "diamond_pendant", chance: 0 },
-      { label: "₹750 OFF", value: "750_off", chance: 45 },
-      { label: "₹5,000 OFF", value: "5000_off", chance: 0 },
-      { label: "₹10,000 OFF", value: "10000_off", chance: 0 }
+      { label: "₹750 OFF", value: "750_off", chance: 41 },        // Position 0 - TOP
+      { label: "₹1,000 OFF", value: "1000_off", chance: 10 },      // Position 1
+      { label: "Diamond Pendant", value: "diamond_pendant", chance: 0 }, // Position 2
+      { label: "₹750 OFF", value: "750_off", chance: 41 },        // Position 3  
+      { label: "₹1,500 OFF", value: "1500_off", chance: 5 },       // Position 4
+      { label: "₹10,000 OFF", value: "10000_off", chance: 1 },     // Position 5
+      { label: "₹5,000 OFF", value: "5000_off", chance: 2 }        // Position 6 (if exists)
     ];
 
     function openloginPopup(id) {
@@ -236,52 +237,59 @@
     }
 
     function getWeightedPrize() {
-      const validPrizes = spinPrizes.filter(p => p.chance > 0);
-      const totalChance = validPrizes.reduce((sum, p) => sum + p.chance, 0);
-      let random = Math.random() * totalChance;
-
-      for (let prize of validPrizes) {
-        if (random < prize.chance) return prize;
-        random -= prize.chance;
-      }
-      return validPrizes[0];
+        let totalChance = spinPrizes.reduce((sum, prize) => sum + prize.chance, 0);
+        let random = Math.random() * totalChance;
+        
+        for (let i = 0; i < spinPrizes.length; i++) {
+            if (random < spinPrizes[i].chance) {
+                return { prize: spinPrizes[i], index: i };
+            }
+            random -= spinPrizes[i].chance;
+        }
+        return { prize: spinPrizes[0], index: 0 };
     }
 
     const regBtn = document.getElementById('completeRegistration');
+    
     if (regBtn) {
-      regBtn.addEventListener('click', async () => {
-        const firstName = document.getElementById('regFirstName').value.trim();
-        const lastName  = document.getElementById('regLastName').value.trim();
-        const email     = document.getElementById('regEmail').value.trim();
+        regBtn.addEventListener('click', async () => {
+            const firstName = document.getElementById('regFirstName').value.trim();
+            const lastName = document.getElementById('regLastName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            
+            let hasError = false;
+            if (validateName(firstName, 'first name')) { showError('firstNameError', validateName(firstName, 'first name')); hasError = true; } else hideError('firstNameError');
+            if (validateName(lastName, 'last name')) { showError('lastNameError', validateName(lastName, 'last name')); hasError = true; } else hideError('lastNameError');
+            if (validateEmail(email)) { showError('emailError', validateEmail(email)); hasError = true; } else hideError('emailError');
 
-        if (!firstName || !lastName || !email) return;
+            if (hasError) return;
 
-        regBtn.textContent = 'Spinning...';
-        regBtn.disabled = true;
+            regBtn.textContent = 'Spinning...';
+            regBtn.disabled = true;
+            
+            const result = getWeightedPrize();
+            const prizeIndex = result.index;
+            const wonPrize = result.prize;
 
-        const wonPrize = getWeightedPrize();
+            const wheel = document.getElementById('spin-wheel-image');
+            const totalSegments = 6; 
+            const sliceAngle = 360 / totalSegments;
+            
+            const extraSpins = 360 * 5;
+            
+            const targetRotation = prizeIndex * sliceAngle;
+            const rotation = extraSpins + targetRotation;
 
-        const prizeIndex = spinPrizes.findIndex(
-          p => p.value === wonPrize.value
-        );
+            if (wheel) {
+                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+                wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
+            }
 
-        const wheel = document.getElementById('spin-wheel-image');
-        const totalSegments = spinPrizes.length; // 6
-        const sliceAngle = 360 / totalSegments;  // 60°
-        const extraSpins = 360 * 5;
-
-        const rotation =
-          extraSpins + (prizeIndex * sliceAngle);
-
-        wheel.style.transition =
-          'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-        wheel.style.transform =
-          `translate(-50%, -50%) rotate(-${rotation}deg)`;
-        setTimeout(async () => {
-          document.getElementById('spinResult').value = wonPrize.value;
-          await processRegistration(firstName, lastName, email, wonPrize);
-        }, 4200);
-      });
+            setTimeout(async () => {
+                document.getElementById('spinResult').value = wonPrize.value;
+                await processRegistration(firstName, lastName, email, wonPrize);
+            }, 4200); 
+        });
     }
 
     async function processRegistration(firstName, lastName, email, prizeData) {
@@ -312,7 +320,7 @@
             const data = await res.json();
 
             if (data.type === 'success' && data.credentials) {
-                alert(`🎉 Congratulations! You won ${prizeData.label}!`);
+                alert(`🎉 Congratulations! You won ${prizeData.label}! Your account has been created.`);
                 
                 window.dataLayer = window.dataLayer || [];
                 dataLayer.push({
@@ -374,19 +382,16 @@
             wheel.style.transition = 'none';
             wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
             
-            // Re-enable transition after a brief moment
             setTimeout(() => {
                 wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
             }, 50);
         }
         
-        // Clear all form inputs
         document.getElementById('regFirstName').value = '';
         document.getElementById('regLastName').value = '';
         document.getElementById('regEmail').value = '';
         document.querySelectorAll('.otp-inputs input').forEach(input => input.value = '');
         
-        // Hide all errors
         hideError('firstNameError');
         hideError('lastNameError');
         hideError('emailError');
@@ -446,7 +451,7 @@
    .login-pop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:9999999;  background-color: #00000080; transition: display .3s; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);}
   .otp-login-form-wrapper { width: 800px; display: flex; border-radius: 12px; overflow: hidden; align-items: center;}
   .otp-login-form-wrapper::before { content: ""; width: 60%; background: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Lucira_model_day_1_32568_copy_2_1_1.jpg?v=1768388597) center / cover no-repeat; height: 100%; }
-  .otp-form-wrapper{width: 40%; padding: 0; margin-left: 20px; margin-right: 10px;}
+  .otp-form-wrapper{width: 40%; padding: 0; margin-left: 20px;}
   .mobile-wrap { display: flex; align-items: center; border: 1px solid #e2e2e2; border-radius: 8px; padding: 10px 16px; background: #ffffff; }
   .country-code { font-weight: 400; font-size: 14px; line-height: 1.6; text-transform: capitalize; margin-right: 10px; padding-right: 12px; border-right: 1px solid #d0d0d0; }
   .mobile-wrap input{border:0;outline:0;width:100%}
@@ -510,9 +515,9 @@
       .otp-login-form-wrapper.signup-active::before { display: none; }
   }
 
-  {% comment %} @media only screen and (min-width:768px){
+  @media only screen and (min-width:768px){
     .registration-form-inputs {overflow-y: scroll; padding-right: 13px; box-sizing: content-box; width: 100%; height: 100%;}
-  } {% endcomment %}
+  }
 </style>
 {% schema %}
 {
