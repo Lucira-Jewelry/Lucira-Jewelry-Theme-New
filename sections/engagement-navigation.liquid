@@ -1,4 +1,189 @@
-{% comment %} In your section file {% endcomment %}
+{{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
+
+{% comment %} Metaobjects logic {% endcomment %}
+{% assign current_slug = request.path | split: '/' | last %}
+{% assign main_tab_slug = request.path | split: '/' | last | default: 'engagement' %}
+
+{% comment %} Get main tab data {% endcomment %}
+{% assign main_tab = shop.metaobjects.navigation_tab.values 
+  | where: "slug", main_tab_slug 
+  | first 
+  | default: shop.metaobjects.navigation_tab.values 
+  | where: "slug", "engagement" 
+  | first %}
+
+{% comment %} Get all main tabs (tabs without parent) {% endcomment %}
+{% assign main_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab", blank 
+  | where: "is_active", true 
+  | sort: "sort_order" %}
+
+{% comment %} Get sub-tabs for current main tab {% endcomment %}
+{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab.slug", main_tab_slug 
+  | where: "is_active", true 
+  | sort: "sort_order" %}
+
+{% comment %} Get current content page if sub-tab is selected {% endcomment %}
+{% assign current_content_page = nil %}
+{% if request.path contains '/pages/' %}
+  {% assign path_parts = request.path | split: '/' %}
+  {% assign content_slug = path_parts[3] | default: path_parts[2] %}
+  
+  {% if content_slug != main_tab_slug %}
+    {% assign current_content_page = shop.metaobjects.content_page.values 
+      | where: "slug", content_slug 
+      | where: "parent_tab.slug", main_tab_slug 
+      | first %}
+  {% endif %}
+{% endif %}
+
+{% comment %} Set meta information {% endcomment %}
+{% if current_content_page %}
+  {% assign page_title = current_content_page.meta_title | default: current_content_page.content_header %}
+  {% assign page_description = current_content_page.meta_description | default: current_content_page.content_body | strip_html | truncate: 160 %}
+{% else %}
+  {% assign page_title = main_tab.title %}
+  {% assign page_description = main_tab.description | strip_html | truncate: 160 %}
+{% endif %}
+
+{% assign featured_image = current_content_page.banner_image | default: main_tab.banner_image %}
+
+{% comment %} Update page title and description {% endcomment %}
+<script type="application/javascript">
+  document.title = "{{ page_title | escape }}";
+  document.querySelector('meta[name="description"]').setAttribute('content', '{{ page_description | escape }}');
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "{{ shop.url }}"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "{{ main_tab.title }}",
+      "item": "{{ shop.url }}/pages/{{ main_tab.slug }}"
+    }
+    {% if current_content_page %}
+    ,{
+      "@type": "ListItem",
+      "position": 3,
+      "name": "{{ current_content_page.content_header }}",
+      "item": "{{ shop.url }}/pages/{{ main_tab.slug }}/{{ current_content_page.slug }}"
+    }
+    {% endif %}
+  ]
+}
+</script>
+
+<div class="page-width" data-section-id="{{ section.id }}" data-section-type="tab-navigation">
+  <!-- Dynamic Banner Section -->
+  <section class="tab-banner" id="tab-banner">
+    <div class="banner-image-container">
+      {% if featured_image %}
+        <img src="{{ featured_image | image_url: width: 2000 }}" 
+             alt="{{ main_tab.title }}" 
+             class="banner-image"
+             loading="eager"
+             width="2000"
+             height="800">
+      {% endif %}
+      
+      <div class="banner-content">
+        <h1 class="banner-title" id="banner-header">
+          {% if current_content_page %}
+            {{ current_content_page.content_header }}
+          {% else %}
+            {{ main_tab.header }}
+          {% endif %}
+        </h1>
+        
+        <p class="banner-description" id="banner-description">
+          {% if current_content_page %}
+            {{ current_content_page.content_body | strip_html | truncate: 200 }}
+          {% else %}
+            {{ main_tab.description }}
+          {% endif %}
+        </p>
+        
+        <a href="{% if current_content_page %}{{ current_content_page.cta_link }}{% else %}{{ main_tab.cta_link }}{% endif %}" 
+           class="button button--primary" 
+           id="banner-cta">
+          {% if current_content_page %}
+            {{ current_content_page.cta_text | default: 'Learn More' }}
+          {% else %}
+            {{ main_tab.cta_text | default: 'Explore Collection' }}
+          {% endif %}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Tabs Navigation -->
+  <nav class="main-tabs-navigation" aria-label="Main navigation">
+    <ul class="main-tabs-list" id="main-tabs">
+      {% for tab in main_tabs %}
+        <li class="main-tab-item {% if tab.slug == main_tab.slug %}active{% endif %}">
+          <a href="/pages/{{ tab.slug }}" 
+             class="main-tab-link"
+             data-tab-slug="{{ tab.slug }}"
+             data-banner-src="{{ tab.banner_image | image_url: width: 2000 }}"
+             data-banner-header="{{ tab.header }}"
+             data-banner-description="{{ tab.description }}"
+             data-banner-cta-text="{{ tab.cta_text }}"
+             data-banner-cta-link="{{ tab.cta_link }}">
+            {{ tab.title }}
+          </a>
+        </li>
+      {% endfor %}
+    </ul>
+  </nav>
+
+  <!-- Rest of your HTML content goes here... -->
+  <!-- Copy the rest from your previous template -->
+</div>
+
+<style>
+  /* Your CSS styles here */
+  .main-tabs-navigation {
+    margin: 40px 0;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .main-tabs-list {
+    display: flex;
+    justify-content: center;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  /* ... rest of your CSS */
+</style>
+
+<script>
+  class ShopifyTabNavigation {
+    // Your JavaScript class here
+    constructor() {
+      this.init();
+    }
+    // ... rest of your JavaScript
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    new ShopifyTabNavigation();
+  });
+</script>
+
 {% schema %}
 {
   "name": "Tab Navigation System",
