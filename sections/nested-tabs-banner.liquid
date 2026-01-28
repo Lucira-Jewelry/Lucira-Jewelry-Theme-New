@@ -3,41 +3,9 @@
   Description: Dynamic banner that changes with tabs
 {% endcomment %}
 
-{%- assign category_handle = page.handle -%}
-{%- assign current_category = metaobjects.category_page[category_handle] -%}
-{%- assign tab_slug = request.query.tab | default: current_category.default_tab_slug -%}
-
-{%- assign current_tab = nil -%}
-{% comment %} 
-{%- assign category_tabs = metaobjects.tab_content.values | where: "parent_category.system.handle", current_category.system.handle -%} {% endcomment %}
-
-{% comment %} NEW CODE (fixed) {% endcomment %}
-{% assign category_tabs = metaobjects.tab_content.values %}
-{% assign filtered_tabs = "" | split: "" %}
-
-{% for tab in category_tabs %}
-  {% assign parent_ref = tab.parent_category %}
-  {% if parent_ref and parent_ref.system and parent_ref.system.handle == current_category.system.handle %}
-    {% assign filtered_tabs = filtered_tabs | push: tab %}
-  {% endif %}
-{% endfor %}
-
-{% assign category_tabs = filtered_tabs %}
-
-{%- for tab in category_tabs -%}
-  {%- if tab.tab_slug == tab_slug -%}
-    {%- assign current_tab = tab -%}
-    {%- break -%}
-  {%- endif -%}
-{%- endfor -%}
-
-{%- if current_tab == nil and category_tabs.size > 0 -%}
-  {%- assign current_tab = category_tabs.first -%}
-{%- endif -%}
-
-{%- assign banner_image = current_tab.banner_image | default: current_category.banner_image -%}
-{%- assign banner_title = current_tab.banner_title | default: current_category.banner_title | default: current_category.title -%}
-{%- assign banner_subtitle = current_tab.banner_subtitle | default: current_category.banner_subtitle -%}
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
 
 <style>
   .nested-tabs-banner {
@@ -113,7 +81,50 @@
 </style>
 
 <div class="nested-tabs-banner">
-  {%- if banner_image -%}
+  {% comment %} Get current tab to display correct banner {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign current_tab = nil %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% comment %} First, find all tabs for this category {% endcomment %}
+  {% for tab in all_tabs %}
+    {% comment %} Try to access parent_category from metafields {% endcomment %}
+    {% assign parent_metafield = tab.metafields.custom.parent_category %}
+    {% if parent_metafield and parent_metafield.value %}
+      {% if parent_metafield.value.id == current_category.id %}
+        {% assign category_tabs = category_tabs | push: tab %}
+        
+        {% if tab.tab_slug == tab_slug %}
+          {% assign current_tab = tab %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} If no tab found with current slug, use first tab {% endcomment %}
+  {% if current_tab == nil and category_tabs.size > 0 %}
+    {% assign current_tab = category_tabs.first %}
+  {% endif %}
+  
+  {% comment %} Display banner image {% endcomment %}
+  {% assign banner_image = nil %}
+  {% assign banner_title = current_category.banner_title %}
+  {% assign banner_subtitle = current_category.banner_subtitle %}
+  
+  {% if current_tab %}
+    {% if current_tab.banner_image %}
+      {% assign banner_image = current_tab.banner_image %}
+    {% endif %}
+    {% if current_tab.banner_title %}
+      {% assign banner_title = current_tab.banner_title %}
+    {% endif %}
+  {% endif %}
+  
+  {% if banner_image == nil %}
+    {% assign banner_image = current_category.banner_image %}
+  {% endif %}
+  
+  {% if banner_image %}
     <div class="banner-background">
       <img 
         src="{{ banner_image | image_url: width: 1920 }}" 
@@ -123,15 +134,15 @@
         height="400"
       >
     </div>
-  {%- endif -%}
+  {% endif %}
   
   <div class="banner-overlay"></div>
   
   <div class="banner-content">
     <h1 class="banner-title">{{ banner_title }}</h1>
-    {%- if banner_subtitle -%}
+    {% if banner_subtitle %}
       <p class="banner-subtitle">{{ banner_subtitle }}</p>
-    {%- endif -%}
+    {% endif %}
   </div>
 </div>
 
