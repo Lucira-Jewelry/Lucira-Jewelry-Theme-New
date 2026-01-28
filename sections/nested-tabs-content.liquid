@@ -275,12 +275,17 @@
 {% endschema %} {% endcomment %}
 
 {% comment %}
-  Section: Nested Tabs Content - WITH PROPER NAVIGATION
+  Section: Nested Tabs Content - WITH PROPER URL HANDLING
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
-{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+
+{% comment %} PROPERLY GET TAB FROM URL {% endcomment %}
+{% assign url_params = request.query %}
+{% assign url_tab = url_params.tab %}
+{% assign default_tab = current_category.default_tab_slug | default: 'style' %}
+{% assign tab_slug = url_tab | default: default_tab %}
 
 <style>
   .nested-tabs-container {
@@ -423,11 +428,16 @@
 </style>
 
 <div class="nested-tabs-container">
+  {% comment %} Debug info - remove after testing {% endcomment %}
+  <div style="background: #e3f2fd; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
+    <p><strong>Debug Info:</strong> tab_slug = "{{ tab_slug }}" | URL param = "{{ url_tab }}" | Default = "{{ default_tab }}"</p>
+  </div>
+  
   {% comment %} Get all tabs for this category {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = all_tabs %}
   
-  {% comment %} Find current tab {% endcomment %}
+  {% comment %} Find current tab - MAKE SURE THIS WORKS {% endcomment %}
   {% assign current_tab = nil %}
   {% for tab in category_tabs %}
     {% if tab.tab_slug == tab_slug %}
@@ -436,6 +446,7 @@
     {% endif %}
   {% endfor %}
   
+  {% comment %} Fallback to first tab if not found {% endcomment %}
   {% if current_tab == nil and category_tabs.size > 0 %}
     {% assign current_tab = category_tabs.first %}
     {% assign tab_slug = current_tab.tab_slug %}
@@ -460,6 +471,11 @@
     <!-- Tab Content -->
     <div class="tab-content">
       {% if current_tab %}
+        {% comment %} Debug: Show which tab is active {% endcomment %}
+        <div style="background: #d4edda; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
+          <p><strong>Currently viewing:</strong> {{ current_tab.title }} (slug: {{ current_tab.tab_slug }})</p>
+        </div>
+        
         <div class="tab-content-area {% if current_tab.content_image %}with-image{% endif %}">
           <div class="tab-content-text">
             {% if current_tab.header %}
@@ -510,7 +526,12 @@
         {% endif %}
       {% else %}
         <div class="no-content-message">
-          <p>Select a tab to view content.</p>
+          <p>No content found for tab: "{{ tab_slug }}"</p>
+          <p>Available tab slugs: 
+            {% for tab in category_tabs %}
+              "{{ tab.tab_slug }}"{% unless forloop.last %}, {% endunless %}
+            {% endfor %}
+          </p>
         </div>
       {% endif %}
     </div>
@@ -531,9 +552,6 @@
         // Update active tab visually
         tabLinks.forEach(l => l.classList.remove('active'));
         this.classList.add('active');
-        
-        // The page will reload with the new ?tab parameter
-        // No need for AJAX for now
       });
     });
     
