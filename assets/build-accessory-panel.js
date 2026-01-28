@@ -2,7 +2,7 @@ function resetJourneyOnLoad() {
   try {
     localStorage.removeItem('charm_cart_v1');
     localStorage.removeItem('lucira_price_breakdown');
-  } catch (e) {}
+  } catch (e) { }
 }
 resetJourneyOnLoad();
 
@@ -95,7 +95,7 @@ window.MainBaseCharm = function () {
       }
 
       __VariantIndex.built = true;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function getBaseCollections() {
@@ -199,7 +199,7 @@ window.MainBaseCharm = function () {
           (item) => Number(item.qty || 0) > 0
         );
       }
-    } catch {}
+    } catch { }
 
     const display = hasCharms ? '' : 'none';
 
@@ -228,7 +228,7 @@ window.MainBaseCharm = function () {
     try {
       const v = Number(card.querySelector('.qty-input')?.value || 0);
       card.classList.toggle('is-selected', v > 0);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function refreshSelectedBorders() {
@@ -261,7 +261,7 @@ window.MainBaseCharm = function () {
         if (hit) v = hit[1];
       }
       if (v && typeof v.price === 'number') return v.price;
-    } catch (e) {}
+    } catch (e) { }
 
     return 0;
   }
@@ -274,7 +274,7 @@ window.MainBaseCharm = function () {
         const p = Number(c.price || 0);
         if (!Number.isNaN(p)) sum += p;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return sum;
   }
@@ -754,10 +754,15 @@ window.MainBaseCharm = function () {
       const container = document.getElementById(this.containerId);
       if (!container) return;
 
+      // Fix for mobile drag-and-drop: prevent browser scrolling when touching the canvas
+      container.style.touchAction = 'none';
+      container.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+
+
       const rect = container.getBoundingClientRect();
       const width = Math.max(300, rect.width || 400);
       const height = width * 1.08;
-      
+
       this.stageWidth = width;
       this.stageHeight = height;
 
@@ -768,7 +773,14 @@ window.MainBaseCharm = function () {
         width: this.stageWidth,
         height: this.stageHeight,
         draggable: false,
+        dragDistance: 0, // Make drag start immediately for smoother feel
       });
+
+      // CRITICAL FIX: Disable browser touch actions on the stage content directly
+      if (this.stage.content) {
+        this.stage.content.style.touchAction = 'none';
+      }
+
       this.stage.on('wheel', (e) => {
         e.evt.preventDefault();
 
@@ -827,7 +839,7 @@ window.MainBaseCharm = function () {
           this.productLayer.draw();
           this._productRendered = true;
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     _resetToBaseView(animate = true) {
@@ -835,7 +847,7 @@ window.MainBaseCharm = function () {
       if (!stage) return;
       const center = {
         x: this.stageSize / 2,
-        y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05), 
+        y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05),
       };
 
       const posX = center.x - center.x * 1;
@@ -971,11 +983,11 @@ window.MainBaseCharm = function () {
 
         const baseOverlap = 0.28;
         const distFromCenter = Math.abs(i - centerIndex);
-        const curveCorrection = distFromCenter * 0.04; 
+        const curveCorrection = distFromCenter * 0.04;
         const totalOverlap = baseOverlap + curveCorrection;
 
         let x = chainX;
-        let y = chainY + (size / 2) - (size * totalOverlap); 
+        let y = chainY + (size / 2) - (size * totalOverlap);
         try {
           const img = await this.createImage(c.image || '');
           const kimg = new Konva.Image({
@@ -987,12 +999,14 @@ window.MainBaseCharm = function () {
             listening: true,
             offsetX: size / 2,
             offsetY: size / 2,
+            // Large hit area for mobile, standard for desktop
+            hitStrokeWidth: isMobileLayout() ? 80 : 0,
           });
           let rotation = 0;
           if (i !== centerIndex) {
             const chainAngleDeg = basePt.angle;
             if (chainAngleDeg > 270) {
-              rotation = -((chainAngleDeg - 270) * 0.8); 
+              rotation = -((chainAngleDeg - 270) * 0.8);
             } else if (chainAngleDeg < 270) {
               rotation = (270 - chainAngleDeg) * 0.8;
             }
@@ -1002,7 +1016,7 @@ window.MainBaseCharm = function () {
           kimg.rotation(rotation);
           kimg._productId = c.id;
           kimg._charmIndex = i;
-          
+
           const originalMouseEnter = () => {
             document.body.style.cursor = 'pointer';
             kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
@@ -1013,72 +1027,101 @@ window.MainBaseCharm = function () {
             kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
           };
 
+          // Mouse hover effects
           kimg.on('mouseenter', originalMouseEnter);
           kimg.on('mouseleave', originalMouseLeave);
 
           kimg.draggable(true);
-          kimg._charmIndex = i; 
-          
+          kimg._charmIndex = i;
+
           let dragStartScale = 1;
           let dragStartOpacity = 1;
-          
-          kimg.on('dragstart', (e) => {
+
+          // Explicitly handle touchstart to guarantee drag starts
+          kimg.on('touchstart', (e) => {
+            e.cancelBubble = true;
+            // Stop any potential stage dragging
+            if (this && this.stage) this.stage.stopDrag();
+
+            // Manually start drag on the charm
+            kimg.startDrag();
+
             dragStartScale = kimg.scaleX() || 1;
             dragStartOpacity = kimg.opacity() || 1;
-            
+
             kimg.to({
               opacity: 0.7,
               scaleX: dragStartScale * 1.15,
               scaleY: dragStartScale * 1.15,
               duration: 0.15,
             });
-            
+          });
+
+          kimg.on('dragstart', (e) => {
+            // dragStartScale and dragStartOpacity are already set in touchstart if it's a touch event
+            // For mouse events, set them here
+            if (!e.evt.touches) { // Only if it's not a touch event
+              dragStartScale = kimg.scaleX() || 1;
+              dragStartOpacity = kimg.opacity() || 1;
+
+              kimg.to({
+                opacity: 0.7,
+                scaleX: dragStartScale * 1.15,
+                scaleY: dragStartScale * 1.15,
+                duration: 0.15,
+              });
+            }
+
             document.body.style.cursor = 'grabbing';
             kimg.zIndex(this.charmLayer.children.length + 1);
             this.charmLayer.draw();
           });
-          
+
+          kimg.on('tap', (e) => {
+            e.cancelBubble = true;
+          });
+
           kimg.on('dragend', (e) => {
-  kimg.to({
-    opacity: dragStartOpacity,
-    scaleX: dragStartScale,
-    scaleY: dragStartScale,
-    duration: 0.15,
-  });
+            kimg.to({
+              opacity: dragStartOpacity,
+              scaleX: dragStartScale,
+              scaleY: dragStartScale,
+              duration: 0.15,
+            });
 
-  document.body.style.cursor = 'default';
+            document.body.style.cursor = 'default';
 
-  const allCharms = this.charmLayer.children || [];
-  const draggedIndex = kimg._charmIndex;
+            const allCharms = this.charmLayer.children || [];
+            const draggedIndex = kimg._charmIndex;
 
-  let swapIndex = null;
+            let swapIndex = null;
 
-  for (let j = 0; j < allCharms.length; j++) {
-    const other = allCharms[j];
-    if (other === kimg) continue;
+            for (let j = 0; j < allCharms.length; j++) {
+              const other = allCharms[j];
+              if (other === kimg) continue;
 
-    const dx = kimg.x() - other.x();
-    const dy = kimg.y() - other.y();
-    const dist = Math.sqrt(dx * dx + dy * dy);
+              const dx = kimg.x() - other.x();
+              const dy = kimg.y() - other.y();
+              const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < size * 0.7) {
-      swapIndex = other._charmIndex;
-      break;
-    }
-  }
+              if (dist < size * 0.7) {
+                swapIndex = other._charmIndex;
+                break;
+              }
+            }
 
-  kimg.position({
-    x: this._placedCharmPositions[draggedIndex].x,
-    y: this._placedCharmPositions[draggedIndex].y
-  });
+            kimg.position({
+              x: this._placedCharmPositions[draggedIndex].x,
+              y: this._placedCharmPositions[draggedIndex].y
+            });
 
-  if (swapIndex !== null && swapIndex !== draggedIndex) {
-    this._swapCharmsInVisualiser(draggedIndex, swapIndex);
-  } else {
-    this.charmLayer.destroyChildren();
-    this._placeCharmsSymmetric(visualiser.charms).catch(() => {});
-  }
-});
+            if (swapIndex !== null && swapIndex !== draggedIndex) {
+              this._swapCharmsInVisualiser(draggedIndex, swapIndex);
+            } else {
+              this.charmLayer.destroyChildren();
+              this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
+            }
+          });
 
 
           this.charmLayer.add(kimg);
@@ -1271,8 +1314,8 @@ window.MainBaseCharm = function () {
     _swapCharmsInVisualiser(index1, index2) {
       try {
         // Swap in visualiser.charms array
-        if (visualiser.charms && index1 >= 0 && index2 >= 0 && 
-            index1 < visualiser.charms.length && index2 < visualiser.charms.length) {
+        if (visualiser.charms && index1 >= 0 && index2 >= 0 &&
+          index1 < visualiser.charms.length && index2 < visualiser.charms.length) {
           const temp = visualiser.charms[index1];
           visualiser.charms[index1] = visualiser.charms[index2];
           visualiser.charms[index2] = temp;
@@ -1282,7 +1325,7 @@ window.MainBaseCharm = function () {
         try {
           const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
           if (cart && Array.isArray(cart.sequence) && index1 >= 0 && index2 >= 0 &&
-              index1 < cart.sequence.length && index2 < cart.sequence.length) {
+            index1 < cart.sequence.length && index2 < cart.sequence.length) {
             const tempSeq = cart.sequence[index1];
             cart.sequence[index1] = cart.sequence[index2];
             cart.sequence[index2] = tempSeq;
@@ -1297,7 +1340,7 @@ window.MainBaseCharm = function () {
         }
         this._placedCharmPositions = [];
 
-        this._placeCharmsSymmetric(visualiser.charms).catch(() => {});
+        this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
       } catch (e) {
         console.warn('Error swapping charms in visualiser:', e);
       }
@@ -1329,7 +1372,7 @@ window.MainBaseCharm = function () {
 
       try {
         return JSON.parse(raw.replace(/&quot;/g, '"'));
-      } catch (e) {}
+      } catch (e) { }
 
       return { variantId: raw };
     } catch (e) {
@@ -1377,7 +1420,7 @@ window.MainBaseCharm = function () {
         ensureBV()._productRendered = false;
         bv.render(visualiser);
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   function ensureBaseProductFromLS() {
     if (visualiser.product.image) return;
@@ -1515,7 +1558,7 @@ window.MainBaseCharm = function () {
           n.classList?.remove('active');
         })
       );
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const saved = readSavedVariantFromLS();
@@ -1558,7 +1601,7 @@ window.MainBaseCharm = function () {
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
     setTimeout(() => {
       ensureBV();
@@ -1591,7 +1634,7 @@ window.MainBaseCharm = function () {
         if (visualiser.charms && visualiser.charms.length && visualiser.charms.length < 3)
           bv.autoZoomToCharms();
         else bv.setZoom(1);
-      } catch (_) {}
+      } catch (_) { }
     }, 150);
   }
 
@@ -1603,7 +1646,7 @@ window.MainBaseCharm = function () {
     }
     try {
       ensureBV().setZoom(1);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   (function bindProceedRobustly() {
@@ -1624,7 +1667,7 @@ window.MainBaseCharm = function () {
             try {
               e.preventDefault();
               e.stopPropagation();
-            } catch (_) {}
+            } catch (_) { }
 
             openPanel();
           },
@@ -1644,7 +1687,7 @@ window.MainBaseCharm = function () {
         if (btn) {
           try {
             e.preventDefault();
-          } catch (_) {}
+          } catch (_) { }
           openPanel();
         }
       },
@@ -1660,7 +1703,7 @@ window.MainBaseCharm = function () {
             try {
               if (node.matches && node.matches(sel)) bind(node);
               node.querySelectorAll && node.querySelectorAll(sel).forEach(bind);
-            } catch (_) {}
+            } catch (_) { }
           });
         })
       );
@@ -1774,7 +1817,7 @@ window.MainBaseCharm = function () {
     rebuildVisualiserFromCart();
     const bv = ensureBV();
     bv._productRendered = false;
-    bv.render(visualiser).catch(() => {});
+    bv.render(visualiser).catch(() => { });
     toggleZoomBar();
     const selectedCount = getSelectedCount();
 
@@ -1901,7 +1944,7 @@ window.MainBaseCharm = function () {
     } else {
       const idx = Number(e?.detail?.index);
       if (!Number.isNaN(idx)) {
-        ensureBV().render(visualiser).catch(() => {});
+        ensureBV().render(visualiser).catch(() => { });
       }
     }
     updateBadgesKonva();
@@ -1915,8 +1958,8 @@ window.MainBaseCharm = function () {
         ensureBV().initStage();
         bv.render(visualiser);
 
-        if (typeof currentCollectionId === 'string' && currentCollectionId) {}
-      } catch (e) {}
+        if (typeof currentCollectionId === 'string' && currentCollectionId) { }
+      } catch (e) { }
     },
     { passive: true }
   );
@@ -2059,11 +2102,10 @@ window.MainBaseCharm = function () {
       }
     }
 
-    const meta = `${(pj.title || '').toLowerCase()} ${
-      Array.isArray(pj.tags)
-        ? pj.tags.join(' ').toLowerCase()
-        : String(pj.tags || '').toLowerCase()
-    }`;
+    const meta = `${(pj.title || '').toLowerCase()} ${Array.isArray(pj.tags)
+      ? pj.tags.join(' ').toLowerCase()
+      : String(pj.tags || '').toLowerCase()
+      }`;
 
     for (const [label, kws] of Object.entries(COLOR_KEYWORDS)) {
       if (kws.some((kw) => meta.includes(kw))) return label;
@@ -2090,7 +2132,7 @@ window.MainBaseCharm = function () {
 
         const color = detectColorForProductJSON(pj);
         if (color) productColorMap[pid] = color;
-      } catch (e) {}
+      } catch (e) { }
     });
   }
 
@@ -2109,8 +2151,8 @@ window.MainBaseCharm = function () {
       color === 'Yellow Gold'
         ? '#f2c84b'
         : color === 'Rose Gold'
-        ? '#d88c8c'
-        : '#e5e7eb';
+          ? '#d88c8c'
+          : '#e5e7eb';
   }
 
   function availableVariantMetalsInActiveGrid() {
@@ -2291,7 +2333,7 @@ window.MainBaseCharm = function () {
       if (isVisible) visibleCount++;
       else hiddenCount++;
 
-      if (index < 10) { 
+      if (index < 10) {
         console.log(`Card ${index + 1}: 
           Title: "${cardTitle}"
           data-carat: "${cardCarats}"
@@ -2459,7 +2501,7 @@ document.addEventListener('DOMContentLoaded', function () {
         activeDot.style.display = 'block';
         activeDot.style.left = rect.left - parentRect.left + rect.width / 2 + 'px';
       }
-    } catch {}
+    } catch { }
     if (label) label.textContent = kt;
   }
 
