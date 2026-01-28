@@ -3,7 +3,7 @@
   Description: Displays dynamic tabs and banners using Metaobjects
 {% endcomment %}
 
-{% layout 'theme' %}
+{% comment %} {% layout 'theme' %}
 
 {%- assign category_handle = page.handle -%}
 {%- assign current_category = metaobjects.category_page[category_handle] -%}
@@ -38,7 +38,50 @@
   <main class="nested-tabs-page">
     {%- section 'nested-tabs-banner' -%}
     {%- section 'nested-tabs-content' -%}
+  </main> {% endcomment %}
+
+  {% layout 'theme' %}
+
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+
+{% if current_category == blank %}
+  <div class="container">
+    <h1>Category not configured</h1>
+    <p>Please check the page handle matches a category_page metaobject.</p>
+  </div>
+{% else %}
+  {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+  
+  {% comment %} Get all tabs for this category {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% for tab in all_tabs %}
+    {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
+      {% assign category_tabs = category_tabs | push: tab %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} Find current tab {% endcomment %}
+  {% assign current_tab = nil %}
+  {% for tab in category_tabs %}
+    {% if tab.tab_slug == tab_slug %}
+      {% assign current_tab = tab %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  
+  {% if current_tab == nil and category_tabs.size > 0 %}
+    {% assign current_tab = category_tabs.first %}
+    {% assign tab_slug = current_tab.tab_slug %}
+  {% endif %}
+  
+  <main>
+    {% section 'nested-tabs-banner' %}
+    {% section 'nested-tabs-content' %}
   </main>
+
 
   <script>
     // Store current state for JavaScript
