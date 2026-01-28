@@ -1,0 +1,59 @@
+{% comment %}
+  Template: Page with Nested Tabs
+  Description: Displays dynamic tabs and banners using Metaobjects
+{% endcomment %}
+
+{% layout 'theme' %}
+
+{%- assign category_handle = page.handle -%}
+{%- assign current_category = metaobjects.category_page[category_handle] -%}
+
+{%- if current_category == blank -%}
+  <div class="container mx-auto py-12 text-center">
+    <h1 class="text-2xl font-bold mb-4">Category not found</h1>
+    <p>Please check the page configuration.</p>
+  </div>
+{%- else -%}
+  {%- assign tab_slug = request.query.tab -%}
+  {%- if tab_slug == blank -%}
+    {%- assign tab_slug = current_category.default_tab_slug -%}
+  {%- endif -%}
+
+  {%- comment %} Find current tab content {% endcomment -%}
+  {%- assign current_tab = nil -%}
+  {%- assign category_tabs = metaobjects.tab_content.values | where: "parent_category.system.handle", current_category.system.handle -%}
+  
+  {%- for tab in category_tabs -%}
+    {%- if tab.tab_slug == tab_slug -%}
+      {%- assign current_tab = tab -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- if current_tab == nil and category_tabs.size > 0 -%}
+    {%- assign current_tab = category_tabs.first -%}
+    {%- assign tab_slug = current_tab.tab_slug -%}
+  {%- endif -%}
+
+  <main class="nested-tabs-page">
+    {%- section 'nested-tabs-banner' -%}
+    {%- section 'nested-tabs-content' -%}
+  </main>
+
+  <script>
+    // Store current state for JavaScript
+    window.nestedTabsData = {
+      categoryHandle: '{{ category_handle }}',
+      currentTabSlug: '{{ tab_slug }}',
+      categoryTabs: [
+        {%- for tab in category_tabs -%}
+          {
+            title: '{{ tab.title | escape }}',
+            slug: '{{ tab.tab_slug | escape }}',
+            url: '{{ request.path }}?tab={{ tab.tab_slug | escape }}'
+          }{% unless forloop.last %},{% endunless %}
+        {%- endfor -%}
+      ]
+    };
+  </script>
+{%- endif -%}
