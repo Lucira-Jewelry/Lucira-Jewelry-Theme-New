@@ -1,155 +1,26 @@
-{% comment %}
-  Template: Page with Nested Tabs
-  Description: Displays dynamic tabs and banners using Metaobjects
-{% endcomment %}
-
-{% comment %} {% layout 'theme' %}
-
-{%- assign category_handle = page.handle -%}
-{%- assign current_category = metaobjects.category_page[category_handle] -%}
-
-{%- if current_category == blank -%}
-  <div class="container mx-auto py-12 text-center">
-    <h1 class="text-2xl font-bold mb-4">Category not found</h1>
-    <p>Please check the page configuration.</p>
-  </div>
-{%- else -%}
-  {%- assign tab_slug = request.query.tab -%}
-  {%- if tab_slug == blank -%}
-    {%- assign tab_slug = current_category.default_tab_slug -%}
-  {%- endif -%}
-
-  {%- comment %} Find current tab content {% endcomment -%}
-  {%- assign current_tab = nil -%}
-  {%- assign category_tabs = metaobjects.tab_content.values | where: "parent_category.system.handle", current_category.system.handle -%}
-  
-  {%- for tab in category_tabs -%}
-    {%- if tab.tab_slug == tab_slug -%}
-      {%- assign current_tab = tab -%}
-      {%- break -%}
-    {%- endif -%}
-  {%- endfor -%}
-
-  {%- if current_tab == nil and category_tabs.size > 0 -%}
-    {%- assign current_tab = category_tabs.first -%}
-    {%- assign tab_slug = current_tab.tab_slug -%}
-  {%- endif -%}
-
-  <main class="nested-tabs-page">
-    {%- section 'nested-tabs-banner' -%}
-    {%- section 'nested-tabs-content' -%}
-  </main> {% endcomment %}
-
-
-
-  {% layout 'theme' %}
+{% layout 'theme' %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
 
 {% if current_category == blank %}
-  <div class="container">
+  <div class="container" style="padding: 40px; text-align: center;">
     <h1>Category not found</h1>
     <p>Please check the page configuration.</p>
   </div>
 {% else %}
-  {% comment %} Get current category's tabs {% endcomment %}
-  {% assign all_tabs = metaobjects.tab_content.values %}
-  {% assign category_tabs = "" | split: "" %}
-  
-  {% comment %} DEBUG: Show what we're looking for {% endcomment %}
-  {% comment %}
-    <p>Looking for tabs with parent_category.handle == '{{ current_category.system.handle }}'</p>
-  {% endcomment %}
-  
-  {% for tab in all_tabs %}
-    {% comment %} Check if tab has parent_category and if it matches {% endcomment %}
-    {% if tab.parent_category %}
-      {% assign parent_handle = tab.parent_category.system.handle %}
-      {% if parent_handle == current_category.system.handle %}
-        {% assign category_tabs = category_tabs | push: tab %}
-      {% endif %}
-    {% endif %}
-  {% endfor %}
-  
-  {% comment %} Get the active tab {% endcomment %}
+  {% comment %} Get the active tab from URL or default {% endcomment %}
   {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
-  {% assign current_tab = nil %}
-  
-  {% for tab in category_tabs %}
-    {% if tab.tab_slug == tab_slug %}
-      {% assign current_tab = tab %}
-      {% break %}
-    {% endif %}
-  {% endfor %}
-  
-  {% if current_tab == nil and category_tabs.size > 0 %}
-    {% assign current_tab = category_tabs.first %}
-    {% assign tab_slug = current_tab.tab_slug %}
-  {% endif %}
   
   <main class="nested-tabs-page">
     {% section 'nested-tabs-banner' %}
     {% section 'nested-tabs-content' %}
   </main>
-
-  {% comment %} {% layout 'theme' %}
-
-{% assign category_handle = page.handle %}
-{% assign current_category = metaobjects.category_page[category_handle] %}
-
-{% if current_category == blank %}
-  <div class="container">
-    <h1>Category not configured</h1>
-    <p>Please check the page handle matches a category_page metaobject.</p>
-  </div>
-{% else %}
-  {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
   
-  {% comment %} Get all tabs for this category {% endcomment %}
-  {% assign all_tabs = metaobjects.tab_content.values %}
-  {% assign category_tabs = "" | split: "" %}
-  
-  {% for tab in all_tabs %}
-    {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
-      {% assign category_tabs = category_tabs | push: tab %}
-    {% endif %}
-  {% endfor %}
-  
-  {% comment %} Find current tab {% endcomment %}
-  {% assign current_tab = nil %}
-  {% for tab in category_tabs %}
-    {% if tab.tab_slug == tab_slug %}
-      {% assign current_tab = tab %}
-      {% break %}
-    {% endif %}
-  {% endfor %}
-  
-  {% if current_tab == nil and category_tabs.size > 0 %}
-    {% assign current_tab = category_tabs.first %}
-    {% assign tab_slug = current_tab.tab_slug %}
-  {% endif %}
-  
-  <main>
-    {% section 'nested-tabs-banner' %}
-    {% section 'nested-tabs-content' %}
-  </main>
- {% endcomment %}
-
-  {% comment %} <script>
-    // Store current state for JavaScript
-    window.nestedTabsData = {
+  <script>
+    window.nestedTabsConfig = {
       categoryHandle: '{{ category_handle }}',
-      currentTabSlug: '{{ tab_slug }}',
-      categoryTabs: [
-        {%- for tab in category_tabs -%}
-          {
-            title: '{{ tab.title | escape }}',
-            slug: '{{ tab.tab_slug | escape }}',
-            url: '{{ request.path }}?tab={{ tab.tab_slug | escape }}'
-          }{% unless forloop.last %},{% endunless %}
-        {%- endfor -%}
-      ]
+      currentTabSlug: '{{ tab_slug }}'
     };
-  </script> {% endcomment %}
-{%- endif -%}
+  </script>
+{% endif %}
