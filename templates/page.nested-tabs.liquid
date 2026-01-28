@@ -40,7 +40,60 @@
     {%- section 'nested-tabs-content' -%}
   </main> {% endcomment %}
 
+
+
   {% layout 'theme' %}
+
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+
+{% if current_category == blank %}
+  <div class="container">
+    <h1>Category not found</h1>
+    <p>Please check the page configuration.</p>
+  </div>
+{% else %}
+  {% comment %} Get current category's tabs {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% comment %} DEBUG: Show what we're looking for {% endcomment %}
+  {% comment %}
+    <p>Looking for tabs with parent_category.handle == '{{ current_category.system.handle }}'</p>
+  {% endcomment %}
+  
+  {% for tab in all_tabs %}
+    {% comment %} Check if tab has parent_category and if it matches {% endcomment %}
+    {% if tab.parent_category %}
+      {% assign parent_handle = tab.parent_category.system.handle %}
+      {% if parent_handle == current_category.system.handle %}
+        {% assign category_tabs = category_tabs | push: tab %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} Get the active tab {% endcomment %}
+  {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+  {% assign current_tab = nil %}
+  
+  {% for tab in category_tabs %}
+    {% if tab.tab_slug == tab_slug %}
+      {% assign current_tab = tab %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  
+  {% if current_tab == nil and category_tabs.size > 0 %}
+    {% assign current_tab = category_tabs.first %}
+    {% assign tab_slug = current_tab.tab_slug %}
+  {% endif %}
+  
+  <main class="nested-tabs-page">
+    {% section 'nested-tabs-banner' %}
+    {% section 'nested-tabs-content' %}
+  </main>
+
+  {% comment %} {% layout 'theme' %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
@@ -81,9 +134,9 @@
     {% section 'nested-tabs-banner' %}
     {% section 'nested-tabs-content' %}
   </main>
+ {% endcomment %}
 
-
-  <script>
+  {% comment %} <script>
     // Store current state for JavaScript
     window.nestedTabsData = {
       categoryHandle: '{{ category_handle }}',
@@ -98,5 +151,5 @@
         {%- endfor -%}
       ]
     };
-  </script>
+  </script> {% endcomment %}
 {%- endif -%}
