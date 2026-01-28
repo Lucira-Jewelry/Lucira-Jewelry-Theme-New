@@ -1,11 +1,41 @@
 {% comment %}
-  Section: Nested Tabs Banner
-  Description: Dynamic banner that changes with tabs
+  Section: Nested Tabs Banner - UPDATED
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
-{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+
+{% comment %} Same URL extraction as template {% endcomment %}
+{% assign url_search = request.search %}
+{% assign url_tab = '' %}
+
+{% if url_search contains 'tab=' %}
+  {% assign url_parts = url_search | remove: '?' | split: '&' %}
+  {% for part in url_parts %}
+    {% if part contains 'tab=' %}
+      {% assign url_tab = part | split: '=' | last %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% assign default_tab = current_category.default_tab_slug | default: 'style' %}
+{% assign tab_slug = url_tab | default: default_tab %}
+{% assign tab_slug_lower = tab_slug | downcase %}
+
+{% comment %} Find current tab {% endcomment %}
+{% assign all_tabs = metaobjects.tab_content.values %}
+{% assign current_tab = nil %}
+
+{% for tab in all_tabs %}
+  {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
+    {% assign tab_slug_lowercase = tab.tab_slug | downcase %}
+    {% if tab_slug_lowercase == tab_slug_lower %}
+      {% assign current_tab = tab %}
+      {% break %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
 
 <style>
   .nested-tabs-banner {
@@ -64,65 +94,12 @@
     max-width: 600px;
     margin: 0 auto;
   }
-  
-  @media (max-width: 768px) {
-    .nested-tabs-banner {
-      min-height: 300px;
-    }
-    
-    .banner-title {
-      font-size: 2rem;
-    }
-    
-    .banner-subtitle {
-      font-size: 1rem;
-    }
-  }
 </style>
 
 <div class="nested-tabs-banner">
-  {% comment %} Get current tab to display correct banner {% endcomment %}
-  {% assign all_tabs = metaobjects.tab_content.values %}
-  {% assign current_tab = nil %}
-  {% assign category_tabs = "" | split: "" %}
-  
-  {% comment %} First, find all tabs for this category {% endcomment %}
-  {% for tab in all_tabs %}
-    {% comment %} Try to access parent_category from metafields {% endcomment %}
-    {% assign parent_metafield = tab.metafields.custom.parent_category %}
-    {% if parent_metafield and parent_metafield.value %}
-      {% if parent_metafield.value.id == current_category.id %}
-        {% assign category_tabs = category_tabs | push: tab %}
-        
-        {% if tab.tab_slug == tab_slug %}
-          {% assign current_tab = tab %}
-        {% endif %}
-      {% endif %}
-    {% endif %}
-  {% endfor %}
-  
-  {% comment %} If no tab found with current slug, use first tab {% endcomment %}
-  {% if current_tab == nil and category_tabs.size > 0 %}
-    {% assign current_tab = category_tabs.first %}
-  {% endif %}
-  
-  {% comment %} Display banner image {% endcomment %}
-  {% assign banner_image = nil %}
-  {% assign banner_title = current_category.banner_title %}
-  {% assign banner_subtitle = current_category.banner_subtitle %}
-  
-  {% if current_tab %}
-    {% if current_tab.banner_image %}
-      {% assign banner_image = current_tab.banner_image %}
-    {% endif %}
-    {% if current_tab.banner_title %}
-      {% assign banner_title = current_tab.banner_title %}
-    {% endif %}
-  {% endif %}
-  
-  {% if banner_image == nil %}
-    {% assign banner_image = current_category.banner_image %}
-  {% endif %}
+  {% assign banner_image = current_tab.banner_image | default: current_category.banner_image %}
+  {% assign banner_title = current_tab.banner_title | default: current_tab.header | default: current_category.banner_title | default: current_category.title %}
+  {% assign banner_subtitle = current_tab.banner_subtitle | default: current_category.banner_subtitle %}
   
   {% if banner_image %}
     <div class="banner-background">
