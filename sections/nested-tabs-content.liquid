@@ -275,17 +275,31 @@
 {% endschema %} {% endcomment %}
 
 {% comment %}
-  Section: Nested Tabs Content - WITH PROPER URL HANDLING
+  Section: Nested Tabs Content - FINAL WORKING VERSION
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
 
-{% comment %} PROPERLY GET TAB FROM URL {% endcomment %}
-{% assign url_params = request.query %}
-{% assign url_tab = url_params.tab %}
+{% comment %} IMPROVED URL PARAMETER EXTRACTION {% endcomment %}
+{% assign url_search = request.search %}
+{% assign url_tab = '' %}
+
+{% if url_search contains 'tab=' %}
+  {% assign url_parts = url_search | remove: '?' | split: '&' %}
+  {% for part in url_parts %}
+    {% if part contains 'tab=' %}
+      {% assign url_tab = part | split: '=' | last %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
 {% assign default_tab = current_category.default_tab_slug | default: 'style' %}
 {% assign tab_slug = url_tab | default: default_tab %}
+
+{% comment %} Normalize to lowercase for comparison {% endcomment %}
+{% assign tab_slug_lower = tab_slug | downcase %}
 
 <style>
   .nested-tabs-container {
@@ -428,19 +442,24 @@
 </style>
 
 <div class="nested-tabs-container">
-  {% comment %} Debug info - remove after testing {% endcomment %}
+  {% comment %} REMOVE DEBUG AFTER TESTING {% endcomment %}
+  {% comment %}
   <div style="background: #e3f2fd; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
-    <p><strong>Debug Info:</strong> tab_slug = "{{ tab_slug }}" | URL param = "{{ url_tab }}" | Default = "{{ default_tab }}"</p>
+    <p><strong>Debug:</strong> URL search = "{{ url_search }}"</p>
+    <p><strong>Debug:</strong> Extracted tab = "{{ url_tab }}"</p>
+    <p><strong>Debug:</strong> Using tab_slug = "{{ tab_slug }}" (lowercase: "{{ tab_slug_lower }}")</p>
   </div>
+  {% endcomment %}
   
   {% comment %} Get all tabs for this category {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = all_tabs %}
   
-  {% comment %} Find current tab - MAKE SURE THIS WORKS {% endcomment %}
+  {% comment %} Find current tab - CASE INSENSITIVE {% endcomment %}
   {% assign current_tab = nil %}
   {% for tab in category_tabs %}
-    {% if tab.tab_slug == tab_slug %}
+    {% assign tab_slug_lowercase = tab.tab_slug | downcase %}
+    {% if tab_slug_lowercase == tab_slug_lower %}
       {% assign current_tab = tab %}
       {% break %}
     {% endif %}
@@ -450,6 +469,7 @@
   {% if current_tab == nil and category_tabs.size > 0 %}
     {% assign current_tab = category_tabs.first %}
     {% assign tab_slug = current_tab.tab_slug %}
+    {% assign tab_slug_lower = tab_slug | downcase %}
   {% endif %}
   
   {% comment %} Display tabs and content {% endcomment %}
@@ -457,9 +477,10 @@
     <!-- Tabs Navigation -->
     <nav class="tabs-navigation" role="tablist">
       {% for tab in category_tabs %}
+        {% assign tab_slug_lowercase = tab.tab_slug | downcase %}
         <a 
           href="?tab={{ tab.tab_slug }}" 
-          class="tab-link {% if tab.tab_slug == tab_slug %}active{% endif %}"
+          class="tab-link {% if tab_slug_lowercase == tab_slug_lower %}active{% endif %}"
           data-tab-slug="{{ tab.tab_slug }}"
           role="tab"
         >
@@ -471,11 +492,6 @@
     <!-- Tab Content -->
     <div class="tab-content">
       {% if current_tab %}
-        {% comment %} Debug: Show which tab is active {% endcomment %}
-        <div style="background: #d4edda; padding: 10px; margin-bottom: 20px; border-radius: 4px;">
-          <p><strong>Currently viewing:</strong> {{ current_tab.title }} (slug: {{ current_tab.tab_slug }})</p>
-        </div>
-        
         <div class="tab-content-area {% if current_tab.content_image %}with-image{% endif %}">
           <div class="tab-content-text">
             {% if current_tab.header %}
@@ -549,19 +565,20 @@
     
     tabLinks.forEach(link => {
       link.addEventListener('click', function(e) {
-        // Update active tab visually
         tabLinks.forEach(l => l.classList.remove('active'));
         this.classList.add('active');
       });
     });
     
-    // Check URL for initial active tab
+    // Highlight current tab from URL
     const urlParams = new URLSearchParams(window.location.search);
     const currentTabSlug = urlParams.get('tab');
     
     if (currentTabSlug) {
+      const currentTabSlugLower = currentTabSlug.toLowerCase();
       tabLinks.forEach(link => {
-        if (link.dataset.tabSlug === currentTabSlug) {
+        const linkSlug = link.dataset.tabSlug;
+        if (linkSlug && linkSlug.toLowerCase() === currentTabSlugLower) {
           link.classList.add('active');
         }
       });
