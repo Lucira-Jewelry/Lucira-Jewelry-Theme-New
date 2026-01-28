@@ -5,16 +5,30 @@
     </button>
 
     <div class="spin-wheel-wrapper">
-        <img 
-            src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Wheel_1.png?v=1769229974" 
-            alt="Spin the Wheel"
-            class="spin-wheel-image" id="spin-wheel-image" width="800" height="800"
-        >
-        <img 
-            src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Spinner_1.png?v=1769229971" 
-            alt="Spin CTA"
-            class="spin-wheel-cta" id="spin-wheel-cta" width="200" height="200"
-        >
+        <div class="wheel-container">
+            <!-- Wheel Detection Overlay - invisible divs positioned over each segment -->
+            <div class="wheel-detector-overlay" id="wheel-detector-overlay">
+                <div class="popup_sec" data-pos="1500_off" style="transform: rotate(0deg);"></div>
+                <div class="popup_sec" data-pos="750_off" style="transform: rotate(45deg);"></div>
+                <div class="popup_sec" data-pos="10000_off" style="transform: rotate(90deg);"></div>
+                <div class="popup_sec" data-pos="750_off" style="transform: rotate(135deg);"></div>
+                <div class="popup_sec" data-pos="1000_off" style="transform: rotate(180deg);"></div>
+                <div class="popup_sec" data-pos="750_off" style="transform: rotate(225deg);"></div>
+                <div class="popup_sec" data-pos="5000_off" style="transform: rotate(270deg);"></div>
+                <div class="popup_sec" data-pos="diamond_pendant" style="transform: rotate(315deg);"></div>
+            </div>
+            
+            <img 
+                src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Wheel_1.png?v=1769229974" 
+                alt="Spin the Wheel"
+                class="spin-wheel-image" id="spin-wheel-image" width="800" height="800"
+            >
+            <img 
+                src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Spinner_1.png?v=1769229971" 
+                alt="Spin CTA"
+                class="spin-wheel-cta" id="spin-wheel-cta" width="200" height="200"
+            >
+        </div>
     </div>
 
     <form id="otp-login-form" class="otp-form-wrapper">
@@ -99,21 +113,18 @@
       { label: "₹10,000 OFF", value: "10000_off", chance: 1 }
     ];
     
-    // CRITICAL: Wheel segment angles based on ACTUAL wheel image analysis
-    // Looking at the wheel clockwise from the RIGHT SIDE (pointer position):
-    // The pointer points to the RIGHT (3 o'clock position = 0° in our system)
-    // Each segment is 45° (360° / 8 segments)
-    
+    // Wheel segment positions (8 segments, 45° each)
+    // Based on actual visual inspection of the wheel
+    // Pointer is at TOP (12 o'clock position = 0° reference)
     const wheelSegments = [
-      // Starting from pointer at RIGHT and going clockwise
-      { label: "₹750 OFF", value: "750_off", angle: 0 },           // Right (pointer position)
-      { label: "Diamond Pendant", value: "diamond_pendant", angle: 45 },   // Bottom-right
-      { label: "₹1,500 OFF", value: "1500_off", angle: 90 },       // Bottom
-      { label: "₹10,000 OFF", value: "10000_off", angle: 135 },    // Bottom-left
-      { label: "₹1,000 OFF", value: "1000_off", angle: 180 },      // Left
-      { label: "₹750 OFF", value: "750_off", angle: 225 },         // Top-left
-      { label: "₹5,000 OFF", value: "5000_off", angle: 270 },      // Top
-      { label: "₹750 OFF", value: "750_off", angle: 315 }          // Top-right
+      { value: "1500_off", label: "₹1,500 OFF", angle: 0 },           // Top (12 o'clock)
+      { value: "750_off", label: "₹750 OFF", angle: 45 },             // 1:30 position
+      { value: "10000_off", label: "₹10,000 OFF", angle: 90 },        // Right (3 o'clock)
+      { value: "750_off", label: "₹750 OFF", angle: 135 },            // 4:30 position
+      { value: "1000_off", label: "₹1,000 OFF", angle: 180 },         // Bottom (6 o'clock)
+      { value: "750_off", label: "₹750 OFF", angle: 225 },            // 7:30 position
+      { value: "5000_off", label: "₹5,000 OFF", angle: 270 },         // Left (9 o'clock)
+      { value: "diamond_pendant", label: "Diamond Pendant", angle: 315 } // 10:30 position
     ];
 
     function openloginPopup(id) {
@@ -263,16 +274,20 @@
         return spinPrizes[0];
     }
     
-    function findWheelSegmentForPrize(prizeValue) {
+    function findWheelSegmentsForPrize(prizeValue) {
         // Find all matching segments for this prize
-        const matchingSegments = wheelSegments.filter(seg => seg.value === prizeValue);
+        return wheelSegments.filter(seg => seg.value === prizeValue);
+    }
+    
+    function getRandomSegmentForPrize(prizeValue) {
+        const matchingSegments = findWheelSegmentsForPrize(prizeValue);
         
         if (matchingSegments.length === 0) {
             console.error('No wheel segment found for prize:', prizeValue);
-            return wheelSegments[0]; // Fallback to first segment
+            return wheelSegments[0]; // Fallback
         }
         
-        // If multiple segments exist (like ₹750 OFF appears 3 times), randomly pick one
+        // Randomly pick one if multiple exist
         const randomIndex = Math.floor(Math.random() * matchingSegments.length);
         return matchingSegments[randomIndex];
     }
@@ -295,47 +310,96 @@
             regBtn.textContent = 'Spinning...';
             regBtn.disabled = true;
             
-            // 1. Get weighted prize based on chances
+            // Step 1: Get the prize based on weighted chances
             const wonPrize = getWeightedPrize();
-            console.log('Selected prize (weighted):', wonPrize);
+            console.log('🎯 Prize selected by algorithm:', wonPrize);
             
-            // 2. Find the corresponding wheel segment
-            const targetSegment = findWheelSegmentForPrize(wonPrize.value);
-            console.log('Target wheel segment:', targetSegment);
+            // Step 2: Find which segment(s) have this prize
+            const targetSegment = getRandomSegmentForPrize(wonPrize.value);
+            console.log('🎡 Target segment on wheel:', targetSegment);
 
             const wheel = document.getElementById('spin-wheel-image');
+            const detectorOverlay = document.getElementById('wheel-detector-overlay');
 
-            // 3. Calculate rotation
-            // The pointer is on the RIGHT side (at 0° position in browser coordinates)
-            // We need to rotate the wheel so the prize lands at the pointer
-            // Wheel rotates CLOCKWISE (positive rotation in CSS)
+            // Step 3: Calculate rotation
+            // Pointer is at TOP (0° position)
+            // We need to rotate the wheel so the target segment lands at the pointer
+            // The wheel rotates COUNTER-CLOCKWISE (negative rotation)
             
-            const extraSpins = 360 * 5; // 5 full rotations for effect
+            const extraSpins = 360 * 5; // 5 full rotations
             
-            // To bring a segment to the pointer (right side at 0°):
-            // We need to rotate by the NEGATIVE of its angle
-            // Because if a segment is at 90° (bottom), we rotate -90° to bring it to 0° (right/pointer)
-            const targetRotation = 360 - targetSegment.angle;
-            const finalRotation = extraSpins + targetRotation;
+            // To bring a segment to the pointer at top (0°):
+            // We rotate by negative of the segment's angle
+            // Example: segment at 90° needs -90° rotation to reach 0°
+            const targetRotation = -targetSegment.angle;
+            const finalRotation = -(extraSpins + Math.abs(targetRotation));
             
-            console.log('Rotation calculation:', {
+            console.log('🔄 Rotation calculation:', {
                 segmentAngle: targetSegment.angle,
                 targetRotation: targetRotation,
                 finalRotation: finalRotation,
-                direction: 'clockwise'
+                extraSpins: extraSpins
             });
 
             if (wheel) {
                 wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
                 wheel.style.transform = `translate(-50%, -50%) rotate(${finalRotation}deg)`;
             }
+            
+            // Sync detector overlay with wheel
+            if (detectorOverlay) {
+                detectorOverlay.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+                detectorOverlay.style.transform = `translate(-50%, -50%) rotate(${finalRotation}deg)`;
+            }
 
             setTimeout(async () => {
-                console.log('Spin complete. Prize won:', wonPrize);
+                console.log('✅ Spin complete! Prize won:', wonPrize);
                 document.getElementById('spinResult').value = wonPrize.value;
+                
+                // Verify what the wheel is showing
+                const detectedPrize = detectWheelSegmentAtPointer();
+                console.log('🔍 Detected at pointer:', detectedPrize);
+                
+                if (detectedPrize && detectedPrize.value !== wonPrize.value) {
+                    console.warn('⚠️ Mismatch detected! Expected:', wonPrize.value, 'Got:', detectedPrize.value);
+                }
+                
                 await processRegistration(firstName, lastName, email, wonPrize);
             }, 4200); 
         });
+    }
+    
+    function detectWheelSegmentAtPointer() {
+        // Get the current rotation of the wheel
+        const wheel = document.getElementById('spin-wheel-image');
+        if (!wheel) return null;
+        
+        const transform = window.getComputedStyle(wheel).transform;
+        let rotation = 0;
+        
+        if (transform !== 'none') {
+            const values = transform.split('(')[1].split(')')[0].split(',');
+            const a = values[0];
+            const b = values[1];
+            rotation = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+        }
+        
+        // Normalize to 0-360
+        rotation = ((rotation % 360) + 360) % 360;
+        
+        console.log('🔍 Current wheel rotation:', rotation);
+        
+        // The pointer is at top (0°), find which segment is there
+        // Account for the wheel's rotation
+        const pointerPosition = 0; // top
+        const segmentAtPointer = (pointerPosition - rotation + 360) % 360;
+        
+        // Find the segment (each is 45° wide)
+        const segmentIndex = Math.floor(segmentAtPointer / 45);
+        const detectedSegment = wheelSegments[segmentIndex % wheelSegments.length];
+        
+        console.log('🎯 Segment at pointer:', detectedSegment);
+        return detectedSegment;
     }
 
     async function processRegistration(firstName, lastName, email, prizeData) {
@@ -423,12 +487,21 @@
         document.getElementById('otpSection')?.style.setProperty('display', 'none');
         
         const wheel = document.getElementById('spin-wheel-image');
+        const detectorOverlay = document.getElementById('wheel-detector-overlay');
+        
         if (wheel) {
             wheel.style.transition = 'none';
             wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-            
             setTimeout(() => {
                 wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+            }, 50);
+        }
+        
+        if (detectorOverlay) {
+            detectorOverlay.style.transition = 'none';
+            detectorOverlay.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+            setTimeout(() => {
+                detectorOverlay.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
             }, 50);
         }
         
@@ -529,17 +602,37 @@
   .lucira-logo-popup {text-align: center; margin-bottom: 12px;}
   .signupSection {overflow: hidden;}
   .spin-wheel-wrapper { width: 60%; height: 100%; display: none; align-items: center; justify-content: center; background: #f7efe6; flex-direction: column; position: relative; }
-  .spin-wheel-image { max-width: 90%; }
-  .spin-wheel-cta { margin-top: 20px; max-width: 385px; width: 100%; cursor: pointer; }
+  .wheel-container { position: relative; width: 500px; height: 500px; }
+  .spin-wheel-image { max-width: 100%; height: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .spin-wheel-cta { margin-top: 0; cursor: default; display: block; max-width: 40%; height: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 10; pointer-events: none; }
   .otp-login-form-wrapper::before { content: ""; width: 60%; background: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Lucira_model_day_1_32568_copy_2_1_1.jpg?v=1768388597) center / cover no-repeat; height: 100%; }
   .otp-login-form-wrapper.signup-active::before { display: none; }
   .otp-login-form-wrapper.signup-active .spin-wheel-wrapper { display: flex; }
-  .spin-wheel-image { max-width: 90%; height: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
-  .spin-wheel-cta { margin-top: 0; cursor: pointer; display: block; max-width: 90%; height: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
   p.register-link {margin-top: 12px;}
   .register-link {text-align: center; font-size: 13px; margin-top: 10px;}
   .register-link a {color: #b77766; font-weight: 500; cursor: pointer;}
-  .spin-wheel-cta { margin-top: 0; cursor: default; display: block; max-width: 90%; height: auto; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  
+  /* Wheel detector overlay - invisible divs for segment detection */
+  .wheel-detector-overlay {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  
+  .popup_sec {
+    position: absolute;
+    width: 50%;
+    height: 50%;
+    left: 50%;
+    top: 50%;
+    transform-origin: 0% 0%;
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    opacity: 0; /* Invisible - only for detection */
+  }
   
   @media only screen and (max-width:767px){
       .account-hover-card.active {display: block;}
