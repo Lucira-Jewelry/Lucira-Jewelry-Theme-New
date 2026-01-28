@@ -573,7 +573,41 @@
             </div>
           </div>
         {% endif %} {% endcomment %}
-         {% if card_product.metafields.custom.product_card_tags.value != blank or any_instock %}
+         {% comment %}
+  Calculate whether to show the container:
+  - Always show if there are product card tags
+  - Always show if engraving is available
+  - For Fast Shipping: handled in the logic below
+{% endcomment %}
+{% assign should_show_container = false %}
+
+{% if card_product.metafields.custom.product_card_tags.value != blank %}
+  {% assign should_show_container = true %}
+{% endif %}
+
+{% if card_product.tags contains 'Engraving Available' %}
+  {% assign should_show_container = true %}
+{% endif %}
+
+{% comment %} Check if we should show Fast Shipping for this product {% endcomment %}
+{% assign show_fast_shipping_for_container = false %}
+{% if is_9kt_collection %}
+  {% comment %} For 9kt products: only show Fast Shipping if in stock {% endcomment %}
+  {% if any_instock %}
+    {% assign show_fast_shipping_for_container = true %}
+  {% endif %}
+{% else %}
+  {% comment %} For non-9kt products: show Fast Shipping if in stock (original logic) {% endcomment %}
+  {% if any_instock %}
+    {% assign show_fast_shipping_for_container = true %}
+  {% endif %}
+{% endif %}
+
+{% if show_fast_shipping_for_container %}
+  {% assign should_show_container = true %}
+{% endif %}
+
+{% if should_show_container %}
   <div class="product-collection-card-icons">
     <div class="carousel-container" data-product-id="{{ card_product.id }}">
       <div class="icon-container">
@@ -599,23 +633,8 @@
           {% endif %}
         {% endfor %}
 
-        {% comment %} Only show Fast Shipping for 9kt-collection products if they are in stock {% endcomment %}
-        {% if is_9kt_collection and any_instock %}
-          <img
-            src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
-            class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
-            width="16"
-            height="16"
-            style="width:16px;height:16px;object-fit:contain;"
-            alt="Fast Shipping"
-            title="Fast Shipping"
-            data-tag-type="shipping"
-          >
-          {% assign first_tag = false %}
-          {% assign icon_index = icon_index | plus: 1 %}
-          {% assign all_labels = all_labels | append: 'Fast Shipping' | append: '|' %}
-        {% comment %} For non-9kt-collection products, show Fast Shipping if in stock (original logic) {% endcomment %}
-        {% elsif any_instock and is_9kt_collection == false %}
+        {% comment %} Fast Shipping Icon - Different logic for 9kt vs non-9kt {% endcomment %}
+        {% if show_fast_shipping_for_container %}
           <img
             src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
             class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
