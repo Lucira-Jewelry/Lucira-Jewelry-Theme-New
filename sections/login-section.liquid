@@ -111,7 +111,7 @@
   <input type="email" name="customer[email]" id="ShopifyEmail">
   <input type="password" name="customer[password]" id="ShopifyPassword">
 </form>
-<script> 
+<script>
     const spinPrizes = [
       { label: "₹1,500 OFF", value: "1500_off", chance: 15 },
       { label: "₹1,000 OFF", value: "1000_off", chance: 20 },
@@ -120,16 +120,15 @@
       { label: "₹5,000 OFF", value: "5000_off", chance: 22 },
       { label: "₹10,000 OFF", value: "10000_off", chance: 1 }
     ];
-    
-    // MAP YOUR WHEEL SEGMENTS TO PRIZES (adjust data-pos to match your actual segments)
-    const wheelSegmentMapping = {
-        "Gold Coin": { label: "₹1,500 OFF", value: "1500_off" },
-        "Gift": { label: "₹1,000 OFF", value: "1000_off" },
-        "Ring": { label: "₹750 OFF", value: "750_off" },
-        "Voucher": { label: "Diamond Pendant", value: "diamond_pendant" },
-        "Pendant": { label: "₹5,000 OFF", value: "5000_off" },
-        "Better Luck": { label: "₹10,000 OFF", value: "10000_off" }
-    };
+
+    const wheelOrder = [
+      "1500_off",
+      "1000_off",
+      "750_off",
+      "diamond_pendant",
+      "5000_off",
+      "10000_off"
+    ];
 
     function openloginPopup(id) {
         document.getElementById(id).style.display = 'flex';
@@ -189,7 +188,7 @@
         });
     }
 
-    // OTP SEND
+    /* OTP SEND */
     const sendBtn = document.getElementById('sendOtp');
     if (sendBtn) {
         sendBtn.addEventListener('click', async () => {
@@ -232,8 +231,6 @@
                 return;
             }
             hideError('otpError');
-            verifyBtn.textContent = 'Verifying...';
-            verifyBtn.disabled = true;
 
             try {
                 const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
@@ -252,20 +249,17 @@
                 if (data.type === 'register') {
                     document.getElementById('signupMobile').value = mobile;
                     showSignupWithSpinWheel();
-                    verifyBtn.textContent = 'VERIFY OTP';
-                    verifyBtn.disabled = false;
                     return;
                 }
+
                 showError('otpError', data.msg || 'Invalid OTP');
             } catch (err) {
-                console.error(err);
                 showError('otpError', 'Something went wrong');
             }
-            verifyBtn.textContent = 'VERIFY OTP';
-            verifyBtn.disabled = false;
         });
     }
 
+    /* SOURCE OF TRUTH */
     function getWeightedPrize() {
         let totalChance = spinPrizes.reduce((sum, prize) => sum + prize.chance, 0);
         let random = Math.random() * totalChance;
@@ -278,58 +272,8 @@
         }
         return { prize: spinPrizes[0], index: 0 };
     }
-    
-    // DETECT WHICH SEGMENT THE POINTER IS ACTUALLY POINTING AT
-    function detectWheelResult() {
-        const wheel = document.getElementById('spin-wheel-image');
-        const detectorOverlay = document.getElementById('wheel-detector-overlay');
-        
-        if (!wheel || !detectorOverlay) return null;
-        
-        // Get the current rotation of the wheel
-        const transform = window.getComputedStyle(wheel).transform;
-        let rotation = 0;
-        
-        if (transform !== 'none') {
-            const values = transform.split('(')[1].split(')')[0].split(',');
-            const a = values[0];
-            const b = values[1];
-            rotation = Math.round(Math.atan2(b, a) * (180 / Math.PI));
-        }
-        
-        // Normalize rotation to 0-360
-        rotation = ((rotation % 360) + 360) % 360;
-        
-        // Apply the same rotation to the detector overlay
-        detectorOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
-        
-        // Get all segments from the detector overlay
-        const segments = detectorOverlay.querySelectorAll('.popup_sec');
-        const totalSegments = segments.length;
-        const segmentAngle = 360 / totalSegments;
-        
-        // Pointer is at top (0 degrees), find which segment is there
-        // Account for pointer offset
-        const pointerAngle = 0; // Adjust if your pointer is not at exact top
-        
-        for (let i = 0; i < segments.length; i++) {
-            const segmentStartAngle = i * segmentAngle;
-            const segmentEndAngle = (i + 1) * segmentAngle;
-            
-            // Check if pointer angle falls within this segment
-            if (pointerAngle >= segmentStartAngle && pointerAngle < segmentEndAngle) {
-                const dataPos = segments[i].getAttribute('data-pos');
-                return wheelSegmentMapping[dataPos] || null;
-            }
-        }
-        
-        // Fallback: use first segment
-        const firstSegmentPos = segments[0]?.getAttribute('data-pos');
-        return wheelSegmentMapping[firstSegmentPos] || null;
-    }
 
     const regBtn = document.getElementById('completeRegistration');
-    
     if (regBtn) {
         regBtn.addEventListener('click', async () => {
             const firstName = document.getElementById('regFirstName').value.trim();
@@ -347,32 +291,26 @@
             regBtn.disabled = true;
             
             const result = getWeightedPrize();
-            const prizeIndex = result.index;
+            const prizeIndex = wheelOrder.indexOf(result.prize.value);
+            const safeIndex = prizeIndex === -1 ? 0 : prizeIndex;
 
             const wheel = document.getElementById('spin-wheel-image');
-            const totalSegments = 6; 
+            const totalSegments = wheelOrder.length;
             const sliceAngle = 360 / totalSegments;
-
+            const pointerOffset = sliceAngle / 2;
             const extraSpins = 360 * 5;
-            const targetRotation = prizeIndex * sliceAngle;
-            const pointerOffset = 30;
-            const rotation = extraSpins + targetRotation + pointerOffset;
 
-            if (wheel) {
-                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-                wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
-            }
+            const rotation =
+                extraSpins +
+                safeIndex * sliceAngle +
+                pointerOffset;
+
+            wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+            wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
 
             setTimeout(async () => {
-                // DETECT THE ACTUAL RESULT FROM THE WHEEL POSITION
-                const detectedPrize = detectWheelResult();
-                const wonPrize = detectedPrize || result.prize;
-                
-                console.log('Calculated prize:', result.prize);
-                console.log('Detected prize from wheel:', wonPrize);
-                
-                document.getElementById('spinResult').value = wonPrize.value;
-                await processRegistration(firstName, lastName, email, wonPrize);
+                document.getElementById('spinResult').value = result.prize.value;
+                await processRegistration(firstName, lastName, email, result.prize);
             }, 4200); 
         });
     }
@@ -380,9 +318,6 @@
     async function processRegistration(firstName, lastName, email, prizeData) {
         const mobile = document.getElementById('signupMobile').value.trim();
         const otp = [...document.querySelectorAll('.otp-inputs input')].map(i => i.value).join('');
-        const regBtn = document.getElementById('completeRegistration');
-
-        regBtn.textContent = 'Creating Account...';
 
         try {
             const res = await fetch(
@@ -391,9 +326,9 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        mobile: mobile,
-                        otp: otp,
-                        email: email,
+                        mobile,
+                        otp,
+                        email,
                         first_name: firstName,
                         last_name: lastName,
                         won_prize: prizeData.value,
@@ -405,101 +340,36 @@
             const data = await res.json();
 
             if (data.type === 'success' && data.credentials) {
-                alert(`🎉 Congratulations! You won ${prizeData.label}! Your account has been created.`);
-                
-                window.dataLayer = window.dataLayer || [];
-                dataLayer.push({
-                    event: 'signup',
-                    user: {
-                        name: firstName + ' ' + lastName,
-                        email: email,
-                        mobile: mobile,
-                        signupoffer: prizeData.label
-                    }
-                });
-                
+                alert(`🎉 Congratulations! You won ${prizeData.label}!`);
                 shopifyAutoLogin(data.credentials.email, data.credentials.password);
-            } else {
-                showError('emailError', data.msg || 'Registration failed.');
-                regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-                regBtn.disabled = false;
             }
         } catch (error) {
-            console.error('Registration Error:', error);
             showError('emailError', 'Connection error. Please try again.');
-            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-            regBtn.disabled = false;
         }
     }
 
     function shopifyAutoLogin(email, password) {
-        var currentPath = window.location.pathname + window.location.search;
-        document.getElementById("loginReturnTo").value = currentPath;
+        document.getElementById("loginReturnTo").value = location.pathname + location.search;
         document.getElementById("ShopifyEmail").value = email;
         document.getElementById("ShopifyPassword").value = password;
         document.getElementById("shopify-auto-login-form").submit();
     }
 
     function showSignupWithSpinWheel() {
-        const wrapper = document.querySelector('.otp-login-form-wrapper');
-        if (!wrapper) return;
         document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'none');
         document.getElementById('sendOtp')?.style.setProperty('display', 'none');
         document.getElementById('otpSection')?.style.setProperty('display', 'none');
         document.querySelector('.signupSection')?.style.setProperty('display', 'block');
         document.querySelector('.register-link')?.style.setProperty('display', 'none');
-        wrapper.classList.add('signup-active');
+        document.querySelector('.otp-login-form-wrapper').classList.add('signup-active');
     }
 
     function resetToLoginView() {
-        const wrapper = document.querySelector('.otp-login-form-wrapper');
-        if (!wrapper) return;
-        
-        wrapper.classList.remove('signup-active');
-        document.querySelector('.signupSection')?.style.setProperty('display', 'none');
-        document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
-        document.getElementById('sendOtp')?.style.setProperty('display', 'block');
-        document.getElementById('otpSection')?.style.setProperty('display', 'none');
-        
         const wheel = document.getElementById('spin-wheel-image');
-        if (wheel) {
-            wheel.style.transition = 'none';
-            wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-            
-            setTimeout(() => {
-                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-            }, 50);
-        }
-        
-        document.getElementById('regFirstName').value = '';
-        document.getElementById('regLastName').value = '';
-        document.getElementById('regEmail').value = '';
-        document.querySelectorAll('.otp-inputs input').forEach(input => input.value = '');
-        
-        hideError('firstNameError');
-        hideError('lastNameError');
-        hideError('emailError');
-        hideError('mobileError');
-        hideError('otpError');
-        
-        const regBtn = document.getElementById('completeRegistration');
-        if (regBtn) {
-            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-            regBtn.disabled = false;
-        }
+        wheel.style.transition = 'none';
+        wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+        document.querySelector('.otp-login-form-wrapper').classList.remove('signup-active');
     }
-    
-    const otpInputs = document.querySelectorAll('.otp-inputs input');
-    otpInputs.forEach((input, index) => {
-        input.addEventListener('input', e => {
-            const value = e.target.value.replace(/\D/g, '');
-            e.target.value = value;
-            if (value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
-        });
-        input.addEventListener('keydown', e => {
-            if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index - 1].focus();
-        });
-    });
 
     let timer = 30;
     let timerInterval;
@@ -507,28 +377,24 @@
         timer = 30;
         clearInterval(timerInterval);
         timerInterval = setInterval(() => {
-            let min = Math.floor(timer / 60);
-            let sec = timer % 60;
-            document.getElementById('otp-timer').innerText = `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
-            if (timer <= 0) {
+            document.getElementById('otp-timer').innerText = `Resend OTP in 00:${timer < 10 ? '0'+timer : timer}`;
+            if (timer-- <= 0) {
                 clearInterval(timerInterval);
                 document.getElementById('otp-timer').innerHTML = `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
             }
-            timer--;
         }, 1000);
     }
-    
+
     async function resendOtp() {
-        const mobile = document.getElementById('otpMobile').value.trim();
         await fetch('https://login-otp-385594025448.asia-south1.run.app', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile })
+            body: JSON.stringify({ mobile: document.getElementById('otpMobile').value })
         });
-        document.getElementById('otp-timer').innerText = "Resend OTP in 00:30";
         startTimer();
     }
 </script>
+
 <style>
    .otp-login-form-wrapper {background-color: #FFFEFC; padding: 0 12px 0 0; border-radius: 12px; box-shadow: 0 0 10px #0000004d; max-width: 800px; height: 500px; width: 90%; text-align: left; position: relative;}
    .login-pop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:9999999;  background-color: #00000080; transition: display .3s; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);}
