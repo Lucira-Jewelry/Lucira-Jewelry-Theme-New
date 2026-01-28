@@ -30,7 +30,6 @@ function renderUIForStep(stepNumber) {
   const step2 = document.querySelector('.step[data-step="2"]');
   const step4 = document.querySelector('.step[data-step="4"]');
 
-  // 1. Cleanup visibility
   if (caratSection) caratSection.style.display = 'none';
   if (productPopup) {
     productPopup.style.display = 'none';
@@ -40,7 +39,6 @@ function renderUIForStep(stepNumber) {
   if (overlay) overlay.classList.remove('active');
   document.body.style.overflow = 'auto';
 
-  // 2. Update Icons
   const steps = document.querySelectorAll('.steps-container .step');
   steps.forEach(s => {
     const sNum = parseInt(s.dataset.step);
@@ -54,19 +52,15 @@ function renderUIForStep(stepNumber) {
     if (typeof renderStep === 'function') renderStep(s);
   });
 
-  // 3. MOVE LABEL & APPLY YOUR SPECIFIC CSS
   if (centerLabel && container) {
-    // Force standard styling for the label
     centerLabel.style.whiteSpace = 'nowrap';
     centerLabel.style.display = 'inline-block';
 
     if (step >= 4) {
-      // POSITION: After 4th SVG
       centerLabel.innerText = "SELECT YOUR CHARMS";
       if (step4) {
         step4.insertAdjacentElement('afterend', centerLabel);
         
-        // APPLY YOUR SPACE-REMOVING CSS HERE
         centerLabel.style.marginLeft = '-40px'; 
       }
     } else {
