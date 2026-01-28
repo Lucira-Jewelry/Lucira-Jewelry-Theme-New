@@ -1,5 +1,5 @@
 {% comment %}
-  Section: Nested Tabs Content - FIXED for Mixed References
+  Section: Nested Tabs Content - FINAL WORKING VERSION
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
@@ -7,7 +7,7 @@
 {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
 
 <style>
-  /* [Keep all your CSS styles] */
+  /* [Keep all your CSS styles exactly as before] */
   .nested-tabs-container {
     max-width: 1200px;
     margin: 0 auto;
@@ -146,56 +146,56 @@
 </style>
 
 <div class="nested-tabs-container">
+  {% comment %} REMOVE DEBUG INFO FOR CLEAN DISPLAY {% endcomment %}
+  {% comment %}
   <div class="debug-info">
     <p><strong>Using Mixed Reference Field Type</strong></p>
     <p>Category: {{ current_category.title }} (ID: {{ current_category.id }})</p>
     <p>Category System ID: {{ current_category.system.id }}</p>
     <p>Current tab slug: {{ tab_slug }}</p>
   </div>
+  {% endcomment %}
   
-  {% comment %} Get tabs using Mixed Reference access {% endcomment %}
+  {% comment %} Get tabs using Mixed Reference access - FIXED VERSION {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = "" | split: "" %}
   
-  {% comment %} Debug: Show what we're working with {% endcomment %}
-  <div class="debug-info">
-    <p><strong>Checking {{ all_tabs.size }} tabs:</strong></p>
-    {% for tab in all_tabs %}
-      <div style="border: 1px solid #ddd; padding: 10px; margin: 5px 0;">
-        <p><strong>{{ tab.title }}</strong> ({{ tab.tab_slug }})</p>
-        <p>Parent ref exists: {% if tab.parent_category %}YES{% else %}NO{% endif %}</p>
-        {% if tab.parent_category %}
-          <p>Parent title: {{ tab.parent_category.title }}</p>
-          <p>Parent ID: {{ tab.parent_category.id }}</p>
-          <p>Parent system.handle: {{ tab.parent_category.system.handle }}</p>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </div>
-  
-  {% comment %} Filter tabs for current category {% endcomment %}
+  {% comment %} FIXED: Better way to access mixed references {% endcomment %}
   {% for tab in all_tabs %}
+    {% comment %} Check if parent_category reference exists {% endcomment %}
     {% if tab.parent_category %}
-      {% comment %} Mixed reference comparison - try multiple methods {% endcomment %}
+      {% comment %} Get the reference object {% endcomment %}
       {% assign parent_ref = tab.parent_category %}
       
+      {% comment %} IMPORTANT: Mixed references might need to be accessed via value {% endcomment %}
+      {% assign parent_category_obj = parent_ref.value | default: parent_ref %}
+      
+      {% comment %} Try to get the referenced category {% endcomment %}
+      {% assign referenced_category = nil %}
+      
+      {% comment %} Method 1: Try to access via system.id {% endcomment %}
+      {% for category in metaobjects.category_page.values %}
+        {% if category.system.id == parent_category_obj.system.id 
+            or category.id == parent_category_obj.id 
+            or category.system.handle == parent_category_obj.system.handle %}
+          {% assign referenced_category = category %}
+          {% break %}
+        {% endif %}
+      {% endfor %}
+      
+      {% comment %} Method 2: Direct comparison if reference is loaded {% endcomment %}
+      {% if referenced_category == nil and parent_category_obj.title %}
+        {% assign referenced_category = parent_category_obj %}
+      {% endif %}
+      
       {% comment %} Check if this tab belongs to current category {% endcomment %}
-      {% if parent_ref.id == current_category.id 
-          or parent_ref.system.id == current_category.system.id 
-          or parent_ref.system.handle == current_category.system.handle 
-          or parent_ref.title == current_category.title %}
-        
-        <div class="debug-success">
-          <p>✅ <strong>{{ tab.title }}</strong> belongs to {{ current_category.title }}</p>
-          <p>Matched via: 
-            {% if parent_ref.id == current_category.id %}ID{% endif %}
-            {% if parent_ref.system.id == current_category.system.id %}System ID{% endif %}
-            {% if parent_ref.system.handle == current_category.system.handle %}Handle{% endif %}
-            {% if parent_ref.title == current_category.title %}Title{% endif %}
-          </p>
-        </div>
-        
-        {% assign category_tabs = category_tabs | push: tab %}
+      {% if referenced_category %}
+        {% if referenced_category.system.handle == current_category.system.handle 
+            or referenced_category.system.id == current_category.system.id 
+            or referenced_category.title == current_category.title %}
+          
+          {% assign category_tabs = category_tabs | push: tab %}
+        {% endif %}
       {% endif %}
     {% endif %}
   {% endfor %}
@@ -216,9 +216,13 @@
   
   {% comment %} Display tabs and content {% endcomment %}
   {% if category_tabs.size > 0 %}
+    {% comment %} REMOVE DEBUG SUCCESS MESSAGE FOR CLEAN DISPLAY {% endcomment %}
+    {% comment %}
     <div class="debug-success">
       <h3>✅ SUCCESS: Found {{ category_tabs.size }} tabs!</h3>
+      <p>Current tab: {{ current_tab.title }}</p>
     </div>
+    {% endcomment %}
     
     <!-- Tabs Navigation -->
     <nav class="tabs-navigation" role="tablist">
@@ -285,27 +289,16 @@
             </div>
           </div>
         {% endif %}
+      {% else %}
+        <div class="no-tabs-message">
+          <p>No content available for the selected tab.</p>
+        </div>
       {% endif %}
     </div>
   {% else %}
     <div class="no-tabs-message">
-      <h3>Setup Instructions</h3>
-      <p><strong>To fix this permanently:</strong></p>
-      <ol style="text-align: left; display: inline-block;">
-        <li>Go to <strong>Settings → Custom Data → tab_content</strong></li>
-        <li>Click <strong>"Manage definition"</strong></li>
-        <li>Delete current <code>parent_category</code> field</li>
-        <li>Add new field:
-          <ul>
-            <li><strong>Name:</strong> <code>parent_category</code></li>
-            <li><strong>Type:</strong> <code>Mixed reference</code></li>
-            <li><strong>Select:</strong> <code>category_page</code></li>
-          </ul>
-        </li>
-        <li>Save</li>
-        <li>Re-select "Engagement Rings" for each tab</li>
-        <li>Refresh this page</li>
-      </ol>
+      <h3>No tabs available</h3>
+      <p>Please check your metaobject configuration.</p>
     </div>
   {% endif %}
 </div>
@@ -316,10 +309,29 @@
     
     tabLinks.forEach(link => {
       link.addEventListener('click', function(e) {
+        // Update active tab visually
         tabLinks.forEach(l => l.classList.remove('active'));
         this.classList.add('active');
+        
+        // Optional: Add smooth scroll to content
+        const tabContent = document.querySelector('.tab-content');
+        if (tabContent) {
+          setTimeout(() => {
+            tabContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 100);
+        }
       });
     });
+    
+    // Highlight current tab on page load
+    const currentTabSlug = '{{ tab_slug }}';
+    if (currentTabSlug) {
+      tabLinks.forEach(link => {
+        if (link.dataset.tabSlug === currentTabSlug) {
+          link.classList.add('active');
+        }
+      });
+    }
   });
 </script>
 
