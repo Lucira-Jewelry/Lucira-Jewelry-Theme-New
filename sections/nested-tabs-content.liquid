@@ -1,7 +1,6 @@
 {% comment %}
-  Section: Nested Tabs Content
-  Description: Tabs navigation and dynamic content
-  FIXED VERSION - Handles metafield references correctly
+  Section: Nested Tabs Content - FIXED VERSION
+  Uses direct metaobject reference access
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
@@ -9,13 +8,13 @@
 {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
 
 <style>
+  /* Keep all your CSS styles from before */
   .nested-tabs-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 3rem 1rem;
   }
   
-  /* Tabs Navigation */
   .tabs-navigation {
     display: flex;
     gap: 1rem;
@@ -54,7 +53,6 @@
     color: white;
   }
   
-  /* Tab Content */
   .tab-content-area {
     display: grid;
     grid-template-columns: 1fr;
@@ -109,7 +107,6 @@
     background: #a0760a;
   }
   
-  /* Related Topics */
   .related-topics {
     margin-top: 4rem;
     padding-top: 2rem;
@@ -143,14 +140,6 @@
     text-decoration: underline;
   }
   
-  /* Loading State */
-  .tab-content-loading {
-    text-align: center;
-    padding: 3rem;
-    color: #666;
-  }
-  
-  /* No Tabs Message */
   .no-tabs-message {
     text-align: center;
     padding: 3rem;
@@ -159,7 +148,6 @@
     color: #666;
   }
   
-  /* Debug styles (remove in production) */
   .debug-info {
     background: #fff3cd;
     border: 1px solid #ffeaa7;
@@ -171,32 +159,62 @@
 </style>
 
 <div class="nested-tabs-container">
+  {% comment %} DEBUG INFO - Remove after testing {% endcomment %}
+  <div class="debug-info">
+    <p><strong>Debug Info:</strong></p>
+    <p>Category: {{ current_category.title }}</p>
+    <p>Category Handle: {{ current_category.system.handle }}</p>
+    <p>Category System ID: {{ current_category.system.id }}</p>
+    <p>Current tab slug: {{ tab_slug }}</p>
+    <p>Page handle: {{ category_handle }}</p>
+  </div>
+  
   {% comment %} 
-    FIXED: Get tabs for this category using metafield references
+    FIXED: Get tabs using direct metaobject reference access
   {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = "" | split: "" %}
   
-  {% comment %} Debug info - remove after testing {% endcomment %}
-  <div class="debug-info">
-    <p><strong>Debug Info:</strong></p>
-    <p>Category: {{ current_category.title }} (ID: {{ current_category.id }})</p>
-    <p>Total tabs in system: {{ all_tabs.size }}</p>
-    <p>Current tab slug: {{ tab_slug }}</p>
-  </div>
-  
-  {% comment %} Find all tabs that belong to this category {% endcomment %}
+  {% comment %} Method 1: Direct comparison by handle {% endcomment %}
   {% for tab in all_tabs %}
-    {% comment %} Access parent_category from metafields {% endcomment %}
-    {% assign parent_metafield = tab.metafields.custom.parent_category %}
-    
-    {% if parent_metafield and parent_metafield.value %}
-      {% comment %} Check if this tab belongs to current category {% endcomment %}
-      {% if parent_metafield.value.id == current_category.id %}
+    {% comment %} Access parent_category directly (not through metafields) {% endcomment %}
+    {% if tab.parent_category %}
+      {% comment %} Compare by system handle {% endcomment %}
+      {% if tab.parent_category.system.handle == current_category.system.handle %}
         {% assign category_tabs = category_tabs | push: tab %}
       {% endif %}
     {% endif %}
   {% endfor %}
+  
+  {% comment %} If Method 1 doesn't work, try Method 2 {% endcomment %}
+  {% if category_tabs.size == 0 %}
+    {% comment %} Method 2: Try accessing through system.id {% endcomment %}
+    {% for tab in all_tabs %}
+      {% if tab.parent_category and tab.parent_category.system.id == current_category.system.id %}
+        {% assign category_tabs = category_tabs | push: tab %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  
+  {% comment %} If still no tabs, try Method 3: Check all possibilities {% endcomment %}
+  {% if category_tabs.size == 0 %}
+    <div class="debug-info" style="background: #f8d7da; border-color: #f5c6cb;">
+      <p><strong>Trying Alternative Access Methods:</strong></p>
+      {% for tab in all_tabs %}
+        <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
+          <p><strong>{{ tab.title }}</strong></p>
+          <p>Parent category exists: {% if tab.parent_category %}YES{% else %}NO{% endif %}</p>
+          <p>Parent object: {{ tab.parent_category | json }}</p>
+          <p>All tab data: {{ tab | json }}</p>
+        </div>
+      {% endfor %}
+    </div>
+    
+    {% comment %} Last resort: Get all tabs and let user figure it out {% endcomment %}
+    {% for tab in all_tabs %}
+      {% assign category_tabs = category_tabs | push: tab %}
+    {% endfor %}
+  {% endif %}
   
   {% comment %} Find the current tab {% endcomment %}
   {% assign current_tab = nil %}
@@ -280,61 +298,24 @@
           </div>
         {% endif %}
       {% else %}
-        <div class="tab-content-loading">
-          <p>Loading content...</p>
+        <div class="no-tabs-message">
+          <p>No content available for the selected tab.</p>
         </div>
       {% endif %}
     </div>
   {% else %}
     <div class="no-tabs-message">
-      <h3>No tabs available for this category</h3>
-      <p>Found {{ all_tabs.size }} total tabs in system.</p>
-      <p>Please check that:</p>
-      <ul style="text-align: left; display: inline-block;">
-        <li>Parent category is set in each tab's metafields</li>
-        <li>You're using the correct page handle: {{ category_handle }}</li>
-        <li>The category exists: {{ current_category.title }}</li>
-      </ul>
-      
-      {% comment %} Debug output {% endcomment %}
-      <div style="margin-top: 2rem; text-align: left;">
-        <h4>Debug - All Tabs:</h4>
-        {% for tab in all_tabs %}
-          <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
-            <p><strong>{{ tab.title }}</strong> ({{ tab.tab_slug }})</p>
-            <p>Parent Metafield: {{ tab.metafields.custom.parent_category | json }}</p>
-            {% if tab.metafields.custom.parent_category.value %}
-              <p>Parent ID: {{ tab.metafields.custom.parent_category.value.id }}</p>
-              <p>Parent Title: {{ tab.metafields.custom.parent_category.value.title }}</p>
-            {% endif %}
-          </div>
-        {% endfor %}
-      </div>
+      <h3>Configuration Needed</h3>
+      <p>Please check your metaobject setup:</p>
+      <ol style="text-align: left; display: inline-block;">
+        <li>Ensure `parent_category` field in `tab_content` is set to "Reference" type</li>
+        <li>Make sure each tab has "Engagement Rings" selected as parent</li>
+        <li>Check that your page handle matches exactly: <code>engagement-rings</code></li>
+        <li>Refresh the page after making changes</li>
+      </ol>
     </div>
   {% endif %}
 </div>
-
-<script>
-  // JavaScript for better UX
-  document.addEventListener('DOMContentLoaded', function() {
-    const tabLinks = document.querySelectorAll('.tab-link');
-    
-    tabLinks.forEach(link => {
-      link.addEventListener('click', function(e) {
-        // Remove active class from all tabs
-        tabLinks.forEach(l => l.classList.remove('active'));
-        // Add active class to clicked tab
-        this.classList.add('active');
-        
-        // Optional: Add smooth scroll to content
-        const tabContent = document.querySelector('.tab-content');
-        if (tabContent) {
-          tabContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      });
-    });
-  });
-</script>
 
 {% schema %}
 {
