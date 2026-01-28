@@ -1,6 +1,6 @@
 {% comment %}
-  Section: Nested Tabs Content - FIXED VERSION
-  Uses direct metaobject reference access
+  Section: Nested Tabs Content - WORKING VERSION
+  Temporary workaround for text-based parent_category field
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
@@ -8,13 +8,13 @@
 {% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
 
 <style>
-  /* Keep all your CSS styles from before */
   .nested-tabs-container {
     max-width: 1200px;
     margin: 0 auto;
     padding: 3rem 1rem;
   }
   
+  /* Tabs Navigation */
   .tabs-navigation {
     display: flex;
     gap: 1rem;
@@ -53,6 +53,7 @@
     color: white;
   }
   
+  /* Tab Content */
   .tab-content-area {
     display: grid;
     grid-template-columns: 1fr;
@@ -107,6 +108,7 @@
     background: #a0760a;
   }
   
+  /* Related Topics */
   .related-topics {
     margin-top: 4rem;
     padding-top: 2rem;
@@ -140,6 +142,14 @@
     text-decoration: underline;
   }
   
+  /* Loading State */
+  .tab-content-loading {
+    text-align: center;
+    padding: 3rem;
+    color: #666;
+  }
+  
+  /* No Tabs Message */
   .no-tabs-message {
     text-align: center;
     padding: 3rem;
@@ -148,9 +158,19 @@
     color: #666;
   }
   
+  /* Debug styles */
   .debug-info {
     background: #fff3cd;
     border: 1px solid #ffeaa7;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  
+  .debug-warning {
+    background: #f8d7da;
+    border: 1px solid #f5c6cb;
     padding: 1rem;
     margin-bottom: 2rem;
     border-radius: 4px;
@@ -170,47 +190,53 @@
   </div>
   
   {% comment %} 
-    FIXED: Get tabs using direct metaobject reference access
+    TEMPORARY WORKAROUND: Since parent_category is stored as text ("gold"), 
+    we need to match by category title
   {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = "" | split: "" %}
   
-  {% comment %} Method 1: Direct comparison by handle {% endcomment %}
+  {% comment %} Check what values are stored in parent_category {% endcomment %}
+  <div class="debug-warning">
+    <p><strong>⚠️ Temporary Workaround Active</strong></p>
+    <p>Your <code>parent_category</code> field is storing text values, not references.</p>
+    <p>Looking for tabs where parent_category = "{{ current_category.title }}"</p>
+    <p>Found values in tabs:</p>
+    <ul>
+      {% for tab in all_tabs %}
+        <li><strong>{{ tab.title }}:</strong> "{{ tab.parent_category }}"</li>
+      {% endfor %}
+    </ul>
+  </div>
+  
+  {% comment %} Try multiple matching strategies {% endcomment %}
   {% for tab in all_tabs %}
-    {% comment %} Access parent_category directly (not through metafields) {% endcomment %}
-    {% if tab.parent_category %}
-      {% comment %} Compare by system handle {% endcomment %}
-      {% if tab.parent_category.system.handle == current_category.system.handle %}
-        {% assign category_tabs = category_tabs | push: tab %}
-      {% endif %}
+    {% comment %} Strategy 1: Match exact title {% endcomment %}
+    {% if tab.parent_category == current_category.title %}
+      {% assign category_tabs = category_tabs | push: tab %}
+    {% comment %} Strategy 2: Match "Engagement Rings" if stored differently {% endcomment %}
+    {% elsif tab.parent_category == "Engagement Rings" %}
+      {% assign category_tabs = category_tabs | push: tab %}
+    {% comment %} Strategy 3: Match "gold" if that's what's stored {% endcomment %}
+    {% elsif tab.parent_category == "gold" and current_category.title == "Engagement Rings" %}
+      {% assign category_tabs = category_tabs | push: tab %}
+    {% comment %} Strategy 4: Case-insensitive match {% endcomment %}
+    {% elsif tab.parent_category and current_category.title and tab.parent_category.downcase == current_category.title.downcase %}
+      {% assign category_tabs = category_tabs | push: tab %}
     {% endif %}
   {% endfor %}
   
-  {% comment %} If Method 1 doesn't work, try Method 2 {% endcomment %}
+  {% comment %} If still no tabs, try to get any tab with any parent_category {% endcomment %}
   {% if category_tabs.size == 0 %}
-    {% comment %} Method 2: Try accessing through system.id {% endcomment %}
     {% for tab in all_tabs %}
-      {% if tab.parent_category and tab.parent_category.system.id == current_category.system.id %}
+      {% if tab.parent_category and tab.parent_category != blank %}
         {% assign category_tabs = category_tabs | push: tab %}
       {% endif %}
     {% endfor %}
   {% endif %}
   
-  {% comment %} If still no tabs, try Method 3: Check all possibilities {% endcomment %}
+  {% comment %} Final fallback: Get all tabs {% endcomment %}
   {% if category_tabs.size == 0 %}
-    <div class="debug-info" style="background: #f8d7da; border-color: #f5c6cb;">
-      <p><strong>Trying Alternative Access Methods:</strong></p>
-      {% for tab in all_tabs %}
-        <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
-          <p><strong>{{ tab.title }}</strong></p>
-          <p>Parent category exists: {% if tab.parent_category %}YES{% else %}NO{% endif %}</p>
-          <p>Parent object: {{ tab.parent_category | json }}</p>
-          <p>All tab data: {{ tab | json }}</p>
-        </div>
-      {% endfor %}
-    </div>
-    
-    {% comment %} Last resort: Get all tabs and let user figure it out {% endcomment %}
     {% for tab in all_tabs %}
       {% assign category_tabs = category_tabs | push: tab %}
     {% endfor %}
@@ -306,16 +332,50 @@
   {% else %}
     <div class="no-tabs-message">
       <h3>Configuration Needed</h3>
-      <p>Please check your metaobject setup:</p>
-      <ol style="text-align: left; display: inline-block;">
-        <li>Ensure `parent_category` field in `tab_content` is set to "Reference" type</li>
-        <li>Make sure each tab has "Engagement Rings" selected as parent</li>
-        <li>Check that your page handle matches exactly: <code>engagement-rings</code></li>
-        <li>Refresh the page after making changes</li>
-      </ol>
+      <p>Please fix your metaobject setup:</p>
+      <div style="text-align: left; display: inline-block; max-width: 600px;">
+        <p><strong>Current Issue:</strong> Your <code>parent_category</code> field in the <code>tab_content</code> metaobject is storing text values instead of references.</p>
+        
+        <p><strong>To fix permanently:</strong></p>
+        <ol>
+          <li>Go to <strong>Settings → Custom Data → tab_content → Manage definition</strong></li>
+          <li>Delete the current <code>parent_category</code> field</li>
+          <li>Create a new field:
+            <ul>
+              <li>Name: <code>parent_category</code></li>
+              <li>Type: <strong>Reference</strong> (not Text)</li>
+              <li>Reference to: <code>category_page</code></li>
+            </ul>
+          </li>
+          <li>Re-select "Engagement Rings" for each tab entry</li>
+          <li>Save and refresh this page</li>
+        </ol>
+        
+        <p><strong>Current tab parent_category values:</strong></p>
+        <ul>
+          {% for tab in all_tabs %}
+            <li><code>{{ tab.title }}</code>: "{{ tab.parent_category }}"</li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
   {% endif %}
 </div>
+
+<script>
+  // JavaScript for better UX
+  document.addEventListener('DOMContentLoaded', function() {
+    const tabLinks = document.querySelectorAll('.tab-link');
+    
+    tabLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        // Update active tab visually
+        tabLinks.forEach(l => l.classList.remove('active'));
+        this.classList.add('active');
+      });
+    });
+  });
+</script>
 
 {% schema %}
 {
