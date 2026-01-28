@@ -1,26 +1,12 @@
 {% comment %}
   Section: Nested Tabs Content
   Description: Tabs navigation and dynamic content
+  FIXED VERSION - Handles metafield references correctly
 {% endcomment %}
 
-{%- assign category_handle = page.handle -%}
-{%- assign current_category = metaobjects.category_page[category_handle] -%}
-{%- assign tab_slug = request.query.tab | default: current_category.default_tab_slug -%}
-
-{%- assign category_tabs = metaobjects.tab_content.values | where: "parent_category.system.handle", current_category.system.handle | sort: 'title' -%}
-{%- assign current_tab = nil -%}
-
-{%- for tab in category_tabs -%}
-  {%- if tab.tab_slug == tab_slug -%}
-    {%- assign current_tab = tab -%}
-    {%- break -%}
-  {%- endif -%}
-{%- endfor -%}
-
-{%- if current_tab == nil and category_tabs.size > 0 -%}
-  {%- assign current_tab = category_tabs.first -%}
-  {%- assign tab_slug = current_tab.tab_slug -%}
-{%- endif -%}
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
 
 <style>
   .nested-tabs-container {
@@ -170,14 +156,67 @@
     padding: 3rem;
     background: #f9f9f9;
     border-radius: 8px;
+    color: #666;
+  }
+  
+  /* Debug styles (remove in production) */
+  .debug-info {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    padding: 1rem;
+    margin-bottom: 2rem;
+    border-radius: 4px;
+    font-size: 14px;
   }
 </style>
 
-{% comment %} <div class="nested-tabs-container">
-  {%- if category_tabs.size > 0 -%}
+<div class="nested-tabs-container">
+  {% comment %} 
+    FIXED: Get tabs for this category using metafield references
+  {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% comment %} Debug info - remove after testing {% endcomment %}
+  <div class="debug-info">
+    <p><strong>Debug Info:</strong></p>
+    <p>Category: {{ current_category.title }} (ID: {{ current_category.id }})</p>
+    <p>Total tabs in system: {{ all_tabs.size }}</p>
+    <p>Current tab slug: {{ tab_slug }}</p>
+  </div>
+  
+  {% comment %} Find all tabs that belong to this category {% endcomment %}
+  {% for tab in all_tabs %}
+    {% comment %} Access parent_category from metafields {% endcomment %}
+    {% assign parent_metafield = tab.metafields.custom.parent_category %}
+    
+    {% if parent_metafield and parent_metafield.value %}
+      {% comment %} Check if this tab belongs to current category {% endcomment %}
+      {% if parent_metafield.value.id == current_category.id %}
+        {% assign category_tabs = category_tabs | push: tab %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} Find the current tab {% endcomment %}
+  {% assign current_tab = nil %}
+  {% for tab in category_tabs %}
+    {% if tab.tab_slug == tab_slug %}
+      {% assign current_tab = tab %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+  
+  {% if current_tab == nil and category_tabs.size > 0 %}
+    {% assign current_tab = category_tabs.first %}
+    {% assign tab_slug = current_tab.tab_slug %}
+  {% endif %}
+  
+  {% comment %} Display tabs and content {% endcomment %}
+  {% if category_tabs.size > 0 %}
     <!-- Tabs Navigation -->
     <nav class="tabs-navigation" role="tablist">
-      {%- for tab in category_tabs -%}
+      {% for tab in category_tabs %}
         <a 
           href="{{ request.path }}?tab={{ tab.tab_slug }}" 
           class="tab-link {% if tab.tab_slug == tab_slug %}active{% endif %}"
@@ -186,244 +225,114 @@
         >
           {{ tab.title }}
         </a>
-      {%- endfor -%}
-    </nav>
-
-    <!-- Tab Content -->
-    <div class="tab-content">
-      {%- if current_tab -%}
-        <div class="tab-content-area {% if current_tab.content_image %}with-image{% endif %}">
-          <div class="tab-content-text">
-            <h2 class="tab-content-header">{{ current_tab.header }}</h2>
-            
-            <div class="tab-content-description">
-              {{ current_tab.description }}
-            </div>
-            
-            {%- if current_tab.cta_text and current_tab.cta_link -%}
-              <a href="{{ current_tab.cta_link }}" class="tab-cta-button">
-                {{ current_tab.cta_text }}
-              </a>
-            {%- endif -%}
-          </div>
-          
-          {%- if current_tab.content_image -%}
-            <div class="tab-content-image">
-              <img 
-                src="{{ current_tab.content_image | image_url: width: 800 }}" 
-                alt="{{ current_tab.header | escape }}"
-                loading="lazy"
-                width="800"
-                height="600"
-              >
-            </div>
-          {%- endif -%}
-        </div>
-
-        <!-- Related Topics -->
-        {%- if current_tab.related_blogs.size > 0 -%}
-          <div class="related-topics">
-            <h3>Related Topics</h3>
-            <div class="blog-links">
-              {%- for article_ref in current_tab.related_blogs -%}
-                {%- assign article = article_ref -%}
-                {%- if article -%}
-                  <a href="{{ article.url }}" class="blog-link">
-                    {{ article.title }}
-                  </a>
-                {%- endif -%}
-              {%- endfor -%}
-            </div>
-          </div>
-        {%- endif -%}
-      {%- else -%}
-        <div class="tab-content-loading">
-          <p>Loading content...</p>
-        </div>
-      {%- endif -%}
-    </div>
-  {%- else -%}
-    <div class="no-tabs-message">
-      <h3>No tabs available for this category</h3>
-      <p>Please add tab content in the Shopify admin.</p>
-    </div>
-  {%- endif -%}
-</div> {% endcomment %}
-
-{% assign category_handle = page.handle %}
-{% assign current_category = metaobjects.category_page[category_handle] %}
-{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
-
-{% comment %} Get all tabs for this category {% endcomment %}
-{% assign all_tabs = metaobjects.tab_content.values %}
-{% assign category_tabs = "" | split: "" %}
-
-{% for tab in all_tabs %}
-  {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
-    {% assign category_tabs = category_tabs | push: tab %}
-  {% endif %}
-{% endfor %}
-
-{% comment %} Find current tab {% endcomment %}
-{% assign current_tab = nil %}
-{% for tab in category_tabs %}
-  {% if tab.tab_slug == tab_slug %}
-    {% assign current_tab = tab %}
-    {% break %}
-  {% endif %}
-{% endfor %}
-
-{% if current_tab == nil and category_tabs.size > 0 %}
-  {% assign current_tab = category_tabs.first %}
-  {% assign tab_slug = current_tab.tab_slug %}
-{% endif %}
-
-<style>
-  /* Your CSS styles here */
-</style>
-
-<div class="nested-tabs-container">
-  {% if category_tabs.size > 0 %}
-    <!-- Tabs Navigation -->
-    <nav class="tabs-navigation">
-      {% for tab in category_tabs %}
-        <a href="{{ request.path }}?tab={{ tab.tab_slug }}" 
-           class="tab-link {% if tab.tab_slug == tab_slug %}active{% endif %}">
-          {{ tab.title }}
-        </a>
       {% endfor %}
     </nav>
 
     <!-- Tab Content -->
     <div class="tab-content">
       {% if current_tab %}
-        <!-- Your content rendering here -->
-        <h2>{{ current_tab.header }}</h2>
-        {{ current_tab.description }}
-        
-        {% if current_tab.content_image %}
-          <img src="{{ current_tab.content_image | image_url }}" alt="{{ current_tab.header }}">
-        {% endif %}
-        
-        {% if current_tab.cta_text and current_tab.cta_link %}
-          <a href="{{ current_tab.cta_link }}" class="cta-button">
-            {{ current_tab.cta_text }}
-          </a>
-        {% endif %}
-        
+        <div class="tab-content-area {% if current_tab.content_image %}with-image{% endif %}">
+          <div class="tab-content-text">
+            {% if current_tab.header %}
+              <h2 class="tab-content-header">{{ current_tab.header }}</h2>
+            {% endif %}
+            
+            {% if current_tab.description %}
+              <div class="tab-content-description">
+                {{ current_tab.description }}
+              </div>
+            {% endif %}
+            
+            {% if current_tab.cta_text and current_tab.cta_link %}
+              <a href="{{ current_tab.cta_link }}" class="tab-cta-button">
+                {{ current_tab.cta_text }}
+              </a>
+            {% endif %}
+          </div>
+          
+          {% if current_tab.content_image %}
+            <div class="tab-content-image">
+              <img 
+                src="{{ current_tab.content_image | image_url: width: 800 }}" 
+                alt="{{ current_tab.header | default: current_tab.title | escape }}"
+                loading="lazy"
+                width="800"
+                height="600"
+              >
+            </div>
+          {% endif %}
+        </div>
+
         <!-- Related Topics -->
-        {% if current_tab.related_blogs.size > 0 %}
+        {% if current_tab.related_blogs and current_tab.related_blogs.size > 0 %}
           <div class="related-topics">
             <h3>Related Topics</h3>
-            {% for article_ref in current_tab.related_blogs %}
-              <a href="{{ article_ref.url }}">{{ article_ref.title }}</a>
-            {% endfor %}
+            <div class="blog-links">
+              {% for article_ref in current_tab.related_blogs %}
+                {% assign article = article_ref %}
+                {% if article %}
+                  <a href="{{ article.url }}" class="blog-link">
+                    {{ article.title }}
+                  </a>
+                {% endif %}
+              {% endfor %}
+            </div>
           </div>
         {% endif %}
+      {% else %}
+        <div class="tab-content-loading">
+          <p>Loading content...</p>
+        </div>
       {% endif %}
     </div>
   {% else %}
     <div class="no-tabs-message">
       <h3>No tabs available for this category</h3>
       <p>Found {{ all_tabs.size }} total tabs in system.</p>
-      <p>Current category handle: {{ current_category.system.handle }}</p>
-      <p>Debug: Checking tabs with parent...</p>
-      <ul>
-        {% for tab in all_tabs %}
-          <li>
-            {{ tab.title }} - 
-            Parent: {% if tab.parent_category %}{{ tab.parent_category.title }} ({{ tab.parent_category.system.handle }}){% else %}None{% endif %}
-          </li>
-        {% endfor %}
+      <p>Please check that:</p>
+      <ul style="text-align: left; display: inline-block;">
+        <li>Parent category is set in each tab's metafields</li>
+        <li>You're using the correct page handle: {{ category_handle }}</li>
+        <li>The category exists: {{ current_category.title }}</li>
       </ul>
+      
+      {% comment %} Debug output {% endcomment %}
+      <div style="margin-top: 2rem; text-align: left;">
+        <h4>Debug - All Tabs:</h4>
+        {% for tab in all_tabs %}
+          <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
+            <p><strong>{{ tab.title }}</strong> ({{ tab.tab_slug }})</p>
+            <p>Parent Metafield: {{ tab.metafields.custom.parent_category | json }}</p>
+            {% if tab.metafields.custom.parent_category.value %}
+              <p>Parent ID: {{ tab.metafields.custom.parent_category.value.id }}</p>
+              <p>Parent Title: {{ tab.metafields.custom.parent_category.value.title }}</p>
+            {% endif %}
+          </div>
+        {% endfor %}
+      </div>
     </div>
   {% endif %}
 </div>
 
-
 <script>
-  class NestedTabs extends HTMLElement {
-    constructor() {
-      super();
-      
-      // Handle tab clicks with AJAX for smooth transitions
-      this.tabLinks = this.querySelectorAll('.tab-link');
-      this.tabContent = this.querySelector('.tab-content');
-      
-      this.initEventListeners();
-    }
+  // JavaScript for better UX
+  document.addEventListener('DOMContentLoaded', function() {
+    const tabLinks = document.querySelectorAll('.tab-link');
     
-    initEventListeners() {
-      this.tabLinks.forEach(link => {
-        link.addEventListener('click', (e) => {
-          // Only prevent default if we're doing AJAX loading
-          // For now, let it follow the link normally
-          // You can enhance with AJAX later
-        });
-      });
-    }
-    
-    // Optional: Add AJAX loading for better UX
-    async loadTabContent(tabSlug) {
-      try {
-        // Show loading state
-        this.tabContent.innerHTML = `
-          <div class="tab-content-loading">
-            <p>Loading...</p>
-          </div>
-        `;
+    tabLinks.forEach(link => {
+      link.addEventListener('click', function(e) {
+        // Remove active class from all tabs
+        tabLinks.forEach(l => l.classList.remove('active'));
+        // Add active class to clicked tab
+        this.classList.add('active');
         
-        // Fetch the page with the new tab parameter
-        const response = await fetch(`${window.location.pathname}?tab=${tabSlug}`);
-        const text = await response.text();
-        
-        // Parse the HTML and extract just the tab content
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(text, 'text/html');
-        const newContent = doc.querySelector('.tab-content');
-        
-        if (newContent) {
-          this.tabContent.innerHTML = newContent.innerHTML;
-          this.updateActiveTab(tabSlug);
-          this.updateURL(tabSlug);
-          
-          // Dispatch event for other components
-          this.dispatchEvent(new CustomEvent('tabchange', {
-            detail: { tabSlug }
-          }));
+        // Optional: Add smooth scroll to content
+        const tabContent = document.querySelector('.tab-content');
+        if (tabContent) {
+          tabContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
-      } catch (error) {
-        console.error('Error loading tab:', error);
-        // Fallback to regular navigation
-        window.location.href = `${window.location.pathname}?tab=${tabSlug}`;
-      }
-    }
-    
-    updateActiveTab(tabSlug) {
-      this.tabLinks.forEach(link => {
-        const isActive = link.dataset.tabSlug === tabSlug;
-        link.classList.toggle('active', isActive);
       });
-    }
-    
-    updateURL(tabSlug) {
-      const url = new URL(window.location);
-      url.searchParams.set('tab', tabSlug);
-      window.history.replaceState({}, '', url);
-    }
-  }
-  
-  // Define custom element
-  if (!customElements.get('nested-tabs')) {
-    customElements.define('nested-tabs', NestedTabs);
-  }
-  
-  // Initialize
-  document.addEventListener('DOMContentLoaded', () => {
-    const tabsContainer = document.querySelector('.nested-tabs-container');
-    if (tabsContainer) {
-      // You can wrap the container or just use the script as is
-    }
+    });
   });
 </script>
 
