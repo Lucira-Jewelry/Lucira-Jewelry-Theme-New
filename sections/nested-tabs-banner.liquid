@@ -1,20 +1,161 @@
-{% comment %} Get current tab to display correct banner {% endcomment %}
-{% assign all_tabs = metaobjects.tab_content.values %}
-{% assign current_tab = nil %}
-{% assign category_tabs = "" | split: "" %}
+{% comment %}
+  Section: Nested Tabs Banner
+  Description: Dynamic banner that changes with tabs
+{% endcomment %}
 
-{% comment %} Find all tabs for this category {% endcomment %}
-{% for tab in all_tabs %}
-  {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
-    {% assign category_tabs = category_tabs | push: tab %}
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+
+<style>
+  .nested-tabs-banner {
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    overflow: hidden;
+  }
+  
+  .banner-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  
+  .banner-background img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .banner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2;
+  }
+  
+  .banner-content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    max-width: 800px;
+    padding: 2rem;
+  }
+  
+  .banner-title {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  .banner-subtitle {
+    font-size: 1.25rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+  
+  @media (max-width: 768px) {
+    .nested-tabs-banner {
+      min-height: 300px;
+    }
     
-    {% if tab.tab_slug == tab_slug %}
-      {% assign current_tab = tab %}
+    .banner-title {
+      font-size: 2rem;
+    }
+    
+    .banner-subtitle {
+      font-size: 1rem;
+    }
+  }
+</style>
+
+<div class="nested-tabs-banner">
+  {% comment %} Get current tab to display correct banner {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign current_tab = nil %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% comment %} First, find all tabs for this category {% endcomment %}
+  {% for tab in all_tabs %}
+    {% comment %} Try to access parent_category from metafields {% endcomment %}
+    {% assign parent_metafield = tab.metafields.custom.parent_category %}
+    {% if parent_metafield and parent_metafield.value %}
+      {% if parent_metafield.value.id == current_category.id %}
+        {% assign category_tabs = category_tabs | push: tab %}
+        
+        {% if tab.tab_slug == tab_slug %}
+          {% assign current_tab = tab %}
+        {% endif %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} If no tab found with current slug, use first tab {% endcomment %}
+  {% if current_tab == nil and category_tabs.size > 0 %}
+    {% assign current_tab = category_tabs.first %}
+  {% endif %}
+  
+  {% comment %} Display banner image {% endcomment %}
+  {% assign banner_image = nil %}
+  {% assign banner_title = current_category.banner_title %}
+  {% assign banner_subtitle = current_category.banner_subtitle %}
+  
+  {% if current_tab %}
+    {% if current_tab.banner_image %}
+      {% assign banner_image = current_tab.banner_image %}
+    {% endif %}
+    {% if current_tab.banner_title %}
+      {% assign banner_title = current_tab.banner_title %}
     {% endif %}
   {% endif %}
-{% endfor %}
+  
+  {% if banner_image == nil %}
+    {% assign banner_image = current_category.banner_image %}
+  {% endif %}
+  
+  {% if banner_image %}
+    <div class="banner-background">
+      <img 
+        src="{{ banner_image | image_url: width: 1920 }}" 
+        alt="{{ banner_title | escape }}"
+        loading="eager"
+        width="1920"
+        height="400"
+      >
+    </div>
+  {% endif %}
+  
+  <div class="banner-overlay"></div>
+  
+  <div class="banner-content">
+    <h1 class="banner-title">{{ banner_title }}</h1>
+    {% if banner_subtitle %}
+      <p class="banner-subtitle">{{ banner_subtitle }}</p>
+    {% endif %}
+  </div>
+</div>
 
-{% comment %} If no tab found with current slug, use first tab {% endcomment %}
-{% if current_tab == nil and category_tabs.size > 0 %}
-  {% assign current_tab = category_tabs.first %}
-{% endif %}
+{% schema %}
+{
+  "name": "Nested Tabs Banner",
+  "tag": "section",
+  "class": "section",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Nested Tabs Banner"
+    }
+  ]
+}
+{% endschema %}
