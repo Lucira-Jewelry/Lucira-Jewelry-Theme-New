@@ -173,7 +173,7 @@
   }
 </style>
 
-<div class="nested-tabs-container">
+{% comment %} <div class="nested-tabs-container">
   {%- if category_tabs.size > 0 -%}
     <!-- Tabs Navigation -->
     <nav class="tabs-navigation" role="tablist">
@@ -248,7 +248,98 @@
       <p>Please add tab content in the Shopify admin.</p>
     </div>
   {%- endif -%}
+</div> {% endcomment %}
+
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+{% assign tab_slug = request.query.tab | default: current_category.default_tab_slug %}
+
+{% comment %} Get all tabs for this category {% endcomment %}
+{% assign all_tabs = metaobjects.tab_content.values %}
+{% assign category_tabs = "" | split: "" %}
+
+{% for tab in all_tabs %}
+  {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
+    {% assign category_tabs = category_tabs | push: tab %}
+  {% endif %}
+{% endfor %}
+
+{% comment %} Find current tab {% endcomment %}
+{% assign current_tab = nil %}
+{% for tab in category_tabs %}
+  {% if tab.tab_slug == tab_slug %}
+    {% assign current_tab = tab %}
+    {% break %}
+  {% endif %}
+{% endfor %}
+
+{% if current_tab == nil and category_tabs.size > 0 %}
+  {% assign current_tab = category_tabs.first %}
+  {% assign tab_slug = current_tab.tab_slug %}
+{% endif %}
+
+<style>
+  /* Your CSS styles here */
+</style>
+
+<div class="nested-tabs-container">
+  {% if category_tabs.size > 0 %}
+    <!-- Tabs Navigation -->
+    <nav class="tabs-navigation">
+      {% for tab in category_tabs %}
+        <a href="{{ request.path }}?tab={{ tab.tab_slug }}" 
+           class="tab-link {% if tab.tab_slug == tab_slug %}active{% endif %}">
+          {{ tab.title }}
+        </a>
+      {% endfor %}
+    </nav>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+      {% if current_tab %}
+        <!-- Your content rendering here -->
+        <h2>{{ current_tab.header }}</h2>
+        {{ current_tab.description }}
+        
+        {% if current_tab.content_image %}
+          <img src="{{ current_tab.content_image | image_url }}" alt="{{ current_tab.header }}">
+        {% endif %}
+        
+        {% if current_tab.cta_text and current_tab.cta_link %}
+          <a href="{{ current_tab.cta_link }}" class="cta-button">
+            {{ current_tab.cta_text }}
+          </a>
+        {% endif %}
+        
+        <!-- Related Topics -->
+        {% if current_tab.related_blogs.size > 0 %}
+          <div class="related-topics">
+            <h3>Related Topics</h3>
+            {% for article_ref in current_tab.related_blogs %}
+              <a href="{{ article_ref.url }}">{{ article_ref.title }}</a>
+            {% endfor %}
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="no-tabs-message">
+      <h3>No tabs available for this category</h3>
+      <p>Found {{ all_tabs.size }} total tabs in system.</p>
+      <p>Current category handle: {{ current_category.system.handle }}</p>
+      <p>Debug: Checking tabs with parent...</p>
+      <ul>
+        {% for tab in all_tabs %}
+          <li>
+            {{ tab.title }} - 
+            Parent: {% if tab.parent_category %}{{ tab.parent_category.title }} ({{ tab.parent_category.system.handle }}){% else %}None{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  {% endif %}
 </div>
+
 
 <script>
   class NestedTabs extends HTMLElement {
