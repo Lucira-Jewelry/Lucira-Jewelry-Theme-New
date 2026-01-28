@@ -53,25 +53,16 @@
 {% assign featured_image = current_content_page.banner_image | default: main_tab.banner_image %} {% endcomment %}
  {{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
 
-{% comment %} SIMPLER APPROACH - Use page handle {% endcomment %}
-{% assign debug_mode = true %}
-
+{% comment %} ========== DEBUG SECTION ========== {% endcomment %}
+{% if section.settings.show_debug %}
 <div style="background: #ffebee; padding: 15px; margin-bottom: 20px; border: 1px solid #f44336;">
   <h3>🔍 DEBUG MODE</h3>
   
-  {% comment %} 1. Check page info {% endcomment %}
   <p><strong>Page Info:</strong></p>
   <p>Page Title: {{ page.title }}</p>
   <p>Page Handle: {{ page.handle }}</p>
   <p>Page URL: {{ page.url }}</p>
-  <p>Canonical URL: {{ canonical_url }}</p>
   
-  {% comment %} 2. Check metaobjects {% endcomment %}
-  <p><strong>Metaobjects Check:</strong></p>
-  <p>Has Navigation Tab metaobject: {% if shop.metaobjects.navigation_tab %}✅ Yes{% else %}❌ No{% endif %}</p>
-  <p>Has Content Page metaobject: {% if shop.metaobjects.content_page %}✅ Yes{% else %}❌ No{% endif %}</p>
-  
-  {% comment %} 3. Show ALL navigation tabs {% endcomment %}
   <p><strong>All Navigation Tabs:</strong></p>
   <ul>
   {% for tab in shop.metaobjects.navigation_tab.values %}
@@ -80,161 +71,91 @@
       (slug: {{ tab.slug }}) 
       - Parent: {% if tab.parent_tab %}{{ tab.parent_tab.slug }}{% else %}None (MAIN TAB){% endif %}
       - Active: {{ tab.is_active }}
-      - Description: {{ tab.description | truncate: 50 }}
     </li>
-  {% else %}
-    <li>❌ No navigation tabs found!</li>
-  {% endfor %}
-  </ul>
-  
-  {% comment %} 4. Show ALL content pages {% endcomment %}
-  <p><strong>All Content Pages:</strong></p>
-  <ul>
-  {% for content in shop.metaobjects.content_page.values %}
-    <li>
-      <strong>{{ content.title | default: content.content_header }}</strong>
-      (slug: {{ content.slug }})
-      - Parent Tab: {{ content.parent_tab.slug | default: 'None' }}
-    </li>
-  {% else %}
-    <li>❌ No content pages found!</li>
   {% endfor %}
   </ul>
 </div>
+{% endif %}
+{% comment %} ========== END DEBUG ========== {% endcomment %}
 
 {% comment %} ========== MAIN LOGIC ========== {% endcomment %}
 
-{% comment %} Determine which tab to show {% endcomment %}
-{% assign main_tab_slug = page.handle | default: 'engagement' %}
-
-{% comment %} Get the CURRENT main tab {% endcomment %}
+{% comment %} Extract rich text from metaobject {% endcomment %}
 {% assign main_tab = nil %}
-{% for tab in shop.metaobjects.navigation_tab.values %}
-  {% if tab.slug == main_tab_slug and tab.parent_tab == blank %}
+{% assign main_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab", blank 
+  | where: "is_active", true 
+  | sort: "sort_order" %}
+
+{% comment %} Find current tab based on page handle {% endcomment %}
+{% assign current_slug = page.handle %}
+{% for tab in main_tabs %}
+  {% if tab.slug == current_slug %}
     {% assign main_tab = tab %}
     {% break %}
   {% endif %}
 {% endfor %}
 
-{% if main_tab == nil %}
-  {% comment %} Try to find any main tab {% endcomment %}
-  {% for tab in shop.metaobjects.navigation_tab.values %}
-    {% if tab.parent_tab == blank %}
-      {% assign main_tab = tab %}
-      {% break %}
-    {% endif %}
-  {% endfor %}
+{% if main_tab == nil and main_tabs.size > 0 %}
+  {% assign main_tab = main_tabs.first %}
 {% endif %}
 
-{% if main_tab == nil %}
-  {% comment %} No main tabs found, use dummy data {% endcomment %}
-  <div style="background: #fff3cd; padding: 15px; margin: 20px 0; border: 1px solid #ffc107;">
-    <h3>⚠️ No Main Tabs Found!</h3>
-    <p>Please create at least one Navigation Tab with:</p>
-    <ul>
-      <li><strong>parent_tab</strong> field should be EMPTY</li>
-      <li><strong>slug</strong> should match your page handle (current: {{ page.handle }})</li>
-      <li>Set <strong>is_active</strong> to true</li>
-    </ul>
-    <p>Your page handle is: <code>{{ page.handle }}</code></p>
-    <p>Looking for tab with slug: <code>{{ main_tab_slug }}</code></p>
-  </div>
-{% endif %}
-
-{% comment %} Get ALL main tabs (tabs without parent) {% endcomment %}
-{% assign main_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab", blank 
-  | sort: "sort_order" %}
-
-{% comment %} Get sub-tabs for current main tab {% endcomment %}
-{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab.slug", main_tab_slug 
-  | sort: "sort_order" %}
-
-{% comment %} Debug: Show what we found {% endcomment %}
-<div style="background: #e8f5e8; padding: 15px; margin: 20px 0; border: 1px solid #4caf50;">
-  <p><strong>Current State:</strong></p>
-  <p>Main Tab Slug: {{ main_tab_slug }}</p>
-  <p>Main Tab Found: {{ main_tab.title | default: 'None' }}</p>
-  <p>Main Tabs Count: {{ main_tabs.size }} (should be > 0)</p>
-  <p>Sub Tabs Count: {{ sub_tabs.size }}</p>
-</div>
-
-{% comment %} Check for content page based on URL {% endcomment %}
-{% assign current_content_page = nil %}
-{% assign url_path = request.path %}
-{% assign path_parts = url_path | split: '/' %}
-
-{% if path_parts.size >= 4 %}
-  {% assign content_slug = path_parts[3] %}
-  {% assign current_content_page = shop.metaobjects.content_page.values 
-    | where: "slug", content_slug 
-    | where: "parent_tab.slug", main_tab_slug 
-    | first %}
-{% endif %}
-
-{% comment %} Handle rich text fields properly {% endcomment %}
-{% assign main_description = '' %}
+{% comment %} Get description from rich text field {% endcomment %}
+{% assign tab_description = '' %}
 {% if main_tab.description %}
-  {% if main_tab.description contains '{"type":"root"' %}
-    {% comment %} It's a rich text field, extract text {% endcomment %}
-    {% assign main_description_json = main_tab.description | parse_json %}
-    {% assign main_description = main_description_json.children[0].children[0].value %}
+  {% assign desc_json = main_tab.description | parse_json %}
+  {% if desc_json %}
+    {% assign tab_description = desc_json.children[0].children[0].value %}
   {% else %}
-    {% assign main_description = main_tab.description %}
+    {% assign tab_description = main_tab.description %}
   {% endif %}
 {% endif %}
 
-{% comment %} Set banner image {% endcomment %}
-{% assign featured_image = nil %}
-{% if current_content_page and current_content_page.banner_image %}
-  {% assign featured_image = current_content_page.banner_image %}
-{% elsif main_tab and main_tab.banner_image %}
-  {% assign featured_image = main_tab.banner_image %}
+{% comment %} Get sub-tabs for current main tab {% endcomment %}
+{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
+  | where: "parent_tab.slug", main_tab.slug 
+  | where: "is_active", true 
+  | sort: "sort_order" %}
+
+{% comment %} Get content page if URL has sub-tab {% endcomment %}
+{% assign current_content_page = nil %}
+{% assign url_path = request.path %}
+{% if url_path contains '/' %}
+  {% assign path_parts = url_path | split: '/' %}
+  {% if path_parts.size >= 4 %}
+    {% assign content_slug = path_parts[3] %}
+    {% assign current_content_page = shop.metaobjects.content_page.values 
+      | where: "slug", content_slug 
+      | where: "parent_tab.slug", main_tab.slug 
+      | first %}
+  {% endif %}
 {% endif %}
 
-{% comment %} ========== RENDER THE PAGE ========== {% endcomment %}
+{% comment %} ========== RENDER CONTENT ========== {% endcomment %}
 
-{% if main_tab %}
-  <div class="page-width" data-section-id="{{ section.id }}" data-section-type="tab-navigation">
-    
-    {% comment %} Banner Section {% endcomment %}
-    <section class="tab-banner" id="tab-banner">
+<div class="page-width">
+  {% if main_tab %}
+    <!-- Banner Section -->
+    <section class="tab-banner">
       <div class="banner-image-container">
-        {% if featured_image %}
-          <img src="{{ featured_image | image_url: width: 2000 }}" 
+        {% if main_tab.banner_image %}
+          <img src="{{ main_tab.banner_image | image_url: width: 2000 }}" 
                alt="{{ main_tab.title }}" 
                class="banner-image"
-               loading="eager"
-               width="2000"
-               height="800">
-        {% else %}
-          <div style="background: #f0f0f0; height: 400px; display: flex; align-items: center; justify-content: center;">
-            <p>No banner image set for {{ main_tab.title }}</p>
-          </div>
+               loading="eager">
         {% endif %}
         
         <div class="banner-content">
-          <h1 class="banner-title" id="banner-header">
-            {% if current_content_page %}
-              {{ current_content_page.content_header }}
-            {% else %}
-              {{ main_tab.header | default: main_tab.title }}
-            {% endif %}
+          <h1 class="banner-title">
+            {{ main_tab.header | default: main_tab.title }}
           </h1>
           
-          <p class="banner-description" id="banner-description">
-            {% if current_content_page %}
-              {{ current_content_page.content_body | strip_html | truncate: 200 }}
-            {% else %}
-              {{ main_description | truncate: 200 }}
-            {% endif %}
+          <p class="banner-description">
+            {{ tab_description }}
           </p>
           
           {% if main_tab.cta_text and main_tab.cta_link %}
-            <a href="{{ main_tab.cta_link }}" 
-               class="button button--primary" 
-               id="banner-cta">
+            <a href="{{ main_tab.cta_link }}" class="button button--primary">
               {{ main_tab.cta_text }}
             </a>
           {% endif %}
@@ -242,15 +163,13 @@
       </div>
     </section>
 
-    {% comment %} Main Tabs Navigation - ONLY IF WE HAVE MAIN TABS {% endcomment %}
-    {% if main_tabs.size > 0 %}
-      <nav class="main-tabs-navigation" aria-label="Main navigation">
-        <ul class="main-tabs-list" id="main-tabs">
+    <!-- Main Tabs -->
+    {% if main_tabs.size > 1 %}
+      <nav class="main-tabs-navigation">
+        <ul class="main-tabs-list">
           {% for tab in main_tabs %}
             <li class="main-tab-item {% if tab.slug == main_tab.slug %}active{% endif %}">
-              <a href="/pages/{{ tab.slug }}" 
-                 class="main-tab-link"
-                 data-tab-slug="{{ tab.slug }}">
+              <a href="/pages/{{ tab.slug }}" class="main-tab-link">
                 {{ tab.title }}
               </a>
             </li>
@@ -259,15 +178,13 @@
       </nav>
     {% endif %}
 
-    {% comment %} Sub Tabs Navigation {% endcomment %}
+    <!-- Sub Tabs -->
     {% if sub_tabs.size > 0 %}
-      <nav class="sub-tabs-navigation" aria-label="Sub navigation">
-        <ul class="sub-tabs-list" id="sub-tabs">
+      <nav class="sub-tabs-navigation">
+        <ul class="sub-tabs-list">
           {% for sub_tab in sub_tabs %}
             <li class="sub-tab-item">
-              <a href="/pages/{{ main_tab_slug }}/{{ sub_tab.slug }}" 
-                 class="sub-tab-link"
-                 data-content-slug="{{ sub_tab.slug }}">
+              <a href="/pages/{{ main_tab.slug }}/{{ sub_tab.slug }}" class="sub-tab-link">
                 {{ sub_tab.title }}
               </a>
             </li>
@@ -276,93 +193,40 @@
       </nav>
     {% endif %}
 
-    {% comment %} Content Area {% endcomment %}
-    <section class="tab-content-area" id="content-area">
+    <!-- Content Area -->
+    <section class="tab-content-area">
       {% if current_content_page %}
+        <!-- Sub-tab Content -->
         <article class="content-page">
-          <h2>{{ current_content_page.content_header }}</h2>
+          <h2>{{ current_content_page.content_header | default: current_content_page.title }}</h2>
           <div class="rte">
             {{ current_content_page.content_body }}
           </div>
         </article>
       {% else %}
+        <!-- Main Tab Content -->
         <article class="default-content">
-          <h2>Welcome to {{ main_tab.title }}</h2>
-          <div class="rte">
-            <p>{{ main_description }}</p>
-            {% if page.content %}
-              {{ page.content }}
-            {% endif %}
-          </div>
+          {% if page.content %}
+            {{ page.content }}
+          {% else %}
+            <h2>Welcome to {{ main_tab.title }}</h2>
+            <p>{{ tab_description }}</p>
+          {% endif %}
         </article>
       {% endif %}
     </section>
-  </div>
-{% endif %}
+
+  {% else %}
+    <!-- No tabs found -->
+    <div style="text-align: center; padding: 50px;">
+      <h2>No tabs configured</h2>
+      <p>Please create Navigation Tab metaobjects in Shopify admin.</p>
+      <p>Go to: <strong>Settings → Custom Data</strong></p>
+    </div>
+  {% endif %}
+</div>
 
 <style>
-  .main-tabs-navigation {
-    margin: 40px 0;
-    border-bottom: 1px solid #e0e0e0;
-  }
-  
-  .main-tabs-list {
-    display: flex;
-    justify-content: center;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  
-  .main-tab-item {
-    margin: 0 5px;
-  }
-  
-  .main-tab-link {
-    padding: 15px 30px;
-    text-decoration: none;
-    color: #333;
-    border-bottom: 3px solid transparent;
-    font-weight: 500;
-    transition: all 0.3s ease;
-  }
-  
-  .main-tab-item.active .main-tab-link,
-  .main-tab-link:hover {
-    border-bottom-color: #000;
-    color: #000;
-  }
-  
-  .sub-tabs-navigation {
-    margin: 20px 0 40px;
-  }
-  
-  .sub-tabs-list {
-    display: flex;
-    justify-content: center;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-wrap: wrap;
-    gap: 15px;
-  }
-  
-  .sub-tab-link {
-    padding: 10px 20px;
-    text-decoration: none;
-    color: #666;
-    background: #f5f5f5;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-  }
-  
-  .sub-tab-link:hover {
-    background: #000;
-    color: #fff;
-  }
-  
   .tab-banner {
     position: relative;
     margin-bottom: 40px;
@@ -409,32 +273,77 @@
     border-radius: 4px;
     display: inline-block;
   }
+  
+  .main-tabs-navigation {
+    margin: 40px 0;
+    border-bottom: 1px solid #e0e0e0;
+  }
+  
+  .main-tabs-list {
+    display: flex;
+    justify-content: center;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .main-tab-item {
+    margin: 0 5px;
+  }
+  
+  .main-tab-link {
+    padding: 15px 30px;
+    text-decoration: none;
+    color: #333;
+    border-bottom: 3px solid transparent;
+    font-weight: 500;
+    transition: all 0.3s ease;
+  }
+  
+  .main-tab-item.active .main-tab-link {
+    border-bottom-color: {{ section.settings.tab_active_color }};
+    color: {{ section.settings.tab_active_color }};
+  }
+  
+  .main-tab-link:hover {
+    border-bottom-color: {{ section.settings.tab_hover_color }};
+    color: {{ section.settings.tab_hover_color }};
+  }
+  
+  .sub-tabs-navigation {
+    margin: 20px 0 40px;
+  }
+  
+  .sub-tabs-list {
+    display: flex;
+    justify-content: center;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    flex-wrap: wrap;
+    gap: 15px;
+  }
+  
+  .sub-tab-link {
+    padding: 10px 20px;
+    text-decoration: none;
+    color: #666;
+    background: #f5f5f5;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+  }
+  
+  .sub-tab-link:hover {
+    background: {{ section.settings.tab_active_color }};
+    color: white;
+  }
+  
+  .tab-content-area {
+    margin: 60px 0;
+  }
 </style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function() {
-    // Simple tab switching
-    const mainTabLinks = document.querySelectorAll('.main-tab-link');
-    const subTabLinks = document.querySelectorAll('.sub-tab-link');
-    
-    mainTabLinks.forEach(link => {
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const slug = this.dataset.tabSlug;
-        window.location.href = '/pages/' + slug;
-      });
-    });
-    
-    subTabLinks.forEach(link => {
-      link.addEventListener('click', function(e) {
-        e.preventDefault();
-        const slug = this.dataset.contentSlug;
-        const mainSlug = window.location.pathname.split('/')[2];
-        window.location.href = '/pages/' + mainSlug + '/' + slug;
-      });
-    });
-  });
-</script>
 
 {% schema %}
 {
@@ -444,7 +353,29 @@
       "type": "checkbox",
       "id": "show_debug",
       "label": "Show Debug Information",
-      "default": false
+      "default": true
+    },
+    {
+      "type": "color",
+      "id": "tab_active_color",
+      "label": "Active Tab Color",
+      "default": "#000000"
+    },
+    {
+      "type": "color",
+      "id": "tab_hover_color",
+      "label": "Tab Hover Color",
+      "default": "#333333"
+    },
+    {
+      "type": "range",
+      "id": "banner_height",
+      "label": "Banner Height",
+      "min": 300,
+      "max": 800,
+      "step": 50,
+      "default": 500,
+      "unit": "px"
     }
   ],
   "presets": [
