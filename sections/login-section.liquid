@@ -1,241 +1,534 @@
-<script>
-const spinPrizes = [
-  { label: "₹1,500 OFF", value: "1500_off", chance: 15 },
-  { label: "₹1,000 OFF", value: "1000_off", chance: 20 },
-  { label: "₹750 OFF", value: "750_off", chance: 40 },
-  { label: "Diamond Pendant", value: "diamond_pendant", chance: 2 },
-  { label: "₹5,000 OFF", value: "5000_off", chance: 22 },
-  { label: "₹10,000 OFF", value: "10000_off", chance: 1 }
-];
+<div id="login-popup" class="login-pop-overlay" onclick="closeloginPopup('login-popup')">
+  <div class="otp-login-form-wrapper">
+    <button class="close-button" onclick="closeloginPopup('login-popup')">
+      {{ 'icon-login-close.svg' | inline_asset_content }}
+    </button>
 
-const wheelSegments = [
-  { label: "₹1,500 OFF", value: "1500_off" },        // Gold Coin
-  { label: "₹1,000 OFF", value: "1000_off" },        // Gift
-  { label: "₹750 OFF", value: "750_off" },            // Ring
-  { label: "Diamond Pendant", value: "diamond_pendant" }, // Voucher
-  { label: "₹5,000 OFF", value: "5000_off" },         // Pendant
-  { label: "₹10,000 OFF", value: "10000_off" }        // Better Luck
-];
+    <div class="spin-wheel-wrapper">
+        <img 
+            src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Wheel_1.png?v=1769229974" 
+            alt="Spin the Wheel"
+            class="spin-wheel-image" id="spin-wheel-image" width="800" height="800"
+        >
+        
+        <!-- HIDDEN DETECTION OVERLAY - POSITIONED IN FRONT OF WHEEL -->
+        <div id="wheel-detector-overlay" style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 800px;
+            height: 800px;
+            pointer-events: none;
+            z-index: 10;
+            display: none;
+        ">
+            <div id="inner-wheel">
+                <div class="popup_sec sec" data-pos="Gold Coin"><span class="img_ico gc_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Gift"><span class="img_ico g_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Ring"><span class="img_ico r_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Voucher"><span class="img_ico gv_ico"></span></div>
+                <div class="popup_sec sec" data-pos="Pendant"><span class="img_ico ico_pen"></span></div>
+                <div class="popup_sec sec" data-pos="Better Luck"><span class="img_ico b_l"></span></div>
+            </div>
+        </div>
+        
+        <img 
+            src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Spin_The_Wheel_Spinner_1.png?v=1769229971" 
+            alt="Spin CTA"
+            class="spin-wheel-cta" id="spin-wheel-cta" width="200" height="200"
+        >
+    </div>
 
-function openloginPopup(id) {
-  document.getElementById(id).style.display = 'flex';
-}
+    <form id="otp-login-form" class="otp-form-wrapper">
+      <input type="hidden" id="spinResult" name="won_prize" value="">
 
-function closeloginPopup(e, id) {
-  if (typeof id === 'undefined') id = e;
-  document.getElementById(id).style.display = 'none';
-  resetToLoginView();
-}
+      <h2>{{ section.settings.heading }}</h2>
+      <p>{{ section.settings.subtext }}</p>
+      
+      <div class="otp-number-wrapper">
+        <label>{{ section.settings.phone_label }}</label>
+        <div class="mobile-wrap">
+          <span class="country-code">+91</span>
+          <input type="tel" id="loginMobile" placeholder="{{ section.settings.phone_placeholder }}" maxlength="10" required>
+        </div>
+        <span class="error-message" id="mobileError"></span>
+      </div>
+      <button type="button" id="sendOtp" class="btn-primary">
+        {{ section.settings.request_otp_text }}
+      </button>
+      <p class="register-link">
+        New here? <a href="javascript:void(0)" id="registerNow">Register</a>
+      </p>
 
-document.querySelectorAll('.otp-login-form-wrapper').forEach(el => {
-  el.addEventListener('click', e => e.stopPropagation());
-});
+      <div id="otpSection" style="display:none">
+        <label>{{ section.settings.otp_label }}</label>
+        <div class="mobile-wrap" style="margin-bottom:10px;">
+          <span class="country-code">+91</span>
+          <input type="tel" id="otpMobile" placeholder="{{ section.settings.phone_placeholder }}" maxlength="10" readonly>
+          <button type="button" id="editMobile">✎</button>
+        </div>
+        <div class="otp-inputs">
+          <input maxlength="1"><input maxlength="1"><input maxlength="1"><input maxlength="1">
+        </div>
+        <span class="error-message" id="otpError"></span>
+        <button type="button" id="verifyOtp" class="btn-primary">
+          {{ section.settings.verify_otp_text }}
+        </button>
+        <p id="otp-timer">{{ section.settings.resend_text }}</p>
+      </div>
 
-function showError(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg;
-  el.style.display = 'block';
-}
+      <div class="signupSection" style="display:none">
+        <div class="registration-form-inputs">
+          <label>First Name</label>
+          <input type="text" id="regFirstName" placeholder="First Name" class="field-input" required>
+          <span class="error-message" id="firstNameError" style="display:none; color:red; font-size:12px; margin-top: 0; line-height: 1; margin-bottom: 16px;"></span>
+          
+          <label>Last Name</label>
+          <input type="text" id="regLastName" placeholder="Last Name" class="field-input" required>
+          <span class="error-message" id="lastNameError" style="display:none; color:red; font-size:12px; margin-top: 0; line-height: 1; margin-bottom: 16px;"></span>
+          
+          <label>Email Address</label>
+          <input type="email" id="regEmail" placeholder="Email" class="field-input" required>
+          <span class="error-message" id="emailError" style="display:none; color:red; font-size:12px; margin-top: 0; line-height: 1; margin-bottom: 16px;"></span>
+          
+          <label>Phone Number</label>
+          <div class="mobile-wrap">
+            <span class="country-code">+91</span>
+            <input type="tel" id="signupMobile" placeholder="Enter Phone Number" readonly>
+          </div>
+          <button type="button" id="completeRegistration" class="btn-primary">SPIN & CREATE ACCOUNT</button>
+        </div>
+      </div>
+    </form>
+    
+  </div>
+</div>
+<form id="shopify-auto-login-form" action="/account/login" method="post" style="display:none;">
+  <input type="hidden" name="form_type" value="customer_login">
+  <input type="hidden" name="utf8" value="✓">
+  <input type="hidden" name="return_to" id="loginReturnTo" value="">
+  <input type="email" name="customer[email]" id="ShopifyEmail">
+  <input type="password" name="customer[password]" id="ShopifyPassword">
+</form>
+<script> 
+    const spinPrizes = [
+      { label: "₹1,500 OFF", value: "1500_off", chance: 15 },
+      { label: "₹1,000 OFF", value: "1000_off", chance: 20 },
+      { label: "₹750 OFF", value: "750_off", chance: 40 },
+      { label: "Diamond Pendant", value: "diamond_pendant", chance: 2 },
+      { label: "₹5,000 OFF", value: "5000_off", chance: 22 },
+      { label: "₹10,000 OFF", value: "10000_off", chance: 1 }
+    ];
+    
+    // MAP YOUR WHEEL SEGMENTS TO PRIZES (adjust data-pos to match your actual segments)
+    const wheelSegmentMapping = {
+        "Gold Coin": { label: "₹1,500 OFF", value: "1500_off" },
+        "Gift": { label: "₹1,000 OFF", value: "1000_off" },
+        "Ring": { label: "₹750 OFF", value: "750_off" },
+        "Voucher": { label: "Diamond Pendant", value: "diamond_pendant" },
+        "Pendant": { label: "₹5,000 OFF", value: "5000_off" },
+        "Better Luck": { label: "₹10,000 OFF", value: "10000_off" }
+    };
 
-function hideError(id) {
-  const el = document.getElementById(id);
-  el.style.display = 'none';
-}
-
-function validateMobile(mobile) {
-  if (!mobile) return 'Please enter phone number';
-  if (!/^\d{10}$/.test(mobile)) return 'Enter valid 10 digit number';
-  return null;
-}
-
-function validateEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
-    ? null
-    : 'Enter valid email';
-}
-
-function validateName(val, name) {
-  if (!val) return `Enter ${name}`;
-  if (val.length < 2) return `${name} too short`;
-  return null;
-}
-
-document.getElementById('sendOtp')?.addEventListener('click', async () => {
-  const mobile = loginMobile.value.trim();
-  const err = validateMobile(mobile);
-  if (err) return showError('mobileError', err);
-
-  hideError('mobileError');
-
-  const res = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mobile })
-  });
-
-  const data = await res.json();
-  if (data.type === 'success') {
-    document.querySelector('.otp-number-wrapper').style.display = 'none';
-    sendOtp.style.display = 'none';
-    otpSection.style.display = 'block';
-    otpMobile.value = mobile;
-    startTimer();
-  }
-});
-
-document.getElementById('verifyOtp')?.addEventListener('click', async () => {
-  const otp = [...document.querySelectorAll('.otp-inputs input')]
-    .map(i => i.value).join('');
-
-  if (otp.length !== 4) return showError('otpError', 'Invalid OTP');
-
-  const mobile = otpMobile.value;
-
-  const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ otp, mobile })
-  });
-
-  const data = await res.json();
-
-  if (data.type === 'register') {
-    signupMobile.value = mobile;
-    showSignupWithSpinWheel();
-    return;
-  }
-
-  if (data.type === 'success') {
-    shopifyAutoLogin(data.credentials.email, data.credentials.password);
-  }
-});
-
-function getWeightedPrize() {
-  const total = spinPrizes.reduce((s, p) => s + p.chance, 0);
-  let rand = Math.random() * total;
-
-  for (let p of spinPrizes) {
-    if (rand < p.chance) return p;
-    rand -= p.chance;
-  }
-  return spinPrizes[0];
-}
-
-function getSegmentIndex(value) {
-  return wheelSegments.findIndex(seg => seg.value === value);
-}
-
-document.getElementById('completeRegistration')?.addEventListener('click', async () => {
-  const first = regFirstName.value.trim();
-  const last = regLastName.value.trim();
-  const email = regEmail.value.trim();
-
-  if (validateName(first, 'First name')) return showError('firstNameError', validateName(first, 'First name'));
-  if (validateName(last, 'Last name')) return showError('lastNameError', validateName(last, 'Last name'));
-  if (validateEmail(email)) return showError('emailError', validateEmail(email));
-
-  hideError('firstNameError');
-  hideError('lastNameError');
-  hideError('emailError');
-
-  completeRegistration.textContent = 'Spinning...';
-  completeRegistration.disabled = true;
-
-  const prize = getWeightedPrize();
-  const index = getSegmentIndex(prize.value);
-
-  /* ---- FORCE WHEEL TO THAT SEGMENT ---- */
-  const wheel = document.getElementById('spin-wheel-image');
-  const slices = wheelSegments.length;
-  const angle = 360 / slices;
-  const offset = angle / 2;
-
-  const rotation = 360 * 5 + index * angle + offset;
-
-  wheel.style.transition = 'transform 4s cubic-bezier(0.17,0.67,0.12,0.99)';
-  wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
-
-  setTimeout(async () => {
-    spinResult.value = prize.value;
-    await processRegistration(first, last, email, prize);
-  }, 4200);
-});
-
-async function processRegistration(first, last, email, prize) {
-  const mobile = signupMobile.value;
-  const otp = [...document.querySelectorAll('.otp-inputs input')]
-    .map(i => i.value).join('');
-
-  const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      mobile,
-      otp,
-      email,
-      first_name: first,
-      last_name: last,
-      won_prize: prize.value,
-      prize_label: prize.label
-    })
-  });
-
-  const data = await res.json();
-
-  if (data.type === 'success') {
-    alert(`🎉 You won ${prize.label}`);
-    shopifyAutoLogin(data.credentials.email, data.credentials.password);
-  }
-}
-
-function shopifyAutoLogin(email, password) {
-  loginReturnTo.value = location.pathname + location.search;
-  ShopifyEmail.value = email;
-  ShopifyPassword.value = password;
-  document.getElementById('shopify-auto-login-form').submit();
-}
-
-function showSignupWithSpinWheel() {
-  document.querySelector('.signupSection').style.display = 'block';
-  document.querySelector('.otp-number-wrapper').style.display = 'none';
-  document.getElementById('otpSection').style.display = 'none';
-  document.querySelector('.otp-login-form-wrapper').classList.add('signup-active');
-}
-
-function resetToLoginView() {
-  document.querySelector('.otp-login-form-wrapper').classList.remove('signup-active');
-  document.querySelector('.signupSection').style.display = 'none';
-  document.querySelector('.otp-number-wrapper').style.display = 'block';
-  document.getElementById('otpSection').style.display = 'none';
-
-  const wheel = document.getElementById('spin-wheel-image');
-  wheel.style.transition = 'none';
-  wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-}
-
-let timer = 30, interval;
-function startTimer() {
-  clearInterval(interval);
-  interval = setInterval(() => {
-    otpTimer.textContent = `Resend OTP in 00:${timer--}`;
-    if (timer < 0) {
-      clearInterval(interval);
-      otpTimer.innerHTML = `<a onclick="resendOtp()">Resend OTP</a>`;
+    function openloginPopup(id) {
+        document.getElementById(id).style.display = 'flex';
     }
-  }, 1000);
-}
+    
+    function closeloginPopup(e, id) {
+        if (typeof id === 'undefined') id = e;
+        document.getElementById(id).style.display = 'none';
+        resetToLoginView();
+    }
 
-async function resendOtp() {
-  await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mobile: otpMobile.value })
-  });
-  timer = 30;
-  startTimer();
-}
+    document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
+        el.addEventListener('click', (e) => e.stopPropagation());
+    });
+
+    function showError(elementId, message) {
+        const errorElement = document.getElementById(elementId);
+        errorElement.textContent = message;
+        errorElement.style.display = 'block';
+        const inputId = elementId.replace('Error', '');
+        const inputElement = document.getElementById(inputId);
+        if (inputElement) inputElement.style.border = '1px solid red';
+    }
+
+    function hideError(elementId) {
+        const errorElement = document.getElementById(elementId);
+        errorElement.style.display = 'none';
+        const inputId = elementId.replace('Error', '');
+        const inputElement = document.getElementById(inputId);
+        if (inputElement) inputElement.style.border = '';
+    }
+
+    function validateMobile(mobile) {
+        if (!mobile) return 'Please enter your phone number';
+        if (mobile.length !== 10) return 'Phone number must be 10 digits';
+        if (!/^\d+$/.test(mobile)) return 'Phone number must contain only digits';
+        return null;
+    }
+
+    function validateEmail(email) {
+        if (!email) return 'Please enter your email address';
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) return 'Please enter a valid email address';
+        return null;
+    }
+
+    function validateName(name, fieldName) {
+        if (!name) return `Please enter your ${fieldName}`;
+        if (name.length < 2) return `${fieldName} must be at least 2 characters`;
+        return null;
+    }
+
+    const emailInput = document.getElementById('regEmail');
+    if (emailInput) {
+        emailInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.toLowerCase();
+        });
+    }
+
+    // OTP SEND
+    const sendBtn = document.getElementById('sendOtp');
+    if (sendBtn) {
+        sendBtn.addEventListener('click', async () => {
+            const mobile = document.getElementById('loginMobile').value.replace(/\s+/g,'').trim();
+            const mobileError = validateMobile(mobile);
+            if (mobileError) {
+                showError('mobileError', mobileError);
+                return;
+            }
+            hideError('mobileError');
+
+            const res = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mobile })
+            });
+
+            const data = await res.json();
+            if (data.type === 'success') {
+                document.querySelector('.otp-number-wrapper').style.display = 'none';
+                document.getElementById('sendOtp').style.display = 'none';
+                document.getElementById('otpSection').style.display = 'block';
+                document.getElementById('otpMobile').value = mobile;
+                document.querySelector('.register-link').style.display = 'block';
+                startTimer();
+            } else {
+                showError('mobileError', data.message || 'Failed to send OTP.');
+            }
+        });
+    }
+
+    const verifyBtn = document.getElementById('verifyOtp');
+    if (verifyBtn) {
+        verifyBtn.addEventListener('click', async () => {
+            const otp = [...document.querySelectorAll('.otp-inputs input')].map(i => i.value).join('');
+            const mobile = document.getElementById('otpMobile').value.replace(/\s+/g,'').trim();
+
+            if (otp.length !== 4) {
+                showError('otpError', 'Please enter a valid 4-digit OTP');
+                return;
+            }
+            hideError('otpError');
+            verifyBtn.textContent = 'Verifying...';
+            verifyBtn.disabled = true;
+
+            try {
+                const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ otp, mobile })
+                });
+
+                const data = await res.json();
+                
+                if (data.type === 'success' && data.credentials) {
+                    shopifyAutoLogin(data.credentials.email, data.credentials.password);
+                    return;
+                }
+
+                if (data.type === 'register') {
+                    document.getElementById('signupMobile').value = mobile;
+                    showSignupWithSpinWheel();
+                    verifyBtn.textContent = 'VERIFY OTP';
+                    verifyBtn.disabled = false;
+                    return;
+                }
+                showError('otpError', data.msg || 'Invalid OTP');
+            } catch (err) {
+                console.error(err);
+                showError('otpError', 'Something went wrong');
+            }
+            verifyBtn.textContent = 'VERIFY OTP';
+            verifyBtn.disabled = false;
+        });
+    }
+
+    function getWeightedPrize() {
+        let totalChance = spinPrizes.reduce((sum, prize) => sum + prize.chance, 0);
+        let random = Math.random() * totalChance;
+        
+        for (let i = 0; i < spinPrizes.length; i++) {
+            if (random < spinPrizes[i].chance) {
+                return { prize: spinPrizes[i], index: i };
+            }
+            random -= spinPrizes[i].chance;
+        }
+        return { prize: spinPrizes[0], index: 0 };
+    }
+    
+    // DETECT WHICH SEGMENT THE POINTER IS ACTUALLY POINTING AT
+    function detectWheelResult() {
+        const wheel = document.getElementById('spin-wheel-image');
+        const detectorOverlay = document.getElementById('wheel-detector-overlay');
+        
+        if (!wheel || !detectorOverlay) return null;
+        
+        // Get the current rotation of the wheel
+        const transform = window.getComputedStyle(wheel).transform;
+        let rotation = 0;
+        
+        if (transform !== 'none') {
+            const values = transform.split('(')[1].split(')')[0].split(',');
+            const a = values[0];
+            const b = values[1];
+            rotation = Math.round(Math.atan2(b, a) * (180 / Math.PI));
+        }
+        
+        // Normalize rotation to 0-360
+        rotation = ((rotation % 360) + 360) % 360;
+        
+        // Apply the same rotation to the detector overlay
+        detectorOverlay.style.transform = `translate(-50%, -50%) rotate(${rotation}deg)`;
+        
+        // Get all segments from the detector overlay
+        const segments = detectorOverlay.querySelectorAll('.popup_sec');
+        const totalSegments = segments.length;
+        const segmentAngle = 360 / totalSegments;
+        
+        // Pointer is at top (0 degrees), find which segment is there
+        // Account for pointer offset
+        const pointerAngle = 0; // Adjust if your pointer is not at exact top
+        
+        for (let i = 0; i < segments.length; i++) {
+            const segmentStartAngle = i * segmentAngle;
+            const segmentEndAngle = (i + 1) * segmentAngle;
+            
+            // Check if pointer angle falls within this segment
+            if (pointerAngle >= segmentStartAngle && pointerAngle < segmentEndAngle) {
+                const dataPos = segments[i].getAttribute('data-pos');
+                return wheelSegmentMapping[dataPos] || null;
+            }
+        }
+        
+        // Fallback: use first segment
+        const firstSegmentPos = segments[0]?.getAttribute('data-pos');
+        return wheelSegmentMapping[firstSegmentPos] || null;
+    }
+
+    const regBtn = document.getElementById('completeRegistration');
+    
+    if (regBtn) {
+        regBtn.addEventListener('click', async () => {
+            const firstName = document.getElementById('regFirstName').value.trim();
+            const lastName = document.getElementById('regLastName').value.trim();
+            const email = document.getElementById('regEmail').value.trim();
+            
+            let hasError = false;
+            if (validateName(firstName, 'first name')) { showError('firstNameError', validateName(firstName, 'first name')); hasError = true; } else hideError('firstNameError');
+            if (validateName(lastName, 'last name')) { showError('lastNameError', validateName(lastName, 'last name')); hasError = true; } else hideError('lastNameError');
+            if (validateEmail(email)) { showError('emailError', validateEmail(email)); hasError = true; } else hideError('emailError');
+
+            if (hasError) return;
+
+            regBtn.textContent = 'Spinning...';
+            regBtn.disabled = true;
+            
+            const result = getWeightedPrize();
+            const prizeIndex = result.index;
+
+            const wheel = document.getElementById('spin-wheel-image');
+            const totalSegments = 6; 
+            const sliceAngle = 360 / totalSegments;
+
+            const extraSpins = 360 * 5;
+            const targetRotation = prizeIndex * sliceAngle;
+            const pointerOffset = 30;
+            const rotation = extraSpins + targetRotation + pointerOffset;
+
+            if (wheel) {
+                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+                wheel.style.transform = `translate(-50%, -50%) rotate(-${rotation}deg)`;
+            }
+
+            setTimeout(async () => {
+                // DETECT THE ACTUAL RESULT FROM THE WHEEL POSITION
+                const detectedPrize = detectWheelResult();
+                const wonPrize = detectedPrize || result.prize;
+                
+                console.log('Calculated prize:', result.prize);
+                console.log('Detected prize from wheel:', wonPrize);
+                
+                document.getElementById('spinResult').value = wonPrize.value;
+                await processRegistration(firstName, lastName, email, wonPrize);
+            }, 4200); 
+        });
+    }
+
+    async function processRegistration(firstName, lastName, email, prizeData) {
+        const mobile = document.getElementById('signupMobile').value.trim();
+        const otp = [...document.querySelectorAll('.otp-inputs input')].map(i => i.value).join('');
+        const regBtn = document.getElementById('completeRegistration');
+
+        regBtn.textContent = 'Creating Account...';
+
+        try {
+            const res = await fetch(
+                'https://otp-verification-385594025448.asia-south1.run.app', 
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        mobile: mobile,
+                        otp: otp,
+                        email: email,
+                        first_name: firstName,
+                        last_name: lastName,
+                        won_prize: prizeData.value,
+                        prize_label: prizeData.label
+                    })
+                }
+            );
+
+            const data = await res.json();
+
+            if (data.type === 'success' && data.credentials) {
+                alert(`🎉 Congratulations! You won ${prizeData.label}! Your account has been created.`);
+                
+                window.dataLayer = window.dataLayer || [];
+                dataLayer.push({
+                    event: 'signup',
+                    user: {
+                        name: firstName + ' ' + lastName,
+                        email: email,
+                        mobile: mobile,
+                        signupoffer: prizeData.label
+                    }
+                });
+                
+                shopifyAutoLogin(data.credentials.email, data.credentials.password);
+            } else {
+                showError('emailError', data.msg || 'Registration failed.');
+                regBtn.textContent = 'SPIN & CREATE ACCOUNT';
+                regBtn.disabled = false;
+            }
+        } catch (error) {
+            console.error('Registration Error:', error);
+            showError('emailError', 'Connection error. Please try again.');
+            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
+            regBtn.disabled = false;
+        }
+    }
+
+    function shopifyAutoLogin(email, password) {
+        var currentPath = window.location.pathname + window.location.search;
+        document.getElementById("loginReturnTo").value = currentPath;
+        document.getElementById("ShopifyEmail").value = email;
+        document.getElementById("ShopifyPassword").value = password;
+        document.getElementById("shopify-auto-login-form").submit();
+    }
+
+    function showSignupWithSpinWheel() {
+        const wrapper = document.querySelector('.otp-login-form-wrapper');
+        if (!wrapper) return;
+        document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'none');
+        document.getElementById('sendOtp')?.style.setProperty('display', 'none');
+        document.getElementById('otpSection')?.style.setProperty('display', 'none');
+        document.querySelector('.signupSection')?.style.setProperty('display', 'block');
+        document.querySelector('.register-link')?.style.setProperty('display', 'none');
+        wrapper.classList.add('signup-active');
+    }
+
+    function resetToLoginView() {
+        const wrapper = document.querySelector('.otp-login-form-wrapper');
+        if (!wrapper) return;
+        
+        wrapper.classList.remove('signup-active');
+        document.querySelector('.signupSection')?.style.setProperty('display', 'none');
+        document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
+        document.getElementById('sendOtp')?.style.setProperty('display', 'block');
+        document.getElementById('otpSection')?.style.setProperty('display', 'none');
+        
+        const wheel = document.getElementById('spin-wheel-image');
+        if (wheel) {
+            wheel.style.transition = 'none';
+            wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+            
+            setTimeout(() => {
+                wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+            }, 50);
+        }
+        
+        document.getElementById('regFirstName').value = '';
+        document.getElementById('regLastName').value = '';
+        document.getElementById('regEmail').value = '';
+        document.querySelectorAll('.otp-inputs input').forEach(input => input.value = '');
+        
+        hideError('firstNameError');
+        hideError('lastNameError');
+        hideError('emailError');
+        hideError('mobileError');
+        hideError('otpError');
+        
+        const regBtn = document.getElementById('completeRegistration');
+        if (regBtn) {
+            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
+            regBtn.disabled = false;
+        }
+    }
+    
+    const otpInputs = document.querySelectorAll('.otp-inputs input');
+    otpInputs.forEach((input, index) => {
+        input.addEventListener('input', e => {
+            const value = e.target.value.replace(/\D/g, '');
+            e.target.value = value;
+            if (value && index < otpInputs.length - 1) otpInputs[index + 1].focus();
+        });
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Backspace' && !e.target.value && index > 0) otpInputs[index - 1].focus();
+        });
+    });
+
+    let timer = 30;
+    let timerInterval;
+    function startTimer() {
+        timer = 30;
+        clearInterval(timerInterval);
+        timerInterval = setInterval(() => {
+            let min = Math.floor(timer / 60);
+            let sec = timer % 60;
+            document.getElementById('otp-timer').innerText = `Resend OTP in ${min}:${sec < 10 ? '0' + sec : sec}`;
+            if (timer <= 0) {
+                clearInterval(timerInterval);
+                document.getElementById('otp-timer').innerHTML = `<a href="javascript:void(0)" onclick="resendOtp()">Resend OTP</a>`;
+            }
+            timer--;
+        }, 1000);
+    }
+    
+    async function resendOtp() {
+        const mobile = document.getElementById('otpMobile').value.trim();
+        await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mobile })
+        });
+        document.getElementById('otp-timer').innerText = "Resend OTP in 00:30";
+        startTimer();
+    }
 </script>
-
 <style>
    .otp-login-form-wrapper {background-color: #FFFEFC; padding: 0 12px 0 0; border-radius: 12px; box-shadow: 0 0 10px #0000004d; max-width: 800px; height: 500px; width: 90%; text-align: left; position: relative;}
    .login-pop-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;justify-content:center;align-items:center;z-index:9999999;  background-color: #00000080; transition: display .3s; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);}
