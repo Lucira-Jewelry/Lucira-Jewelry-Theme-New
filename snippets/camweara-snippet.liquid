@@ -120,7 +120,7 @@
 
 
 
-
+{% comment %} 
 
  
 {% assign is_product_available = product.available %}
@@ -428,6 +428,512 @@
 
     // Transform the tryonButton after it's loaded
     setTimeout(transformTryOnButton, 500);
+
+    // Code for the second try on button which is below the add to cart
+    getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
+      .then((skusList) => {
+        console.log("all skus", skusList);
+        if (skusList.includes(productSKUTryOn)){
+          document.getElementById("second-tryon-button").style.display = "block";
+          document.getElementById("virtual-try-on-content").style.display = "flex";
+
+          // Also transform the second button if it exists with id="tryonButton" in that section
+          setTimeout(() => {
+            const secondTryonButton = document.querySelector('#second-tryon-button #tryonButton, #virtual-try-on-content #tryonButton');
+            if (secondTryonButton) {
+              // Clone the transformation for second button
+              transformTryOnButton();
+            }
+          }, 500);
+        }
+      });
+  }
+
+  document.addEventListener("DOMContentLoaded", initTryOnButton);
+</script> {% endcomment %}
+
+{% assign is_product_available = product.available %}
+{% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
+
+<script>
+    var productSKUTryOn = '{{ sku_tryon_pdp }}';
+
+  function onTryOnBuynowclick(skuReceived){
+    console.log("buynow clicked");
+     if (skuReceived === productSKUTryOn){
+        //buynow clicked for first product
+        document.querySelector('.button button--secondary main-product_atc-btn').click();   
+      }else{
+        //go to pdp
+          getProductUrlFromSearch(skuReceived).then(handle => {
+            if (!handle) return;
+            const url = `${window.location.origin}/products/${handle}`;
+            window.location.href = url;
+          });
+      }
+  }
+
+  async function getProductUrlFromSearch(sku) {
+      const res = await fetch(
+        `/search?type=product&q=${encodeURIComponent(sku)}&options[prefix]=last`
+      );
+
+      const html = await res.text();
+
+      // 1. Parse HTML
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      // 2. Find script containing `var meta`
+      const scripts = Array.from(doc.querySelectorAll("script"));
+      const metaScript = scripts.find(s => s.textContent.includes("var meta"));
+
+      if (!metaScript) return null;
+      
+      // 3. Extract object text
+      const match = metaScript.textContent.match(
+        /var\s+meta\s*=\s*({[\s\S]*?});/
+      );
+
+      if (!match) return null;
+
+      // 4. Parse JSON
+      const meta = JSON.parse(match[1]);
+
+      // 5. Extract first product handle
+      return meta?.products?.[0]?.handle || null;
+}
+
+</script>
+
+<style>
+    /* Base animation styles for tryonButton - Apply to both desktop and mobile */
+    #tryonButton {
+        position: relative !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        z-index: 22 !important;
+        width: 45px !important;
+        height: 45px !important;
+        min-width: 45px !important;
+        min-height: 45px !important;
+        left: 0 !important;
+        top: 0 !important;
+    }
+
+    .tryon-button-wrapper {
+        position: relative;
+        width: 45px;
+        height: 45px;
+    }
+
+    .tryon-button-container {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+    }
+
+    .tryon-sliding-panel {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 45px;
+        height: 45px;
+        background: #F4F0F0 !important;
+        border-radius: 50% !important;
+        display: flex;
+        align-items: center;
+        justify-content: flex-start;
+        padding-left: 45px;
+        padding-right: 15px;
+        border: 1px solid #1a1a1a !important;
+        clip-path: circle(50% at 22.5px 22.5px);
+        transition: clip-path 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55), 
+                    width 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        z-index: 1;
+        cursor: pointer;
+        box-sizing: border-box;
+    }
+
+    .tryon-sliding-panel.expanded {
+        clip-path: circle(150% at 22.5px 22.5px);
+        width: 170px;
+    }
+
+    .tryon-icon-circle {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 45px;
+        height: 45px;
+        cursor: pointer;
+        z-index: 3;
+    }
+
+    .tryon-icon-circle svg {
+        width: 100%;
+        height: 100%;
+        display: block;
+    }
+
+    .tryon-text-content {
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        white-space: nowrap;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        margin-left: 10px;
+    }
+
+    .tryon-sliding-panel.expanded .tryon-text-content {
+        opacity: 1;
+        transition-delay: 0.25s;
+    }
+
+    .tryon-text-content span {
+        font-size: 14px;
+        font-weight: 500;
+        color: #000;
+        letter-spacing: 0.5px;
+        font-family: 'Futura Std', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    /* Hide the default button content */
+    #tryonButton > *:not(.tryon-button-wrapper) {
+        display: none !important;
+    }
+
+    /* Mobile button - this needs to override desktop styles */
+    #tryonButton.MBtryonbutton,
+    #tryonButton[class*="MBtryonbutton"],
+    #tryonButton[style*="left: 10px"] {
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        margin: 8px !important;
+        left: 10px !important;
+    }
+    
+    #tryonButton.MBtryonbutton .tryon-button-wrapper,
+    #tryonButton[class*="MBtryonbutton"] .tryon-button-wrapper,
+    #tryonButton[style*="left: 10px"] .tryon-button-wrapper {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    #tryonButton.MBtryonbutton .tryon-sliding-panel,
+    #tryonButton[class*="MBtryonbutton"] .tryon-sliding-panel,
+    #tryonButton[style*="left: 10px"] .tryon-sliding-panel {
+        width: 40px !important;
+        height: 40px !important;
+        padding-left: 40px !important;
+        clip-path: circle(50% at 20px 20px) !important;
+    }
+    
+    #tryonButton.MBtryonbutton .tryon-sliding-panel.expanded,
+    #tryonButton[class*="MBtryonbutton"] .tryon-sliding-panel.expanded,
+    #tryonButton[style*="left: 10px"] .tryon-sliding-panel.expanded {
+        clip-path: circle(150% at 20px 20px) !important;
+        width: 140px !important;
+    }
+    
+    #tryonButton.MBtryonbutton .tryon-icon-circle,
+    #tryonButton[class*="MBtryonbutton"] .tryon-icon-circle,
+    #tryonButton[style*="left: 10px"] .tryon-icon-circle {
+        width: 40px !important;
+        height: 40px !important;
+    }
+    
+    #tryonButton.MBtryonbutton .tryon-text-content span,
+    #tryonButton[class*="MBtryonbutton"] .tryon-text-content span,
+    #tryonButton[style*="left: 10px"] .tryon-text-content span {
+        font-size: 12px !important;
+    }
+
+    /* Mobile media query for responsive adjustments */
+    @media (max-width: 768px) {
+        #tryonButton:not(.tryon-button-transformed) {
+            width: 40px !important;
+            height: 40px !important;
+            min-width: 40px !important;
+            min-height: 40px !important;
+            margin: 8px !important;
+            left: 10px !important;
+        }
+        
+        /* If our transformation hasn't run yet, adjust the default button */
+        #tryonButton:not(.tryon-button-transformed) i.fa-camera {
+            font-size: 16px !important;
+            line-height: 40px !important;
+        }
+    }
+</style>
+
+<script src="{{ 'camweara-api.js' | asset_url }}" async></script>
+
+<script>
+  function initTryOnButton() {
+    if (typeof loadTryOnButton !== "function") {
+      setTimeout(initTryOnButton, 100);
+      return;
+    }
+
+    loadTryOnButton({
+      psku: "{{ sku_tryon_pdp }}",
+      page: "product",
+      regionId: "2",
+      company: "luciraonline",
+      prependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      MBprependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      styles: {
+        tryonbutton: {
+          backgroundColor: "transparent",
+          color: "black",
+          border: "none",
+          borderRadius: "50%",
+          margin: "10px",
+          left: "0%",
+          position: "absolute",
+          zIndex: "22",
+          width: "45px",
+          height: "45px",
+          padding: "0",
+          minWidth: "45px",
+          minHeight: "45px"
+        },
+        MBtryonbutton: {
+          width: "40px",
+          height: "40px",
+          minWidth: "40px",
+          minHeight: "40px",
+          margin: "8px",
+          left: "10px",
+          padding: "0",
+          backgroundColor: "transparent",
+          border: "none",
+          borderRadius: "50%"
+        }
+      },
+      prodRecommendation: "true",
+      buynowCallback: "onTryOnBuynowclick",
+      tryonButtonData: {
+        text: "Try Them On",
+        faIcon: "fa fa-camera"
+      },
+      buynow: {
+        enable: "{{ is_product_available }}"
+      }
+    });
+
+    // Function to transform the tryonButton into animated version
+    function transformTryOnButton() {
+      const tryonButton = document.getElementById('tryonButton');
+      if (!tryonButton) {
+        // Try again if button not found yet
+        setTimeout(transformTryOnButton, 100);
+        return;
+      }
+
+      // Check if already transformed
+      if (tryonButton.classList.contains('tryon-button-transformed')) {
+        return;
+      }
+
+      // Store the original onclick handler
+      const originalOnClick = tryonButton.onclick;
+      const originalClass = tryonButton.className;
+      const originalStyle = tryonButton.getAttribute('style') || '';
+      
+      // Determine if this is mobile button
+      const isMobileButton = originalClass.includes('MBtryonbutton') || 
+                            originalStyle.includes('left: 10px') ||
+                            window.innerWidth <= 768;
+      
+      // Create animated button structure
+      const buttonWrapper = document.createElement('div');
+      buttonWrapper.className = 'tryon-button-wrapper';
+      
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'tryon-button-container';
+      
+      const slidingPanel = document.createElement('div');
+      slidingPanel.className = 'tryon-sliding-panel';
+      slidingPanel.id = 'animatedTryOnPanel';
+      
+      const textContent = document.createElement('div');
+      textContent.className = 'tryon-text-content';
+      textContent.innerHTML = '<span>Try Them On</span>';
+      
+      const iconCircle = document.createElement('div');
+      iconCircle.className = 'tryon-icon-circle';
+      
+      // SVG with viewBox for scaling
+      iconCircle.innerHTML = `
+        <svg viewBox="0 0 54 54" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+            <rect x="0.375" y="0.375" width="53.2501" height="53.25" rx="26.625" fill="white" fill-opacity="0.2"/>
+            <rect x="0.375" y="0.375" width="53.2501" height="53.25" rx="26.625" stroke="black" stroke-width="0.75"/>
+            <path d="M16.125 22.5982L19.3256 19.4557M16.125 22.5982L26.7547 36M16.125 22.5982L22.1758 25.0244M19.3256 19.4557L22.9 18H31.0767L35.2117 19.4557M19.3256 19.4557L23.3906 20.9114M35.2117 19.4557L37.875 22.5982M35.2117 19.4557L30.8898 20.9114M37.875 22.5982L26.7547 36M37.875 22.5982L31.9644 25.0244M26.7547 36L31.9644 25.0244M26.7547 36L22.1758 25.0244M31.9644 25.0244L30.8898 20.9114M31.9644 25.0244H22.1758M30.8898 20.9114H23.3906M23.3906 20.9114L22.1758 25.0244" stroke="black" stroke-width="1.24143"/>
+            <rect x="12" y="33" width="0.75" height="9" fill="black"/>
+            <rect x="12" y="42" width="0.75" height="9" transform="rotate(-90 12 42)" fill="black"/>
+            <rect width="0.75" height="9" transform="matrix(1 0 0 -1 11.9999 21)" fill="black"/>
+            <rect width="0.75" height="9" transform="matrix(0 1 1 0 12 12)" fill="black"/>
+            <rect x="42.0001" y="21" width="0.75" height="9" transform="rotate(180 42.0001 21)" fill="black"/>
+            <rect x="42" y="12" width="0.75" height="9" transform="rotate(90 42 12)" fill="black"/>
+            <rect width="0.75" height="9" transform="matrix(-1 0 0 1 42 33)" fill="black"/>
+            <rect width="0.75" height="9" transform="matrix(0 -1 -1 0 42 42)" fill="black"/>
+        </svg>
+      `;
+      
+      slidingPanel.appendChild(textContent);
+      buttonContainer.appendChild(slidingPanel);
+      buttonContainer.appendChild(iconCircle);
+      buttonWrapper.appendChild(buttonContainer);
+      
+      // Clear existing content and add animated button
+      tryonButton.innerHTML = '';
+      tryonButton.appendChild(buttonWrapper);
+      
+      // Mark as transformed
+      tryonButton.classList.add('tryon-button-transformed');
+      
+      // If it's a mobile button, add the mobile class
+      if (isMobileButton) {
+        tryonButton.classList.add('MBtryonbutton');
+        // Also add inline styles for mobile
+        tryonButton.style.width = '40px';
+        tryonButton.style.height = '40px';
+        tryonButton.style.minWidth = '40px';
+        tryonButton.style.minHeight = '40px';
+        tryonButton.style.left = '10px';
+        tryonButton.style.margin = '8px';
+      }
+      
+      // Restore the original onclick handler to the new elements
+      if (originalOnClick) {
+        slidingPanel.onclick = originalOnClick;
+        iconCircle.onclick = originalOnClick;
+      } else {
+        // If no onclick, find and preserve any event listeners
+        const originalButton = tryonButton.cloneNode(true);
+        const clickEvent = originalButton.onclick;
+        if (clickEvent) {
+          slidingPanel.onclick = clickEvent;
+          iconCircle.onclick = clickEvent;
+        }
+      }
+      
+      // Start animation
+      startButtonAnimation(slidingPanel);
+    }
+
+    // Function to start animation
+    function startButtonAnimation(panel) {
+      if (!panel) return;
+      
+      function animateButton() {
+        panel.classList.add('expanded');
+        
+        setTimeout(() => {
+          panel.classList.remove('expanded');
+        }, 2000);
+      }
+      
+      // Start animation after delay
+      setTimeout(() => {
+        animateButton();
+        
+        // Repeat animation
+        setInterval(() => {
+          animateButton();
+        }, 4000);
+      }, 1000);
+    }
+
+    // Transform the tryonButton after it's loaded
+    setTimeout(transformTryOnButton, 500);
+    
+    // Also check for mobile button after a delay
+    setTimeout(() => {
+      const tryonButton = document.getElementById('tryonButton');
+      if (tryonButton && !tryonButton.classList.contains('tryon-button-transformed')) {
+        transformTryOnButton();
+      }
+    }, 1000);
+
+    // Handle window resize
+    window.addEventListener('resize', function() {
+      const tryonButton = document.getElementById('tryonButton');
+      if (tryonButton && tryonButton.classList.contains('tryon-button-transformed')) {
+        if (window.innerWidth <= 768) {
+          tryonButton.classList.add('MBtryonbutton');
+          tryonButton.style.width = '40px';
+          tryonButton.style.height = '40px';
+          tryonButton.style.minWidth = '40px';
+          tryonButton.style.minHeight = '40px';
+          tryonButton.style.left = '10px';
+          tryonButton.style.margin = '8px';
+          
+          // Also update the inner elements
+          const wrapper = tryonButton.querySelector('.tryon-button-wrapper');
+          const panel = tryonButton.querySelector('.tryon-sliding-panel');
+          const icon = tryonButton.querySelector('.tryon-icon-circle');
+          
+          if (wrapper) {
+            wrapper.style.width = '40px';
+            wrapper.style.height = '40px';
+          }
+          if (panel) {
+            panel.style.width = '40px';
+            panel.style.height = '40px';
+            panel.style.paddingLeft = '40px';
+            panel.style.clipPath = 'circle(50% at 20px 20px)';
+          }
+          if (icon) {
+            icon.style.width = '40px';
+            icon.style.height = '40px';
+          }
+        } else {
+          tryonButton.classList.remove('MBtryonbutton');
+          tryonButton.style.width = '45px';
+          tryonButton.style.height = '45px';
+          tryonButton.style.minWidth = '45px';
+          tryonButton.style.minHeight = '45px';
+          tryonButton.style.left = '0';
+          tryonButton.style.margin = '10px';
+          
+          // Also update the inner elements
+          const wrapper = tryonButton.querySelector('.tryon-button-wrapper');
+          const panel = tryonButton.querySelector('.tryon-sliding-panel');
+          const icon = tryonButton.querySelector('.tryon-icon-circle');
+          
+          if (wrapper) {
+            wrapper.style.width = '45px';
+            wrapper.style.height = '45px';
+          }
+          if (panel) {
+            panel.style.width = '45px';
+            panel.style.height = '45px';
+            panel.style.paddingLeft = '45px';
+            panel.style.clipPath = 'circle(50% at 22.5px 22.5px)';
+          }
+          if (icon) {
+            icon.style.width = '45px';
+            icon.style.height = '45px';
+          }
+        }
+      }
+    });
 
     // Code for the second try on button which is below the add to cart
     getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
