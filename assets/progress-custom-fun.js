@@ -19,17 +19,20 @@ function refreshStepIcons() {
 
 function renderUIForStep(stepNumber) {
   const step = parseInt(stepNumber);
-  
+
+  // Selectors for sections
   const caratSection = document.querySelector('.carat-section');
   const productPopup = document.querySelector('#product-popup');
   const charmPanel = document.querySelector('.lucira-accessory-fullscreen');
   const overlay = document.querySelector('.popup-overlay');
-  
+
+  // Selectors for stepper elements
   const container = document.querySelector('.steps-container');
   const centerLabel = document.querySelector('.center-label');
   const step2 = document.querySelector('.step[data-step="2"]');
   const step4 = document.querySelector('.step[data-step="4"]');
 
+  // 1. CLEANUP: Hide everything before showing the correct state
   if (caratSection) caratSection.style.display = 'none';
   if (productPopup) {
     productPopup.style.display = 'none';
@@ -39,12 +42,13 @@ function renderUIForStep(stepNumber) {
   if (overlay) overlay.classList.remove('active');
   document.body.style.overflow = 'auto';
 
+  // 2. UPDATE STEP ICONS (Checks vs Numbers)
   const steps = document.querySelectorAll('.steps-container .step');
   steps.forEach(s => {
     const sNum = parseInt(s.dataset.step);
     if (sNum < step) {
       s.classList.add('is-complete');
-      s.dataset.svg = 'check'; 
+      s.dataset.svg = 'check';
     } else {
       s.classList.remove('is-complete');
       s.dataset.svg = 's' + sNum;
@@ -52,25 +56,29 @@ function renderUIForStep(stepNumber) {
     if (typeof renderStep === 'function') renderStep(s);
   });
 
+  // 3. FIX: MOVE LABEL & APPLY CSS
   if (centerLabel && container) {
     centerLabel.style.whiteSpace = 'nowrap';
     centerLabel.style.display = 'inline-block';
 
+    // THRESHOLD CHANGE: Use >= 3 so the label stays at the end for both Step 3 and 4
     if (step >= 3) {
       centerLabel.innerText = "SELECT YOUR CHARM";
       if (step4) {
         step4.insertAdjacentElement('afterend', centerLabel);
-        centerLabel.style.marginLeft = '-40px'; 
+        // This is the CSS to remove the space
+        centerLabel.style.marginLeft = '-40px';
       }
     } else {
       centerLabel.innerText = "SELECT YOUR STYLE";
       if (step2) {
         step2.insertAdjacentElement('afterend', centerLabel);
-        centerLabel.style.marginLeft = '0px'; 
+        centerLabel.style.marginLeft = '0px';
       }
     }
   }
 
+  // 4. ACTIVATE CURRENT VIEW
   switch (step) {
     case 1: window.location.href = '/pages/build-your-jewelry'; break;
     case 2: if (caratSection) caratSection.style.display = 'block'; break;
@@ -84,21 +92,33 @@ function renderUIForStep(stepNumber) {
       break;
     case 4:
       if (charmPanel) charmPanel.style.display = 'block';
+      // Trigger canvas resize logic if needed
       if (typeof proceedBtnClicked === 'function') proceedBtnClicked();
       break;
   }
 }
 
-function activeSlide(element) {
-  const step = element.getAttribute('data-step');
+function activeSlide(element, force = false) {
+  if (!element) return;
+  const step = parseInt(element.getAttribute('data-step'), 10);
+
+  // Guard: Only allow interaction if the step is already complete (green)
+  // or if we are forcing the change (e.g. clicking 'Select' on a product).
+  // Step 1 is always allowed.
+  if (!force && step > 1 && !element.classList.contains('is-complete')) {
+    return;
+  }
+
   renderUIForStep(step);
 }
 
+window.activeSlide = activeSlide;
+
 document.addEventListener('DOMContentLoaded', () => {
-  
+
   const caratExists = document.querySelector('.carat-section');
   if (caratExists) {
-    renderUIForStep(2); 
+    renderUIForStep(2);
   } else {
     refreshStepIcons();
   }
@@ -110,10 +130,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.body.addEventListener('click', function (e) {
-    const isProceed = e.target.closest('.proceed-button') || 
-                      (e.target.innerText && e.target.innerText.toUpperCase().includes('PROCEED'));
+    const isProceed = e.target.closest('.proceed-button') ||
+      (e.target.innerText && e.target.innerText.toUpperCase().includes('PROCEED'));
     if (isProceed) {
-      renderUIForStep(4); 
+      renderUIForStep(4);
     }
   });
 });
