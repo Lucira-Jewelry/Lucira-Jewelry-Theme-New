@@ -17,7 +17,7 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 1.35;
+  const SIZE_MULTIPLIER = 1.20;
 
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
@@ -26,11 +26,41 @@ window.MainBaseCharm = function () {
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
+  function injectSafeStyles() {
+    if (typeof document === 'undefined') return;
+    const id = 'lucira-visualiser-fix';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.innerHTML = `
+      @media (max-width: 768px) {
+        .variant-img-wrap {
+          width: 350px !important;
+          height: 353px !important;
+          margin: 0 auto !important;
+          display: block !important;
+        }
+        #vis-Visualiser_Canvas {
+          width: 350px !important;
+          height: 353px !important;
+        }
+        #vis-Visualiser_Canvas canvas {
+          width: 350px !important;
+          height: 353px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  injectSafeStyles();
+
   const MIN_ZOOM = 1.0;
   const MAX_ZOOM = 2.0;
 
-  const CHAIN_CENTER_Y_FACTOR = 0.42;
-  const CHAIN_RADIUS_FACTOR = 0.55;
+  // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
+  // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
+  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -759,12 +789,28 @@ window.MainBaseCharm = function () {
       container.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
 
+      const wrapper = container.closest('.variant-img-wrap');
+      if (isMobileLayout()) {
+        if (wrapper) {
+          wrapper.style.setProperty('width', '350px', 'important');
+          wrapper.style.setProperty('height', '353px', 'important');
+        }
+      } else {
+        // Desktop: Increase main container height to prevent cropping
+        if (wrapper) {
+          wrapper.style.setProperty('height', '470px', 'important');
+        }
+      }
+
       const rect = container.getBoundingClientRect();
-      const width = Math.max(300, rect.width || 400);
-      const height = width * 1.08;
+      let width = isMobileLayout() ? 350 : (rect.width || 440);
+      width = Math.max(300, width || 400);
+      // Desktop: Slightly decrease canvas layer height to 445px
+      const height = isMobileLayout() ? 353 : (width * (445 / 440));
 
       this.stageWidth = width;
       this.stageHeight = height;
+      this.stageSize = width;
 
       if (this.stage) this.stage.destroy();
       this._productRendered = false;
@@ -845,13 +891,17 @@ window.MainBaseCharm = function () {
     _resetToBaseView(animate = true) {
       const stage = this.stage;
       if (!stage) return;
+
+      const isMobile = isMobileLayout();
+      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
+
       const center = {
         x: this.stageSize / 2,
-        y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05),
+        y: this.stageSize * (centerYFactor - 0.05),
       };
 
-      const posX = center.x - center.x * 1;
-      const posY = center.y - center.y * 1;
+      const posX = 0;
+      const posY = 0;
 
       if (animate) {
         stage.to({
@@ -884,12 +934,17 @@ window.MainBaseCharm = function () {
       this.charmPosition = vis.product.charmPosition || DEFAULT_CHARM_POSITION;
       this.charmLayer.destroyChildren();
       this._placedCharmPositions = [];
+
+      // Force product re-render if stageSize is different from rendered size
       this._renderProductIfNeeded();
 
       if (Array.isArray(vis.charms) && vis.charms.length) {
         await this._placeCharmsSymmetric(vis.charms);
 
-        if (vis.charms.length < 3) {
+        // Always stay at base view on mobile to ensure same size every time
+        if (isMobileLayout()) {
+          this._resetToBaseView(true);
+        } else if (vis.charms.length < 3) {
           this.autoZoomToCharms();
         } else {
           this._resetToBaseView(true);
@@ -902,12 +957,17 @@ window.MainBaseCharm = function () {
     }
 
     _computeArcPositionsLinear(count) {
+      // Dynamic factors based on layout
+      const isMobile = isMobileLayout();
+      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
+      const radiusFactor = isMobile ? 0.45 : CHAIN_RADIUS_FACTOR;
+
       const center = {
         x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        y: this.stageSize * centerYFactor,
       };
 
-      const radius = Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR);
+      const radius = Math.max(8, this.stageSize * radiusFactor);
 
       this._chainGeom = { center, radius };
 
@@ -986,8 +1046,15 @@ window.MainBaseCharm = function () {
         const curveCorrection = distFromCenter * 0.04;
         const totalOverlap = baseOverlap + curveCorrection;
 
+        const isMobile = isMobileLayout();
         let x = chainX;
         let y = chainY + (size / 2) - (size * totalOverlap);
+
+        // Mobile specific: Hang directly from the chain point
+        if (isMobile) {
+          y = chainY;
+        }
+
         try {
           const img = await this.createImage(c.image || '');
           const kimg = new Konva.Image({
@@ -998,9 +1065,10 @@ window.MainBaseCharm = function () {
             height: size,
             listening: true,
             offsetX: size / 2,
-            offsetY: size / 2,
-            // Large hit area for mobile, standard for desktop
-            hitStrokeWidth: isMobileLayout() ? 80 : 0,
+            // Mobile: Pivot at top ring (approx 6% down). Desktop: Pivot at center.
+            offsetY: isMobile ? size * 0.06 : size / 2,
+            // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
+            hitStrokeWidth: 80,
           });
           let rotation = 0;
           if (i !== centerIndex) {
@@ -1011,6 +1079,13 @@ window.MainBaseCharm = function () {
               rotation = (270 - chainAngleDeg) * 0.8;
             }
             rotation = Math.max(-30, Math.min(30, rotation));
+          }
+
+          // Tilt only the leftmost and rightmost charms on mobile
+          if (isMobile) {
+            if (i !== 0 && i !== count - 1) {
+              rotation = 0;
+            }
           }
 
           kimg.rotation(rotation);
@@ -2655,4 +2730,4 @@ window.addEventListener('storage', (e) => {
   if (e.key === 'Carat-value') scheduleUpdateCounts();
 });
 
-window.updateCharmCounts = updateCountsUI;
+window.updateCharmCounts = updateCountsUI
