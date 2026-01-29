@@ -1,31 +1,3 @@
-{% comment %} {%- if card_product and card_product != empty -%}
-  {%- liquid
-    assign ratio = 1.4
-    if card_product.featured_media and media_aspect_ratio == 'portrait'
-      assign ratio = 0.72
-    elsif card_product.featured_media and media_aspect_ratio == 'adapt'
-      assign ratio = card_product.featured_media.aspect_ratio
-    endif
-    if ratio == 0 or ratio == null
-      assign ratio = 1.4
-    endif
-  -%}
-
-  {%- assign first_instock_variant = nil -%}
-  {%- for v in card_product.variants -%}
-    {%- if v.inventory_quantity > 0 -%}
-      {%- assign first_instock_variant = v -%}
-      {%- break -%}
-    {%- endif -%}
-  {%- endfor -%}
-
-  {%- if card_product.url contains '?' -%}
-    {%- assign variant_delim = '&' -%}
-  {%- else -%}
-    {%- assign variant_delim = '?' -%}
-  {%- endif -%} {% endcomment %}
-
-  
   {%- if card_product and card_product != empty -%}
   {%- liquid
     assign ratio = 1.4
@@ -490,23 +462,50 @@
         </div>
       </div>
 
-      {% assign any_instock = false %}
-      {% for v in card_product.variants %}
-        {% if v.available %}
-          {% if v.inventory_management %}
-            {% if v.inventory_quantity > 0 %}
-              {% assign any_instock = true %}
+      {%- comment -%} 
+        Fast Shipping Logic:
+        - For 9kt-collection: Show only if 9kt variants are in stock
+        - For other collections: Show if any variant is in stock
+      {%- endcomment -%}
+      {% assign show_fast_shipping = false %}
+      
+      {% if is_9kt_collection %}
+        {%- comment -%} For 9kt-collection, check if any 9kt variant is in stock {%- endcomment -%}
+        {% for v in card_product.variants %}
+          {% if v.available %}
+            {% assign variant_title_lower = v.title | downcase %}
+            {% if variant_title_lower contains '9kt' or variant_title_lower contains '9 kt' %}
+              {% if v.inventory_management %}
+                {% if v.inventory_quantity > 0 %}
+                  {% assign show_fast_shipping = true %}
+                  {% break %}
+                {% endif %}
+              {% else %}
+                {% assign show_fast_shipping = true %}
+                {% break %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {%- comment -%} For non-9kt collections, check if any variant is in stock {%- endcomment -%}
+        {% for v in card_product.variants %}
+          {% if v.available %}
+            {% if v.inventory_management %}
+              {% if v.inventory_quantity > 0 %}
+                {% assign show_fast_shipping = true %}
+                {% break %}
+              {% endif %}
+            {% else %}
+              {% assign show_fast_shipping = true %}
               {% break %}
             {% endif %}
-          {% else %}
-            {% assign any_instock = true %}
-            {% break %}
           {% endif %}
-        {% endif %}
-      {% endfor %}
+        {% endfor %}
+      {% endif %}
 
       <div class="card__content">
-        {% if card_product.metafields.custom.product_card_tags.value != blank or any_instock %}
+        {% if card_product.metafields.custom.product_card_tags.value != blank or show_fast_shipping %}
           <div class="product-collection-card-icons">
             <div class="carousel-container" data-product-id="{{ card_product.id }}">
               <div class="icon-container">
@@ -532,7 +531,7 @@
                   {% endif %}
                 {% endfor %}
 
-                {% if any_instock %}
+                {% if show_fast_shipping %}
                   <img
                     src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
                     class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
