@@ -1,4 +1,4 @@
-{% assign is_product_available = product.available %}
+{% comment %} {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
 <script>
@@ -116,9 +116,9 @@
 
   document.addEventListener("DOMContentLoaded", initTryOnButton);
 </script> 
+ {% endcomment %}
 
-
-{% comment %} {% assign is_product_available = product.available %}
+ {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
 <script>
@@ -172,6 +172,19 @@
 </script>
 
 <style>
+    /* Animation styles for tryonButton */
+    #tryonButton {
+        position: relative;
+        width: 54px !important;
+        height: 54px !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 10px !important;
+        overflow: visible !important;
+        z-index: 22 !important;
+    }
+
     .tryon-button-wrapper {
         position: relative;
         width: 54px;
@@ -192,13 +205,13 @@
         left: 0;
         top: 0;
         height: 54px;
-        background: #F4F0F0;
-        border-radius: 27px;
+        background: #F4F0F0 !important;
+        border-radius: 27px !important;
         display: flex;
         align-items: center;
         padding-left: 64px;
         padding-right: 20px;
-        border: 0.75px solid #000;
+        border: 0.75px solid #000 !important;
         width: 200px;
         clip-path: circle(27px at 27px 27px);
         transition: clip-path 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
@@ -230,6 +243,7 @@
         opacity: 0;
         transition: opacity 0.3s ease;
         white-space: nowrap;
+        pointer-events: none;
     }
 
     .tryon-sliding-panel.expanded .tryon-text-content {
@@ -245,15 +259,19 @@
         font-family: 'Futura Std', 'Futura', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
-    /* For the second tryon button */
-    #second-tryon-button .tryon-button-wrapper {
-        position: static;
-        margin: 0 auto;
+    /* Hide the default button content */
+    #tryonButton > *:not(.tryon-button-wrapper) {
+        display: none !important;
     }
-    
-    #second-tryon-button .tryon-button-container {
-        position: relative;
-        margin: 0 auto;
+
+    /* For mobile */
+    @media (max-width: 768px) {
+        #tryonButton {
+            width: 54px !important;
+            height: 54px !important;
+            left: 10px !important;
+            margin: 10px 0 !important;
+        }
     }
 </style>
 
@@ -266,8 +284,70 @@
       return;
     }
 
-    // Create animated button structure
-    function createAnimatedButton() {
+    loadTryOnButton({
+      psku: "{{ sku_tryon_pdp }}",
+      page: "product",
+      regionId: "2",
+      company: "luciraonline",
+      prependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      MBprependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      styles: {
+        tryonbutton: {
+          backgroundColor: "transparent",
+          color: "black",
+          border: "none",
+          borderRadius: "27px",
+          margin: "10px",
+          left: "0%",
+          position: "absolute",
+          zIndex: "22",
+          width: "54px",
+          height: "54px",
+          padding: "0"
+        },
+        MBtryonbutton: {
+          width: "54px",
+          height: "54px",
+          margin: "10px 0",
+          left: "10px",
+          padding: "0",
+          backgroundColor: "transparent",
+          border: "none"
+        }
+      },
+      prodRecommendation: "true",
+      buynowCallback: "onTryOnBuynowclick",
+      tryonButtonData: {
+        text: "Try Them On",
+        faIcon: "fa fa-camera"
+      },
+      buynow: {
+        enable: "{{ is_product_available }}"
+      }
+    });
+
+    // Function to transform the tryonButton into animated version
+    function transformTryOnButton() {
+      const tryonButton = document.getElementById('tryonButton');
+      if (!tryonButton) {
+        // Try again if button not found yet
+        setTimeout(transformTryOnButton, 100);
+        return;
+      }
+
+      // Check if already transformed
+      if (tryonButton.querySelector('.tryon-button-wrapper')) {
+        return;
+      }
+
+      // Store the original onclick handler
+      const originalOnClick = tryonButton.onclick;
+      
+      // Create animated button structure
       const buttonWrapper = document.createElement('div');
       buttonWrapper.className = 'tryon-button-wrapper';
       
@@ -305,7 +385,18 @@
       buttonContainer.appendChild(iconCircle);
       buttonWrapper.appendChild(buttonContainer);
       
-      return { wrapper: buttonWrapper, panel: slidingPanel };
+      // Clear existing content and add animated button
+      tryonButton.innerHTML = '';
+      tryonButton.appendChild(buttonWrapper);
+      
+      // Restore the original onclick handler to the new elements
+      if (originalOnClick) {
+        slidingPanel.onclick = originalOnClick;
+        iconCircle.onclick = originalOnClick;
+      }
+      
+      // Start animation
+      startButtonAnimation(slidingPanel);
     }
 
     // Function to start animation
@@ -329,90 +420,30 @@
           animateButton();
         }, 4000);
       }, 1000);
-      
-      // Add click handler
-      panel.addEventListener('click', function(e) {
-        e.stopPropagation();
-        // This will be handled by the loadTryOnButton callback
-        console.log('Try on button clicked');
-      });
     }
 
-    loadTryOnButton({
-      psku: "{{ sku_tryon_pdp }}",
-      page: "product",
-      regionId: "2",
-      company: "luciraonline",
-      prependButton: {
-        class: "product__media-list contains-media grid grid--peek list-unstyled"
-      },
-      MBprependButton: {
-        class: "product__media-list contains-media grid grid--peek list-unstyled"
-      },
-      styles: {
-        tryonbutton: {
-          display: "none" // Hide default button since we're using custom
-        },
-        MBtryonbutton: {
-          display: "none" // Hide default mobile button
-        }
-      },
-      prodRecommendation: "true",
-      buynowCallback: "onTryOnBuynowclick",
-      tryonButtonData: {
-        text: "Try Them On",
-        faIcon: "fa fa-camera"
-      },
-      buynow: {
-        enable: "{{ is_product_available }}"
-      },
-      // Custom button injection
-      customButton: true,
-      onButtonLoad: function() {
-        // Find where the button should be placed
-        const buttonTarget = document.querySelector('.product__media-list.contains-media');
-        if (buttonTarget) {
-          const { wrapper, panel } = createAnimatedButton();
-          
-          // Insert at the beginning of the media list
-          buttonTarget.insertBefore(wrapper, buttonTarget.firstChild);
-          
-          // Start animation
-          startButtonAnimation(panel);
-        }
-      }
-    });
+    // Transform the tryonButton after it's loaded
+    setTimeout(transformTryOnButton, 500);
 
     // Code for the second try on button which is below the add to cart
     getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
       .then((skusList) => {
         console.log("all skus", skusList);
         if (skusList.includes(productSKUTryOn)){
-          const secondButtonContainer = document.getElementById("second-tryon-button");
-          const tryOnContent = document.getElementById("virtual-try-on-content");
-          
-          if (secondButtonContainer && tryOnContent) {
-            secondButtonContainer.style.display = "block";
-            tryOnContent.style.display = "flex";
-            
-            // Create animated button for second position
-            const { wrapper, panel } = createAnimatedButton();
-            secondButtonContainer.innerHTML = '';
-            secondButtonContainer.appendChild(wrapper);
-            
-            // Start animation
-            startButtonAnimation(panel);
-            
-            // Add click handler for second button
-            panel.addEventListener('click', function() {
-              // Trigger the try-on functionality
-              console.log('Second try-on button clicked');
-              // You might want to trigger the same functionality as the first button
-            });
-          }
+          document.getElementById("second-tryon-button").style.display = "block";
+          document.getElementById("virtual-try-on-content").style.display = "flex";
+
+          // Also transform the second button if it exists with id="tryonButton" in that section
+          setTimeout(() => {
+            const secondTryonButton = document.querySelector('#second-tryon-button #tryonButton, #virtual-try-on-content #tryonButton');
+            if (secondTryonButton) {
+              // Clone the transformation for second button
+              transformTryOnButton();
+            }
+          }, 500);
         }
       });
   }
 
   document.addEventListener("DOMContentLoaded", initTryOnButton);
-</script> {% endcomment %}
+</script>
