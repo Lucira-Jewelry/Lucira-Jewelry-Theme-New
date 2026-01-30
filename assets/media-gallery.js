@@ -116,7 +116,7 @@ if (!customElements.get('media-gallery')) {
 }
 
 (function() {
-  const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
+  const COLOR_TOKENS = ["white", "yellow", "rose", "plt", "platinum"]
   const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
