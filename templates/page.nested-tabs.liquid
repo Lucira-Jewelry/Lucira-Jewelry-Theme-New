@@ -1,271 +1,135 @@
-{% comment %} {% layout 'theme' %}
-
-{% assign category_handle = page.handle %}
-{% assign current_category = metaobjects.category_page[category_handle] %}
-
-{% if current_category == blank %}
-  <div class="container" style="padding: 40px; text-align: center;">
-    <h1>Category not found</h1>
-    <p>Please check the page configuration.</p>
-  </div>
-{% else %}
-  {% comment %} Get all tabs for this category {% endcomment %}
-  {% assign all_tabs = metaobjects.tab_content.values %}
-  {% assign category_tabs = "" | split: "" %}
-  
-  {% comment %} Filter tabs by parent category {% endcomment %}
-  {% for tab in all_tabs %}
-    {% if tab.parent_category %}
-      {% assign parent = tab.parent_category %}
-      {% if parent.system.handle == current_category.system.handle 
-          or parent.title == current_category.title 
-          or parent.system.id == current_category.system.id %}
-        {% assign category_tabs = category_tabs | push: tab %}
-      {% endif %}
-    {% endif %}
-  {% endfor %}
-  
-  {% comment %} If no filtered tabs, show all tabs {% endcomment %}
-  {% if category_tabs.size == 0 %}
-    {% assign category_tabs = all_tabs %}
-  {% endif %}
-  
-  {% comment %} Get active tab from URL {% endcomment %}
-  {% assign url_search = request.search %}
-  {% assign url_tab = '' %}
-  
-  {% if url_search contains 'tab=' %}
-    {% assign url_parts = url_search | remove: '?' | split: '&' %}
-    {% for part in url_parts %}
-      {% if part contains 'tab=' %}
-        {% assign url_tab = part | split: '=' | last %}
-        {% break %}
-      {% endif %}
-    {% endfor %}
-  {% endif %}
-  
-  {% assign default_tab = current_category.default_tab_slug | default: category_tabs.first.tab_slug %}
-  {% assign active_tab_slug = url_tab | default: default_tab %}
-  {% assign active_tab_slug_lower = active_tab_slug | downcase %}
-  
-  {% comment %} Store data for JavaScript {% endcomment %}
-  {% comment %} <script type="application/json" id="tabs-data">
-    {
-      "category": {
-        "title": "{{ current_category.title | escape }}",
-        "handle": "{{ current_category.system.handle | escape }}"
-      },
-      "tabs": [
-        {% for tab in category_tabs %}
-          {
-            "id": "tab-{{ forloop.index0 }}",
-            "title": "{{ tab.title | escape }}",
-            "slug": "{{ tab.tab_slug | escape }}",
-            "header": "{{ tab.header | default: tab.title | escape }}",
-            "description": "{{ tab.description | escape | newline_to_br }}",
-            "content_image": "{% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | escape }}{% endif %}",
-            "cta_text": "{{ tab.cta_text | escape }}",
-            "cta_link": "{{ tab.cta_link | escape }}",
-            "banner_image": "{% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | escape }}{% endif %}",
-            "banner_title": "{{ tab.banner_title | default: tab.header | default: tab.title | escape }}",
-            "related_blogs": [
-              {% for article_ref in tab.related_blogs %}
-                {% assign article = article_ref %}
-                {% if article %}
-                  {
-                    "title": "{{ article.title | escape }}",
-                    "url": "{{ article.url | escape }}"
-                  }{% unless forloop.last %},{% endunless %}
-                {% endif %}
-              {% endfor %}
-            ]
-          }{% unless forloop.last %},{% endunless %}
-        {% endfor %}
-      ],
-      "activeTabSlug": "{{ active_tab_slug | escape }}"
-    }
-  </script> {% endcomment %}
-  {% comment %} In the JSON data section, only include filtered tabs {% endcomment %}
-
-{% comment %} <script type="application/json" id="tabs-data">
-{
-  "category": {
-    "title": "{{ current_category.title | escape }}",
-    "handle": "{{ current_category.system.handle | escape }}"
-  },
-  "tabs": [
-    {% comment %} Only include tabs for this category {% endcomment %}
-    {% for tab in category_tabs %}
-      {
-        "id": "tab-{{ forloop.index0 }}",
-        "title": "{{ tab.title | escape }}",
-        "slug": "{{ tab.tab_slug | escape }}",
-        "header": "{{ tab.header | default: tab.title | escape }}",
-        "description": "{{ tab.description | escape | newline_to_br }}",
-        "content_image": "{% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | escape }}{% endif %}",
-        "cta_text": "{{ tab.cta_text | escape }}",
-        "cta_link": "{{ tab.cta_link | escape }}",
-        "banner_image": "{% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | escape }}{% endif %}",
-        "banner_title": "{{ tab.banner_title | default: tab.header | default: tab.title | escape }}",
-        "parentCategoryHandle": "{{ tab.parent_category.system.handle | escape }}",
-        "related_blogs": [
-          {% for article_ref in tab.related_blogs %}
-            {% assign article = article_ref %}
-            {% if article %}
-              {
-                "title": "{{ article.title | escape }}",
-                "url": "{{ article.url | escape }}"
-              }{% unless forloop.last %},{% endunless %}
-            {% endif %}
-          {% endfor %}
-        ]
-      }{% unless forloop.last %},{% endunless %}
-    {% endfor %}
-  ],
-  "activeTabSlug": "{{ active_tab_slug | escape }}"
-}
-</script> {% endcomment %}
-
-{% comment %} In the JSON data section, only include filtered tabs {% endcomment %}
-
-<script type="application/json" id="tabs-data">
-{
-  "category": {
-    "title": "{{ current_category.title | escape }}",
-    "handle": "{{ current_category.system.handle | escape }}"
-  },
-  "tabs": [
-    {% comment %} Only include tabs for this category {% endcomment %}
-    {% for tab in category_tabs %}
-      {
-        "id": "tab-{{ forloop.index0 }}",
-        "title": "{{ tab.title | escape }}",
-        "slug": "{{ tab.tab_slug | escape }}",
-        "header": "{{ tab.header | default: tab.title | escape }}",
-        "description": "{{ tab.description | escape | newline_to_br }}",
-        "content_image": "{% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | escape }}{% endif %}",
-        "cta_text": "{{ tab.cta_text | escape }}",
-        "cta_link": "{{ tab.cta_link | escape }}",
-        "banner_image": "{% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | escape }}{% endif %}",
-        "banner_title": "{{ tab.banner_title | default: tab.header | default: tab.title | escape }}",
-        "parentCategoryHandle": "{{ tab.parent_category.system.handle | escape }}",
-        "related_blogs": [
-          {% for article_ref in tab.related_blogs %}
-            {% assign article = article_ref %}
-            {% if article %}
-              {
-                "title": "{{ article.title | escape }}",
-                "url": "{{ article.url | escape }}"
-              }{% unless forloop.last %},{% endunless %}
-            {% endif %}
-          {% endfor %}
-        ]
-      }{% unless forloop.last %},{% endunless %}
-    {% endfor %}
-  ],
-  "activeTabSlug": "{{ active_tab_slug | escape }}"
-}
-</script>
-  
-  <main class="nested-tabs-page" id="nested-tabs-page">
-    {% section 'main-tabs-navigation' %}
-    <div id="dynamic-banner">
-      {% comment %} Banner will be loaded by JavaScript {% endcomment %}
-    </div>
-    <div id="dynamic-content">
-      {% comment %} Content will be loaded by JavaScript {% endcomment %}
-    </div>
-  </main>
-  
-  {% comment %} Initial load template {% endcomment %}
-  <template id="tab-banner-template">
-    <section class="nested-tabs-banner">
-      <div class="banner-background">
-        <img id="banner-image" src="" alt="" loading="eager" width="1920" height="400">
-      </div>
-      <div class="banner-overlay"></div>
-      <div class="banner-content">
-        <h1 class="banner-title" id="banner-title"></h1>
-        <p class="banner-subtitle" id="banner-subtitle"></p>
-      </div>
-    </section>
-  </template>
-  
-  <template id="tab-content-template">
-    <div class="nested-tabs-container">
-      <nav class="tabs-navigation" id="tabs-navigation"></nav>
-      <div class="tab-content" id="tab-content-area"></div>
-    </div>
-  </template>
-  
-  <template id="single-tab-template">
-    <div class="tab-content-area" data-tab-slug="{slug}">
-      <div class="tab-content-text">
-        <h2 class="tab-content-header">{header}</h2>
-        <div class="tab-content-description">{description}</div>
-        {cta_button}
-      </div>
-      {content_image}
-      {related_topics}
-    </div>
-  </template>
-  
-  <template id="cta-button-template">
-    <a href="{link}" class="tab-cta-button">{text}</a>
-  </template>
-  
-  <template id="content-image-template">
-    <div class="tab-content-image">
-      <img src="{src}" alt="{alt}" loading="lazy" width="800" height="600">
-    </div>
-  </template>
-  
-  <template id="related-topics-template">
-    <div class="related-topics">
-      <h3>Related Topics</h3>
-      <div class="blog-links">{blog_links}</div>
-    </div>
-  </template>
-  
-  <template id="blog-link-template">
-    <a href="{url}" class="blog-link">{title}</a>
-  </template>
-{% endif %} {% endcomment %}
-
-
 {% layout 'theme' %}
 
 {% comment %}
-  FIXED Nested Tabs Template
-  Works around parent_category metaobject reference limitation
-  Uses tab naming convention instead: category-slug_tab-slug
+  DEBUG MODE ENABLED - This template will show you exactly what's happening
+  Remove debug sections after everything works
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
 {% assign current_category = metaobjects.category_page[category_handle] %}
 
+<style>
+  .debug-panel {
+    background: #f0f0f0;
+    border: 2px solid #333;
+    padding: 20px;
+    margin: 20px;
+    font-family: monospace;
+    font-size: 12px;
+  }
+  .debug-panel h3 { color: #d63384; margin-top: 0; }
+  .debug-panel pre { background: white; padding: 10px; overflow: auto; }
+  .success { color: green; font-weight: bold; }
+  .error { color: red; font-weight: bold; }
+</style>
+
+{% comment %} DEBUG: Show what we found {% endcomment %}
+<div class="debug-panel">
+  <h3>🔍 DEBUG INFO - Page Handle: {{ page.handle }}</h3>
+  
+  <p><strong>Current Category Found:</strong> 
+    {% if current_category %}
+      <span class="success">✅ YES</span> - {{ current_category.title }}
+    {% else %}
+      <span class="error">❌ NO - Create category_page with handle: {{ category_handle }}</span>
+    {% endif %}
+  </p>
+  
+  {% if current_category %}
+    <p><strong>Category Handle:</strong> {{ current_category.system.handle }}</p>
+    <p><strong>Category Title:</strong> {{ current_category.title }}</p>
+    <p><strong>Default Tab Slug:</strong> {{ current_category.default_tab_slug | default: 'NOT SET' }}</p>
+  {% endif %}
+</div>
+
 {% if current_category == blank %}
   <div class="container" style="padding: 40px; text-align: center;">
-    <h1>Category not found: {{ category_handle }}</h1>
-    <p>Please create a category_page entry with handle: {{ category_handle }}</p>
+    <h1>⚠️ Category not found: {{ category_handle }}</h1>
+    <p>Create a category_page metaobject entry with handle: <strong>{{ category_handle }}</strong></p>
+    <p>Then refresh this page.</p>
   </div>
 {% else %}
-  {% comment %} 
-    WORKAROUND: Filter tabs by checking if tab_slug starts with category handle
-    Format: engagement-style, engagement-settings, wedding-bands, etc.
-  {% endcomment %}
+  
+  {% comment %} METHOD 1: Try to get tabs using parent_category {% endcomment %}
+  {% assign method1_tabs = "" | split: "" %}
   {% assign all_tabs = metaobjects.tab_content.values %}
-  {% assign category_tabs = "" | split: "" %}
-  {% assign category_prefix = category_handle | append: '-' %}
   
   {% for tab in all_tabs %}
-    {% comment %} Check if tab_slug starts with category handle {% endcomment %}
-    {% if tab.tab_slug contains category_prefix %}
-      {% assign category_tabs = category_tabs | push: tab %}
+    {% if tab.parent_category %}
+      {% assign parent = tab.parent_category %}
+      {% comment %} Try to access parent handle {% endcomment %}
+      {% capture parent_handle %}{{ parent.system.handle }}{% endcapture %}
+      {% if parent_handle == current_category.system.handle %}
+        {% assign method1_tabs = method1_tabs | push: tab %}
+      {% endif %}
     {% endif %}
   {% endfor %}
   
-  {% comment %} Get active tab from URL or use default {% endcomment %}
+  {% comment %} METHOD 2: Filter by tab_slug prefix {% endcomment %}
+  {% assign method2_tabs = "" | split: "" %}
+  {% assign category_prefix = category_handle | append: '-' %}
+  
+  {% for tab in all_tabs %}
+    {% if tab.tab_slug contains category_prefix %}
+      {% assign method2_tabs = method2_tabs | push: tab %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} METHOD 3: Get ALL tabs (fallback) {% endcomment %}
+  {% assign method3_tabs = all_tabs %}
+  
+  {% comment %} DEBUG: Show all methods {% endcomment %}
+  <div class="debug-panel">
+    <h3>🔍 TAB FILTERING METHODS</h3>
+    
+    <p><strong>Total Tabs in System:</strong> {{ all_tabs.size }}</p>
+    
+    <p><strong>Method 1 (parent_category):</strong> 
+      Found {{ method1_tabs.size }} tabs
+      {% if method1_tabs.size > 0 %}
+        <span class="success">✅ WORKING</span>
+      {% else %}
+        <span class="error">❌ NOT WORKING (parent_category not accessible)</span>
+      {% endif %}
+    </p>
+    
+    <p><strong>Method 2 (tab_slug prefix "{{ category_prefix }}"):</strong> 
+      Found {{ method2_tabs.size }} tabs
+      {% if method2_tabs.size > 0 %}
+        <span class="success">✅ WORKING</span>
+      {% else %}
+        <span class="error">❌ NOT WORKING (no matching slugs)</span>
+      {% endif %}
+    </p>
+    
+    {% if method1_tabs.size > 0 %}
+      <p><strong>Using Method 1 (parent_category)</strong></p>
+      <pre>{% for tab in method1_tabs %}{{ forloop.index }}. {{ tab.title }} ({{ tab.tab_slug }})
+{% endfor %}</pre>
+    {% elsif method2_tabs.size > 0 %}
+      <p><strong>Using Method 2 (slug prefix)</strong></p>
+      <pre>{% for tab in method2_tabs %}{{ forloop.index }}. {{ tab.title }} ({{ tab.tab_slug }})
+{% endfor %}</pre>
+    {% else %}
+      <p class="error"><strong>⚠️ SHOWING ALL TABS (no filtering working)</strong></p>
+      <pre>{% for tab in method3_tabs limit: 10 %}{{ forloop.index }}. {{ tab.title }} ({{ tab.tab_slug }})
+{% endfor %}{% if method3_tabs.size > 10 %}... and {{ method3_tabs.size | minus: 10 }} more{% endif %}</pre>
+    {% endif %}
+  </div>
+  
+  {% comment %} Choose which method to use {% endcomment %}
+  {% if method1_tabs.size > 0 %}
+    {% assign category_tabs = method1_tabs %}
+    {% assign filtering_method = 'parent_category' %}
+  {% elsif method2_tabs.size > 0 %}
+    {% assign category_tabs = method2_tabs %}
+    {% assign filtering_method = 'slug_prefix' %}
+  {% else %}
+    {% assign category_tabs = method3_tabs %}
+    {% assign filtering_method = 'all_tabs_fallback' %}
+  {% endif %}
+  
+  {% comment %} Get active tab {% endcomment %}
   {% assign url_search = request.search %}
   {% assign url_tab = '' %}
   
@@ -273,7 +137,7 @@
     {% assign url_parts = url_search | remove: '?' | split: '&' %}
     {% for part in url_parts %}
       {% if part contains 'tab=' %}
-        {% assign url_tab = part | split: '=' | last %}
+        {% assign url_tab = part | split: '=' | last | url_decode %}
         {% break %}
       {% endif %}
     {% endfor %}
@@ -282,9 +146,23 @@
   {% assign default_tab = current_category.default_tab_slug | default: category_tabs.first.tab_slug %}
   {% assign active_tab_slug = url_tab | default: default_tab %}
   
-  {% comment %} Store data for JavaScript {% endcomment %}
+  {% comment %} DEBUG: Show tab selection {% endcomment %}
+  <div class="debug-panel">
+    <h3>🔍 TAB SELECTION</h3>
+    <p><strong>URL Parameter (?tab=):</strong> {{ url_tab | default: 'NOT SET' }}</p>
+    <p><strong>Default Tab (from category):</strong> {{ current_category.default_tab_slug | default: 'NOT SET' }}</p>
+    <p><strong>First Tab (fallback):</strong> {{ category_tabs.first.tab_slug | default: 'NO TABS' }}</p>
+    <p><strong>Active Tab (final choice):</strong> <span class="success">{{ active_tab_slug }}</span></p>
+  </div>
+  
+  {% comment %} Prepare JSON data {% endcomment %}
   <script type="application/json" id="tabs-data">
     {
+      "debug": {
+        "filteringMethod": "{{ filtering_method }}",
+        "totalTabs": {{ category_tabs.size }},
+        "pageHandle": "{{ page.handle }}"
+      },
       "category": {
         "title": {{ current_category.title | json }},
         "handle": {{ current_category.system.handle | json }}
@@ -296,20 +174,19 @@
             "title": {{ tab.title | json }},
             "slug": {{ tab.tab_slug | json }},
             "header": {{ tab.header | default: tab.title | json }},
-            "description": {{ tab.description | json }},
+            "description": {{ tab.description | default: "" | json }},
             "content_image": {% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | json }}{% else %}null{% endif %},
-            "cta_text": {{ tab.cta_text | json }},
-            "cta_link": {{ tab.cta_link | json }},
-            "banner_image": {% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | json }}{% else %}null{% endif %},
-            "banner_title": {{ tab.banner_title | default: tab.header | default: tab.title | json }},
-            "banner_subtitle": {{ current_category.banner_subtitle | json }},
+            "cta_text": {{ tab.cta_text | default: "" | json }},
+            "cta_link": {{ tab.cta_link | default: "" | json }},
+            "banner_image": {% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | json }}{% else %}{% if current_category.banner_image %}{{ current_category.banner_image | image_url: width: 1920 | json }}{% else %}null{% endif %}{% endif %},
+            "banner_title": {{ tab.banner_title | default: current_category.banner_title | default: tab.header | default: tab.title | json }},
+            "banner_subtitle": {{ current_category.banner_subtitle | default: "" | json }},
             "related_blogs": [
               {% for article_ref in tab.related_blogs %}
-                {% assign article = article_ref %}
-                {% if article %}
+                {% if article_ref.title %}
                   {
-                    "title": {{ article.title | json }},
-                    "url": {{ article.url | json }}
+                    "title": {{ article_ref.title | json }},
+                    "url": {{ article_ref.url | json }}
                   }{% unless forloop.last %},{% endunless %}
                 {% endif %}
               {% endfor %}
@@ -321,23 +198,51 @@
     }
   </script>
   
+  {% if category_tabs.size == 0 %}
+    <div class="debug-panel">
+      <h3 class="error">❌ NO TABS FOUND - ACTION REQUIRED</h3>
+      
+      <p><strong>Why this is happening:</strong></p>
+      <ol>
+        <li>Method 1 failed: parent_category field not accessible in storefront</li>
+        <li>Method 2 failed: No tab_slug values start with "{{ category_prefix }}"</li>
+      </ol>
+      
+      <p><strong>How to fix (choose ONE):</strong></p>
+      
+      <p><strong>Option A: Update tab_slug values (RECOMMENDED)</strong></p>
+      <pre>Go to: Settings → Custom Data → tab_content
+For each tab that belongs to {{ category_handle }}:
+  - Change tab_slug to: {{ category_prefix }}[tabname]
+  
+Examples:
+  style → {{ category_prefix }}style
+  settings → {{ category_prefix }}settings
+  bands → {{ category_prefix }}bands</pre>
+      
+      <p><strong>Option B: Enable parent_category field</strong></p>
+      <pre>Contact Shopify Support and request:
+"Enable storefront access for parent_category field 
+in tab_content metaobject definition"</pre>
+      
+      <p><strong>Current tab_slug values in your system:</strong></p>
+      <pre>{% for tab in all_tabs limit: 20 %}{{ forloop.index }}. "{{ tab.tab_slug }}"{% if tab.parent_category %} (parent exists but not accessible){% endif %}
+{% endfor %}</pre>
+    </div>
+  {% endif %}
+  
   <main class="nested-tabs-page" id="nested-tabs-page">
     {% section 'main-tabs-navigation' %}
     
-    <div id="dynamic-banner" class="dynamic-banner-container">
-      {% comment %} Banner will be rendered by JavaScript {% endcomment %}
-    </div>
-    
-    <div id="dynamic-content" class="dynamic-content-container">
-      {% comment %} Content will be rendered by JavaScript {% endcomment %}
-    </div>
+    <div id="dynamic-banner"></div>
+    <div id="dynamic-content"></div>
   </main>
   
   {% comment %} HTML Templates {% endcomment %}
   <template id="tab-banner-template">
     <section class="nested-tabs-banner">
       <div class="banner-background">
-        <img data-banner-img src="" alt="" loading="eager" width="1920" height="400">
+        <img data-banner-img src="" alt="" loading="eager">
       </div>
       <div class="banner-overlay"></div>
       <div class="banner-content">
@@ -355,7 +260,7 @@
   </template>
   
   <template id="single-tab-template">
-    <div class="tab-content-area" data-tab-slug="">
+    <div class="tab-content-area">
       <div class="tab-content-text">
         <h2 class="tab-content-header" data-header></h2>
         <div class="tab-content-description" data-description></div>
@@ -367,12 +272,12 @@
   </template>
   
   <template id="cta-button-template">
-    <a href="" class="tab-cta-button" data-cta-link data-cta-text></a>
+    <a href="" class="tab-cta-button" data-cta-link></a>
   </template>
   
   <template id="content-image-template">
     <div class="tab-content-image">
-      <img src="" alt="" loading="lazy" width="800" height="600" data-content-img>
+      <img src="" alt="" loading="lazy" data-content-img>
     </div>
   </template>
   
@@ -384,6 +289,16 @@
   </template>
   
   <template id="blog-link-template">
-    <a href="" class="blog-link" data-blog-link data-blog-title></a>
+    <a href="" class="blog-link" data-blog-link></a>
   </template>
+  
 {% endif %}
+
+{% comment %} REMOVE THIS COMMENT IN PRODUCTION - Debug panels will be visible {% endcomment %}
+<div class="debug-panel">
+  <h3>🎯 NEXT STEPS</h3>
+  <p>1. Check the debug info above to see what's working/not working</p>
+  <p>2. Follow the recommended fix (usually updating tab_slug values)</p>
+  <p>3. Once working, you can remove all debug-panel sections from this template</p>
+  <p>4. Press F12 and check Console for JavaScript errors</p>
+</div>
