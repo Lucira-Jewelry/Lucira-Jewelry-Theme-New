@@ -1,28 +1,78 @@
-class TabsController {
-  constructor() {
-    this.data = null;
-    this.activeTab = null;
-    this.init();
-  }
+// class TabsController {
+//   constructor() {
+//     this.data = null;
+//     this.activeTab = null;
+//     this.init();
+//   }
   
-  init() {
-    // Get data from Liquid
-    const dataElement = document.getElementById('tabs-data');
-    if (!dataElement) {
-      console.error('Tabs data not found');
-      return;
+//   init() {
+//     // Get data from Liquid
+//     const dataElement = document.getElementById('tabs-data');
+//     if (!dataElement) {
+//       console.error('Tabs data not found');
+//       return;
+//     }
+    
+//     this.data = JSON.parse(dataElement.textContent);
+//     this.activeTab = this.data.activeTabSlug;
+    
+//     // Initialize UI
+//     this.renderBanner();
+//     this.renderTabs();
+//     this.renderContent();
+//     this.setupEventListeners();
+//     this.updateURL();
+//   }
+
+  class TabsController {
+    constructor() {
+      this.data = null;
+      this.activeTab = null;
+      this.currentCategoryHandle = null;
+      this.filteredTabs = [];
+      this.init();
     }
     
-    this.data = JSON.parse(dataElement.textContent);
-    this.activeTab = this.data.activeTabSlug;
+    init() {
+      // Get data from Liquid
+      const dataElement = document.getElementById('tabs-data');
+      if (!dataElement) {
+        console.error('Tabs data not found');
+        return;
+      }
+      
+      this.data = JSON.parse(dataElement.textContent);
+      this.currentCategoryHandle = this.data.category.handle;
+      this.activeTab = this.data.activeTabSlug;
+      
+      // Filter tabs by current category
+      this.filterTabsByCategory();
+      
+      // Initialize UI
+      this.renderBanner();
+      this.renderTabs();
+      this.renderContent();
+      this.setupEventListeners();
+      this.updateURL();
+    }
     
-    // Initialize UI
-    this.renderBanner();
-    this.renderTabs();
-    this.renderContent();
-    this.setupEventListeners();
-    this.updateURL();
-  }
+    filterTabsByCategory() {
+      // In the Liquid template, we should pass filtered tabs only
+      // But for safety, filter here too
+      this.filteredTabs = this.data.tabs.filter(tab => {
+        // If tabs data includes parent info, use it
+        if (tab.parentCategoryHandle) {
+          return tab.parentCategoryHandle === this.currentCategoryHandle;
+        }
+        // Otherwise, assume tabs are pre-filtered by Liquid
+        return true;
+      });
+      
+      // If no filtered tabs, use all tabs as fallback
+      if (this.filteredTabs.length === 0) {
+        this.filteredTabs = this.data.tabs;
+      }
+    }
   
   renderBanner() {
     const activeTabData = this.getActiveTabData();
