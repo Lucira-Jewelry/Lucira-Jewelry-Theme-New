@@ -153,42 +153,68 @@
         }) || null
       );
     }
-    function buildColorButtonsFromCard(productCard) {
+   function buildColorButtonsFromCard(productCard, preSelectedColor, skipInitialRender) {
       if (!popupColors) return;
       popupColors.innerHTML = '';
       if (!sel.carat) return;
       const grp = productCard.querySelector(`.color-group[data-carat="${sel.carat}"]`);
       if (!grp) return;
       const seen = new Set();
+      let matchingBtn = null;
+      
       grp.querySelectorAll('.color-option').forEach((srcBtn) => {
         const baseColor = srcBtn.dataset.color || srcBtn.title || srcBtn.textContent.trim();
         if (!baseColor || seen.has(baseColor)) return;
         seen.add(baseColor);
         const clone = srcBtn.cloneNode(true);
         clone.classList.remove('active');
+        
+        if (preSelectedColor && baseColor === preSelectedColor) {
+          matchingBtn = clone;
+        }
+        
         clone.addEventListener('click', () => {
           popupColors.querySelectorAll('.color-option').forEach((b) => b.classList.remove('active'));
           clone.classList.add('active');
-          sel.color = baseColor;
-          buildSizeButtons(currentProduct);
-          sel.variant = findVariant(currentProduct, sel);
+          const currentSize = sel.size; 
+          sel.color = baseColor; 
+          
+          let potentialVariant = findVariant(currentProduct, sel);
+          if (currentSize) {
+             const variantSize = potentialVariant?.options?.[optionIndex.size];
+             
+             if (potentialVariant && variantSize === currentSize) {
+                 sel.variant = potentialVariant; 
+             } else {
+                 sel.size = null; 
+                 sel.variant = findVariant(currentProduct, { ...sel, size: null });
+             }
+          } else {
+             sel.variant = potentialVariant;
+          }
+
+          buildSizeButtons(currentProduct); 
           renderPrices(sel.variant);
           renderImage(sel.variant, currentProduct);
           saveVariantToLS(sel.variant);
-          setProceedUI(!!(sel.variant && sel.variant.id));
+        
+          setProceedUI(!!(sel.size && sel.variant && sel.variant.id));
         });
         popupColors.appendChild(clone);
       });
-      const first = popupColors.querySelector('.color-option');
-      if (first) {
-        first.classList.add('active');
-        sel.color = first.dataset.color || first.title || first.textContent.trim();
+      
+      const toActivate = matchingBtn || popupColors.querySelector('.color-option');
+      if (toActivate) {
+        toActivate.classList.add('active');
+        sel.color = toActivate.dataset.color || toActivate.title || toActivate.textContent.trim();
         sel.variant = findVariant(currentProduct, sel);
-        renderPrices(sel.variant);
-        renderImage(sel.variant, currentProduct);
+        
+        if (!skipInitialRender) {
+          renderPrices(sel.variant);
+          renderImage(sel.variant, currentProduct);
+        }
       }
     }
-
     function buildSizeButtons(product) {
       if (!popupSizes) return;
       popupSizes.innerHTML = '';
@@ -212,16 +238,20 @@
       Array.from(sizeSet).forEach((size) => {
         const sizeBtn = document.createElement('button');
         sizeBtn.className = 'size-btn';
+                if (sel.size && sel.size === size) {
+            sizeBtn.classList.add('active');
+        }
+
         sizeBtn.innerHTML = `<span class="size-subtext">princess</span><span class="size-number">${size}</span>`;
         sizeBtn.addEventListener('click', () => {
           popupSizes.querySelectorAll('.size-btn').forEach((b) => b.classList.remove('active'));
           sizeBtn.classList.add('active');
-          sel.size = size;
+          sel.size = size; 
           sel.variant = findVariant(product, sel);
           renderPrices(sel.variant);
           renderImage(sel.variant, product);
           saveVariantToLS(sel.variant);
-          setProceedUI(!!(sel.variant && sel.variant.id)); // triggers mobile hide when true
+          setProceedUI(!!(sel.size && sel.variant && sel.variant.id)); 
         });
         popupSizes.appendChild(sizeBtn);
       });
@@ -265,6 +295,14 @@
         const productCard = button.closest('.carat-item');
         const productId = productCard && productCard.dataset.productId;
         const caratValue = (button.dataset.carat || '').toUpperCase();
+        const activeColorBtn = productCard.querySelector('.color-option.active');
+        const preSelectedColor = activeColorBtn ? (activeColorBtn.dataset.color || activeColorBtn.title || '') : null;
+                const cardImg = productCard.querySelector('.product-img');
+        const preSelectedImage = cardImg ? cardImg.src : null;
+        const cardPrice = productCard.querySelector('.price-text');
+        const preSelectedPrice = cardPrice ? cardPrice.textContent : null;
+        const cardComparePrice = productCard.querySelector('.carat-comp_price');
+        const preSelectedComparePrice = cardComparePrice ? cardComparePrice.textContent : null;
 
         try {
           currentProduct = productId
@@ -276,15 +314,32 @@
         }
 
         optionIndex = detectOptionIndexes(currentProduct || { options: [] });
-        sel = { carat: caratValue, color: null, size: null, variant: null };
+        sel = { carat: caratValue, color: preSelectedColor, size: null, variant: null };
 
         saveVariantToLS(null);
         setProceedUI(false);
         popup.classList.remove('proceed-active');
         popupTitle.textContent = currentProduct?.title || '';
-        renderImage(null, currentProduct);
-        renderPrices(null);
-        buildColorButtonsFromCard(productCard);
+                if (popupImg && preSelectedImage) {
+          popupImg.src = preSelectedImage;
+          popupImg.alt = currentProduct?.title || 'Product image';
+          popupImg.style.display = '';
+        } else {
+          renderImage(null, currentProduct);
+        }
+                if (popupPrice && preSelectedPrice) {
+          popupPrice.textContent = preSelectedPrice;
+        }
+                if (popupCompare) {
+          if (preSelectedComparePrice) {
+            popupCompare.textContent = preSelectedComparePrice;
+            popupCompare.style.display = '';
+          } else {
+            popupCompare.textContent = '';
+            popupCompare.style.display = 'none';
+          }
+        }
+                buildColorButtonsFromCard(productCard, preSelectedColor, true);
         buildSizeButtons(currentProduct);
         popup.classList.add('active');
         document.body.style.overflow = 'hidden';
@@ -408,6 +463,11 @@ function closePopup() {
       if (caratValue) {
         label.insertAdjacentHTML('afterbegin', `<span class="carat-value">${caratValue}</span> `);
       }
+
+      if (window.filterCharmsBySelectedVariantCarat) {
+        window.filterCharmsBySelectedVariantCarat();
+      }
+
       document.querySelectorAll('.charms-grid-container.active .custom-charm-grid').forEach((each) => {
         const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
         const colorName = document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
@@ -424,11 +484,11 @@ function closePopup() {
       function resizeKonvaCanvas() {
         if(window.innerWidth > 768){
           const baseScreen = 1920;   
-          const baseSize = 500;     
+          const baseSize = 550;     
 
           let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
-          canvasSize = Math.max(300, Math.min(canvasSize, 650));
+          canvasSize = Math.max(350, Math.min(canvasSize, 700));
           document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
             each.style.width = canvasSize + 'px';
             each.style.height = canvasSize + 'px';
@@ -439,11 +499,11 @@ function closePopup() {
           document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         } else {
           const baseScreen = 768;   
-          const baseSize = 350;     
+          const baseSize = 400;     
 
           let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
-          canvasSize = Math.max(150, Math.min(canvasSize, 500));
+          canvasSize = Math.max(180, Math.min(canvasSize, 550));
           document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
             each.style.width = canvasSize + 'px';
             each.style.height = canvasSize + 'px';

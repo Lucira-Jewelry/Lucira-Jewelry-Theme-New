@@ -2,9 +2,10 @@ function resetJourneyOnLoad() {
   try {
     localStorage.removeItem('charm_cart_v1');
     localStorage.removeItem('lucira_price_breakdown');
-  } catch (e) {}
+  } catch (e) { }
 }
 resetJourneyOnLoad();
+
 window.MainBaseCharm = function () {
   const CANVAS_ID = 'vis-Visualiser_Canvas';
   const LS_KEY = 'SelectedVariant';
@@ -16,8 +17,7 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 1.35;
-
+  const SIZE_MULTIPLIER = 1.20;
 
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
@@ -26,11 +26,41 @@ window.MainBaseCharm = function () {
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
+  function injectSafeStyles() {
+    if (typeof document === 'undefined') return;
+    const id = 'lucira-visualiser-fix';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.innerHTML = `
+      @media (max-width: 768px) {
+        .variant-img-wrap {
+          width: 350px !important;
+          height: 353px !important;
+          margin: 0 auto !important;
+          display: block !important;
+        }
+        #vis-Visualiser_Canvas {
+          width: 350px !important;
+          height: 353px !important;
+        }
+        #vis-Visualiser_Canvas canvas {
+          width: 350px !important;
+          height: 353px !important;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+  injectSafeStyles();
+
   const MIN_ZOOM = 1.0;
   const MAX_ZOOM = 2.0;
 
-  const CHAIN_CENTER_Y_FACTOR = 0.42;
-  const CHAIN_RADIUS_FACTOR = 0.55;
+  // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
+  // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
+  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -95,7 +125,7 @@ window.MainBaseCharm = function () {
       }
 
       __VariantIndex.built = true;
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function getBaseCollections() {
@@ -130,19 +160,19 @@ window.MainBaseCharm = function () {
   const __BASE_TYPE__ = detectBaseType();
   const MAX_CHARMS = getCapForBaseType(__BASE_TYPE__);
 
-function getSelectedCount() {
-  try {
-    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
-    if (!cart || !cart.items) return 0;
+  function getSelectedCount() {
+    try {
+      const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+      if (!cart || !cart.items) return 0;
 
-    return Object.values(cart.items).reduce(
-      (sum, item) => sum + Number(item.qty || 0),
-      0
-    );
-  } catch {
-    return 0;
+      return Object.values(cart.items).reduce(
+        (sum, item) => sum + Number(item.qty || 0),
+        0
+      );
+    } catch {
+      return 0;
+    }
   }
-}
 
   function ensureCapLabel() {
     const bar = document.getElementById('lf-color-filter');
@@ -180,56 +210,55 @@ function getSelectedCount() {
     setPlusButtonsDisabled(atCap);
     updateMinusButtonsForCap(atCap);
   }
- 
-
-/* 👇 ADD IT HERE */
-function toggleZoomBar() {
-  const slider = document.getElementById('zoom-range');
-  const zoomIn = document.getElementById('zoom-in');
-  const zoomOut = document.getElementById('zoom-out');
-  const wrap =
-    document.querySelector('.variant-zoom-controls') ||
-    slider?.parentElement;
-
-  let hasCharms = false;
-
-  try {
-    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
-    if (cart && cart.items) {
-      hasCharms = Object.values(cart.items).some(
-        (item) => Number(item.qty || 0) > 0
-      );
-    }
-  } catch {}
-
-  const display = hasCharms ? '' : 'none';
-
-  if (wrap) wrap.style.display = display;
-  if (slider) slider.style.display = display;
-  if (zoomIn) zoomIn.style.display = display;
-  if (zoomOut) zoomOut.style.display = display;
-}
 
 
- function updateMinusButtonsForCap(atCap) {
-  document.querySelectorAll('.charm-card').forEach((card) => {
-    const minus = card.querySelector('.qty-decr');
-    const input = card.querySelector('.qty-input');
-    if (!minus || !input) return;
+  function toggleZoomBar() {
+    const slider = document.getElementById('zoom-range');
+    const zoomIn = document.getElementById('zoom-in');
+    const zoomOut = document.getElementById('zoom-out');
+    const wrap =
+      document.querySelector('.variant-zoom-controls') ||
+      slider?.parentElement;
 
-    const qty = Number(input.value || 0);
-    const shouldDisable = qty === 0;
-    minus.disabled = shouldDisable;
-    minus.style.opacity = shouldDisable ? 0.35 : 1;
-    minus.style.pointerEvents = shouldDisable ? 'none' : 'auto';
-    minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
-  });
-}
+    let hasCharms = false;
+
+    try {
+      const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+      if (cart && cart.items) {
+        hasCharms = Object.values(cart.items).some(
+          (item) => Number(item.qty || 0) > 0
+        );
+      }
+    } catch { }
+
+    const display = hasCharms ? '' : 'none';
+
+    if (wrap) wrap.style.display = display;
+    if (slider) slider.style.display = display;
+    if (zoomIn) zoomIn.style.display = display;
+    if (zoomOut) zoomOut.style.display = display;
+  }
+
+
+  function updateMinusButtonsForCap(atCap) {
+    document.querySelectorAll('.charm-card').forEach((card) => {
+      const minus = card.querySelector('.qty-decr');
+      const input = card.querySelector('.qty-input');
+      if (!minus || !input) return;
+
+      const qty = Number(input.value || 0);
+      const shouldDisable = qty === 0;
+      minus.disabled = shouldDisable;
+      minus.style.opacity = shouldDisable ? 0.35 : 1;
+      minus.style.pointerEvents = shouldDisable ? 'none' : 'auto';
+      minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
+    });
+  }
   function setSelectedBorder(card) {
     try {
       const v = Number(card.querySelector('.qty-input')?.value || 0);
       card.classList.toggle('is-selected', v > 0);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   function refreshSelectedBorders() {
@@ -262,7 +291,7 @@ function toggleZoomBar() {
         if (hit) v = hit[1];
       }
       if (v && typeof v.price === 'number') return v.price;
-    } catch (e) {}
+    } catch (e) { }
 
     return 0;
   }
@@ -275,7 +304,7 @@ function toggleZoomBar() {
         const p = Number(c.price || 0);
         if (!Number.isNaN(p)) sum += p;
       }
-    } catch (_) {}
+    } catch (_) { }
 
     return sum;
   }
@@ -375,7 +404,6 @@ function toggleZoomBar() {
   }
 
   function setActiveCollectionById(targetId) {
-    console.log('339')
     const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
 
@@ -411,8 +439,7 @@ function toggleZoomBar() {
               ? ''
               : 'none';
         });
-      
-      // Apply KT filtering immediately after collection switch
+
       filterCharmsBySelectedVariantCarat();
     }, 500);
 
@@ -440,9 +467,9 @@ function toggleZoomBar() {
     const loadCart = () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-      return raw
-        ? JSON.parse(raw)
-        : { items: {}, sequence: [], totals: { metal: 0, diamond: 0 } };
+        return raw
+          ? JSON.parse(raw)
+          : { items: {}, sequence: [], totals: { metal: 0, diamond: 0 } };
       } catch (err) {
         console.error('loadCart error', err);
         return { items: {}, totals: { metal: 0, diamond: 0 } };
@@ -480,54 +507,46 @@ function toggleZoomBar() {
     };
 
     const changeQty = (variantId, delta, metalPerUnit, diamondPerUnit) => {
-  const cart = loadCart();
+      const cart = loadCart();
+      cart.items = cart.items || {};
+      cart.sequence = cart.sequence || [];
 
-  // ✅ ENSURE STRUCTURE
-  cart.items = cart.items || {};
-  cart.sequence = cart.sequence || [];
+      const items = cart.items;
 
-  const items = cart.items;
+      const existing = items[variantId] || {
+        qty: 0,
+        metalPerUnit: metalPerUnit,
+        diamondPerUnit: diamondPerUnit,
+      };
 
-  const existing = items[variantId] || {
-    qty: 0,
-    metalPerUnit: metalPerUnit,
-    diamondPerUnit: diamondPerUnit,
-  };
+      let newQty = parseInt(existing.qty || 0, 10) + delta;
+      if (newQty < 0) newQty = 0;
 
-  let newQty = parseInt(existing.qty || 0, 10) + delta;
-  if (newQty < 0) newQty = 0;
+      if (delta === 1) {
+        cart.sequence.push(String(variantId));
+      }
 
-  // ================================
-  // ✅ SEQUENCE LOGIC (CORE FIX)
-  // ================================
-  if (delta === 1) {
-    // ➕ ADD → store order
-    cart.sequence.push(String(variantId));
-  }
+      if (delta === -1) {
+        const idx = cart.sequence.lastIndexOf(String(variantId));
+        if (idx > -1) cart.sequence.splice(idx, 1);
+      }
 
-  if (delta === -1) {
-    // ➖ REMOVE → remove last occurrence
-    const idx = cart.sequence.lastIndexOf(String(variantId));
-    if (idx > -1) cart.sequence.splice(idx, 1);
-  }
-  // ================================
+      if (newQty === 0) {
+        delete items[variantId];
+      } else {
+        upsertItem(cart, variantId, metalPerUnit, diamondPerUnit, newQty);
+      }
 
-  if (newQty === 0) {
-    delete items[variantId];
-  } else {
-    upsertItem(cart, variantId, metalPerUnit, diamondPerUnit, newQty);
-  }
+      cart.items = items;
+      recomputeTotals(cart);
+      saveCart(cart);
 
-  cart.items = items;
-  recomputeTotals(cart);
-  saveCart(cart);
+      document.dispatchEvent(
+        new CustomEvent('charmCartUpdated', { detail: { cart } })
+      );
 
-  document.dispatchEvent(
-    new CustomEvent('charmCartUpdated', { detail: { cart } })
-  );
-
-  return cart;
-};
+      return cart;
+    };
 
     const initUIFromCart = () => {
       const cart = loadCart();
@@ -634,21 +653,21 @@ function toggleZoomBar() {
       initUIFromCart();
     }
   })();
-document.addEventListener('charmCartUpdated', () => {
-  try {
-    syncUIFromCart();
-  } catch (e) {
-    console.warn('Visualiser sync failed', e);
-  }
-});
+  document.addEventListener('charmCartUpdated', () => {
+    try {
+      syncUIFromCart();
+    } catch (e) {
+      console.warn('Visualiser sync failed', e);
+    }
+  });
 
-document.addEventListener('charmCartLoaded', () => {
-  try {
-    syncUIFromCart();
-  } catch (e) {
-    console.warn('Sync after cart load failed', e);
-  }
-});
+  document.addEventListener('charmCartLoaded', () => {
+    try {
+      syncUIFromCart();
+    } catch (e) {
+      console.warn('Sync after cart load failed', e);
+    }
+  });
 
   function bindCollectionTiles() {
     const tiles = document.querySelectorAll('.collection-tile');
@@ -663,430 +682,585 @@ document.addEventListener('charmCartLoaded', () => {
 
     if (currentCollectionId) setActiveCollectionById(currentCollectionId);
   }
-class BVCanvas {
-  constructor(containerId) {
-    this.containerId = containerId;
-    this.stage = null;
-    this.productLayer = null;
-    this.charmLayer = null;
-    this.stageSize = 400;
-    this.zoomFactor = 1;
-    this.slider = $('zoom-range');
-    this.btnIn = $('zoom-in');
-    this.btnOut = $('zoom-out');
+  class BVCanvas {
+    constructor(containerId) {
+      this.containerId = containerId;
+      this.stage = null;
+      this.productLayer = null;
+      this.charmLayer = null;
+      this.stageSize = 400;
+      this.zoomFactor = 1;
+      this.slider = $('zoom-range');
+      this.btnIn = $('zoom-in');
+      this.btnOut = $('zoom-out');
 
-    this._updateZoomTrack = null;
-    this._setSliderValue = null;
+      this._updateZoomTrack = null;
+      this._setSliderValue = null;
 
-    this._bindZoomUI();
-    this.initStage();
-  }
-  _bindZoomUI() {
-    const slider = this.slider;
-    const btnIn = this.btnIn;
-    const btnOut = this.btnOut;
-
-    if (!slider) {
-      btnIn?.addEventListener('click', () =>
-        this.setZoom(Math.min(MAX_ZOOM, this.zoomFactor + 0.1))
-      );
-      btnOut?.addEventListener('click', () =>
-        this.setZoom(Math.max(MIN_ZOOM, this.zoomFactor - 0.1))
-      );
-      return;
+      this._bindZoomUI();
+      this.initStage();
     }
+    _bindZoomUI() {
+      const slider = this.slider;
+      const btnIn = this.btnIn;
+      const btnOut = this.btnOut;
 
-    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-
-    const updateTrack = () => {
-      const min = +slider.min || MIN_ZOOM;
-      const max = +slider.max || MAX_ZOOM;
-      const val = clamp(+slider.value || min, min, max);
-      const pct = ((val - min) / (max - min)) * 100;
-      slider.style.background =
-        `linear-gradient(90deg,#000 ${pct}%,#ddd ${pct}%)`;
-    };
-
-    const setValue = (v, emit = true) => {
-      const min = +slider.min || MIN_ZOOM;
-      const max = +slider.max || MAX_ZOOM;
-      const val = clamp(v, min, max);
-      slider.value = val.toFixed(2);
-      updateTrack();
-      if (emit) {
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        slider.dispatchEvent(new Event('change', { bubbles: true }));
+      if (!slider) {
+        btnIn?.addEventListener('click', () =>
+          this.setZoom(Math.min(MAX_ZOOM, this.zoomFactor + 0.1))
+        );
+        btnOut?.addEventListener('click', () =>
+          this.setZoom(Math.max(MIN_ZOOM, this.zoomFactor - 0.1))
+        );
+        return;
       }
-    };
 
-    const applyZoom = (animate) => {
-      this.setZoom(+slider.value, { animate });
-    };
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 
-    this._updateZoomTrack = updateTrack;
-    this._setSliderValue = setValue;
+      const updateTrack = () => {
+        const min = +slider.min || MIN_ZOOM;
+        const max = +slider.max || MAX_ZOOM;
+        const val = clamp(+slider.value || min, min, max);
+        const pct = ((val - min) / (max - min)) * 100;
+        slider.style.background =
+          `linear-gradient(90deg,#000 ${pct}%,#ddd ${pct}%)`;
+      };
 
-    slider.addEventListener(
-      'input',
-      () => {
+      const setValue = (v, emit = true) => {
+        const min = +slider.min || MIN_ZOOM;
+        const max = +slider.max || MAX_ZOOM;
+        const val = clamp(v, min, max);
+        slider.value = val.toFixed(2);
         updateTrack();
-        this.setZoom(+slider.value, { animate: false });
-      },
-      { passive: true }
-    );
+        if (emit) {
+          slider.dispatchEvent(new Event('input', { bubbles: true }));
+          slider.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      };
 
-    slider.addEventListener('change', () => applyZoom(true));
+      const applyZoom = (animate) => {
+        this.setZoom(+slider.value, { animate });
+      };
 
-    const step = +slider.step || 0.1;
+      this._updateZoomTrack = updateTrack;
+      this._setSliderValue = setValue;
 
-    btnIn?.addEventListener(
-      'click',
-      (e) => {
-        e.preventDefault();
-        setValue(+slider.value + step, false);
-        applyZoom(true);
-      },
-      { passive: false }
-    );
-
-    btnOut?.addEventListener(
-      'click',
-      (e) => {
-        e.preventDefault();
-        setValue(+slider.value - step, false);
-        applyZoom(true);
-      },
-      { passive: false }
-    );
-
-    updateTrack();
-  }
-  initStage() {
-    const container = document.getElementById(this.containerId);
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const size = Math.max(
-      300,
-      Math.floor(Math.min(rect.width || 400, rect.height || 400))
-    );
-    this.stageSize = size;
-
-    if (this.stage) this.stage.destroy();
-    this._productRendered = false;
-    this.stage = new Konva.Stage({
-      container: this.containerId,
-      width: this.stageSize,
-      height: this.stageSize,
-      draggable: false, 
-    });
-    this.stage.on('wheel', (e) => {
-      e.evt.preventDefault();
-
-      const current = this.zoomFactor || this.stage.scaleX() || 1;
-      const step = 0.12; 
-      const dir = e.evt.deltaY > 0 ? -1 : 1; 
-      const target = current + dir * step;
-
-      this.setZoom(target, { animate: false });
-    });
-
-    this.productLayer = new Konva.Layer();
-    this.charmLayer = new Konva.Layer();
-
-    this.stage.add(this.productLayer);
-    this.stage.add(this.charmLayer);
-
-    if (this.slider) {
-      this.slider.min = MIN_ZOOM;
-      this.slider.max = MAX_ZOOM;
-      this.slider.step = 0.01;
-    }
-
-    this.setZoom(1, { animate: false });
-
-    this._updateZoomTrack && this._updateZoomTrack();
-  }
-createImage(url) {
-  return new Promise((resolve, reject) => {
-    if (!url) return reject('no-url');
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => resolve(img);
-    img.onerror = () => reject('load-fail');
-    img.src = url;
-  });
-}
-_renderProductIfNeeded() {
-  if (this._productRendered) return;
-
-  const imgUrl = this.visualiser?.product?.image;
-  if (!imgUrl) return;
-
-  this.createImage(imgUrl)
-    .then((img) => {
-      this.productLayer.destroyChildren();
-      this.productLayer.add(
-        new Konva.Image({
-          x: 0,
-          y: 0,
-          image: img,
-          width: this.stageSize,
-          height: this.stageSize,
-        })
+      slider.addEventListener(
+        'input',
+        () => {
+          updateTrack();
+          this.setZoom(+slider.value, { animate: false });
+        },
+        { passive: true }
       );
-      this.productLayer.draw();
-      this._productRendered = true;
-    })
-    .catch(() => {});
-}
 
-  _resetToBaseView(animate = true) {
-    const stage = this.stage;
-    if (!stage) return;
+      slider.addEventListener('change', () => applyZoom(true));
 
-    // Adjust center position to account for charm positioning
-    const center = {
-      x: this.stageSize / 2,
-      y: this.stageSize * (CHAIN_CENTER_Y_FACTOR - 0.05), // Slightly higher to show charms better
-    };
+      const step = +slider.step || 0.1;
 
-    const posX = center.x - center.x * 1;
-    const posY = center.y - center.y * 1;
+      btnIn?.addEventListener(
+        'click',
+        (e) => {
+          e.preventDefault();
+          setValue(+slider.value + step, false);
+          applyZoom(true);
+        },
+        { passive: false }
+      );
 
-    if (animate) {
-      stage.to({
-        scaleX: 1,
-        scaleY: 1,
-        x: posX,
-        y: posY,
-        duration: 0.18,
-      });
-    } else {
-      stage.scale({ x: 1, y: 1 });
-      stage.position({ x: posX, y: posY });
-      stage.batchDraw();
+      btnOut?.addEventListener(
+        'click',
+        (e) => {
+          e.preventDefault();
+          setValue(+slider.value - step, false);
+          applyZoom(true);
+        },
+        { passive: false }
+      );
+
+      updateTrack();
     }
+    initStage() {
+      const container = document.getElementById(this.containerId);
+      if (!container) return;
 
-    this.zoomFactor = 1;
-    stage.draggable(false);
+      // Fix for mobile drag-and-drop: prevent browser scrolling when touching the canvas
+      container.style.touchAction = 'none';
+      container.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
-    if (this.slider) {
-      this.slider.value = '1';
+
+      const wrapper = container.closest('.variant-img-wrap');
+      if (isMobileLayout()) {
+        if (wrapper) {
+          wrapper.style.setProperty('width', '350px', 'important');
+          wrapper.style.setProperty('height', '353px', 'important');
+        }
+      } else {
+        // Desktop: Increase main container height to prevent cropping
+        if (wrapper) {
+          wrapper.style.setProperty('height', '470px', 'important');
+        }
+      }
+
+      const rect = container.getBoundingClientRect();
+      let width = isMobileLayout() ? 350 : (rect.width || 440);
+      width = Math.max(300, width || 400);
+      // Desktop: Slightly decrease canvas layer height to 445px
+      const height = isMobileLayout() ? 353 : (width * (445 / 440));
+
+      this.stageWidth = width;
+      this.stageHeight = height;
+      this.stageSize = width;
+
+      if (this.stage) this.stage.destroy();
+      this._productRendered = false;
+      this.stage = new Konva.Stage({
+        container: this.containerId,
+        width: this.stageWidth,
+        height: this.stageHeight,
+        draggable: false,
+        dragDistance: 0, // Make drag start immediately for smoother feel
+      });
+
+      // CRITICAL FIX: Disable browser touch actions on the stage content directly
+      if (this.stage.content) {
+        this.stage.content.style.touchAction = 'none';
+      }
+
+      this.stage.on('wheel', (e) => {
+        e.evt.preventDefault();
+
+        const current = this.zoomFactor || this.stage.scaleX() || 1;
+        const step = 0.12;
+        const dir = e.evt.deltaY > 0 ? -1 : 1;
+        const target = current + dir * step;
+
+        this.setZoom(target, { animate: false });
+      });
+
+      this.productLayer = new Konva.Layer();
+      this.charmLayer = new Konva.Layer();
+
+      this.stage.add(this.productLayer);
+      this.stage.add(this.charmLayer);
+
+      if (this.slider) {
+        this.slider.min = MIN_ZOOM;
+        this.slider.max = MAX_ZOOM;
+        this.slider.step = 0.01;
+      }
+
+      this.setZoom(1, { animate: false });
+
       this._updateZoomTrack && this._updateZoomTrack();
     }
-  }
-
- async render(vis) {
-  if (!vis || !vis.product) return;
-
-  this.visualiser = vis;
-  this.charmScale = vis.product.charmScale || DEFAULT_CHARM_SCALE;
-  this.charmPosition = vis.product.charmPosition || DEFAULT_CHARM_POSITION;
-  this.charmLayer.destroyChildren();
-  this._placedCharmPositions = [];
-  this._renderProductIfNeeded();
-
-  if (Array.isArray(vis.charms) && vis.charms.length) {
-    await this._placeCharmsSymmetric(vis.charms);
-
-    if (vis.charms.length < 3) {
-      this.autoZoomToCharms();
-    } else {
-      this._resetToBaseView(true);
+    createImage(url) {
+      return new Promise((resolve, reject) => {
+        if (!url) return reject('no-url');
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => reject('load-fail');
+        img.src = url;
+      });
     }
-  } else {
-    this._resetToBaseView(true);
-  }
+    _renderProductIfNeeded() {
+      if (this._productRendered) return;
 
-  this.stage.draw();
-}
+      const imgUrl = this.visualiser?.product?.image;
+      if (!imgUrl) return;
 
-  _computeArcPositionsLinear(count) {
-    const center = {
-      x: this.stageSize / 2,
-      y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-    };
-
-    const radius = Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR);
-
-    this._chainGeom = { center, radius };
-
-    const pts = [];
-    if (count <= 0) return pts;
-
-    const fullArcDeg = Math.abs(ARC_END_DEG - ARC_START_DEG);
-    const fullArcRad = (fullArcDeg * Math.PI) / 180;
-    const arcLength = radius * fullArcRad;
-
-    let spacing = (CHARM_SPACING_CM / CHAIN_LENGTH_CM) * arcLength;
-    spacing = Math.max(MIN_SPACING_PX, spacing);
-
-    if ((count - 1) * spacing > arcLength) {
-      spacing = arcLength / Math.max(1, count - 1);
+      this.createImage(imgUrl)
+        .then((img) => {
+          this.productLayer.destroyChildren();
+          this.productLayer.add(
+            new Konva.Image({
+              x: 0,
+              y: 0,
+              image: img,
+              width: this.stageSize,
+              height: this.stageSize,
+            })
+          );
+          this.productLayer.draw();
+          this._productRendered = true;
+        })
+        .catch(() => { });
     }
 
-    const usedTotalLength = Math.max(0, (count - 1) * spacing);
-    const usedAngleRad = usedTotalLength / radius;
+    _resetToBaseView(animate = true) {
+      const stage = this.stage;
+      if (!stage) return;
 
-    const midDeg = (ARC_START_DEG + ARC_END_DEG) / 2;
-    const midRad = (midDeg * Math.PI) / 180;
+      const isMobile = isMobileLayout();
+      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
 
-    const startAngleRad = midRad - usedAngleRad / 2;
-
-    for (let i = 0; i < count; i++) {
-      const angleRad = startAngleRad + (i * spacing) / radius;
-      const angleDeg = (angleRad * 180) / Math.PI;
-
-      const x = center.x + radius * Math.cos(angleRad);
-      const y = center.y - radius * Math.sin(angleRad);
-
-      pts.push({ x, y, angle: angleDeg });
-    }
-
-    return pts;
-  }
-
-  _computeSymmetricOrder(linearPts) {
-    if (!linearPts.length) return [];
-
-    const midIndex = Math.floor((linearPts.length - 1) / 2);
-    const ordered = [];
-
-    ordered.push(linearPts[midIndex]);
-
-    for (let offset = 1; ordered.length < linearPts.length; offset++) {
-      const right = linearPts[midIndex + offset];
-      if (right) ordered.push(right);
-
-      const left = linearPts[midIndex - offset];
-      if (left && ordered.length < linearPts.length) ordered.push(left);
-    }
-
-    return ordered;
-  }
-
-  async _placeCharmsSymmetric(charms) {
-    const count = charms.length;
-    if (count === 0) return;
-
-    const linear = this._computeArcPositionsLinear(count);
-    const pts = this._computeSymmetricOrder(linear);
-
-    const baseSize = Math.round(this.stageSize * this.charmScale);
-    const size = Math.max(10, Math.round(baseSize * SIZE_MULTIPLIER));
-
-    this._placedCharmPositions = [];
-
-    const geom = this._chainGeom || {
-      center: {
-        x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-      },
-      radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
-    };
-
-    const chainR = geom.radius;
-    const centerIndex = Math.floor((count - 1) / 2);
-    
-    // More aggressive cropping prevention - ensure charms fit within stage
-    const stageBottom = this.stageSize - (size * 0.5); // Increased margin for better safety
-
-    for (let i = 0; i < count; i++) {
-      const c = charms[i];
-      const basePt = pts[i] || pts[0];
-      const angleRad = (basePt.angle * Math.PI) / 180;
-      
-      // Calculate chain attachment point
-      const chainX = geom.center.x + chainR * Math.cos(angleRad);
-      const chainY = geom.center.y - chainR * Math.sin(angleRad);
-      
-      // Position-based hang distance
-      let hangDistance;
-      if (i === centerIndex) {
-        hangDistance = size * 0.25; // Center charm hangs more below
-      } else if (i === 0 || i === count - 1) {
-        hangDistance = size * 0.08; // Side charms closer to chain
-      } else {
-        hangDistance = size * 0.12; // Medium distance
-      }
-      
-      // Position charm below chain with enhanced cropping prevention
-      let x = chainX;
-      // Ensure all charms hang below the chain center, not above it
-      // Use the lower of chainY or chain center Y, then add hangDistance
-      const baseY = Math.max(chainY, geom.center.y);
-      let y = baseY + hangDistance;
-      
-      // Enhanced cropping prevention - check both individual charm and overall bounds
-      const charmBottom = y + (size / 2);
-      if (charmBottom > stageBottom) {
-        // Adjust position to prevent cropping
-        const maxAllowedY = stageBottom - (size / 2);
-        y = Math.min(y, maxAllowedY);
-        // Recalculate hang distance to maintain proper positioning
-        hangDistance = Math.max(y - baseY, size * 0.05);
-        y = baseY + hangDistance;
-      }
-
-      try {
-        const img = await this.createImage(c.image || '');
-        const kimg = new Konva.Image({
-          x: Math.round(x),
-          y: Math.round(y),
-          image: img,
-          width: size,
-          height: size,
-          listening: true,
-          offsetX: size / 2,
-          offsetY: size / 2,
-        });
-
-        // Calculate rotation based on position
-        let rotation = 0;
-        if (i !== centerIndex) {
-          const chainAngleDeg = basePt.angle;
-          if (chainAngleDeg > 270) {
-            rotation = -((chainAngleDeg - 270) * 0.8); // Left tilt
-          } else if (chainAngleDeg < 270) {
-            rotation = (270 - chainAngleDeg) * 0.8; // Right tilt
-          }
-          rotation = Math.max(-30, Math.min(30, rotation));
-        }
-        
-        kimg.rotation(rotation);
-        kimg._productId = c.id;
-
-        // Hover effects
-        kimg.on('mouseenter', () => {
-          document.body.style.cursor = 'pointer';
-          kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
-        });
-
-        kimg.on('mouseleave', () => {
-          document.body.style.cursor = 'default';
-          kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
-        });
-
-        this.charmLayer.add(kimg);
-        this._placedCharmPositions.push({ x, y, w: size, h: size });
-      } catch (e) {
-        console.warn('Charm image load failed', e);
-      }
-    }
-  }
-  _focusCharmsAtScale(scale, animate = true) {
-    const pts = this._placedCharmPositions || [];
-    const stage = this.stage;
-    if (!stage) return;
-
-    if (!pts.length) {
       const center = {
+        x: this.stageSize / 2,
+        y: this.stageSize * (centerYFactor - 0.05),
+      };
+
+      const posX = 0;
+      const posY = 0;
+
+      if (animate) {
+        stage.to({
+          scaleX: 1,
+          scaleY: 1,
+          x: posX,
+          y: posY,
+          duration: 0.18,
+        });
+      } else {
+        stage.scale({ x: 1, y: 1 });
+        stage.position({ x: posX, y: posY });
+        stage.batchDraw();
+      }
+
+      this.zoomFactor = 1;
+      stage.draggable(false);
+
+      if (this.slider) {
+        this.slider.value = '1';
+        this._updateZoomTrack && this._updateZoomTrack();
+      }
+    }
+
+    async render(vis) {
+      if (!vis || !vis.product) return;
+
+      this.visualiser = vis;
+      this.charmScale = vis.product.charmScale || DEFAULT_CHARM_SCALE;
+      this.charmPosition = vis.product.charmPosition || DEFAULT_CHARM_POSITION;
+      this.charmLayer.destroyChildren();
+      this._placedCharmPositions = [];
+
+      // Force product re-render if stageSize is different from rendered size
+      this._renderProductIfNeeded();
+
+      if (Array.isArray(vis.charms) && vis.charms.length) {
+        await this._placeCharmsSymmetric(vis.charms);
+
+        // Always stay at base view on mobile to ensure same size every time
+        if (isMobileLayout()) {
+          this._resetToBaseView(true);
+        } else if (vis.charms.length < 3) {
+          this.autoZoomToCharms();
+        } else {
+          this._resetToBaseView(true);
+        }
+      } else {
+        this._resetToBaseView(true);
+      }
+
+      this.stage.draw();
+    }
+
+    _computeArcPositionsLinear(count) {
+      // Dynamic factors based on layout
+      const isMobile = isMobileLayout();
+      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
+      const radiusFactor = isMobile ? 0.45 : CHAIN_RADIUS_FACTOR;
+
+      const center = {
+        x: this.stageSize / 2,
+        y: this.stageSize * centerYFactor,
+      };
+
+      const radius = Math.max(8, this.stageSize * radiusFactor);
+
+      this._chainGeom = { center, radius };
+
+      const pts = [];
+      if (count <= 0) return pts;
+
+      const fullArcDeg = Math.abs(ARC_END_DEG - ARC_START_DEG);
+      const fullArcRad = (fullArcDeg * Math.PI) / 180;
+      const arcLength = radius * fullArcRad;
+
+      let spacing = (CHARM_SPACING_CM / CHAIN_LENGTH_CM) * arcLength;
+      spacing = Math.max(MIN_SPACING_PX, spacing);
+
+      if ((count - 1) * spacing > arcLength) {
+        spacing = arcLength / Math.max(1, count - 1);
+      }
+
+      const usedTotalLength = Math.max(0, (count - 1) * spacing);
+      const usedAngleRad = usedTotalLength / radius;
+
+      const midDeg = (ARC_START_DEG + ARC_END_DEG) / 2;
+      const midRad = (midDeg * Math.PI) / 180;
+
+      const startAngleRad = midRad - usedAngleRad / 2;
+
+      for (let i = 0; i < count; i++) {
+        const angleRad = startAngleRad + (i * spacing) / radius;
+        const angleDeg = (angleRad * 180) / Math.PI;
+
+        const x = center.x + radius * Math.cos(angleRad);
+        const y = center.y - radius * Math.sin(angleRad);
+
+        pts.push({ x, y, angle: angleDeg });
+      }
+
+      return pts;
+    }
+
+    _computeSymmetricOrder(linearPts) {
+      if (!linearPts.length) return [];
+      return linearPts;
+    }
+
+    async _placeCharmsSymmetric(charms) {
+      const count = charms.length;
+      if (count === 0) return;
+
+      const linear = this._computeArcPositionsLinear(count);
+      const pts = this._computeSymmetricOrder(linear);
+
+      const baseSize = Math.round(this.stageSize * this.charmScale);
+      const size = Math.max(10, Math.round(baseSize * SIZE_MULTIPLIER));
+
+      this._placedCharmPositions = [];
+
+      const geom = this._chainGeom || {
+        center: {
+          x: this.stageSize / 2,
+          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        },
+        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+      };
+
+      const chainR = geom.radius;
+      const centerIndex = Math.floor((count - 1) / 2);
+
+      for (let i = 0; i < count; i++) {
+        const c = charms[i];
+        const basePt = pts[i] || pts[0];
+        const angleRad = (basePt.angle * Math.PI) / 180;
+        const chainX = geom.center.x + chainR * Math.cos(angleRad);
+        const chainY = geom.center.y - chainR * Math.sin(angleRad);
+
+        const baseOverlap = 0.28;
+        const distFromCenter = Math.abs(i - centerIndex);
+        const curveCorrection = distFromCenter * 0.04;
+        const totalOverlap = baseOverlap + curveCorrection;
+
+        const isMobile = isMobileLayout();
+        let x = chainX;
+        let y = chainY + (size / 2) - (size * totalOverlap);
+
+        // Mobile specific: Hang directly from the chain point
+        if (isMobile) {
+          y = chainY;
+        }
+
+        try {
+          const img = await this.createImage(c.image || '');
+          const kimg = new Konva.Image({
+            x: Math.round(x),
+            y: Math.round(y),
+            image: img,
+            width: size,
+            height: size,
+            listening: true,
+            offsetX: size / 2,
+            // Mobile: Pivot at top ring (approx 6% down). Desktop: Pivot at center.
+            offsetY: isMobile ? size * 0.06 : size / 2,
+            // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
+            hitStrokeWidth: 80,
+          });
+          let rotation = 0;
+          if (i !== centerIndex) {
+            const chainAngleDeg = basePt.angle;
+            if (chainAngleDeg > 270) {
+              rotation = -((chainAngleDeg - 270) * 0.8);
+            } else if (chainAngleDeg < 270) {
+              rotation = (270 - chainAngleDeg) * 0.8;
+            }
+            rotation = Math.max(-30, Math.min(30, rotation));
+          }
+
+          // Tilt only the leftmost and rightmost charms on mobile
+          if (isMobile) {
+            if (i !== 0 && i !== count - 1) {
+              rotation = 0;
+            }
+          }
+
+          kimg.rotation(rotation);
+          kimg._productId = c.id;
+          kimg._charmIndex = i;
+
+          const originalMouseEnter = () => {
+            document.body.style.cursor = 'pointer';
+            kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
+          };
+
+          const originalMouseLeave = () => {
+            document.body.style.cursor = 'default';
+            kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
+          };
+
+          // Mouse hover effects
+          kimg.on('mouseenter', originalMouseEnter);
+          kimg.on('mouseleave', originalMouseLeave);
+
+          kimg.draggable(true);
+          kimg._charmIndex = i;
+
+          let dragStartScale = 1;
+          let dragStartOpacity = 1;
+
+          // Explicitly handle touchstart to guarantee drag starts
+          kimg.on('touchstart', (e) => {
+            e.cancelBubble = true;
+            // Stop any potential stage dragging
+            if (this && this.stage) this.stage.stopDrag();
+
+            // Manually start drag on the charm
+            kimg.startDrag();
+
+            dragStartScale = kimg.scaleX() || 1;
+            dragStartOpacity = kimg.opacity() || 1;
+
+            kimg.to({
+              opacity: 0.7,
+              scaleX: dragStartScale * 1.15,
+              scaleY: dragStartScale * 1.15,
+              duration: 0.15,
+            });
+          });
+
+          kimg.on('dragstart', (e) => {
+            // dragStartScale and dragStartOpacity are already set in touchstart if it's a touch event
+            // For mouse events, set them here
+            if (!e.evt.touches) { // Only if it's not a touch event
+              dragStartScale = kimg.scaleX() || 1;
+              dragStartOpacity = kimg.opacity() || 1;
+
+              kimg.to({
+                opacity: 0.7,
+                scaleX: dragStartScale * 1.15,
+                scaleY: dragStartScale * 1.15,
+                duration: 0.15,
+              });
+            }
+
+            document.body.style.cursor = 'grabbing';
+            kimg.zIndex(this.charmLayer.children.length + 1);
+            this.charmLayer.draw();
+          });
+
+          kimg.on('tap', (e) => {
+            e.cancelBubble = true;
+          });
+
+          kimg.on('dragend', (e) => {
+            kimg.to({
+              opacity: dragStartOpacity,
+              scaleX: dragStartScale,
+              scaleY: dragStartScale,
+              duration: 0.15,
+            });
+
+            document.body.style.cursor = 'default';
+
+            const allCharms = this.charmLayer.children || [];
+            const draggedIndex = kimg._charmIndex;
+
+            let swapIndex = null;
+
+            for (let j = 0; j < allCharms.length; j++) {
+              const other = allCharms[j];
+              if (other === kimg) continue;
+
+              const dx = kimg.x() - other.x();
+              const dy = kimg.y() - other.y();
+              const dist = Math.sqrt(dx * dx + dy * dy);
+
+              if (dist < size * 0.7) {
+                swapIndex = other._charmIndex;
+                break;
+              }
+            }
+
+            kimg.position({
+              x: this._placedCharmPositions[draggedIndex].x,
+              y: this._placedCharmPositions[draggedIndex].y
+            });
+
+            if (swapIndex !== null && swapIndex !== draggedIndex) {
+              this._swapCharmsInVisualiser(draggedIndex, swapIndex);
+            } else {
+              this.charmLayer.destroyChildren();
+              this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
+            }
+          });
+
+
+          this.charmLayer.add(kimg);
+          this._placedCharmPositions.push({ x, y, w: size, h: size });
+        } catch (e) {
+          console.warn('Charm image load failed', e);
+        }
+      }
+    }
+    _focusCharmsAtScale(scale, animate = true) {
+      const pts = this._placedCharmPositions || [];
+      const stage = this.stage;
+      if (!stage) return;
+
+      if (!pts.length) {
+        const center = {
+          x: this.stageSize / 2,
+          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        };
+        const posX = center.x - center.x * scale;
+        const posY = center.y - center.y * scale;
+
+        if (animate) {
+          stage.to({
+            scaleX: scale,
+            scaleY: scale,
+            x: posX,
+            y: posY,
+            duration: 0.18,
+          });
+        } else {
+          stage.scale({ x: scale, y: scale });
+          stage.position({ x: posX, y: posY });
+          stage.batchDraw();
+        }
+        return;
+      }
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      pts.forEach((p) => {
+        const left = p.x - p.w / 2;
+        const right = p.x + p.w / 2;
+        const top = p.y - p.h / 2;
+        const bottom = p.y + p.h / 2;
+
+        minX = Math.min(minX, left);
+        maxX = Math.max(maxX, right);
+        minY = Math.min(minY, top);
+        maxY = Math.max(maxY, bottom);
+      });
+
+      const boxCenterX = minX + (maxX - minX) / 2;
+      const boxCenterY = minY + (maxY - minY) / 2;
+
+      const viewportCenter = {
         x: this.stageSize / 2,
         y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
       };
-      const posX = center.x - center.x * scale;
-      const posY = center.y - center.y * scale;
+
+      const posX = viewportCenter.x - boxCenterX * scale;
+      const posY = viewportCenter.y - boxCenterY * scale;
 
       if (animate) {
         stage.to({
@@ -1101,169 +1275,159 @@ _renderProductIfNeeded() {
         stage.position({ x: posX, y: posY });
         stage.batchDraw();
       }
-      return;
     }
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    autoZoomToCharms() {
+      const pts = this._placedCharmPositions || [];
+      if (!pts.length) {
+        this.setZoom(1, { animate: true });
+        return;
+      }
 
-    pts.forEach((p) => {
-      const left = p.x - p.w / 2;
-      const right = p.x + p.w / 2;
-      const top = p.y - p.h / 2;
-      const bottom = p.y + p.h / 2;
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
 
-      minX = Math.min(minX, left);
-      maxX = Math.max(maxX, right);
-      minY = Math.min(minY, top);
-      maxY = Math.max(maxY, bottom);
-    });
+      pts.forEach((p) => {
+        const left = p.x - p.w / 2;
+        const right = p.x + p.w / 2;
+        const top = p.y - p.h / 2;
+        const bottom = p.y + p.h / 2;
 
-    const boxCenterX = minX + (maxX - minX) / 2;
-    const boxCenterY = minY + (maxY - minY) / 2;
+        minX = Math.min(minX, left);
+        maxX = Math.max(maxX, right);
+        minY = Math.min(minY, top);
+        maxY = Math.max(maxY, bottom);
+      });
 
-    const viewportCenter = {
-      x: this.stageSize / 2,
-      y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-    };
+      const boxW = Math.max(1, maxX - minX);
+      const boxH = Math.max(1, maxY - minY);
+      const boxCenterX = minX + boxW / 2;
+      const boxCenterY = minY + boxH / 2;
+      const desiredFraction = 0.5; // Increased from 0.42 for better view
+      const scaleX = (this.stageSize * desiredFraction) / boxW;
+      const scaleY = (this.stageSize * desiredFraction) / boxH;
 
-    const posX = viewportCenter.x - boxCenterX * scale;
-    const posY = viewportCenter.y - boxCenterY * scale;
+      let targetScale = Math.min(scaleX, scaleY);
+      targetScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetScale));
+      targetScale = Math.max(1.0, targetScale);
 
-    if (animate) {
-      stage.to({
-        scaleX: scale,
-        scaleY: scale,
+      const sx = targetScale;
+      const viewportCenter = {
+        x: this.stageSize / 2,
+        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+      };
+
+      const posX = viewportCenter.x - boxCenterX * sx;
+      const posY = viewportCenter.y - boxCenterY * sx;
+
+      this.stage.to({
+        scaleX: sx,
+        scaleY: sx,
         x: posX,
         y: posY,
-        duration: 0.18,
+        duration: 0.22,
       });
-    } else {
-      stage.scale({ x: scale, y: scale });
-      stage.position({ x: posX, y: posY });
-      stage.batchDraw();
+      this.zoomFactor = sx;
+
+      if (this.slider) this.slider.value = sx.toFixed(2);
+      this._updateZoomTrack && this._updateZoomTrack();
+
+      this.stage.draggable(sx > 1);
     }
-  }
-  autoZoomToCharms() {
-    const pts = this._placedCharmPositions || [];
-    if (!pts.length) {
-      this.setZoom(1, { animate: true });
-      return;
+    setZoom(scale, opts = { animate: true }) {
+      const stage = this.stage;
+      if (!stage) return;
+
+      if (!this._placedCharmPositions || this._placedCharmPositions.length === 0) {
+        this._resetToBaseView(opts?.animate !== false);
+        return;
+      }
+      scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
+      this.zoomFactor = scale;
+
+      const animate = opts && opts.animate !== false;
+      const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
+
+      const center = {
+        x: this.stageSize / 2,
+        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+      };
+
+      const applyCenterZoom = () => {
+        const posX = center.x - center.x * scale;
+        const posY = center.y - center.y * scale;
+
+        if (animate) {
+          stage.to({
+            scaleX: scale,
+            scaleY: scale,
+            x: posX,
+            y: posY,
+            duration: 0.18,
+          });
+        } else {
+          stage.scale({ x: scale, y: scale });
+          stage.position({ x: posX, y: posY });
+          stage.batchDraw();
+        }
+      };
+
+      if (!hasCharms || scale <= 1.0001) {
+        applyCenterZoom();
+      } else {
+        this._focusCharmsAtScale(scale, animate);
+      }
+
+      if (this.slider) {
+        this.slider.value = scale.toFixed(2);
+        this._updateZoomTrack && this._updateZoomTrack();
+      }
+      stage.draggable(scale > 1);
     }
 
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
+    _swapCharmsInVisualiser(index1, index2) {
+      try {
+        // Swap in visualiser.charms array
+        if (visualiser.charms && index1 >= 0 && index2 >= 0 &&
+          index1 < visualiser.charms.length && index2 < visualiser.charms.length) {
+          const temp = visualiser.charms[index1];
+          visualiser.charms[index1] = visualiser.charms[index2];
+          visualiser.charms[index2] = temp;
+        }
 
-    pts.forEach((p) => {
-      const left = p.x - p.w / 2;
-      const right = p.x + p.w / 2;
-      const top = p.y - p.h / 2;
-      const bottom = p.y + p.h / 2;
+        // Swap in localStorage charm_cart_v1.sequence
+        try {
+          const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+          if (cart && Array.isArray(cart.sequence) && index1 >= 0 && index2 >= 0 &&
+            index1 < cart.sequence.length && index2 < cart.sequence.length) {
+            const tempSeq = cart.sequence[index1];
+            cart.sequence[index1] = cart.sequence[index2];
+            cart.sequence[index2] = tempSeq;
+            localStorage.setItem('charm_cart_v1', JSON.stringify(cart));
+          }
+        } catch (e) {
+          console.warn('Error swapping charms in localStorage:', e);
+        }
 
-      minX = Math.min(minX, left);
-      maxX = Math.max(maxX, right);
-      minY = Math.min(minY, top);
-      maxY = Math.max(maxY, bottom);
-    });
+        if (this.charmLayer) {
+          this.charmLayer.destroyChildren();
+        }
+        this._placedCharmPositions = [];
 
-    const boxW = Math.max(1, maxX - minX);
-    const boxH = Math.max(1, maxY - minY);
-    const boxCenterX = minX + boxW / 2;
-    const boxCenterY = minY + boxH / 2;
-
-    // Improved fraction for better visibility without cropping
-    const desiredFraction = 0.5; // Increased from 0.42 for better view
-    const scaleX = (this.stageSize * desiredFraction) / boxW;
-    const scaleY = (this.stageSize * desiredFraction) / boxH;
-
-    let targetScale = Math.min(scaleX, scaleY);
-    targetScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetScale));
-    targetScale = Math.max(1.0, targetScale);
-
-    const sx = targetScale;
-    const viewportCenter = {
-      x: this.stageSize / 2,
-      y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-    };
-
-    const posX = viewportCenter.x - boxCenterX * sx;
-    const posY = viewportCenter.y - boxCenterY * sx;
-
-    this.stage.to({
-      scaleX: sx,
-      scaleY: sx,
-      x: posX,
-      y: posY,
-      duration: 0.22,
-    });
-    this.zoomFactor = sx;
-
-    if (this.slider) this.slider.value = sx.toFixed(2);
-    this._updateZoomTrack && this._updateZoomTrack();
-
-    this.stage.draggable(sx > 1);
-  }
-  setZoom(scale, opts = { animate: true }) {
-  const stage = this.stage;
-  if (!stage) return;
-
-  if (!this._placedCharmPositions || this._placedCharmPositions.length === 0) {
-    this._resetToBaseView(opts?.animate !== false);
-    return;
-  }
-  scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
-  this.zoomFactor = scale;
-
-  const animate = opts && opts.animate !== false;
-  const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
-
-  const center = {
-    x: this.stageSize / 2,
-    y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-  };
-
-  const applyCenterZoom = () => {
-    const posX = center.x - center.x * scale;
-    const posY = center.y - center.y * scale;
-
-    if (animate) {
-      stage.to({
-        scaleX: scale,
-        scaleY: scale,
-        x: posX,
-        y: posY,
-        duration: 0.18,
-      });
-    } else {
-      stage.scale({ x: scale, y: scale });
-      stage.position({ x: posX, y: posY });
-      stage.batchDraw();
+        this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
+      } catch (e) {
+        console.warn('Error swapping charms in visualiser:', e);
+      }
     }
-  };
 
-  if (!hasCharms || scale <= 1.0001) {
-    applyCenterZoom();
-  } else {
-    this._focusCharmsAtScale(scale, animate);
   }
-
-  if (this.slider) {
-    this.slider.value = scale.toFixed(2);
-    this._updateZoomTrack && this._updateZoomTrack();
-  }
-  stage.draggable(scale > 1);
-}
-
-}
   let bv = null;
   function ensureBV() {
     if (!bv) {
       bv = new BVCanvas(CANVAS_ID);
       window.bv = bv;
-            window.setZoomSliderValue = function (v) {
+      window.setZoomSliderValue = function (v) {
         if (bv && typeof bv._setSliderValue === 'function') {
           bv._setSliderValue(v);
         }
@@ -1283,7 +1447,7 @@ _renderProductIfNeeded() {
 
       try {
         return JSON.parse(raw.replace(/&quot;/g, '"'));
-      } catch (e) {}
+      } catch (e) { }
 
       return { variantId: raw };
     } catch (e) {
@@ -1316,44 +1480,44 @@ _renderProductIfNeeded() {
     return null;
   }
   function renderLeftSafe(variant) {
-  try {
-    const img =
-      variant?.image ||
-      variant?.featured_image?.src ||
-      variant?.image_src ||
-      variant ||
+    try {
+      const img =
+        variant?.image ||
+        variant?.featured_image?.src ||
+        variant?.image_src ||
+        variant ||
+        '';
+
+      if (img) {
+        visualiser.product.image = img;
+        if (typeof variant.price === 'number')
+          visualiser.product.price = variant.price;
+        ensureBV()._productRendered = false;
+        bv.render(visualiser);
+      }
+    } catch (e) { }
+  }
+  function ensureBaseProductFromLS() {
+    if (visualiser.product.image) return;
+
+    const saved = readSavedVariantFromLS();
+    if (!saved) return;
+
+    const vid = saved.variantId || saved.id;
+    if (!vid) return;
+
+    const resolved = resolveVariantFromPage(vid);
+    if (!resolved) return;
+
+    visualiser.product.image =
+      resolved.image ||
+      resolved.featured_image?.src ||
       '';
 
-    if (img) {
-      visualiser.product.image = img;
-      if (typeof variant.price === 'number')
-        visualiser.product.price = variant.price;
-      ensureBV()._productRendered = false;
-      bv.render(visualiser);
-        }
-  } catch (e) {}
+    if (typeof resolved.price === 'number') {
+      visualiser.product.price = resolved.price;
+    }
   }
-function ensureBaseProductFromLS() {
-  if (visualiser.product.image) return;
-
-  const saved = readSavedVariantFromLS();
-  if (!saved) return;
-
-  const vid = saved.variantId || saved.id;
-  if (!vid) return;
-
-  const resolved = resolveVariantFromPage(vid);
-  if (!resolved) return;
-
-  visualiser.product.image =
-    resolved.image ||
-    resolved.featured_image?.src ||
-    '';
-
-  if (typeof resolved.price === 'number') {
-    visualiser.product.price = resolved.price;
-  }
-}
 
   function getSelectedVariantCarat() {
     try {
@@ -1366,7 +1530,6 @@ function ensureBaseProductFromLS() {
         if (normalized.includes('9KT') || normalized.includes('9')) return '9KT';
       }
 
-      // Fallback to variant data if Carat-value is not available
       const saved = readSavedVariantFromLS();
       if (!saved) return null;
 
@@ -1375,10 +1538,8 @@ function ensureBaseProductFromLS() {
 
       const resolved = resolveVariantFromPage(vid);
       if (!resolved) return null;
-
-      // Extract carat from variant title or options
       const variantText = `${resolved.title || ''} ${resolved.option1 || ''} ${resolved.option2 || ''} ${resolved.option3 || ''}`.toUpperCase();
-      
+
       if (variantText.includes('18KT') || variantText.includes('18 KT')) return '18KT';
       if (variantText.includes('14KT') || variantText.includes('14 KT')) return '14KT';
       if (variantText.includes('9KT') || variantText.includes('9 KT')) return '9KT';
@@ -1388,15 +1549,12 @@ function ensureBaseProductFromLS() {
       return null;
     }
   }
-
-  // Track if counts have been initialized to prevent unnecessary updates
   let countsInitialized = false;
 
   function filterCharmsBySelectedVariantCarat() {
     const caratValue = localStorage.getItem('Carat-value');
     if (!caratValue) {
       console.log('No Carat-value found in localStorage - showing all charms');
-      // Update counts even when no KT filter is applied
       if (!countsInitialized) {
         setTimeout(() => {
           updateCountsUI();
@@ -1412,46 +1570,34 @@ function ensureBaseProductFromLS() {
     let hiddenCount = 0;
     let shownCount = 0;
     let debugCount = 0;
-
-    // Simple KT-only filtering - don't break existing color functionality
     document.querySelectorAll('.charm-card').forEach((card) => {
-      // Skip if card is already hidden by other filters (color, etc.)
       const wasAlreadyHidden = card.style.display === 'none';
       if (wasAlreadyHidden) return;
-      
+
       const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
       const cardCarats = (card.dataset.carat || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
-      
-      // Check if this charm variant matches the selected KT
       let shouldShow = false;
-      
-      // Method 1: Check data-carat attribute
       if (cardCarats.length > 0) {
         shouldShow = cardCarats.some(carat => {
           const normalizedCarat = carat.replace(/\s+/g, '');
           const normalizedSelected = selectedKT.replace(/\s+/g, '');
-          return normalizedCarat === normalizedSelected || 
-                 normalizedCarat.includes(normalizedSelected) ||
-                 (normalizedSelected.includes('14') && normalizedCarat.includes('14')) ||
-                 (normalizedSelected.includes('18') && normalizedCarat.includes('18'));
+          return normalizedCarat === normalizedSelected ||
+            normalizedCarat.includes(normalizedSelected) ||
+            (normalizedSelected.includes('14') && normalizedCarat.includes('14')) ||
+            (normalizedSelected.includes('18') && normalizedCarat.includes('18'));
         });
       }
-      
-      // Method 2: Check title if data-carat is empty or didn't match
+
       if (!shouldShow && cardTitle) {
         const titleUpper = cardTitle.toUpperCase();
         shouldShow = (selectedKT.includes('14') && titleUpper.includes('14KT')) ||
-                    (selectedKT.includes('18') && titleUpper.includes('18KT')) ||
-                    titleUpper.includes(selectedKT);
+          (selectedKT.includes('18') && titleUpper.includes('18KT')) ||
+          titleUpper.includes(selectedKT);
       }
-      
-      // Debug first few cards
       if (debugCount < 5) {
         console.log(`Card ${debugCount + 1}: "${cardTitle.substring(0, 30)}...", Carats: [${cardCarats.join(', ')}], Should show: ${shouldShow}`);
         debugCount++;
       }
-      
-      // Apply KT filtering (only hide, don't show if already hidden by color filter)
       if (!shouldShow) {
         card.style.display = 'none';
         hiddenCount++;
@@ -1462,16 +1608,12 @@ function ensureBaseProductFromLS() {
 
     console.log(`✅ KT filtering complete: ${shownCount} shown, ${hiddenCount} hidden by KT filter`);
 
-    // Update the color filter label to show the selected carat
     const colorNameEl = document.getElementById('lf-color-name');
     if (colorNameEl) {
       const currentText = colorNameEl.textContent;
       const cleanText = currentText.replace(/^\d+KT\s*/, ''); // Remove existing KT prefix
       colorNameEl.textContent = `${selectedKT} ${cleanText}`;
     }
-
-    // IMPORTANT: Update collection counts AFTER KT filtering is complete
-    // But only if counts haven't been initialized yet
     if (!countsInitialized) {
       setTimeout(() => {
         updateCountsUI();
@@ -1491,7 +1633,7 @@ function ensureBaseProductFromLS() {
           n.classList?.remove('active');
         })
       );
-    } catch (_) {}
+    } catch (_) { }
 
     try {
       const saved = readSavedVariantFromLS();
@@ -1525,48 +1667,49 @@ function ensureBaseProductFromLS() {
                 v.image?.src ||
                 pj.featured_image ||
                 (pj.images && pj.images[0]) ||
+                (pj.variants &&
+                  pj.variants[0] &&
+                  (pj.variants[0].featured_image || pj.variants[0].image)) ||
                 '',
               price: v.price,
             });
           }
         }
       }
-    } catch (e) {}
+    } catch (e) { }
 
-   setTimeout(() => {
-  ensureBV();
-  attachQtyHandlersKonva();
-  syncUIFromCart();
-  refreshSelectedBorders();
-  bindCollectionTiles();
-  buildColorMapForActiveGrid();
-  buildSwatchDots();
-  toggleZoomBar();
-  
-  // Apply KT filtering when panel first opens
-  setTimeout(() => {
-    filterCharmsBySelectedVariantCarat();
-    // Force count update for all collections on panel open
     setTimeout(() => {
-      updateCountsUI();
-      countsInitialized = true;
-      console.log('🔄 All collection counts initialized on panel open');
-    }, 100);
-  }, 200);
-}, 80);
+      ensureBV();
+      attachQtyHandlersKonva();
+      syncUIFromCart();
+      refreshSelectedBorders();
+      bindCollectionTiles();
+      buildColorMapForActiveGrid();
+      buildSwatchDots();
+      toggleZoomBar();
+
+      setTimeout(() => {
+        filterCharmsBySelectedVariantCarat();
+        setTimeout(() => {
+          updateCountsUI();
+          countsInitialized = true;
+          console.log('🔄 All collection counts initialized on panel open');
+        }, 100);
+      }, 200);
+    }, 80);
     if (full) {
       full.style.display = 'block';
       document.querySelector('.carat-section').style.display = 'none';
       full.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
     }
-  setTimeout(() => {
+    setTimeout(() => {
       try {
         ensureBV();
         if (visualiser.charms && visualiser.charms.length && visualiser.charms.length < 3)
           bv.autoZoomToCharms();
         else bv.setZoom(1);
-      } catch (_) {}
+      } catch (_) { }
     }, 150);
   }
 
@@ -1578,7 +1721,7 @@ function ensureBaseProductFromLS() {
     }
     try {
       ensureBV().setZoom(1);
-    } catch (_) {}
+    } catch (_) { }
   }
 
   (function bindProceedRobustly() {
@@ -1599,7 +1742,7 @@ function ensureBaseProductFromLS() {
             try {
               e.preventDefault();
               e.stopPropagation();
-            } catch (_) {}
+            } catch (_) { }
 
             openPanel();
           },
@@ -1619,7 +1762,7 @@ function ensureBaseProductFromLS() {
         if (btn) {
           try {
             e.preventDefault();
-          } catch (_) {}
+          } catch (_) { }
           openPanel();
         }
       },
@@ -1635,7 +1778,7 @@ function ensureBaseProductFromLS() {
             try {
               if (node.matches && node.matches(sel)) bind(node);
               node.querySelectorAll && node.querySelectorAll(sel).forEach(bind);
-            } catch (_) {}
+            } catch (_) { }
           });
         })
       );
@@ -1722,45 +1865,45 @@ function ensureBaseProductFromLS() {
       diamond_1_weight: mf.diamond,
     };
   }
-function rebuildVisualiserFromCart() {
-  try {
-    const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
-    visualiser.charms.length = 0;
+  function rebuildVisualiserFromCart() {
+    try {
+      const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
+      visualiser.charms.length = 0;
 
-    if (!cart || !Array.isArray(cart.sequence)) return;
+      if (!cart || !Array.isArray(cart.sequence)) return;
 
-    cart.sequence.forEach((variantId) => {
-      const card = document.querySelector(
-        `.charm-card[data-variant-id="${variantId}"],
+      cart.sequence.forEach((variantId) => {
+        const card = document.querySelector(
+          `.charm-card[data-variant-id="${variantId}"],
          .charm-card[data-product-id="${variantId}"]`
-      );
-      if (!card) return;
+        );
+        if (!card) return;
 
-      visualiser.charms.push(buildCharmObjFromCard(card));
-    });
-  } catch (e) {
-    visualiser.charms.length = 0;
+        visualiser.charms.push(buildCharmObjFromCard(card));
+      });
+    } catch (e) {
+      visualiser.charms.length = 0;
+    }
   }
-}
 
 
-function syncUIFromCart() {
+  function syncUIFromCart() {
     ensureBaseProductFromLS();
-  rebuildVisualiserFromCart();
-  const bv = ensureBV();
-  bv._productRendered = false;
-  bv.render(visualiser).catch(() => {});
-  toggleZoomBar();
-  const selectedCount = getSelectedCount();
+    rebuildVisualiserFromCart();
+    const bv = ensureBV();
+    bv._productRendered = false;
+    bv.render(visualiser).catch(() => { });
+    toggleZoomBar();
+    const selectedCount = getSelectedCount();
 
-  if (selectedCount > 0) {
-    updateCTATotal();
-  } else {
-    const footer = document.querySelector('.cta-footer');
-    if (footer) footer.style.display = 'none';
+    if (selectedCount > 0) {
+      updateCTATotal();
+    } else {
+      const footer = document.querySelector('.cta-footer');
+      if (footer) footer.style.display = 'none';
+    }
+    refreshCapState();
   }
-  refreshCapState();
-}
   function attachQtyHandlersKonva() {
     const gridsWrapper = document.getElementById('lf-charms-grids-wrapper');
     if (!gridsWrapper) return;
@@ -1792,37 +1935,37 @@ function syncUIFromCart() {
       const newIn = card.querySelector('.qty-incr');
       const newDe = card.querySelector('.qty-decr');
 
-     newIn?.addEventListener(
-  'click',
-  () => {
-    if (getSelectedCount() >= MAX_CHARMS) {
-      refreshCapState();
-      return;
-    }
+      newIn?.addEventListener(
+        'click',
+        () => {
+          if (getSelectedCount() >= MAX_CHARMS) {
+            refreshCapState();
+            return;
+          }
 
-    let v = clamp(input.value);
-    input.value = String(++v);
-    setSelectedBorder(card);
-    updateBadgesKonva();
-    refreshCapState();
-  },
-  { passive: true }
-);
+          let v = clamp(input.value);
+          input.value = String(++v);
+          setSelectedBorder(card);
+          updateBadgesKonva();
+          refreshCapState();
+        },
+        { passive: true }
+      );
 
 
-     newDe?.addEventListener(
-  'click',
-  () => {
-    let v = clamp(input.value);
-    if (v <= 0) return;
+      newDe?.addEventListener(
+        'click',
+        () => {
+          let v = clamp(input.value);
+          if (v <= 0) return;
 
-    input.value = String(--v);
-    setSelectedBorder(card);
-    updateBadgesKonva();
-    refreshCapState();
-  },
-  { passive: true }
-);
+          input.value = String(--v);
+          setSelectedBorder(card);
+          updateBadgesKonva();
+          refreshCapState();
+        },
+        { passive: true }
+      );
 
       input?.addEventListener('keydown', (e) => e.preventDefault());
     });
@@ -1876,7 +2019,7 @@ function syncUIFromCart() {
     } else {
       const idx = Number(e?.detail?.index);
       if (!Number.isNaN(idx)) {
-        ensureBV().render(visualiser).catch(() => {});
+        ensureBV().render(visualiser).catch(() => { });
       }
     }
     updateBadgesKonva();
@@ -1890,9 +2033,8 @@ function syncUIFromCart() {
         ensureBV().initStage();
         bv.render(visualiser);
 
-        if (typeof currentCollectionId === 'string' && currentCollectionId) {
-        }
-      } catch (e) {}
+        if (typeof currentCollectionId === 'string' && currentCollectionId) { }
+      } catch (e) { }
     },
     { passive: true }
   );
@@ -2035,11 +2177,10 @@ function syncUIFromCart() {
       }
     }
 
-    const meta = `${(pj.title || '').toLowerCase()} ${
-      Array.isArray(pj.tags)
-        ? pj.tags.join(' ').toLowerCase()
-        : String(pj.tags || '').toLowerCase()
-    }`;
+    const meta = `${(pj.title || '').toLowerCase()} ${Array.isArray(pj.tags)
+      ? pj.tags.join(' ').toLowerCase()
+      : String(pj.tags || '').toLowerCase()
+      }`;
 
     for (const [label, kws] of Object.entries(COLOR_KEYWORDS)) {
       if (kws.some((kw) => meta.includes(kw))) return label;
@@ -2066,7 +2207,7 @@ function syncUIFromCart() {
 
         const color = detectColorForProductJSON(pj);
         if (color) productColorMap[pid] = color;
-      } catch (e) {}
+      } catch (e) { }
     });
   }
 
@@ -2085,8 +2226,8 @@ function syncUIFromCart() {
       color === 'Yellow Gold'
         ? '#f2c84b'
         : color === 'Rose Gold'
-        ? '#d88c8c'
-        : '#e5e7eb';
+          ? '#d88c8c'
+          : '#e5e7eb';
   }
 
   function availableVariantMetalsInActiveGrid() {
@@ -2123,8 +2264,6 @@ function syncUIFromCart() {
     if (!wrap) return;
 
     wrap.innerHTML = '';
-
-    // Use the selected variant's carat if available, otherwise fall back to localStorage
     const selectedVariantCarat = getSelectedVariantCarat();
     if (selectedVariantCarat) {
       currentCarat = selectedVariantCarat;
@@ -2155,12 +2294,10 @@ function syncUIFromCart() {
         dot.classList.add('active');
 
         setActiveLabel(color);
-        
-        // Apply KT filtering after color filtering
         setTimeout(() => {
           filterCharmsBySelectedVariantCarat();
         }, 50);
-        
+
         refreshCapState();
       });
 
@@ -2169,8 +2306,7 @@ function syncUIFromCart() {
 
     applyColorFilter(currentColorLabel);
     setActiveLabel(currentColorLabel);
-    
-    // Apply KT filtering after building color dots
+
     setTimeout(() => {
       filterCharmsBySelectedVariantCarat();
     }, 100);
@@ -2250,92 +2386,83 @@ function syncUIFromCart() {
 
   window.luciraOpenAccessory = openPanel;
   window.luciraCloseAccessory = closePanel;
-  
-  // Expose the filtering function globally
   window.filterCharmsBySelectedVariantCarat = filterCharmsBySelectedVariantCarat;
   window.getSelectedVariantCarat = getSelectedVariantCarat;
-
-  // Debug function to test filtering
-  window.debugCaratFiltering = function() {
+  window.debugCaratFiltering = function () {
     const caratValue = localStorage.getItem('Carat-value');
-    
+
     console.log('=== CARAT FILTERING DEBUG ===');
     console.log('localStorage Carat-value:', caratValue);
-    
+
     const charmCards = document.querySelectorAll('.charm-card');
     console.log(`Total charm cards found: ${charmCards.length}`);
-    
+
     let visibleCount = 0;
     let hiddenCount = 0;
-    
+
     charmCards.forEach((card, index) => {
       const cardCarats = card.dataset.carat || '';
       const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
       const isVisible = card.style.display !== 'none';
-      
+
       if (isVisible) visibleCount++;
       else hiddenCount++;
-      
-      if (index < 10) { // Show first 10 for debugging
+
+      if (index < 10) {
         console.log(`Card ${index + 1}: 
           Title: "${cardTitle}"
           data-carat: "${cardCarats}"
           Visible: ${isVisible}`);
       }
     });
-    
+
     console.log(`Summary: ${visibleCount} visible, ${hiddenCount} hidden`);
     console.log('=== END DEBUG ===');
-    
+
     return { caratValue, totalCards: charmCards.length, visibleCount, hiddenCount };
   };
-
-  // Manual filter trigger for testing
-  window.testCaratFilter = function() {
+  window.testCaratFilter = function () {
     console.log('Manually triggering carat filter...');
     filterCharmsBySelectedVariantCarat();
     return debugCaratFiltering();
   };
 
-  // Test combined color and KT filtering
-  window.testCombinedFilter = function(color = null) {
+  window.testCombinedFilter = function (color = null) {
     const caratValue = localStorage.getItem('Carat-value');
     const testColor = color || currentColorLabel || 'All';
-    
+
     console.log('=== TESTING COMBINED FILTER ===');
     console.log('KT from localStorage:', caratValue);
     console.log('Color filter:', testColor);
-    
+
     applyColorFilter(testColor);
-    
+
     const visible = document.querySelectorAll('.charm-card:not([style*="display: none"])').length;
     const hidden = document.querySelectorAll('.charm-card[style*="display: none"]').length;
-    
+
     console.log(`Results: ${visible} visible, ${hidden} hidden`);
     console.log('=== END TEST ===');
-    
+
     return { caratValue, testColor, visible, hidden };
   };
 
-  // Debug collection counts
-  window.debugCollectionCounts = function() {
+  window.debugCollectionCounts = function () {
     const caratValue = localStorage.getItem('Carat-value');
     console.log('=== COLLECTION COUNTS DEBUG ===');
     console.log('Selected KT:', caratValue);
-    
+
     document.querySelectorAll('.charms-grid-container').forEach((container) => {
       const containerId = container.id;
       const isActive = container.classList.contains('active');
-      
+
       if (isActive) {
         const allCards = container.querySelectorAll('.charm-card');
         const visibleCards = container.querySelectorAll('.charm-card:not([style*="display: none"])');
-        
+
         console.log(`\n📊 Active Collection: ${containerId}`);
         console.log(`   Total charm cards: ${allCards.length}`);
         console.log(`   Visible after filtering: ${visibleCards.length}`);
-        
-        // Sample first few cards
+
         allCards.forEach((card, index) => {
           if (index < 3) {
             const title = card.dataset.title || 'No title';
@@ -2346,17 +2473,15 @@ function syncUIFromCart() {
         });
       }
     });
-    
+
     console.log('=== END DEBUG ===');
   };
 
-  // Debug charm rotations
-  window.debugCharmRotations = function() {
+  window.debugCharmRotations = function () {
     console.log('=== CHARM ROTATIONS DEBUG ===');
     const charmImages = document.querySelectorAll('.konvajs-content canvas');
     if (charmImages.length > 0) {
       console.log(`Found ${charmImages.length} Konva canvases`);
-      // Check if we can access Konva objects
       if (window.bv && window.bv.charmLayer) {
         const charms = window.bv.charmLayer.children;
         charms.forEach((charm, index) => {
@@ -2368,26 +2493,24 @@ function syncUIFromCart() {
     }
     console.log('=== END DEBUG ===');
   };
-
-  // Debug canvas bounds
-  window.debugCanvasBounds = function() {
+  window.debugCanvasBounds = function () {
     console.log('=== CANVAS BOUNDS DEBUG ===');
     if (window.bv && window.bv.stage) {
       const stage = window.bv.stage;
       console.log(`Canvas size: ${stage.width()} x ${stage.height()}`);
       console.log(`Container size: ${stage.container().offsetWidth} x ${stage.container().offsetHeight}`);
-      
+
       if (window.bv.charmLayer) {
         const charms = window.bv.charmLayer.children;
         charms.forEach((charm, index) => {
           const bounds = charm.getClientRect();
           console.log(`Charm ${index} bounds: x=${bounds.x}, y=${bounds.y}, width=${bounds.width}, height=${bounds.height}`);
-          console.log(`  - Right edge: ${bounds.x + bounds.width}, Bottom edge: ${bounds.y + bounds.height}`);
-          console.log(`  - Within canvas: ${bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= stage.width() && bounds.y + bounds.height <= stage.height()}`);
+          console.log(`   - Right edge: ${bounds.x + bounds.width}, Bottom edge: ${bounds.y + bounds.height}`);
+          console.log(`   - Within canvas: ${bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= stage.width() && bounds.y + bounds.height <= stage.height()}`);
         });
       }
     }
-    console.log('=== END DEBUG ===');
+    // console.log('=== END DEBUG ===');
   };
 
 };
@@ -2453,7 +2576,7 @@ document.addEventListener('DOMContentLoaded', function () {
         activeDot.style.display = 'block';
         activeDot.style.left = rect.left - parentRect.left + rect.width / 2 + 'px';
       }
-    } catch {}
+    } catch { }
     if (label) label.textContent = kt;
   }
 
@@ -2521,7 +2644,6 @@ function computeCountsSimple() {
     let selectedQty = 0;
 
     cards.forEach((card) => {
-      // 👉 SAME KT LOGIC AS ACTIVE GRID
       const carats = (card.dataset.carat || '')
         .split(',')
         .map(v => v.toUpperCase().replace(/\s+/g, ''))
@@ -2545,7 +2667,6 @@ function computeCountsSimple() {
       }
     });
 
-    // 👉 UPDATE ONLY THIS TILE
     const tile = document.querySelector(
       `.collection-tile[data-target="${containerId}"]`
     );
@@ -2565,14 +2686,13 @@ function updateCountsUI() {
 }
 
 let __countsScheduled = false;
+
 function scheduleUpdateCounts() {
-  console.log('2166');
   let totalQty = 0;
-  document.querySelectorAll('.qty-input').forEach((each)=>{
-      totalQty+=Number(each.value)
+  document.querySelectorAll('.qty-input').forEach((each) => {
+    totalQty += Number(each.value)
   });
-  if(totalQty >= 5) return;
-  // console.log('2172');
+  if (totalQty >= 5) return;
 
 
   if (__countsScheduled) return;
@@ -2580,7 +2700,6 @@ function scheduleUpdateCounts() {
   const run = () => {
     __countsScheduled = false;
     // Don't update counts directly - let KT filtering handle it
-    // This prevents counting before KT filtering is applied
     console.log('Scheduled count update - will be handled by KT filtering');
   };
   if (typeof requestAnimationFrame === 'function') {
@@ -2593,7 +2712,6 @@ function scheduleUpdateCounts() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  // Don't update counts immediately - wait for KT filtering
   console.log('DOM loaded - counts will be updated after KT filtering');
 });
 
@@ -2612,4 +2730,4 @@ window.addEventListener('storage', (e) => {
   if (e.key === 'Carat-value') scheduleUpdateCounts();
 });
 
-window.updateCharmCounts = updateCountsUI;
+window.updateCharmCounts = updateCountsUI

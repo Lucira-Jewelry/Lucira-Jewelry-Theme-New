@@ -167,12 +167,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   function openDrawer(){
     backdrop.style.display = 'flex';
+    document.body.classList.add('drawer-open');
     setTimeout(() => drawer.classList.add('open'), 20);
     setTimeout(populate, 30);
   }
 
   function closeDrawer(){
     drawer.classList.remove('open');
+    document.body.classList.remove('drawer-open');
     setTimeout(() => backdrop.style.display='none', 280);
   }
 
@@ -199,29 +201,50 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 function sendToCart() {
+  const bundleId = 'bundle_' + Date.now() + '_' + Math.floor(Math.random() * 100000);
+
   console.log("clicked");
+
   function getFinalItemsArray() {
     const items = [];
+
     const charm = JSON.parse(localStorage.getItem("charm_cart_v1") || "{}");
-    const variantTitle = localStorage.getItem("SelectedVariantTitle") || "";
     const baseObj = JSON.parse(localStorage.getItem("SelectedVariant") || "null");
-    if (charm.items) {
-      Object.keys(charm.items).forEach((id) => {
-        const qty = parseInt(charm.items[id].qty || 0, 10);
-        if (qty > 0) {
-          items.push({
-            id: Number(id),
-            quantity: qty,
-            parent_id:Number(baseObj),
-          });
-        }
-      });
-    }
-    // console.log("itemsss", items)
+
+    /* BASE PRODUCT – unchanged */
     if (baseObj) {
       items.push({
         id: Number(baseObj),
         quantity: 1,
+        properties: {
+          _bundle_id: bundleId,
+          _bundle_type: 'base'
+        }
+      });
+    }
+
+    if (Array.isArray(charm.sequence) && charm.items) {
+      const used = new Set();
+
+      charm.sequence.forEach((id) => {
+        if (used.has(id)) return;
+
+        const item = charm.items[id];
+        if (!item) return;
+
+        const qty = parseInt(item.qty || 0, 10);
+        if (qty <= 0) return;
+
+        items.push({
+          id: Number(id),
+          quantity: qty,
+          properties: {
+            _bundle_id: bundleId,
+            _bundle_type: 'charm'
+          }
+        });
+
+        used.add(id);
       });
     }
 
@@ -229,37 +252,36 @@ function sendToCart() {
   }
 
   const items = getFinalItemsArray();
-//   console.log("Final items:", items);
 
   fetch("/cart/add.js", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ items }), 
+    body: JSON.stringify({ items })
   })
     .then((res) => res.json())
     .then((data) => {
       console.log("Products added:", data);
-      fetch("/cart?section_id=cart-drawer")
-        .then((response) => response.text())
-        .then((html) => {
-          const parser = new DOMParser();
-          const newDoc = parser.parseFromString(html, "text/html");
 
-          const newDrawer = newDoc.querySelector("#CartDrawer");
-          const currentDrawer = document.querySelector("#CartDrawer");
-        //   console.log('306', currentDrawer, newDrawer)
+      return fetch("/cart?section_id=cart-drawer");
+    })
+    .then((response) => response.text())
+    .then((html) => {
+      const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, "text/html");
 
-          if (currentDrawer && newDrawer) {
-            currentDrawer.innerHTML = newDrawer.innerHTML;
-          }
+      const newDrawer = newDoc.querySelector("#CartDrawer");
+      const currentDrawer = document.querySelector("#CartDrawer");
 
-          document.querySelector("cart-drawer")?.classList.add("is-open");
-          document.querySelector("cart-drawer")?.classList.remove("is-empty");
-          document.querySelector("cart-drawer")?.classList.add("active");
-          document.querySelector('.drawer__inner').style.transform = 'translateX(0)';
-          document.body.classList.add("overflow-hidden");
-        })
-        .catch((err) => console.error("Error updating cart drawer:", err));
+      if (currentDrawer && newDrawer) {
+        currentDrawer.innerHTML = newDrawer.innerHTML;
+      }
+
+      document.querySelector("cart-drawer")?.classList.add("is-open");
+      document.querySelector("cart-drawer")?.classList.remove("is-empty");
+      document.querySelector("cart-drawer")?.classList.add("active");
+      document.querySelector(".drawer__inner").style.transform = "translateX(0)";
+      document.body.classList.add("overflow-hidden");
     })
     .catch((err) => console.error("Add to cart error:", err));
 }
+
