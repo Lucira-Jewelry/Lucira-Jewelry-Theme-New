@@ -236,10 +236,9 @@
 {% layout 'theme' %}
 
 {% comment %}
-  Nested Tabs Page Template
-  - Main categories: Engagement, Wedding, etc.
-  - Sub tabs filtered by parent_category
-  - Dynamic banner and content switching
+  FIXED Nested Tabs Template
+  Works around parent_category metaobject reference limitation
+  Uses tab naming convention instead: category-slug_tab-slug
 {% endcomment %}
 
 {% assign category_handle = page.handle %}
@@ -251,16 +250,18 @@
     <p>Please create a category_page entry with handle: {{ category_handle }}</p>
   </div>
 {% else %}
-  {% comment %} Filter tabs by parent category {% endcomment %}
+  {% comment %} 
+    WORKAROUND: Filter tabs by checking if tab_slug starts with category handle
+    Format: engagement-style, engagement-settings, wedding-bands, etc.
+  {% endcomment %}
   {% assign all_tabs = metaobjects.tab_content.values %}
   {% assign category_tabs = "" | split: "" %}
+  {% assign category_prefix = category_handle | append: '-' %}
   
   {% for tab in all_tabs %}
-    {% if tab.parent_category %}
-      {% assign parent = tab.parent_category %}
-      {% if parent.system.handle == current_category.system.handle %}
-        {% assign category_tabs = category_tabs | push: tab %}
-      {% endif %}
+    {% comment %} Check if tab_slug starts with category handle {% endcomment %}
+    {% if tab.tab_slug contains category_prefix %}
+      {% assign category_tabs = category_tabs | push: tab %}
     {% endif %}
   {% endfor %}
   
@@ -281,7 +282,7 @@
   {% assign default_tab = current_category.default_tab_slug | default: category_tabs.first.tab_slug %}
   {% assign active_tab_slug = url_tab | default: default_tab %}
   
-  {% comment %} Prepare data for JavaScript {% endcomment %}
+  {% comment %} Store data for JavaScript {% endcomment %}
   <script type="application/json" id="tabs-data">
     {
       "category": {
