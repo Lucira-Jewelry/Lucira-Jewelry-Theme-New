@@ -609,7 +609,6 @@ if (!customElements.get('product-info')) {
             ? String(variant.inventory_quantity)
             : "";
 
-        // 🔥 Trigger your widget
         window.repaintDelivery?.();
       });
 
