@@ -31,22 +31,16 @@
     </div>
   </div>
 
-  {% assign v = product.selected_or_first_available_variant %}
+  {% assign total_seconds = delivery_days | times: 86400 %}
+  {% assign now = 'now' | date: '%s' %}
+  {% assign future_timestamp = now | plus: total_seconds %}
+  {% assign delivery_date = future_timestamp | date: '%B %d, %Y' %}
 
-  <div class="lucira-delivery-info {% if v.available %} offer-delivery-strip {% endif %}">
-    <span class="lucira-delivery-time" id="delivery-text">
-      {% if v.available %}
-        Arrives before <strong class="hightlight-text">Valentine’s Day</strong>
-      {% else %}
-        Estimated Free Dispatch by
-        <span class="delivry_txt">{{ delivery_date }}</span>
-      {% endif %}
+  <div class="lucira-delivery-info">
+    <span class="lucira-delivery-time">Estimated Free Dispatch by 
+      <span class="delivry_txt">{{ delivery_date }}</span>
     </span>
   </div>
-  <style>
-    .offer-delivery-strip {background: #fafafa; width: 100%; max-width: 100%; padding: 8px; display: block; text-align: center; border-radius: 7px;}
-  </style>
-  
 </div>
 
 <script>
@@ -136,40 +130,18 @@
     const computeDays = () => (isVariantInStock() ? 2 : 15);
 
     function repaint() {
-      const deliveryText = container.querySelector("#delivery-text");
-      if (!deliveryText) return;
-
-      const inStock = isVariantInStock();
-      const hasFastShipping = true; // already validated server-side
-
-      // Clear previous content safely
-      deliveryText.textContent = '';
-
-      if (inStock && hasFastShipping) {
-        deliveryText.append(document.createTextNode('Arrives before '));
-
-        const strong = document.createElement('strong');
-        strong.className = 'hightlight-text';
-        strong.textContent = 'Valentine’s Day';
-
-        deliveryText.append(strong);
-        return;
-      }
-
+      if (!dateSpan) return;
       const days = computeDays();
-      const date = fmtDatePlus(days);
-
-      deliveryText.append(
-        document.createTextNode('Estimated Free Dispatch by ')
-      );
-
-      const dateSpan = document.createElement('span');
-      dateSpan.className = 'delivry_txt';
-      dateSpan.textContent = date;
-
-      deliveryText.append(dateSpan);
+      dateSpan.textContent = fmtDatePlus(days);
+      
+      console.log('Repaint called:', {
+        inStock: isVariantInStock(),
+        days: days,
+        date: dateSpan.textContent,
+        mode: submitBtn?.getAttribute("data-mode"),
+        hasPincode: !!lastEnteredPincode
+      });
     }
-
 
     function setLocateView() {
       isProcessingLocate = false;
@@ -458,8 +430,6 @@
         luciraLocateMe: typeof window.luciraLocateMe
       };
     };
-
-    window.repaintDelivery = repaint;
 
     console.log('Delivery widget initialized:', window.debugDeliveryWidget());
   })();
