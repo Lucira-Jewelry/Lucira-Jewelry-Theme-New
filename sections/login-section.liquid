@@ -688,70 +688,52 @@
     document.getElementById('couponCode').innerText = coupon;
   }
 
-  document.addEventListener('click', function (e) {
-    const copyBtn = e.target.closest('#copyCoupon');
-    if (!copyBtn) return;
+  document.addEventListener('DOMContentLoaded', function() {
+    const copyBtn = document.getElementById('copyCoupon');
+    const codeSpan = document.getElementById('couponCode');
+    const feedbackMsg = document.getElementById('copyFeedback'); // From your previous code
 
-    e.preventDefault();
+    if (copyBtn) {
+      copyBtn.addEventListener('click', function(e) {
+        e.preventDefault(); // Prevent any default button behavior
 
-    const couponEl = document.getElementById('couponCode');
-    const code = couponEl ? couponEl.innerText.trim() : '';
+        // 1. Get the text to copy
+        // We check data-coupon first, fallback to innerText
+        const textToCopy = codeSpan.getAttribute('data-coupon') || codeSpan.innerText;
 
-    // 3. Validation
-    if (!code) {
-      console.warn('No coupon code found to copy');
-      return;
-    }
+        if (!textToCopy) {
+          alert('No code available to copy!');
+          return;
+        }
 
-    // 4. Success Feedback Function
-    const triggerSuccessFeedback = () => {
-      const msg = document.getElementById('copyFeedback');
-      if (msg) {
-        msg.style.display = 'block';
-        msg.innerText = 'Copied to clipboard!';
-        
-        // Hide message after 2 seconds
-        setTimeout(() => {
-          msg.style.display = 'none';
-        }, 2000);
-      }
-    };
+        // 2. Copy to Clipboard API
+        navigator.clipboard.writeText(textToCopy).then(function() {
+          
+          // --- Success State ---
+          
+          // Option A: Show the feedback text below (if you have that element)
+          if (feedbackMsg) {
+            feedbackMsg.style.display = 'block';
+            feedbackMsg.innerText = 'Code copied!';
+            setTimeout(() => {
+              feedbackMsg.style.display = 'none';
+            }, 2000);
+          }
 
-    // 5. Copy Logic (Modern API + Fallback for older devices)
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(code)
-        .then(triggerSuccessFeedback)
-        .catch((err) => {
-          console.error('Clipboard API failed, trying fallback', err);
-          fallbackCopyText(code);
+          // Option B: Visual feedback on the button itself (optional)
+          const originalTitle = copyBtn.getAttribute('title');
+          copyBtn.setAttribute('title', 'Copied!');
+          copyBtn.classList.add('copied-success'); // Add a class for CSS styling
+          
+          setTimeout(() => {
+            copyBtn.setAttribute('title', originalTitle);
+            copyBtn.classList.remove('copied-success');
+          }, 2000);
+
+        }).catch(function(err) {
+          console.error('Failed to copy: ', err);
         });
-    } else {
-      fallbackCopyText(code);
-    }
-
-    // Fallback function for older browsers or non-secure contexts (HTTP)
-    function fallbackCopyText(text) {
-      const textArea = document.createElement("textarea");
-      textArea.value = text;
-      
-      // Ensure the textarea is part of the DOM but invisible
-      textArea.style.top = "0";
-      textArea.style.left = "0";
-      textArea.style.position = "fixed";
-      textArea.style.opacity = "0";
-
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-
-      try {
-        const successful = document.execCommand('copy');
-        if (successful) triggerSuccessFeedback();
-      } catch (err) {
-        console.error('Fallback: Oops, unable to copy', err);
-      }
-
-      document.body.removeChild(textArea);
+      });
     }
   });
 </script>
