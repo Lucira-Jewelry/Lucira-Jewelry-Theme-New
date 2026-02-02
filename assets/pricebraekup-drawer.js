@@ -1,63 +1,63 @@
 
 document.addEventListener("DOMContentLoaded", function () {
 
-  function s(n){ return isFinite(Number(n)) ? Number(n) : 0; }
+  function s(n) { return isFinite(Number(n)) ? Number(n) : 0; }
 
-  function fmt(v){ 
-  try {
-    return Number(v).toLocaleString('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-  } catch (e) {
-    return String(v);
-  }
-}
-
-
-  function getLS(k){ 
+  function fmt(v) {
     try {
-      var r = localStorage.getItem(k); 
+      return Number(v).toLocaleString('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
+      });
+    } catch (e) {
+      return String(v);
+    }
+  }
+
+
+  function getLS(k) {
+    try {
+      var r = localStorage.getItem(k);
       return r ? JSON.parse(r) : null;
-    } catch(e){
+    } catch (e) {
       return null;
     }
   }
 
-  function readCharm(){ 
+  function readCharm() {
     var c = getLS('charm_cart_v1') || getLS('charm_cart') || {};
-    if (c.totals) return { metal: s(c.totals.metal), diamond: s(c.totals.diamond), price:0 };
+    if (c.totals) return { metal: s(c.totals.metal), diamond: s(c.totals.diamond), price: 0 };
 
-    var m=0, d=0, p=0;
-    var it=c.items || {};
+    var m = 0, d = 0, p = 0;
+    var it = c.items || {};
 
-    for (var id in it){
+    for (var id in it) {
       if (!it.hasOwnProperty(id)) continue;
-      var o=it[id];
-      var q=parseInt(o.qty||0,10)||0;
+      var o = it[id];
+      var q = parseInt(o.qty || 0, 10) || 0;
 
-      m += s(o.metalPerUnit)*q;
-      d += s(o.diamondPerUnit)*q;
-      p += (o.price ? s(o.price) : (o.price_cents ? s(o.price_cents)/100 : 0)) * q;
+      m += s(o.metalPerUnit) * q;
+      d += s(o.diamondPerUnit) * q;
+      p += (o.price ? s(o.price) : (o.price_cents ? s(o.price_cents) / 100 : 0)) * q;
     }
-    return { metal:m, diamond:d, price:p };
+    return { metal: m, diamond: d, price: p };
   }
 
-  function readBase(){
-    var keys=[
+  function readBase() {
+    var keys = [
       'SelectedVariantCombinedTotals',
       'SelectedVariantCombined',
       'SelectedVariant',
       'SelectedVariantLabel'
     ];
 
-    for (var i=0; i<keys.length; i++){
-      var o=getLS(keys[i]);
+    for (var i = 0; i < keys.length; i++) {
+      var o = getLS(keys[i]);
       if (!o) continue;
 
-      if (o.base){
+      if (o.base) {
         return {
           metal: s(o.base.metal_weight_num || o.base.metal_num || o.base.metal || o.base.metal_weight),
           diamond: s(o.base.diamond_1_weight_num || o.base.diamond_num || o.base.diamond || o.base.diamond_1_weight),
@@ -67,7 +67,7 @@ document.addEventListener("DOMContentLoaded", function () {
         };
       }
 
-      if (o.metal_weight_num || o.diamond_1_weight_num || o.metal_weight || o.diamond_1_weight){
+      if (o.metal_weight_num || o.diamond_1_weight_num || o.metal_weight || o.diamond_1_weight) {
         return {
           metal: s(o.metal_weight_num || o.metal_weight),
           diamond: s(o.diamond_1_weight_num || o.diamond_1_weight),
@@ -78,60 +78,60 @@ document.addEventListener("DOMContentLoaded", function () {
       }
     }
 
-    return { metal:0, diamond:0, variantId:null, image:null, title:null };
+    return { metal: 0, diamond: 0, variantId: null, image: null, title: null };
   }
 
-  function readBreakdown(){ 
-    var b = getLS('lucira_price_breakdown'); 
+  function readBreakdown() {
+    var b = getLS('lucira_price_breakdown');
     if (!b) return null;
 
     if (b.baseCents !== undefined || b.charmsCents !== undefined)
-      return { base:s(b.baseCents)/100, charms:s(b.charmsCents)/100, total:s(b.totalCents)/100 };
+      return { base: s(b.baseCents) / 100, charms: s(b.charmsCents) / 100, total: s(b.totalCents) / 100 };
 
     if (b.base !== undefined || b.charms !== undefined)
-      return { base:s(b.base), charms:s(b.charms), total:s(b.total || b.base + b.charms) };
+      return { base: s(b.base), charms: s(b.charms), total: s(b.total || b.base + b.charms) };
 
     if (b.base_price !== undefined || b.charms_price !== undefined)
-      return { base:s(b.base_price), charms:s(b.charms_price), total:s(b.total_price || b.base_price + b.charms_price) };
+      return { base: s(b.base_price), charms: s(b.charms_price), total: s(b.total_price || b.base_price + b.charms_price) };
 
     return null;
   }
 
-  function readVariantImageFromPage(id){
+  function readVariantImageFromPage(id) {
     try {
       if (!id) return null;
 
-      var n=document.getElementById('variant-meta-' + id);
+      var n = document.getElementById('variant-meta-' + id);
       if (!n) return null;
 
       var p = JSON.parse(n.textContent || n.innerText || '{}');
-      if (p.image){
-        var im=p.image;
+      if (p.image) {
+        var im = p.image;
         if (im.indexOf('//') === 0) im = window.location.protocol + im;
         return im;
       }
 
-    } catch(e){}
+    } catch (e) { }
     return null;
   }
 
   // DOM refs
-  var backdrop=document.getElementById('lucira-drawer-backdrop');
-  var drawer=document.getElementById('lucira-drawer');
-  var closeBtn=document.getElementById('lucira-drawer-close');
+  var backdrop = document.getElementById('lucira-drawer-backdrop');
+  var drawer = document.getElementById('lucira-drawer');
+  var closeBtn = document.getElementById('lucira-drawer-close');
 
-  var imgEl=document.getElementById('lucira-variant-img');
-  var titleEl=document.getElementById('lucira-variant-title');
-  var subEl=document.getElementById('lucira-variant-sub');
+  var imgEl = document.getElementById('lucira-variant-img');
+  var titleEl = document.getElementById('lucira-variant-title');
+  var subEl = document.getElementById('lucira-variant-sub');
 
-  var metalEl=document.getElementById('lucira-metal-value');
-  var diamondEl=document.getElementById('lucira-diamond-value');
+  var metalEl = document.getElementById('lucira-metal-value');
+  var diamondEl = document.getElementById('lucira-diamond-value');
 
-  var basePriceEl=document.getElementById('lucira-base-price');
-  var charmsPriceEl=document.getElementById('lucira-charms-price');
-  var totalPriceEl=document.getElementById('lucira-total-price');
+  var basePriceEl = document.getElementById('lucira-base-price');
+  var charmsPriceEl = document.getElementById('lucira-charms-price');
+  var totalPriceEl = document.getElementById('lucira-total-price');
 
-  function populate(){
+  function populate() {
     var charm = readCharm();
     var base = readBase();
 
@@ -145,49 +145,72 @@ document.addEventListener("DOMContentLoaded", function () {
     var basePrice = 0;
     var charmsPrice = 0;
 
-    if (breakdown){
+    if (breakdown) {
       basePrice = breakdown.base;
       charmsPrice = breakdown.charms;
     } else {
-      basePrice = getLS('SelectedVariantCombinedTotals')?.base?.price || 
-                  getLS('SelectedVariant')?.basePrice || 0;
+      basePrice = getLS('SelectedVariantCombinedTotals')?.base?.price ||
+        getLS('SelectedVariant')?.basePrice || 0;
       charmsPrice = charm.price || 0;
     }
 
-    if (imgEl) imgEl.src = base.image || readVariantImageFromPage(base.variantId) || imgEl.src;
+    var cachedImage = localStorage.getItem('lucira_visualiser_image_url');
+    if (imgEl) imgEl.src = cachedImage || base.image || readVariantImageFromPage(base.variantId) || imgEl.src;
     if (titleEl) titleEl.textContent = base.title || 'Selected product';
     if (subEl) subEl.textContent = base.variantId ? ('Variant: ' + base.variantId) : '';
 
     if (basePriceEl) basePriceEl.textContent = basePrice ? fmt(basePrice) : '-';
     if (charmsPriceEl) charmsPriceEl.textContent = charmsPrice ? fmt(charmsPrice) : '-';
-    if (totalPriceEl) totalPriceEl.textContent = (s(basePrice)+s(charmsPrice)) ? fmt(s(basePrice)+s(charmsPrice)) : '-';
+    if (totalPriceEl) totalPriceEl.textContent = (s(basePrice) + s(charmsPrice)) ? fmt(s(basePrice) + s(charmsPrice)) : '-';
+  }
+
+  async function uploadVisualizerImage() {
+    if (typeof window.getVisualizerImage !== 'function') return;
+    const dataURL = window.getVisualizerImage();
+    if (!dataURL) return;
+
+    try {
+      const response = await fetch('http://72.61.251.237:3000/api/upload-shopify-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataURL })
+      });
+      const data = await response.json();
+      if (data && data.fileUrl) {
+        localStorage.setItem('lucira_visualiser_image_url', data.fileUrl);
+        if (imgEl) imgEl.src = data.fileUrl;
+      }
+    } catch (e) {
+      console.error('Failed to upload visualizer image', e);
+    }
   }
 
   if (!backdrop || !drawer) return;
 
-  function openDrawer(){
+  function openDrawer() {
     backdrop.style.display = 'flex';
     document.body.classList.add('drawer-open');
     setTimeout(() => drawer.classList.add('open'), 20);
     setTimeout(populate, 30);
+    uploadVisualizerImage();
   }
 
-  function closeDrawer(){
+  function closeDrawer() {
     drawer.classList.remove('open');
     document.body.classList.remove('drawer-open');
-    setTimeout(() => backdrop.style.display='none', 280);
+    setTimeout(() => backdrop.style.display = 'none', 280);
   }
 
-  document.body.addEventListener('click', function(e){
-    if (e.target.closest('.cta-footer, #lf-total-cta')){
+  document.body.addEventListener('click', function (e) {
+    if (e.target.closest('.cta-footer, #lf-total-cta')) {
       e.preventDefault();
       openDrawer();
     }
-  }, {passive:true});
+  }, { passive: true });
 
   if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 
-  backdrop.addEventListener('click', function(e){
+  backdrop.addEventListener('click', function (e) {
     if (e.target === backdrop) closeDrawer();
   });
 
@@ -213,13 +236,17 @@ function sendToCart() {
 
     /* BASE PRODUCT – unchanged */
     if (baseObj) {
+      const cachedImage = localStorage.getItem('lucira_visualiser_image_url');
+      const props = {
+        _bundle_id: bundleId,
+        _bundle_type: 'base'
+      };
+      if (cachedImage) props._visualiser_image = cachedImage;
+
       items.push({
         id: Number(baseObj),
         quantity: 1,
-        properties: {
-          _bundle_id: bundleId,
-          _bundle_type: 'base'
-        }
+        properties: props
       });
     }
 
@@ -261,7 +288,7 @@ function sendToCart() {
     .then((res) => res.json())
     .then((data) => {
       console.log("Products added:", data);
-
+      localStorage.removeItem('lucira_visualiser_image_url');
       return fetch("/cart?section_id=cart-drawer");
     })
     .then((response) => response.text())
