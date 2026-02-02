@@ -84,8 +84,8 @@
   }
 
   .charm-drawer__image-wrap img {
-    max-width: 100%;
     height: auto;
+    width:50%;
     display: block;
   }
 
@@ -124,13 +124,31 @@
   }
   @media screen and (min-width:900px) and (max-width:1600px){
 .charm-drawer__image-wrap{
-    width:300px;
+  
     height:auto;
 }
 .charm-drawer__content h3 {
     font-size: 24px;
 }
 }
+  .charm-drawer__specs {
+    margin-top: 30px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 20px;
+  }
+  .spec-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    font-size: 15px;
+    color: #1a1a1a;
+  }
+  .spec-label {
+    color: #666;
+  }
+  .spec-value {
+    font-weight: 500;
+  }
 </style>
 
 
@@ -146,8 +164,19 @@
       </div>
 
       <div class="charm-drawer__content">
-        <h3 id="drawer-charm-title"></h3>
+
         <p id="drawer-charm-desc"></p>
+        <div id="drawer-product-desc-wrap" style="display:none;">
+          <div id="drawer-product-desc" style="font-size: 14px; color: #666; line-height: 1.6; margin-top: 10px;"></div>
+        </div>
+
+        <div class="charm-drawer__specs" id="drawer-specs-wrap" style="display:none;">
+          <div class="spec-item"><span class="spec-label">Gold Purity :</span><span class="spec-value" id="spec-gold-purity">-</span></div>
+          <div class="spec-item"><span class="spec-label">Gold Weight (Net) :</span><span class="spec-value" id="spec-gold-weight">-</span></div>
+          <div class="spec-item"><span class="spec-label">Diamond Weight :</span><span class="spec-value" id="spec-diamond-weight">-</span></div>
+          <div class="spec-item"><span class="spec-label">Diamond Quantity :</span><span class="spec-value" id="spec-diamond-qty">-</span></div>
+          <div class="spec-item"><span class="spec-label">Pendant Weight (Gross) :</span><span class="spec-value" id="spec-gross-weight">-</span></div>
+        </div>
 
         <button class="drawer-cta" data-close-drawer>CONTINUE SHOPPING</button>
       </div>
@@ -178,6 +207,7 @@
     };
 
     const open = (m) => {
+      console.log('Charm Drawer: Opening with metadata:', m);
       if (!m) return;
       if (img) {
         img.src = m.image || '';
@@ -185,6 +215,67 @@
       }
       if (title) title.textContent = m.heading || '';
       if (desc) desc.textContent = m.description || '';
+
+      // Product Description
+      const prodDescWrap = document.getElementById('drawer-product-desc-wrap');
+      const prodDesc = document.getElementById('drawer-product-desc');
+      if (prodDesc && m.product_description) {
+        prodDesc.innerHTML = m.product_description;
+        prodDescWrap.style.display = 'block';
+      } else if (prodDescWrap) {
+        prodDescWrap.style.display = 'none';
+      }
+
+      // Specifications calculation
+      const specsWrap = document.getElementById('drawer-specs-wrap');
+      if (specsWrap) {
+        // Handle different JSON structures: either { components: [...] } or just [...]
+        let comps = null;
+        if (m.components) {
+          if (Array.isArray(m.components)) {
+             comps = m.components;
+          } else if (m.components.components && Array.isArray(m.components.components)) {
+             comps = m.components.components;
+          }
+        }
+
+        if (comps && comps.length > 0) {
+          console.log('Charm Drawer: Calculating specs from', comps.length, 'components');
+          specsWrap.style.display = 'block';
+          
+          // Gold Purity (Variant Name)
+          document.getElementById('spec-gold-purity').textContent = m.heading || '-';
+          
+          // Gold Weight (Net) - 1st component
+          const goldWeight = parseFloat(comps[0].weight) || 0;
+          document.getElementById('spec-gold-weight').textContent = goldWeight.toFixed(2) + ' gm';
+          
+          let diamondWeight = 0;
+          let diamondQty = 0;
+          let grossWeight = 0;
+          
+          comps.forEach((c, idx) => {
+            const w = parseFloat(c.weight) || 0;
+            const p = parseInt(c.pieces) || 0;
+            
+            grossWeight += w;
+            
+            if (idx > 0) {
+              if (p > 0) {
+                diamondWeight += w;
+              }
+              diamondQty += p;
+            }
+          });
+          
+          document.getElementById('spec-diamond-weight').textContent = diamondWeight.toFixed(2) + ' gm';
+          document.getElementById('spec-diamond-qty').textContent = diamondQty + ' units';
+          document.getElementById('spec-gross-weight').textContent = grossWeight.toFixed(2) + ' gm';
+        } else {
+          console.warn('Charm Drawer: No components array found in', m.components);
+          specsWrap.style.display = 'none';
+        }
+      }
 
       lastFocus = document.activeElement;
       document.body.style.overflow = 'hidden';
