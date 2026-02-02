@@ -347,46 +347,26 @@ function sendToCart() {
     .then((res) => res.json())
     .then((data) => {
       console.log("Products added:", data);
-      // Fetch both drawer and bubble sections
-      return fetch(`${window.location.pathname}?sections=cart-drawer,cart-icon-bubble`);
+
+      return fetch("/cart?section_id=cart-drawer");
     })
-    .then((response) => response.json())
-    .then((sections) => {
+    .then((response) => response.text())
+    .then((html) => {
       const parser = new DOMParser();
+      const newDoc = parser.parseFromString(html, "text/html");
 
-      // 1. Update Cart Drawer
-      if (sections['cart-drawer']) {
-        const drawerHtml = parser.parseFromString(sections['cart-drawer'], "text/html");
-        const newDrawerInner = drawerHtml.querySelector("#CartDrawer");
-        const currentDrawer = document.querySelector("#CartDrawer");
-        if (currentDrawer && newDrawerInner) {
-          currentDrawer.innerHTML = newDrawerInner.innerHTML;
-        }
+      const newDrawer = newDoc.querySelector("#CartDrawer");
+      const currentDrawer = document.querySelector("#CartDrawer");
+
+      if (currentDrawer && newDrawer) {
+        currentDrawer.innerHTML = newDrawer.innerHTML;
       }
 
-      // 2. Update Cart Bubble (Count)
-      if (sections['cart-icon-bubble']) {
-        const bubbleHtml = parser.parseFromString(sections['cart-icon-bubble'], "text/html");
-        const newBubbleInner = bubbleHtml.querySelector("#cart-icon-bubble");
-        const currentBubble = document.querySelector("#cart-icon-bubble");
-        if (currentBubble && newBubbleInner) {
-          currentBubble.innerHTML = newBubbleInner.innerHTML;
-        }
-      }
-
-      // 3. Open Drawer
       document.querySelector("cart-drawer")?.classList.add("is-open");
       document.querySelector("cart-drawer")?.classList.remove("is-empty");
       document.querySelector("cart-drawer")?.classList.add("active");
-      const drawerInner = document.querySelector(".drawer__inner");
-      if (drawerInner) drawerInner.style.transform = "translateX(0)";
+      document.querySelector(".drawer__inner").style.transform = "translateX(0)";
       document.body.classList.add("overflow-hidden");
-
-      // 4. Trigger theme event for other components
-      document.dispatchEvent(new CustomEvent('cart:change', {
-        bubbles: true,
-        detail: { base_item: data }
-      }));
     })
     .catch((err) => console.error("Add to cart error:", err));
 }
