@@ -174,7 +174,18 @@
 
                         <tr id="CartDrawer-Item-{{ item.index | plus: 1 }}" class="cart-item parent_item{% if item.product.title contains 'Jewelry Insurance' %} insurance-item-cart-item{% endif %}" role="row" data-cart-item>
                           <td class="cart-item__media" role="cell" headers="CartDrawer-ColumnProductImage">
-                            {% if item.image %}
+                            {% if item.properties._visualiser_image != blank %}
+                              <img
+                                class="cart-item__image"
+                                src="{{ item.properties._visualiser_image }}"
+                                alt="{{ item.image.alt | escape }}"
+                                title="{{ item.image.alt | escape }}"
+                                loading="lazy"
+                                width="150"
+                                height="150"
+                                style="object-fit: contain;"
+                              >
+                             {% elsif item.image %}
                               <img
                                 class="cart-item__image"
                                 src="{{ item.image | image_url: width: 300 }}"
@@ -546,6 +557,56 @@
   data-parent-key="{{ item.key }}"
   data-bundle-id="{{ item.properties._bundle_id }}"
 >
+                           <!-- Parent product as first child in breakup -->
+                              <div class="component_item">
+                                <div class="commponent_item_image">
+                                  {% if item.image %}
+                                    <img
+                                      class="commponent_item_image_item"
+                                      src="{{ item.image | image_url: width: 130 }}"
+                                      alt="{{ item.image.alt | escape }}"
+                                      title="{{ item.image.alt | escape }}"
+                                      loading="lazy"
+                                      width="150"
+                                      height="{{ 150 | divided_by: item.image.aspect_ratio | ceil }}"
+                                    >
+                                  {% endif %}
+                                </div>
+                                <div class="component_item_details">
+                                    <div class="cart-item__name h4 break desktop-show">
+                                      {{- item.product.title | escape | truncate: 42 -}}
+                                    </div>
+                                    <div class="cart-item__name h4 break mobile-show">
+                                      {{- item.product.title | escape | truncate: 32 -}}
+                                    </div>
+                                      <span class="child-quantity">
+                                        x{{ item.quantity }}
+                                      </span>
+
+                                    {%- if item.product.has_only_default_variant == false or item.properties.size != 0 -%}
+                                      <dl class="item_details">
+                                        {%- if item.product.has_only_default_variant == false -%}
+                                          {%- for option in item.options_with_values -%}
+                                            <div class="product-option">
+                                              <dt>{{ option.name }}:</dt>
+                                              <dd>
+                                                {{ option.value -}}
+                                                {%- unless forloop.last %}, {% endunless %}
+                                              </dd>
+                                            </div>
+                                          {%- endfor -%}
+                                        {%- endif -%}
+                                      </dl>
+                                    {%- endif -%}
+                                </div>
+                                <div class="component_item_price">
+                                  <div class="cart-item__price-wrapper">
+                                      <span class="price price--end">
+                                        {{ item.final_line_price | money }}
+                                      </span>
+                                  </div>
+                                </div>
+                              </div>
 
 
                           {% for child in cart.items %}
@@ -648,6 +709,72 @@
                               </div>
                             {% endif %}
                           {% endfor %}
+                          </td>
+                        </tr>
+                      {% elsif item.properties._bundle_type == blank %}
+                        <!-- Regular non-bundled item -->
+                        <tr id="CartDrawer-Item-{{ item.index | plus: 1 }}" class="cart-item{% if item.product.title contains 'Jewelry Insurance' %} insurance-item-cart-item{% endif %}" role="row" data-cart-item>
+                          <td class="cart-item__media" role="cell" headers="CartDrawer-ColumnProductImage">
+                             {% if item.image %}
+                              <img
+                                class="cart-item__image"
+                                src="{{ item.image | image_url: width: 300 }}"
+                                alt="{{ item.image.alt | escape }}"
+                                title="{{ item.image.alt | escape }}"
+                                loading="lazy"
+                                width="150"
+                                height="{{ 150 | divided_by: item.image.aspect_ratio | ceil }}"
+                              >
+                            {% endif %}
+                          </td>
+
+                          <td class="cart-item__details" role="cell" headers="CartDrawer-ColumnProduct">
+                            <div class="cart-item__name h4 break desktop-show">{{ item.product.title | escape | truncate: 42 }}</div>
+                            <div class="cart-item__name h4 break mobile-show">{{ item.product.title | escape | truncate: 32 }}</div>
+                            {%- if item.product.has_only_default_variant == false or item.properties.size != 0 -%}
+                              <dl>
+                                {%- if item.product.has_only_default_variant == false -%}
+                                  {%- for option in item.options_with_values -%}
+                                    <div class="product-option">
+                                      <dt>{{ option.name }}:</dt>
+                                      <dd>{{ option.value -}}{%- unless forloop.last %}, {% endunless %}</dd>
+                                    </div>
+                                  {%- endfor -%}
+                                {%- endif -%}
+                                {%- for property in item.properties -%}
+                                  {%- assign property_first_char = property.first | slice: 0 -%}
+                                  {%- if property.last != blank and property_first_char != '_' -%}
+                                    <div class="product-option">
+                                      <dt>{{ property.first }}:</dt>
+                                      <dd>{{ property.last }}</dd>
+                                    </div>
+                                  {%- endif -%}
+                                {%- endfor -%}
+                              </dl>
+                            {%- endif -%}
+                          </td>
+
+                          <td class="cart-item__totals right" role="cell" headers="CartDrawer-ColumnTotal">
+                            <div class="cart-item__price-wrapper">
+                              <span class="price price--end">{{ item.final_line_price | money }}</span>
+                            </div>
+                          </td>
+
+                          <td class="cart-item__quantity" role="cell" headers="CartDrawer-ColumnQuantity">
+                             <div class="cart-qty">
+                                <quantity-popover>
+                                  <div class="cart-item__quantity-wrapper quantity-popover-wrapper">
+                                    <quantity-input class="quantity cart-quantity">
+                                      <button class="quantity__button" name="minus" type="button"><span class="svg-wrapper">{{ 'icon-minus.svg' | inline_asset_content }}</span></button>
+                                      <input class="quantity__input" type="number" name="updates[]" value="{{ item.quantity }}" data-index="{{ item.index | plus: 1 }}" id="Drawer-quantity-{{ item.index | plus: 1 }}">
+                                      <button class="quantity__button" name="plus" type="button"><span class="svg-wrapper">{{ 'icon-plus.svg' | inline_asset_content }}</span></button>
+                                    </quantity-input>
+                                    <cart-remove-button data-index="{{ item.index | plus: 1 }}">
+                                      <button type="button" class="button button--tertiary cart-remove-button"><span class="svg-wrapper">{{ 'icon-remove.svg' | inline_asset_content }}</span></button>
+                                    </cart-remove-button>
+                                  </div>
+                                </quantity-popover>
+                             </div>
                           </td>
                         </tr>
                       {% endif %}
