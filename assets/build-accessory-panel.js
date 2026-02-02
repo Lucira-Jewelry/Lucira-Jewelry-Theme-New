@@ -2,6 +2,7 @@ function resetJourneyOnLoad() {
   try {
     localStorage.removeItem('charm_cart_v1');
     localStorage.removeItem('lucira_price_breakdown');
+    localStorage.removeItem('lucira_visualiser_image_url');
   } catch (e) { }
 }
 resetJourneyOnLoad();
@@ -36,17 +37,17 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
           margin: 0 auto !important;
           display: block !important;
         }
         #vis-Visualiser_Canvas {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
         }
         #vis-Visualiser_Canvas canvas {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
         }
       }
     `;
@@ -793,7 +794,7 @@ window.MainBaseCharm = function () {
       if (isMobileLayout()) {
         if (wrapper) {
           wrapper.style.setProperty('width', '350px', 'important');
-          wrapper.style.setProperty('height', '353px', 'important');
+          wrapper.style.setProperty('height', '310px', 'important');
         }
       } else {
         // Desktop: Increase main container height to prevent cropping
@@ -806,7 +807,7 @@ window.MainBaseCharm = function () {
       let width = isMobileLayout() ? 350 : (rect.width || 440);
       width = Math.max(300, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
-      const height = isMobileLayout() ? 353 : (width * (445 / 440));
+      const height = isMobileLayout() ? 310 : (width * (445 / 440));
 
       this.stageWidth = width;
       this.stageHeight = height;
@@ -1421,7 +1422,37 @@ window.MainBaseCharm = function () {
       }
     }
 
+    toDataURL() {
+      if (!this.stage) return null;
+
+      // Reset to base view briefly to capture a consistent image
+      const oldScale = this.stage.scaleX();
+      const oldPos = this.stage.position();
+
+      this.stage.scale({ x: 1, y: 1 });
+      this.stage.position({ x: 0, y: 0 });
+      this.stage.batchDraw();
+
+      const dataURL = this.stage.toDataURL({
+        pixelRatio: 2 // High quality
+      });
+
+      // Restore previous view
+      this.stage.scale({ x: oldScale, y: oldScale });
+      this.stage.position(oldPos);
+      this.stage.batchDraw();
+
+      return dataURL;
+    }
+
   }
+
+  window.getVisualizerImage = function () {
+    if (typeof ensureBV !== 'function') return null;
+    const instance = ensureBV();
+    return instance ? instance.toDataURL() : null;
+  };
+
   let bv = null;
   function ensureBV() {
     if (!bv) {
