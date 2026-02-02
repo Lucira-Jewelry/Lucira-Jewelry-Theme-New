@@ -594,6 +594,24 @@ if (!customElements.get('product-info')) {
       get sectionId() {
         return this.dataset.originalSection || this.dataset.section;
       }
+
+      subscribe(PUB_SUB_EVENTS.variantChange, ({ data }) => {
+        const variant = data?.variant;
+        if (!variant) return;
+
+        const container = document.getElementById("pdp-delivery-check");
+        if (!container) return;
+
+        container.dataset.variantId = variant.id;
+        container.dataset.available = String(!!variant.available);
+        container.dataset.inventoryQuantity =
+          typeof variant.inventory_quantity === "number"
+            ? String(variant.inventory_quantity)
+            : "";
+
+        window.repaintDelivery?.();
+      });
+
     }
   );
 }
