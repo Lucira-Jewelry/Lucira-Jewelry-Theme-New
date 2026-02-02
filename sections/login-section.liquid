@@ -569,90 +569,84 @@
 </script>
 
 <script>
-  function setCookie(name, value, days) {
-    const d = new Date();
-    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-    document.cookie = `${name}=${value}; expires=${d.toUTCString()}; path=/; SameSite=Lax`;
-  }
+/* ===========================
+   🍪 COOKIE HELPERS (30 DAYS)
+   =========================== */
+function setLuciraPopupCookie(days = 30) {
+  const d = new Date();
+  d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie =
+    'lucira_login_popup_seen=true; expires=' +
+    d.toUTCString() +
+    '; path=/; SameSite=Lax';
+}
 
-  function getCookie(name) {
-    return document.cookie
-      .split('; ')
-      .find(row => row.startsWith(name + '='))
-      ?.split('=')[1];
-  }
-</script>
+function hasLuciraPopupCookie() {
+  return document.cookie
+    .split('; ')
+    .some(row => row.startsWith('lucira_login_popup_seen='));
+}
 
-<script>
-(function () {
-
+/* =========================================
+   ⏱ POPUP AUTO SHOW (SAFE GUARD ONLY)
+   ========================================= */
+document.addEventListener('DOMContentLoaded', function () {
   const POPUP_ID = 'login-popup';
-  const COOKIE_KEY = 'lucira_login_popup_seen';
-  const COOKIE_DAYS = 30;
   const SHOW_DELAY = 15000;
 
-  function hideSpinWheelHard() {
-    const wheel = document.querySelector('.spin-wheel-wrapper');
-    if (!wheel) return;
-    wheel.style.display = 'none';
-    wheel.style.visibility = 'hidden';
+  const popup = document.getElementById(POPUP_ID);
+  if (!popup) return;
+
+  // ❌ Do not show popup if cookie exists
+  if (hasLuciraPopupCookie()) return;
+
+  // ❌ Logged-in users should never see popup
+  if (document.body.classList.contains('customer-logged-in')) {
+    setLuciraPopupCookie();
+    return;
   }
 
-  function resetPopupState() {
-    const wrapper = document.querySelector('.otp-login-form-wrapper');
-    if (!wrapper) return;
-    wrapper.classList.remove('signup-active');
-    hideSpinWheelHard();
-  }
+  // ⏱ Show popup after delay (ONLY ONCE)
+  setTimeout(() => {
+    // Double safety check
+    if (hasLuciraPopupCookie()) return;
 
-  function showPopup() {
-    const popup = document.getElementById(POPUP_ID);
-    if (!popup) return;
     popup.style.display = 'flex';
+    setLuciraPopupCookie(); // persist for 30 days
+  }, SHOW_DELAY);
+});
+
+/* =========================================
+   🔒 PATCH EXISTING LOGIN SUCCESS (NO CHANGE)
+   ========================================= */
+/*
+  IMPORTANT:
+  Add ONLY this line inside your EXISTING login success block:
+
+  setLuciraPopupCookie();
+
+  Example (DO NOT DUPLICATE THIS BLOCK):
+
+  if (data.type === 'success' && data.credentials) {
+    setLuciraPopupCookie(); // 👈 ADD THIS LINE
+    shopifyAutoLogin(data.credentials.email, data.credentials.password);
+    return;
   }
+*/
 
-  document.addEventListener('DOMContentLoaded', function () {
-
-    // 🔒 Always lock wheel on load
-    resetPopupState();
-
-    // ❌ Logged-in user → never show popup
-    if (document.body.classList.contains('customer-logged-in')) {
-      setCookie(COOKIE_KEY, 'true', COOKIE_DAYS);
-      return;
+/* =========================================
+   ❌ OPTIONAL: When popup is manually closed
+   ========================================= */
+window.closeloginPopup = (function (originalFn) {
+  return function (e, id) {
+    setLuciraPopupCookie(); // persist on manual close
+    if (typeof originalFn === 'function') {
+      originalFn(e, id);
     }
-
-    // ❌ Cookie exists → do nothing
-    if (getCookie(COOKIE_KEY)) return;
-
-    // ⏱ Delayed popup
-    setTimeout(() => {
-      showPopup();
-      setCookie(COOKIE_KEY, 'true', COOKIE_DAYS);
-    }, SHOW_DELAY);
-  });
-
-  // 🔁 Used after OTP → register
-  window.showSignupWithSpinWheel = function () {
-    const wrapper = document.querySelector('.otp-login-form-wrapper');
-    const wheel = document.querySelector('.spin-wheel-wrapper');
-    if (!wrapper || !wheel) return;
-
-    wrapper.classList.add('signup-active');
-    wheel.style.display = 'flex';
-    wheel.style.visibility = 'visible';
   };
-
-  // ❌ Close popup
-  window.closeloginPopup = function (e, id) {
-    if (typeof id === 'undefined') id = e;
-    const popup = document.getElementById(id);
-    if (popup) popup.style.display = 'none';
-    resetPopupState();
-  };
-
-})();
+})(window.closeloginPopup);
 </script>
+
 
 
 <style>
