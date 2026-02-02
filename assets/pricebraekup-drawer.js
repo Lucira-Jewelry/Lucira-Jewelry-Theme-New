@@ -131,7 +131,53 @@ document.addEventListener("DOMContentLoaded", function () {
   var charmsPriceEl = document.getElementById('lucira-charms-price');
   var totalPriceEl = document.getElementById('lucira-total-price');
 
+  async function prepareAndStoreVisualiserImage() {
+    const debugImg = document.getElementById('lucira-variant-img');
+    if (typeof window.getVisualizerImage !== 'function') {
+      console.warn('Visualizer: window.getVisualizerImage missing');
+      return;
+    }
+    const dataURL = window.getVisualizerImage();
+    if (!dataURL || dataURL.length < 1000) {
+      console.warn('Visualizer: Capture failed or too small');
+      return;
+    }
+
+    // Immediate update
+    if (debugImg) {
+      debugImg.src = dataURL;
+      debugImg.style.objectFit = 'contain';
+      console.log('Visualizer: Immediate UI update with dataURL');
+    }
+    localStorage.setItem('visualiser_image_url', dataURL);
+
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const response = await fetch('http://72.61.251.237:3000/api/upload-shopify-file', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: dataURL }),
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data && data.fileUrl) {
+          localStorage.setItem('visualiser_image_url', data.fileUrl);
+          if (debugImg) debugImg.src = data.fileUrl;
+          console.log('Visualizer: Shopify CDN URL saved:', data.fileUrl);
+        }
+      }
+    } catch (e) {
+      console.warn('Visualizer: Upload background task failed', e);
+    }
+  }
+
   function populate() {
+    console.log('Visualizer: populate() called');
     var charm = readCharm();
     var base = readBase();
 
@@ -154,35 +200,26 @@ document.addEventListener("DOMContentLoaded", function () {
       charmsPrice = charm.price || 0;
     }
 
-    var cachedImage = localStorage.getItem('lucira_visualiser_image_url');
-    if (imgEl) imgEl.src = cachedImage || base.image || readVariantImageFromPage(base.variantId) || imgEl.src;
+    const vImg = localStorage.getItem('visualiser_image_url');
+    const targetImg = document.getElementById('lucira-variant-img');
+
+    if (targetImg) {
+      if (vImg && vImg.length > 500) {
+        targetImg.src = vImg;
+        targetImg.style.objectFit = 'contain';
+        console.log('Visualizer populate: Applied capture from cache');
+      } else {
+        targetImg.src = base.image || readVariantImageFromPage(base.variantId) || targetImg.src;
+        console.log('Visualizer populate: Fallback to base image');
+      }
+    }
+
     if (titleEl) titleEl.textContent = base.title || 'Selected product';
     if (subEl) subEl.textContent = base.variantId ? ('Variant: ' + base.variantId) : '';
 
     if (basePriceEl) basePriceEl.textContent = basePrice ? fmt(basePrice) : '-';
     if (charmsPriceEl) charmsPriceEl.textContent = charmsPrice ? fmt(charmsPrice) : '-';
     if (totalPriceEl) totalPriceEl.textContent = (s(basePrice) + s(charmsPrice)) ? fmt(s(basePrice) + s(charmsPrice)) : '-';
-  }
-
-  async function uploadVisualizerImage() {
-    if (typeof window.getVisualizerImage !== 'function') return;
-    const dataURL = window.getVisualizerImage();
-    if (!dataURL) return;
-
-    try {
-      const response = await fetch('http://72.61.251.237:3000/api/upload-shopify-file', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: dataURL })
-      });
-      const data = await response.json();
-      if (data && data.fileUrl) {
-        localStorage.setItem('lucira_visualiser_image_url', data.fileUrl);
-        if (imgEl) imgEl.src = data.fileUrl;
-      }
-    } catch (e) {
-      console.error('Failed to upload visualizer image', e);
-    }
   }
 
   if (!backdrop || !drawer) return;
@@ -192,7 +229,6 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.classList.add('drawer-open');
     setTimeout(() => drawer.classList.add('open'), 20);
     setTimeout(populate, 30);
-    uploadVisualizerImage();
   }
 
   function closeDrawer() {
@@ -201,12 +237,35 @@ document.addEventListener("DOMContentLoaded", function () {
     setTimeout(() => backdrop.style.display = 'none', 280);
   }
 
-  document.body.addEventListener('click', function (e) {
-    if (e.target.closest('.cta-footer, #lf-total-cta')) {
-      e.preventDefault();
-      openDrawer();
+  document.body.addEventListener('click', async function (e) {
+    const btn = e.target.closest('.cta-footer, #lf-total-cta');
+    if (!btn) return;
+
+    e.preventDefault();
+    const originalContent = btn.innerHTML;
+    const isMainBtn = btn.id === 'lf-total-cta';
+
+    if (isMainBtn) {
+      btn.innerText = 'GENERATING IMAGE...';
+      btn.style.pointerEvents = 'none';
+      btn.style.opacity = '0.7';
     }
-  }, { passive: true });
+
+    try {
+      await prepareAndStoreVisualiserImage();
+    } catch (err) {
+      console.error('Visualiser upload failed:', err);
+    } finally {
+      if (isMainBtn) {
+        btn.innerHTML = originalContent;
+        btn.style.pointerEvents = '';
+        btn.style.opacity = '';
+      }
+    }
+
+    openDrawer();
+  }, { passive: false });
+
 
   if (closeBtn) closeBtn.addEventListener('click', closeDrawer);
 
@@ -234,9 +293,9 @@ function sendToCart() {
     const charm = JSON.parse(localStorage.getItem("charm_cart_v1") || "{}");
     const baseObj = JSON.parse(localStorage.getItem("SelectedVariant") || "null");
 
-    /* BASE PRODUCT – unchanged */
+    /* BASE PRODUCT */
     if (baseObj) {
-      const cachedImage = localStorage.getItem('lucira_visualiser_image_url');
+      const cachedImage = localStorage.getItem('visualiser_image_url');
       const props = {
         _bundle_id: bundleId,
         _bundle_type: 'base'
@@ -288,7 +347,7 @@ function sendToCart() {
     .then((res) => res.json())
     .then((data) => {
       console.log("Products added:", data);
-      localStorage.removeItem('lucira_visualiser_image_url');
+
       return fetch("/cart?section_id=cart-drawer");
     })
     .then((response) => response.text())
