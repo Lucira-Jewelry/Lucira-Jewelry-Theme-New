@@ -40,22 +40,25 @@
 
   {% assign v = product.selected_or_first_available_variant %}
 
-  <div class="lucira-delivery-info {% if v.available %} offer-delivery-strip {% endif %}">
+  <div class="lucira-delivery-info  offer-delivery-strip">
     <span class="lucira-delivery-time" id="delivery-text">
       {% if v.inventory_quantity > 0
         and v.available
         and product.tags contains 'fast shipping' %}
-        Arrives before <strong class="hightlight-text">Valentine’s Day</strong>
+        Arrives before <strong>Valentine’s Day</strong>
       {% else %}
         Estimated Free Dispatch by
         <span class="delivry_txt">{{ delivery_date }}</span>
       {% endif %}
+      {% if v.inventory_quantity > 0
+        and v.available
+        and product.tags contains 'fast shipping' %}
+        <style>
+          .offer-delivery-strip {background: #ffedfb; width: 100%; max-width: 100%; padding: 8px; display: block; text-align: center; border-radius: 7px;}
+        </style>
+      {% endif %}
     </span>
   </div>
-  <style>
-    .offer-delivery-strip {background: #fafafa; width: 100%; max-width: 100%; padding: 8px; display: block; text-align: center; border-radius: 7px;}
-    .hightlight-text {font-weight: 500 !important; color: #ff0085 !important;}
-  </style>
 
 
 
@@ -149,44 +152,28 @@
 
     const computeDays = () => (isVariantInStock() ? 2 : 15);
 
-  function repaint() {
-    const deliveryText = container.querySelector("#delivery-text");
-    if (!deliveryText) return;
+    function repaint() {
+      const deliveryText = container.querySelector("#delivery-text");
+      const dateSpan = container.querySelector(".delivry_txt");
 
-    const inStock = isVariantInStock();
-    const showValentine = inStock && canShowValentine();
+      if (!deliveryText) return;
 
-    // Clear safely
-    deliveryText.textContent = '';
+      const inStock = isVariantInStock();
+      const hasFastShipping = true; // tag already validated server-side
 
-    // 💝 Valentine logic (STRICT)
-    if (showValentine) {
-      deliveryText.append(document.createTextNode('Arrives before '));
+      if (inStock && hasFastShipping) {
+        deliveryText.innerHTML = `Arrives before <strong>Valentine’s Day</strong>`;
+        return;
+      }
 
-      const strong = document.createElement('strong');
-      strong.className = 'hightlight-text';
-      strong.textContent = 'Valentine’s Day';
+      const days = computeDays();
+      const date = fmtDatePlus(days);
 
-      deliveryText.append(strong);
-      return;
+      deliveryText.innerHTML = `
+        Estimated Free Dispatch by
+        <span class="delivry_txt">${date}</span>
+      `;
     }
-
-    // 📦 Default delivery message
-    const days = computeDays();
-    const date = fmtDatePlus(days);
-
-    deliveryText.append(
-      document.createTextNode('Estimated Free Dispatch by ')
-    );
-
-    const dateSpan = document.createElement('span');
-    dateSpan.className = 'delivry_txt';
-    dateSpan.textContent = date;
-
-    deliveryText.append(dateSpan);
-  }
-
-
 
     function setLocateView() {
       isProcessingLocate = false;
@@ -481,4 +468,3 @@
     console.log('Delivery widget initialized:', window.debugDeliveryWidget());
   })();
 </script>
-
