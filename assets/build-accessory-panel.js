@@ -36,17 +36,17 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
           margin: 0 auto !important;
           display: block !important;
         }
         #vis-Visualiser_Canvas {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
         }
         #vis-Visualiser_Canvas canvas {
           width: 350px !important;
-          height: 353px !important;
+          height: 310px !important;
         }
       }
     `;
@@ -793,7 +793,7 @@ window.MainBaseCharm = function () {
       if (isMobileLayout()) {
         if (wrapper) {
           wrapper.style.setProperty('width', '350px', 'important');
-          wrapper.style.setProperty('height', '353px', 'important');
+          wrapper.style.setProperty('height', '310px', 'important');
         }
       } else {
         // Desktop: Increase main container height to prevent cropping
@@ -806,7 +806,7 @@ window.MainBaseCharm = function () {
       let width = isMobileLayout() ? 350 : (rect.width || 440);
       width = Math.max(300, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
-      const height = isMobileLayout() ? 353 : (width * (445 / 440));
+      const height = isMobileLayout() ? 310 : (width * (445 / 440));
 
       this.stageWidth = width;
       this.stageHeight = height;
@@ -1421,7 +1421,63 @@ window.MainBaseCharm = function () {
       }
     }
 
+    toDataURL() {
+      try {
+        if (!this.stage) return null;
+
+        // Save current state
+        const oldScale = this.stage.scaleX();
+        const oldPos = this.stage.position();
+
+        // Reset view for capture
+        this.stage.scale({ x: 1, y: 1 });
+        this.stage.position({ x: 0, y: 0 });
+        this.stage.draw(); // Use draw() for synchronous capture
+
+        let dataURL = null;
+        try {
+          dataURL = this.stage.toDataURL({
+            pixelRatio: 2
+          });
+        } catch (err) {
+          console.error('Visualizer: Capture failed. This is likely a CORS issue (tainted canvas).', err);
+          // If it's a security error, high-level fallback won't help, but we'll try standard ratio
+          try {
+            dataURL = this.stage.toDataURL({ pixelRatio: 1 });
+          } catch (inner) {
+            console.error('Visualizer: Standard capture also failed.', inner);
+          }
+        }
+
+        // Restore view
+        this.stage.scale({ x: oldScale, y: oldScale });
+        this.stage.position(oldPos);
+        this.stage.draw(); // Synchronous draw to restore view
+
+        return dataURL;
+      } catch (e) {
+        console.warn('Visualizer: Error in toDataURL method', e);
+        return null;
+      }
+    }
+
   }
+
+  window.getVisualizerImage = function () {
+    try {
+      if (window.bv && typeof window.bv.toDataURL === 'function') {
+        return window.bv.toDataURL();
+      }
+      if (typeof ensureBV === 'function') {
+        const instance = ensureBV();
+        return (instance && typeof instance.toDataURL === 'function') ? instance.toDataURL() : null;
+      }
+    } catch (e) {
+      console.error('Visualizer: getVisualizerImage failed', e);
+    }
+    return null;
+  };
+
   let bv = null;
   function ensureBV() {
     if (!bv) {
@@ -2521,8 +2577,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const dotsWrap = document.getElementById('lf-dots');
   const activeDot = document.getElementById('lf-active-dot');
   const caratValue = localStorage.getItem('Carat-value');
-  if (caratValue) {
-    label.insertAdjacentText('afterbegin', `<span class="carat-value">${caratValue}</span> `);
+  if (label && caratValue) {
+    label.insertAdjacentHTML('afterbegin', `<span class="carat-value">${caratValue}</span> `);
   }
 
   if (dotsWrap && dotsWrap.children.length === 0) {
