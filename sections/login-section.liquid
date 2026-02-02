@@ -567,83 +567,87 @@
     });
 
 </script>
+
+<script>
+  function setCookie(name, value, days) {
+    const d = new Date();
+    d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = `${name}=${value}; expires=${d.toUTCString()}; path=/; SameSite=Lax`;
+  }
+
+  function getCookie(name) {
+    return document.cookie
+      .split('; ')
+      .find(row => row.startsWith(name + '='))
+      ?.split('=')[1];
+  }
+</script>
+
 <script>
 (function () {
 
   const POPUP_ID = 'login-popup';
-  const SESSION_KEY = 'loginPopupShown';
+  const COOKIE_KEY = 'lucira_login_popup_seen';
+  const COOKIE_DAYS = 30;
   const SHOW_DELAY = 15000;
 
   function hideSpinWheelHard() {
     const wheel = document.querySelector('.spin-wheel-wrapper');
     if (!wheel) return;
-
     wheel.style.display = 'none';
     wheel.style.visibility = 'hidden';
-  }
-
-  function showSpinWheel() {
-    const wrapper = document.querySelector('.otp-login-form-wrapper');
-    const wheel = document.querySelector('.spin-wheel-wrapper');
-
-    if (!wrapper || !wheel) return;
-
-    wrapper.classList.add('signup-active');
-    wheel.style.display = 'flex';
-    wheel.style.visibility = 'visible';
   }
 
   function resetPopupState() {
     const wrapper = document.querySelector('.otp-login-form-wrapper');
     if (!wrapper) return;
-
     wrapper.classList.remove('signup-active');
     hideSpinWheelHard();
   }
 
-  // 🚀 DOM READY
+  function showPopup() {
+    const popup = document.getElementById(POPUP_ID);
+    if (!popup) return;
+    popup.style.display = 'flex';
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
 
-    // 🔓 Unlock UI paint
-    document.documentElement.classList.remove('popup-boot-lock');
-
-    // ❌ Logged-in users never see popup
-    if (document.body.classList.contains('customer-logged-in')) {
-      resetPopupState();
-      return;
-    }
-
-    // ❌ Already shown this session
-    if (sessionStorage.getItem(SESSION_KEY)) {
-      resetPopupState();
-      return;
-    }
-
-    // 🔒 Always hide wheel on load
-    hideSpinWheelHard();
+    // 🔒 Always lock wheel on load
     resetPopupState();
 
-    // ⏱ Delayed popup open
-    setTimeout(() => {
-      const popup = document.getElementById(POPUP_ID);
-      if (!popup) return;
+    // ❌ Logged-in user → never show popup
+    if (document.body.classList.contains('customer-logged-in')) {
+      setCookie(COOKIE_KEY, 'true', COOKIE_DAYS);
+      return;
+    }
 
-      popup.style.display = 'flex';
-      sessionStorage.setItem(SESSION_KEY, 'true');
+    // ❌ Cookie exists → do nothing
+    if (getCookie(COOKIE_KEY)) return;
+
+    // ⏱ Delayed popup
+    setTimeout(() => {
+      showPopup();
+      setCookie(COOKIE_KEY, 'true', COOKIE_DAYS);
     }, SHOW_DELAY);
   });
 
-  // 🔁 Expose for OTP → REGISTER FLOW
+  // 🔁 Used after OTP → register
   window.showSignupWithSpinWheel = function () {
-    showSpinWheel();
+    const wrapper = document.querySelector('.otp-login-form-wrapper');
+    const wheel = document.querySelector('.spin-wheel-wrapper');
+    if (!wrapper || !wheel) return;
+
+    wrapper.classList.add('signup-active');
+    wheel.style.display = 'flex';
+    wheel.style.visibility = 'visible';
   };
 
-  // ❌ Close popup safely
+  // ❌ Close popup
   window.closeloginPopup = function (e, id) {
     if (typeof id === 'undefined') id = e;
     const popup = document.getElementById(id);
     if (popup) popup.style.display = 'none';
-
     resetPopupState();
   };
 
