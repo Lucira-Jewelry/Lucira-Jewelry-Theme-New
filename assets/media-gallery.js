@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      codes: { mv: [], mq: [], ci: [], mh: [], v360: [] },
       extras: []
     };
 
