@@ -371,6 +371,34 @@
 </script>
 
 <script>
+  function getSelectedColorFromAlt() {
+    const variantInputs = document.querySelectorAll(
+      'input[name*="Color"]:checked, select[name*="Color"]'
+    );
+
+    for (const el of variantInputs) {
+      const val = (el.value || '').toLowerCase();
+      if (val.includes('yellow')) return 'yellow';
+      if (val.includes('white')) return 'white';
+      if (val.includes('rose')) return 'rose';
+      if (val.includes('plt') || val.includes('platinum')) return 'plt';
+    }
+
+    return null;
+  }
+
+  function filterPhotoSwipeItemsByColor(items, color) {
+    if (!color) return items;
+
+    return items.filter(item => {
+      const alt = (item.element?.querySelector('img')?.alt || '').toLowerCase();
+      return alt.includes(color);
+    });
+  }
+</script>
+
+
+<script>
   (function () {
     const wrapper = document.getElementById('MediaGalleryWrapper-{{ section.id }}');
     if (wrapper) {
@@ -391,9 +419,7 @@
     }
   })();
 
-  // Initialize PhotoSwipe with full UI controls
   document.addEventListener('DOMContentLoaded', function () {
-    // Check if PhotoSwipe is loaded
     if (typeof PhotoSwipeLightbox === 'undefined') {
       console.error('PhotoSwipeLightbox not loaded');
       return;
@@ -404,20 +430,16 @@
       children: 'a.pswp-gallery-item',
       pswpModule: PhotoSwipe,
       
-      // UI Options
       bgOpacity: 0.9,
       showHideAnimationType: 'fade',
       
-      // Zoom settings
       initialZoomLevel: 'fit',
       secondaryZoomLevel: 1.5,
       maxZoomLevel: 3,
       
-      // Enable pinch to close on mobile
       pinchToClose: true,
       closeOnVerticalDrag: true,
       
-      // Padding
       paddingFn: (viewportSize) => {
         return {
           top: 30,
@@ -427,10 +449,7 @@
         }
       }
     });
-
-    // Add custom UI elements (only fullscreen and share - PhotoSwipe already has zoom and close)
     lightbox.on('uiRegister', function() {
-      // Fullscreen button
       lightbox.pswp.ui.registerElement({
         name: 'fullscreen-button',
         order: 8,
@@ -449,8 +468,6 @@
           }
         }
       });
-
-      // Share button
       lightbox.pswp.ui.registerElement({
         name: 'share-button',
         order: 9,
@@ -472,7 +489,6 @@
           if (navigator.share) {
             navigator.share(shareData).catch(err => console.log('Error sharing:', err));
           } else {
-            // Fallback: copy URL to clipboard
             navigator.clipboard.writeText(window.location.href).then(() => {
               alert('Link copied to clipboard!');
             });
@@ -480,188 +496,33 @@
         }
       });
     });
-
-    // Add smooth zoom on image click
-    lightbox.on('contentActivate', ({ content }) => {
-      content.element.addEventListener('click', (e) => {
-        // Don't zoom if clicking on a button
-        if (e.target.closest('.pswp__button')) {
-          return;
-        }
-
-        const pswp = lightbox.pswp;
-        const currentZoomLevel = pswp.currSlide.currZoomLevel;
-        const initialZoomLevel = pswp.currSlide.zoomLevels.initial;
-        const secondaryZoomLevel = pswp.currSlide.zoomLevels.secondary;
-
-        // Get click position
-        const rect = content.element.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        // Toggle between initial and secondary zoom levels
-        if (currentZoomLevel === initialZoomLevel) {
-          pswp.currSlide.zoomTo(secondaryZoomLevel, { x, y }, 300);
-        } else {
-          pswp.currSlide.zoomTo(initialZoomLevel, { x: pswp.currSlide.width / 2, y: pswp.currSlide.height / 2 }, 300);
-        }
-      });
-    });
-
-    // Add double-click zoom for better UX
-    lightbox.on('contentActivate', ({ content }) => {
-      content.element.addEventListener('dblclick', (e) => {
-        if (e.target.closest('.pswp__button')) {
-          return;
-        }
-
-        const pswp = lightbox.pswp;
-        const currentZoomLevel = pswp.currSlide.currZoomLevel;
-        const initialZoomLevel = pswp.currSlide.zoomLevels.initial;
-        const maxZoomLevel = pswp.currSlide.zoomLevels.max;
-
-        const rect = content.element.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
-
-        if (currentZoomLevel === initialZoomLevel) {
-          pswp.currSlide.zoomTo(maxZoomLevel, { x, y }, 300);
-        } else {
-          pswp.currSlide.zoomTo(initialZoomLevel, { x: pswp.currSlide.width / 2, y: pswp.currSlide.height / 2 }, 300);
-        }
-      });
-    });
-
-    // Initialize the lightbox
     lightbox.init();
-
     console.log('PhotoSwipe initialized successfully');
   });
 </script>
 
 <style>
-  /* Custom PhotoSwipe button styles */
-  .pswp__button {
-    background: rgba(0, 0, 0, 0.5) !important;
-    border-radius: 50%;
-    width: 44px;
-    height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin: 0 4px;
-    cursor: pointer;
-    transition: background 0.2s;
-  }
   
-  .pswp__button:hover {
-    background: rgba(0, 0, 0, 0.7) !important;
-  }
-  
-  .pswp__button svg {
-    color: #fff;
-  }
-  
-  /* Position buttons in top right */
-  .pswp__top-bar {
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    padding: 16px;
-    background: transparent;
-  }
-  
-  /* Remove target="_blank" to prevent opening in new tab */
-  .pswp-gallery-item {
-    cursor: pointer;
-  }
-  
-  .pswp-gallery-item:focus {
-    outline: 2px solid #fff;
-    outline-offset: 2px;
-  }
-
-  /* Hide default PhotoSwipe button icons and add custom ones */
-  .pswp__button--close::before,
-  .pswp__button--zoom::before,
-  .pswp__button--arrow--left::before,
-  .pswp__button--arrow--right::before {
-    display: none;
-  }
-
-  /* Custom Close Button (X) */
-  .pswp__button--close::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M18 6L6 18M6 6L18 18' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-  }
-
-  /* Custom Zoom Button (Magnifying Glass with +) */
-  .pswp__button--zoom::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='11' cy='11' r='7' stroke='white' stroke-width='2'/%3E%3Cpath d='M16 16L21 21' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M11 8V14M8 11H14' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-  }
-
-  /* Custom Left Arrow */
-  .pswp__button--arrow--left {
-    left: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    position: absolute;
-  }
-
-  .pswp__button--arrow--left::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 18L9 12L15 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-  }
-
-  /* Custom Right Arrow */
-  .pswp__button--arrow--right {
-    right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    position: absolute;
-  }
-
-  .pswp__button--arrow--right::after {
-    content: '';
-    width: 24px;
-    height: 24px;
-    background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 18L15 12L9 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: contain;
-  }
-
-  /* Make arrows larger and more visible */
-  .pswp__button--arrow--left,
-  .pswp__button--arrow--right {
-    width: 50px;
-    height: 50px;
-  }
-
-  /* Image counter styling */
-  .pswp__counter {
-    position: absolute;
-    left: 20px;
-    top: 20px;
-    font-size: 16px;
-    color: #fff;
-    font-weight: 500;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5);
-  }
+  .pswp__button { background: rgba(0, 0, 0, 0.5) !important; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; transition: background 0.2s; }
+  .pswp__button:hover { background: rgba(0, 0, 0, 0.7) !important; }
+  .pswp__button svg { color: #fff; }
+  .pswp__top-bar { display: flex; justify-content: flex-end; align-items: center; padding: 16px; background: transparent; }
+  .pswp-gallery-item { cursor: pointer; }
+  .pswp-gallery-item:focus { outline: 2px solid #fff; outline-offset: 2px; }
+  .pswp__button--close::before, .pswp__button--zoom::before, .pswp__button--arrow--left::before, .pswp__button--arrow--right::before { display: none; }
+  .pswp__button--close::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M18 6L6 18M6 6L18 18' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--zoom::after { content: ''; position: absolute; width: 24px; height: 24px; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='11' cy='11' r='7' stroke='white' stroke-width='2'/%3E%3Cpath d='M16 16L21 21' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M11 8V14M8 11H14' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; display: block; }
+  .pswp__button--arrow--left { left: 20px; top: 50%; transform: translateY(-50%); position: absolute; }
+  .pswp__button--arrow--prev::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 18L9 12L15 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--arrow--right { right: 20px; top: 50%; transform: translateY(-50%); position: absolute; }
+  .pswp__button--arrow--next::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 18L15 12L9 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--arrow--left, .pswp__button--arrow--right { width: 50px; height: 50px; }
+  .pswp__counter { position: absolute; left: 0; top: 0; font-size: 16px; color: #fff; font-weight: 500; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); }
+  .pswp__button--close svg {display: none;}
+  .pswp__button--zoom svg {display: none;}
+  .pswp__button--arrow--prev svg {display: none;}
+  .pswp__button--arrow--next svg {display: none;}
+  .pswp__button--arrow--next { right: 12px; top: 47%;}
+  .pswp__button--arrow--prev { right: 12px; top: 47%;}
+  .pswp--touch .pswp__button--arrow { visibility: visible; }
 </style>
