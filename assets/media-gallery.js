@@ -126,8 +126,6 @@ if (!customElements.get('media-gallery')) {
   let mediaList = null;
   let observer = null;
   let isReordering = false;
-  let pswpOriginalItems = null;
-  let pswpLightbox = null;
   let visibleSlides = [];
   
   let touchStartX = 0;
@@ -157,20 +155,6 @@ if (!customElements.get('media-gallery')) {
     if (lower.includes("rose")) return "rose";
     if (lower.includes("plt") || lower.includes("platinum")) return "plt";
     return "";
-  }
-
-  function shouldShowInPhotoswipe(alt, targetColor) {
-    if (!alt) return false;
-
-    const lower = alt.toLowerCase();
-    const itemColor = getColorFromAlt(lower);
-    const isAnyColor = COLOR_TOKENS.some(c => lower.includes(c));
-
-    if (!isAnyColor && ALWAYS_SHOW_CODES.some(code => lower.includes(code))) {
-      return true;
-    }
-
-    return itemColor === targetColor;
   }
 
   function classifyItemsByColor(targetColor) {
