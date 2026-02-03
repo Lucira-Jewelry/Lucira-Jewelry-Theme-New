@@ -378,7 +378,13 @@
       if (firstImg && firstImg.complete) {
         wrapper.classList.add('loaded');
       } else if (firstImg) {
-        firstImg.addEventListener('load', () => wrapper.classList.add('loaded'), { once: true });
+        firstImg.addEventListener(
+          'load',
+          function () {
+            wrapper.classList.add('loaded');
+          },
+          { once: true }
+        );
       } else {
         setTimeout(() => wrapper.classList.add('loaded'), 100);
       }
@@ -386,57 +392,51 @@
   })();
 
   document.addEventListener('DOMContentLoaded', function () {
+    // 1. Define the Lightbox with Enhanced Options
     const lightbox = new PhotoSwipeLightbox({
       gallery: '#Slider-Gallery-{{ section.id }}',
-      children: 'a',
+      children: 'a', // Targets the anchor tag containing the large image
       pswpModule: PhotoSwipe,
       
-      // Animation & Smoothness
-      showHideAnimationType: 'zoom',
-      showAnimationDuration: 400,
-      hideAnimationDuration: 400,
+      // --- NEW OPTIONS ADDED BELOW ---
       
-      // Zoom & Scroll Behavior
-      wheelToZoom: true,      // Smooth scroll zoom
-      clickToCloseNonZoomable: false,
+      // Smooth Transition & Zoom Settings
+      showHideAnimationType: 'zoom', // Smooth zoom-in/out effect on open/close
+      showAnimationDuration: 300,    // Duration in ms
+      hideAnimationDuration: 300,
       
-      // Layout & Appearance
-      bgOpacity: 0.9,
-      padding: { top: 20, bottom: 80, left: 20, right: 20 }, // Extra bottom padding for thumbs
+      // Zoom Behavior
+      zoom: true,          // Enable zoom
+      wheelToZoom: true,   // Allow mouse wheel to zoom
+      secondaryZoomLevel: 2, // 2x zoom on double tap
+      maxZoomLevel: 4,       // Maximum zoom level
       
-      // --- THUMBNAIL LOGIC ---
-      // This tells PhotoSwipe where to find the thumbnail image for the transition
-      getThumbBoundsFn: (index) => {
-        const thumbnail = document.querySelectorAll('#Slider-Gallery-{{ section.id }} img')[index];
-        if (thumbnail) {
-          const rect = thumbnail.getBoundingClientRect();
-          return { x: rect.left, y: rect.top + window.scrollY, w: rect.width };
-        }
+      // UI / UX Options
+      bgOpacity: 0.85,     // Darker background for better focus (like reference)
+      allowPanToNext: true, // Swipe to next image
+      loop: true,          // Infinite loop of images
+      
+      // Padding to ensure buttons don't overlap content
+      paddingFn: (viewportSize) => {
+        return {
+          top: 0, bottom: 0, left: 0, right: 0
+        };
       }
     });
 
-    // Enable Smooth Zooming via mousewheel
-    lightbox.on('afterInit', () => {
-      const { pswp } = lightbox;
-      // Force smooth transition on zoom
-      pswp.on('zoomPanUpdate', (e) => {
-        if (e.slide) {
-          e.slide.container.style.transition = 'transform 0.3s cubic-bezier(0.1, 0, 0.25, 1)';
-        }
-      });
-    });
-
+    // 2. Initialize the Lightbox
     lightbox.init();
 
-    // Sync with Shopify Product Thumbnails (the dots/images below the main slider)
-    const productThumbnails = document.querySelectorAll('.thumbnail-list__item, .product__media-item img');
-    productThumbnails.forEach((thumb, index) => {
-      thumb.addEventListener('click', (e) => {
-        // Only trigger if it's not already opening from the main anchor
-        if (!e.target.closest('a[data-pswp-width]')) {
-           lightbox.loadAndOpen(index);
-        }
+    // 3. (Optional) Sync External Thumbnails
+    // If you have a separate strip of thumbnails on the page, use this to open the lightbox at specific index
+    const thumbnails = document.querySelectorAll('.product__media-item--variant img'); // Adjust selector to match your thumbnail class
+    if (thumbnails.length > 0) {
+      thumbnails.forEach((thumb, index) => {
+        thumb.addEventListener('click', (e) => {
+          e.preventDefault();
+          lightbox.loadAndOpen(index, { gallery: document.querySelector('#Slider-Gallery-{{ section.id }}') });
+        });
       });
-    });
+    }
   });
 </script>
