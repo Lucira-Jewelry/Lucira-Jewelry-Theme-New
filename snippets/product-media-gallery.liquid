@@ -473,6 +473,82 @@
   });
 </script>
 
+<script>
+(function () {
+  let lightboxInstance = null;
+
+  function getVisibleGalleryItems(sectionId) {
+    const container = document.querySelector(`#Slider-Gallery-${sectionId}`);
+    if (!container) return [];
+
+    return Array.from(container.querySelectorAll('li.product__media-item'))
+      .filter(item => item.style.display !== 'none')
+      .map(item => {
+        const link = item.querySelector('a.pswp-gallery-item');
+        const img = item.querySelector('img');
+
+        if (!link || !img) return null;
+
+        return {
+          src: link.getAttribute('href'),
+          w: parseInt(link.dataset.pswpWidth || img.naturalWidth || 2000),
+          h: parseInt(link.dataset.pswpHeight || img.naturalHeight || 2000),
+          alt: img.alt || ''
+        };
+      })
+      .filter(Boolean);
+  }
+
+  function rebuildPhotoSwipe(sectionId) {
+    if (lightboxInstance) {
+      try {
+        lightboxInstance.destroy();
+      } catch (e) {}
+      lightboxInstance = null;
+    }
+
+    const items = getVisibleGalleryItems(sectionId);
+    if (!items.length) return;
+
+    lightboxInstance = new PhotoSwipeLightbox({
+      dataSource: items,
+      pswpModule: PhotoSwipe,
+      bgOpacity: 0.9,
+      showHideAnimationType: 'fade',
+      initialZoomLevel: 'fit',
+      secondaryZoomLevel: 1.5,
+      maxZoomLevel: 3,
+      pinchToClose: true,
+      closeOnVerticalDrag: true
+    });
+
+    lightboxInstance.init();
+  }
+
+  function init(sectionId) {
+    rebuildPhotoSwipe(sectionId);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const gallery = document.querySelector('[id^="MediaGallery-"]');
+    if (!gallery) return;
+
+    const sectionId = gallery.id.replace('MediaGallery-', '');
+    init(sectionId);
+
+    // 🔁 Rebuild on variant change
+    document.addEventListener('variant:change', () => {
+      setTimeout(() => rebuildPhotoSwipe(sectionId), 200);
+    });
+
+    document.addEventListener('variant:selected', () => {
+      setTimeout(() => rebuildPhotoSwipe(sectionId), 200);
+    });
+  });
+})();
+</script>
+
+
 <style>
   
   .pswp__button { background: rgba(0, 0, 0, 0.5) !important; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; transition: background 0.2s; }
