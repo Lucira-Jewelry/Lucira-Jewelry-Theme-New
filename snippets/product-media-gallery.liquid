@@ -476,64 +476,16 @@
   (function () {
     let pswpInstance = null;
 
-    const COLOR_TOKENS = ['white', 'yellow', 'rose', 'plt'];
-    const ALWAYS_SHOW_CODES = ['mq', 'mh', 'ci', 'mv', '360v'];
-
-    function getColorFromAlt(text) {
-      const lower = (text || '').toLowerCase();
-      if (lower.includes('white')) return 'white';
-      if (lower.includes('yellow')) return 'yellow';
-      if (lower.includes('rose')) return 'rose';
-      if (lower.includes('plt') || lower.includes('platinum')) return 'plt';
-      return '';
-    }
-
-    function getSelectedColor() {
-      // SAME strategy as your gallery
-      const inputs = document.querySelectorAll(
-        'input[name*="Color"]:checked, input[name*="color"]:checked, ' +
-          '[data-selected-value], .variant-input-wrapper .selected'
-      );
-
-      for (const el of inputs) {
-        const value = el.value || el.textContent || el.getAttribute('data-selected-value');
-        const color = getColorFromAlt(value);
-        if (color) return color;
-      }
-
-      return 'yellow'; // fallback (same as your gallery)
-    }
-
-    function shouldIncludeSlide(alt, selectedColor) {
-      const lower = (alt || '').toLowerCase();
-      const slideColor = getColorFromAlt(lower);
-      const hasAnyColor = COLOR_TOKENS.some((c) => lower.includes(c));
-
-      // ✅ always include coded images
-      if (ALWAYS_SHOW_CODES.some((code) => lower.includes(code))) return true;
-
-      // ✅ include only selected color
-      if (slideColor === selectedColor) return true;
-
-      // ❌ hide other colors
-      if (hasAnyColor) return false;
-
-      return false;
-    }
-
     function getVisibleSlidesForPhotoSwipe(sectionId) {
       const mediaList = document.querySelector(`#Slider-Gallery-${sectionId}`);
       if (!mediaList) return [];
 
-      const selectedColor = getSelectedColor();
-
       return Array.from(mediaList.querySelectorAll('.product__media-item'))
+        .filter((slide) => slide.style.display !== 'none')
         .map((slide) => {
           const link = slide.querySelector('a.pswp-gallery-item');
           const img = slide.querySelector('img');
           if (!link || !img) return null;
-
-          if (!shouldIncludeSlide(img.alt, selectedColor)) return null;
 
           return {
             src: link.href,
@@ -574,8 +526,10 @@
 
       const sectionId = gallery.id.replace('MediaGallery-', '');
 
+      // initial
       rebuildPhotoSwipe(sectionId);
 
+      // rebuild when your script changes visibility
       document.addEventListener('variant:change', () => {
         setTimeout(() => rebuildPhotoSwipe(sectionId), 150);
       });
@@ -584,6 +538,7 @@
 </script>
 
 <style>
+
   .pswp__button { background: rgba(0, 0, 0, 0.5) !important; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; transition: background 0.2s; }
   .pswp__button:hover { background: rgba(0, 0, 0, 0.7) !important; }
   .pswp__button svg { color: #fff; }
