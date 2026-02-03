@@ -397,79 +397,70 @@
       return;
     }
 
-      // ----------------------------------------------------
-      // 1️⃣ Get sectionId and collect ALL media once
-      // ----------------------------------------------------
-      const galleryWrapper = document.querySelector('[id^="MediaGallery-"]');
-      if (!galleryWrapper) return;
+    const sectionId = document.querySelector('[id^="MediaGallery-"]').id
+    .replace('MediaGallery-', '');
+    const mediaList = document.querySelector(`#Slider-Gallery-${sectionId}`);
+    const allMediaImages = Array.from(
+      mediaList.querySelectorAll('.product__media-item')
+    ).map(li => {
+      const link = li.querySelector('a.pswp-gallery-item');
+      const img = li.querySelector('img');
+      if (!link || !img) return null;
+      return {
+        src: link.href,
+        w: parseInt(link.dataset.pswpWidth || img.naturalWidth || 1600),
+        h: parseInt(link.dataset.pswpHeight || img.naturalHeight || 1600),
+        alt: (img.alt || '').trim(),
+      };
+    }).filter(Boolean);
 
-      const sectionId = galleryWrapper.id.replace('MediaGallery-', '');
-      const mediaList = document.querySelector(`#Slider-Gallery-${sectionId}`);
+    console.table("ALL MEDIA STORED:", allMediaImages);
 
-      const allMediaImages = Array.from(
-        mediaList.querySelectorAll('.product__media-item')
-      )
-        .map(li => {
-          const link = li.querySelector('a.pswp-gallery-item');
-          const img = li.querySelector('img');
+    function openPhotoSwipeForAlt(selectedAlt) {
+      const filteredSlides = allMediaImages.filter(item =>
+        item.alt.toLowerCase() === selectedAlt.toLowerCase()
+      );
 
-          if (!link || !img) return null;
+      if (filteredSlides.length === 0) {
+        console.warn("No images found for alt:", selectedAlt);
+        return;
+      }
 
+      const lightbox = new PhotoSwipeLightbox({
+        dataSource: filteredSlides,
+        pswpModule: PhotoSwipe,
+
+        bgOpacity: 0.9,
+        showHideAnimationType: 'fade',
+        initialZoomLevel: 'fit',
+        secondaryZoomLevel: 1.5,
+        maxZoomLevel: 3,
+        pinchToClose: true,
+        closeOnVerticalDrag: true,      
+        paddingFn: (viewportSize) => {
           return {
-            src: link.href,
-            w: parseInt(link.dataset.pswpWidth || img.naturalWidth || 1600),
-            h: parseInt(link.dataset.pswpHeight || img.naturalHeight || 1600),
-            alt: (img.alt || '').trim(),
-          };
-        })
-        .filter(Boolean);
-
-      console.table(allMediaImages); // debugging
-
-      // ----------------------------------------------------
-      // 2️⃣ Helper to open PhotoSwipe with ALL images
-      // ----------------------------------------------------
-      function openPhotoSwipeAt(index) {
-        const lightbox = new PhotoSwipeLightbox({
-          dataSource: allMediaImages, // ✅ ALL images
-          pswpModule: PhotoSwipe,
-
-          bgOpacity: 0.9,
-          showHideAnimationType: 'fade',
-          initialZoomLevel: 'fit',
-          secondaryZoomLevel: 1.5,
-          maxZoomLevel: 3,
-          pinchToClose: true,
-          closeOnVerticalDrag: true,
-
-          paddingFn: () => ({
             top: 30,
             bottom: 30,
             left: 30,
             right: 30
-          })
-        });
-
-        lightbox.init();
-        lightbox.loadAndOpen(index); // open from clicked slide
-      }
-
-      // ----------------------------------------------------
-      // 3️⃣ Attach click listeners to your thumbnails
-      // ----------------------------------------------------
-      document.querySelectorAll('a.pswp-gallery-item').forEach((el, index) => {
-        el.addEventListener('click', (e) => {
-          e.preventDefault();
-
-          const img = el.querySelector('img');
-          const clickedAlt = (img?.alt || '').trim();
-
-          console.log("Clicked ALT:", clickedAlt);
-          console.log("Opening PhotoSwipe at index:", index);
-
-          openPhotoSwipeAt(index);
-        });
+          }
+        }
       });
+
+      lightbox.init();
+      lightbox.loadAndOpen(0); 
+    }
+
+    document.querySelectorAll('a.pswp-gallery-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        const img = el.querySelector('img');
+        const currentAlt = (img?.alt || '').trim();
+        console.log("Clicked ALT:", currentAlt);
+        openPhotoSwipeForAlt(currentAlt);
+      });
+
+    });
 
 
 
