@@ -371,23 +371,106 @@
 </script>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const lightbox = new PhotoSwipeLightbox({
-    gallery: '#Slider-Gallery-{{ section.id }}',
-    children: 'a',
-    pswpModule: PhotoSwipe,
+  /* Skeleton / loaded state */
+  (function () {
+    const wrapper = document.getElementById('MediaGalleryWrapper-{{ section.id }}');
+    if (wrapper) {
+      const firstImg = wrapper.querySelector('.product__media-item img');
+      if (firstImg && firstImg.complete) {
+        wrapper.classList.add('loaded');
+      } else if (firstImg) {
+        firstImg.addEventListener(
+          'load',
+          function () {
+            wrapper.classList.add('loaded');
+          },
+          { once: true }
+        );
+      } else {
+        setTimeout(() => wrapper.classList.add('loaded'), 100);
+      }
+    }
+  })();
 
-    bgOpacity: 0.92,
-    wheelToZoom: true,
-    zoom: true,
-    spacing: 0.15,
+  /* PhotoSwipe */
+  document.addEventListener('DOMContentLoaded', function () {
+    const lightbox = new PhotoSwipeLightbox({
+      gallery: '#Slider-Gallery-{{ section.id }}',
+      children: 'a',
+      pswpModule: PhotoSwipe,
 
-    showHideAnimationType: 'fade',
-    hideAnimationDuration: 250,
-    showAnimationDuration: 250
+      bgOpacity: 0.92,
+      showHideAnimationType: 'fade',
+      spacing: 0.15
+    });
+
+    /* 🔹 Thumbnails UI */
+    lightbox.on('uiRegister', function () {
+
+      /* Bottom thumbnails */
+      lightbox.pswp.ui.registerElement({
+        name: 'custom-thumbs',
+        order: 9,
+        isButton: false,
+        appendTo: 'root',
+        onInit: (el, pswp) => {
+          el.className = 'pswp__custom-thumbs';
+
+          pswp.items.forEach((item, index) => {
+            const img = document.createElement('img');
+            img.src = item.src;
+            img.className = 'pswp__thumb';
+            img.onclick = () => pswp.goTo(index);
+            el.appendChild(img);
+          });
+
+          const update = () => {
+            el.querySelectorAll('.pswp__thumb').forEach((t, i) => {
+              t.classList.toggle('active', i === pswp.currIndex);
+            });
+          };
+
+          pswp.on('change', update);
+          update();
+        }
+      });
+
+      /* 🔹 Custom Close Icon */
+      lightbox.pswp.ui.registerElement({
+        name: 'close',
+        isButton: true,
+        order: 20,
+        html: `
+          <svg width="24" height="24" viewBox="0 0 24 24">
+            <path d="M6 6L18 18M18 6L6 18"
+              stroke="white"
+              stroke-width="2"
+              stroke-linecap="round"/>
+          </svg>
+        `,
+        onClick: (event, el, pswp) => pswp.close()
+      });
+
+      /* 🔹 Custom Arrows */
+      lightbox.pswp.ui.registerElement({
+        name: 'arrowPrev',
+        isButton: true,
+        order: 10,
+        html: '&#10094;',
+        onClick: (event, el, pswp) => pswp.prev()
+      });
+
+      lightbox.pswp.ui.registerElement({
+        name: 'arrowNext',
+        isButton: true,
+        order: 11,
+        html: '&#10095;',
+        onClick: (event, el, pswp) => pswp.next()
+      });
+
+    });
+
+    lightbox.init();
   });
-
-  lightbox.init();
-});
 </script>
 
