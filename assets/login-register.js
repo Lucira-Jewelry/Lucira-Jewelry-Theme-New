@@ -47,10 +47,17 @@ document.getElementById(id).style.display = 'flex';
 }
 
 function closeloginPopup(e, id) {
-if (typeof id === 'undefined') id = e;
-document.getElementById(id).style.display = 'none';
-resetToLoginView();
+  if (typeof id === 'undefined') id = e;
+  document.getElementById(id).style.display = 'none';
+  resetToLoginView();
+  const popup = document.getElementById('login-popup');
+  if (!popup) return;
+  const h2 = popup.querySelector('.otp-number-wrapper h2');
+  const p = popup.querySelector('.otp-number-wrapper p');
+  if (h2) h2.innerText = ORIGINAL_POPUP_HEADING;
+  if (p) p.innerText = ORIGINAL_POPUP_SUBTEXT;
 }
+
 
 document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
 el.addEventListener('click', (e) => e.stopPropagation());
@@ -618,4 +625,18 @@ setTimeout(() => {
     if (subtext) subtext.innerText = 'Get assured reward of ₹750';
     setLuciraSessionPopup();
 }, SHOW_DELAY);
+});
+
+let ORIGINAL_POPUP_HEADING = '';
+let ORIGINAL_POPUP_SUBTEXT = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const popup = document.getElementById('login-popup');
+  if (!popup) return;
+
+  const h2 = popup.querySelector('.otp-number-wrapper h2');
+  const p = popup.querySelector('.otp-number-wrapper p');
+
+  if (h2) ORIGINAL_POPUP_HEADING = h2.innerText;
+  if (p) ORIGINAL_POPUP_SUBTEXT = p.innerText;
 });
