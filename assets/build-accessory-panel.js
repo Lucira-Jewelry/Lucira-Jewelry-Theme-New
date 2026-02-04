@@ -414,6 +414,7 @@ window.MainBaseCharm = function () {
 
     document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
       grid.classList.remove('active');
+      grid.classList.remove('open-with-grid');
       grid.style.display = 'none';
     });
 
