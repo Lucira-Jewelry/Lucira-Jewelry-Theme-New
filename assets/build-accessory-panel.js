@@ -881,7 +881,7 @@ window.MainBaseCharm = function () {
         this.slider.step = 0.01;
       }
 
-      this.setZoom(5, { animate: false });
+      this.setZoom(1, { animate: false });
 
       this._updateZoomTrack && this._updateZoomTrack();
     }
