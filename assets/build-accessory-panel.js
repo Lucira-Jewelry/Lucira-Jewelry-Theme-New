@@ -404,35 +404,31 @@ window.MainBaseCharm = function () {
   }
 
 
-  function onCollectionTileClick(tile) {
-        const targetId = tile.dataset.target;
-        const isActive = tile.classList.contains('active');
-        console.log("I am in is collection grid");
-        // CASE 1: Tile is already active → deactivate
-        if (isActive) {
-         
-          tile.classList.remove('active');
-          tile.setAttribute('aria-selected', 'false');
+  window.onCollectionTileClick = function (tile) {
+  const targetId = tile.dataset.target;
+  const isActive = tile.classList.contains('active');
 
-          // Hide active grid
-          document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
-            grid.classList.remove('active');
-            grid.style.display = 'none';
-          });
+  if (isActive) {
+    tile.classList.remove('active');
+    tile.setAttribute('aria-selected', 'false');
 
-          // Mobile: remove grid from under tile
-          const gridsColumn = document.querySelector('.grids-column');
-          if (gridsColumn && gridsColumn.parentNode) {
-            gridsColumn.parentNode.removeChild(gridsColumn);
-          }
+    document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
+      grid.classList.remove('active');
+      grid.style.display = 'none';
+    });
 
-          currentCollectionId = null;
-          return;
-        }
+    const gridsColumn = document.querySelector('.grids-column');
+    if (gridsColumn && gridsColumn.parentNode) {
+      gridsColumn.parentNode.removeChild(gridsColumn);
+    }
 
-        // CASE 2: Tile is NOT active → activate normally
-        setActiveCollectionById(targetId);
+    currentCollectionId = null;
+    return;
   }
+
+  setActiveCollectionById(targetId);
+};
+
 
   function setActiveCollectionById(targetId) {
     const wrapper = $('lf-charms-grids-wrapper');
