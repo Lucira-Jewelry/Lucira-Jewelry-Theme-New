@@ -43,14 +43,17 @@ const wheelSegments = [
 ];
 
 function openloginPopup(id) {
-document.getElementById(id).style.display = 'flex';
+  resetPopupState();   // ✅ ensures clean state
+  document.getElementById(id).style.display = 'flex';
 }
 
+
 function closeloginPopup(e, id) {
-if (typeof id === 'undefined') id = e;
-document.getElementById(id).style.display = 'none';
-resetToLoginView();
+  if (typeof id === 'undefined') id = e;
+  document.getElementById(id).style.display = 'none';
+  resetPopupState();
 }
+
 
 document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
 el.addEventListener('click', (e) => e.stopPropagation());
@@ -619,3 +622,45 @@ setTimeout(() => {
     setLuciraSessionPopup();
 }, SHOW_DELAY);
 });
+
+function resetPopupState() {
+  const wrapper = document.querySelector('.otp-login-form-wrapper');
+  if (!wrapper) return;
+
+  // remove forced signup state
+  wrapper.classList.remove('signup-active');
+
+  // show login view
+  document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
+  document.getElementById('sendOtp')?.style.setProperty('display', 'block');
+  document.getElementById('otpSection')?.style.setProperty('display', 'none');
+  document.querySelector('.signupSection')?.style.setProperty('display', 'none');
+
+  // hide wheel
+  const wheelWrapper = document.querySelector('.spin-wheel-wrapper');
+  if (wheelWrapper) {
+    wheelWrapper.style.display = 'none';
+    wheelWrapper.style.visibility = 'hidden';
+  }
+
+  // reset heading text
+  setPopupHeading();
+}
+
+function closeloginPopup(e, id) {
+  if (typeof id === 'undefined') id = e;
+
+  document.getElementById(id).style.display = 'none';
+
+  resetPopupState();   // ✅ IMPORTANT
+}
+
+function setPopupHeading() {
+  document.querySelectorAll('.otp-number-wrapper h2').forEach(el => {
+    el.innerText = 'REGISTER & WIN';
+  });
+
+  document.querySelectorAll('.otp-number-wrapper p').forEach(el => {
+    el.innerText = 'Get assured reward of ₹750';
+  });
+}
