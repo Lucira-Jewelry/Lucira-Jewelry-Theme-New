@@ -834,7 +834,7 @@ window.MainBaseCharm = function () {
       }
 
       const rect = container.getBoundingClientRect();
-      let width = isMobileLayout() ? 280 : (rect.width || 440);
+      let width = isMobileLayout() ? 260 : (rect.width || 440);
       const minWidth = isMobileLayout() ? 260 : 300;
       width = Math.max(minWidth, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
