@@ -827,10 +827,10 @@ window.MainBaseCharm = function () {
           wrapper.style.setProperty('height', '280px', 'important');
         }
       } else {
-        // Desktop: Increase main container height to prevent cropping
-        // if (wrapper) {
-        //   wrapper.style.setProperty('height', '470px', 'important');
-        // }
+        //Desktop: Increase main container height to prevent cropping
+        if (wrapper) {
+          wrapper.style.setProperty('height', '470px', 'important');
+        }
       }
 
       const rect = container.getBoundingClientRect();
