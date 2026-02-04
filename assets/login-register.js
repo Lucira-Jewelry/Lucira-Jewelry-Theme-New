@@ -584,22 +584,35 @@ return sessionStorage.getItem('lucira_login_popup_seen') === 'true';
 function setLuciraSessionPopup() {
 sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
-document.addEventListener('DOMContentLoaded', function () {
+
+async function isCustomerLoggedIn() {
+  try {
+    const res = await fetch('/account', {
+      credentials: 'same-origin',
+    });
+    return !res.url.includes('/account/login');
+  } catch (e) {
+    return false;
+  }
+}
+
+document.addEventListener('DOMContentLoaded', async function () {
   const POPUP_ID = 'login-popup';
   const SHOW_DELAY = 15000;
 
   const popup = document.getElementById(POPUP_ID);
   if (!popup) return;
 
-  // ✅ session-based suppression
   if (hasLuciraSessionPopup()) return;
 
-  // ✅ reliable Shopify login check
-  if (window.LUCIRA_IS_LOGGED_IN === true) return;
+  const loggedIn = await isCustomerLoggedIn();
+  if (loggedIn) return;
 
-  setTimeout(() => {
+  setTimeout(async () => {
     if (hasLuciraSessionPopup()) return;
-    if (window.LUCIRA_IS_LOGGED_IN === true) return;
+
+    const loggedInNow = await isCustomerLoggedIn();
+    if (loggedInNow) return;
 
     popup.style.display = 'flex';
 
@@ -624,12 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
       wheelWrapper.style.visibility = 'visible';
     }
 
-    const heading = popup.querySelector('.otp-number-wrapper h2');
-    const subtext = popup.querySelector('.otp-number-wrapper p');
-
-    if (heading) heading.innerText = 'REGISTER & WIN';
-    if (subtext) subtext.innerText = 'Get assured reward of ₹750';
-
     setLuciraSessionPopup();
   }, SHOW_DELAY);
 });
+
