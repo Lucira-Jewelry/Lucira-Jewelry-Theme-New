@@ -332,3 +332,27 @@ $(document).ready(function () {
   setupBradAccordion();
   $(window).on("resize", setupBradAccordion);
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    const text = "LUCIRA EXPRESS";
+    const expressEl = document.getElementById('luciraExpress');
+    
+    if (expressEl) {
+        expressEl.innerHTML = '';
+        
+        // Add speed lines
+        for (let i = 1; i <= 3; i++) {
+            const speedLine = document.createElement('span');
+            speedLine.className = `speed-line speed-line-${i}`;
+            expressEl.appendChild(speedLine);
+        }
+        
+        // Add characters
+        for (let i = 0; i < text.length; i++) {
+            const span = document.createElement('span');
+            span.className = 'char';
+            span.textContent = text[i];
+            expressEl.appendChild(span);
+        }
+    }
+});
