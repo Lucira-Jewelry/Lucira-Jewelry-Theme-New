@@ -431,53 +431,81 @@ window.MainBaseCharm = function () {
 };
 
 
+  // function setActiveCollectionById(targetId) {
+  //   console.log("This is an isuue, let me in ");
+  //   const wrapper = $('lf-charms-grids-wrapper');
+  //   if (!wrapper) return;
+
+  //   wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
+  //     if (c.id === targetId) {
+  //       c.style.display = '';
+  //       c.classList.add('active');
+  //     } else {
+  //       c.style.display = 'none';
+  //       c.classList.remove('active');
+  //     }
+  //   });
+
+  //   currentCollectionId = targetId;
+
+  //   document.querySelectorAll('.collection-tile').forEach((t) => {
+  //     const active = t.dataset.target === targetId;
+
+  //     t.classList.toggle('active', active);
+  //     t.setAttribute('aria-selected', active ? 'true' : 'false');
+  //   });
+
+  //   setTimeout(() => {
+  //     document
+  //       .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+  //       .forEach((each) => {
+  //         const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
+  //         const colorName =
+  //           document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+
+  //         each.style.display =
+  //           title.includes(colorName) || colorName.includes(title)
+  //             ? ''
+  //             : 'none';
+  //       });
+
+  //     filterCharmsBySelectedVariantCarat();
+  //   }, 500);
+
+  //   moveGridsColumnBelowTile(targetId);
+
+  //   buildColorMapForActiveGrid();
+  //   buildSwatchDots();
+  //   refreshSelectedBorders();
+  //   refreshCapState();
+  // }
+
+
   function setActiveCollectionById(targetId) {
-    console.log("This is an isuue, let me in ");
-    const wrapper = $('lf-charms-grids-wrapper');
-    if (!wrapper) return;
+  const isSameAsCurrent = currentCollectionId === targetId;
 
-    wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      if (c.id === targetId) {
-        c.style.display = '';
-        c.classList.add('active');
-      } else {
-        c.style.display = 'none';
-        c.classList.remove('active');
-      }
+  // 👉 TOGGLE OFF if clicking same active tile
+  if (isSameAsCurrent) {
+    // Clear active grid
+    document.querySelectorAll('.charms-grid-container.active').forEach((c) => {
+      c.classList.remove('active');
+      c.style.display = 'none';
     });
 
-    currentCollectionId = targetId;
-
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      const active = t.dataset.target === targetId;
-
-      t.classList.toggle('active', active);
-      t.setAttribute('aria-selected', active ? 'true' : 'false');
+    // Clear active tiles
+    document.querySelectorAll('.collection-tile.active').forEach((t) => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
     });
 
-    setTimeout(() => {
-      document
-        .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
-        .forEach((each) => {
-          const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
-          const colorName =
-            document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+    // Remove grid on mobile
+    const gridsColumn = document.querySelector('.grids-column');
+    if (gridsColumn && gridsColumn.parentNode) {
+      gridsColumn.parentNode.removeChild(gridsColumn);
+    }
 
-          each.style.display =
-            title.includes(colorName) || colorName.includes(title)
-              ? ''
-              : 'none';
-        });
-
-      filterCharmsBySelectedVariantCarat();
-    }, 500);
-
-    moveGridsColumnBelowTile(targetId);
-
-    buildColorMapForActiveGrid();
-    buildSwatchDots();
-    refreshSelectedBorders();
-    refreshCapState();
+    currentCollectionId = null;
+    return;
   }
 
   (function () {
