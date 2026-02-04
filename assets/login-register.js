@@ -584,66 +584,38 @@ return sessionStorage.getItem('lucira_login_popup_seen') === 'true';
 function setLuciraSessionPopup() {
 sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
+document.addEventListener('DOMContentLoaded', function () {
+const POPUP_ID = 'login-popup';
+const SHOW_DELAY = 15000;
 
-async function isCustomerLoggedIn() {
-  try {
-    const res = await fetch('/account', {
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-    const text = await res.text();
-    if (text.includes('name="customer[email]"')) {
-      return false;
-    }
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
+const popup = document.getElementById(POPUP_ID);
+if (!popup) return;
 
-
-document.addEventListener('DOMContentLoaded', async function () {
-  const POPUP_ID = 'login-popup';
-  const SHOW_DELAY = 15000;
-
-  const popup = document.getElementById(POPUP_ID);
-  if (!popup) return;
-
-  if (hasLuciraSessionPopup()) return;
-
-  const loggedIn = await isCustomerLoggedIn();
-  if (loggedIn) return;
-
-  setTimeout(async () => {
+if (hasLuciraSessionPopup()) return;
+if (document.body.classList.contains('customer-logged-in')) return;
+setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
-
-    const loggedInNow = await isCustomerLoggedIn();
-    if (loggedInNow) return;
-
     popup.style.display = 'flex';
-
     document.querySelector('.otp-login-form-wrapper')
-      ?.classList.add('signup-active');
-
+    ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
-      ?.style.setProperty('display', 'block');
-
+    ?.style.setProperty('display', 'block');
     document.getElementById('sendOtp')
-      ?.style.setProperty('display', 'block');
-
+    ?.style.setProperty('display', 'block');
     document.getElementById('otpSection')
-      ?.style.setProperty('display', 'none');
-
+    ?.style.setProperty('display', 'none');
     document.querySelector('.signupSection')
-      ?.style.setProperty('display', 'none');
+    ?.style.setProperty('display', 'none');
 
     const wheelWrapper = document.querySelector('.spin-wheel-wrapper');
     if (wheelWrapper) {
-      wheelWrapper.style.display = 'flex';
-      wheelWrapper.style.visibility = 'visible';
+    wheelWrapper.style.display = 'flex';
+    wheelWrapper.style.visibility = 'visible';
     }
-
+    const heading = popup.querySelector('.otp-number-wrapper h2');
+    const subtext = popup.querySelector('.otp-number-wrapper p');
+    if (heading) heading.innerText = 'REGISTER & WIN';
+    if (subtext) subtext.innerText = 'Get assured reward of ₹750';
     setLuciraSessionPopup();
-  }, SHOW_DELAY);
+}, SHOW_DELAY);
 });
-
