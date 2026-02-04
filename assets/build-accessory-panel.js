@@ -410,6 +410,7 @@ window.MainBaseCharm = function () {
 
   // CASE 1: Tile is already active → deactivate
   if (isActive) {
+    console.log("I am in is active");
     tile.classList.remove('active');
     tile.setAttribute('aria-selected', 'false');
 
