@@ -676,65 +676,42 @@
   });
 </script>
 <script>
-  const POPUP_ID = 'login-popup';
-  const COOKIE_NAME = 'lucira_login_popup_seen'; // For 30-day block (Closed or Logged In)
-  const SESSION_KEY = 'lucira_popup_session_shown'; // For "One per session" block
-  const COOKIE_DAYS = 30;
-  const SHOW_DELAY = 5000;
-
-  function setLuciraPopupCookie() {
+  function setLuciraPopupCookie(days = 30) {
     const d = new Date();
-    d.setTime(d.getTime() + COOKIE_DAYS * 24 * 60 * 60 * 1000);
-    document.cookie = `${COOKIE_NAME}=true; expires=${d.toUTCString()}; path=/; SameSite=Lax`;
+    d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = 'lucira_login_popup_seen=true; expires=' + d.toUTCString() + '; path=/; SameSite=Lax';
   }
 
   function hasLuciraPopupCookie() {
-    return document.cookie.split('; ').some((row) => row.startsWith(`${COOKIE_NAME}=`));
+    return document.cookie.split('; ').some((row) => row.startsWith('lucira_login_popup_seen='));
   }
 
-  function hasSeenInSession() {
-    return sessionStorage.getItem(SESSION_KEY) === 'true';
-  }
+  {% comment %} document.addEventListener('DOMContentLoaded', function () {
+    const POPUP_ID = 'login-popup';
+    const SHOW_DELAY = 15000;
 
-  document.addEventListener('DOMContentLoaded', function () {
     const popup = document.getElementById(POPUP_ID);
-    const isUserLoggedIn = document.body.classList.contains('customer-logged-in'); 
-
     if (!popup) return;
-    if (isUserLoggedIn) {
-      if (!hasLuciraPopupCookie()) {
-        setLuciraPopupCookie();
-      }
-      return; 
-    }
 
-    if (hasLuciraPopupCookie()) {
+    if (hasLuciraPopupCookie()) return;
+
+    if (document.body.classList.contains('customer-logged-in')) {
+      setLuciraPopupCookie();
       return;
     }
-
-    if (hasSeenInSession()) {
-      return;
-    }
-
     setTimeout(() => {
-      if (hasLuciraPopupCookie() || hasSeenInSession()) return;
+      if (hasLuciraPopupCookie()) return;
 
       popup.style.display = 'flex';
-
-      sessionStorage.setItem(SESSION_KEY, 'true'); 
-      
+      setLuciraPopupCookie();
     }, SHOW_DELAY);
-  });
+  }); {% endcomment %}
 
   window.closeloginPopup = (function (originalFn) {
     return function (e, id) {
       setLuciraPopupCookie();
-      
       if (typeof originalFn === 'function') {
         originalFn(e, id);
-      } else {
-        const el = document.getElementById(id || POPUP_ID);
-        if(el) el.style.display = 'none';
       }
     };
   })(window.closeloginPopup);
@@ -747,35 +724,57 @@
       '1000_off': 'GRAND1000',
       '1500_off': 'GRAND1500',
     };
+
     const coupon = couponMap[prizeValue] || '';
 
     document.querySelector('.signupSection')?.style.setProperty('display', 'none');
     document.getElementById('otpSection')?.style.setProperty('display', 'none');
     document.getElementById('successSection').style.display = 'block';
-    
-    const couponElem = document.getElementById('couponCode');
-    if(couponElem) {
-        couponElem.innerText = coupon;
-        couponElem.setAttribute('data-coupon', coupon);
-    }
+    document.getElementById('couponCode').innerText = coupon;
   }
 
   document.addEventListener('DOMContentLoaded', function() {
     const copyBtn = document.getElementById('copyCoupon');
     const codeSpan = document.getElementById('couponCode');
-    const feedbackMsg = document.getElementById('copyFeedback');
+    const feedbackMsg = document.getElementById('copyFeedback'); // From your previous code
 
     if (copyBtn) {
       copyBtn.addEventListener('click', function(e) {
-        e.preventDefault();
-        const textToCopy = codeSpan.getAttribute('data-coupon') || codeSpan.innerText;
-        if (!textToCopy) return;
+        e.preventDefault(); // Prevent any default button behavior
 
+        // 1. Get the text to copy
+        // We check data-coupon first, fallback to innerText
+        const textToCopy = codeSpan.getAttribute('data-coupon') || codeSpan.innerText;
+
+        if (!textToCopy) {
+          alert('No code available to copy!');
+          return;
+        }
+
+        // 2. Copy to Clipboard API
         navigator.clipboard.writeText(textToCopy).then(function() {
+          
+          // --- Success State ---
+          
+          // Option A: Show the feedback text below (if you have that element)
           if (feedbackMsg) {
             feedbackMsg.style.display = 'block';
-            setTimeout(() => { feedbackMsg.style.display = 'none'; }, 2000);
+            feedbackMsg.innerText = 'Code copied!';
+            setTimeout(() => {
+              feedbackMsg.style.display = 'none';
+            }, 2000);
           }
+
+          // Option B: Visual feedback on the button itself (optional)
+          const originalTitle = copyBtn.getAttribute('title');
+          copyBtn.setAttribute('title', 'Copied!');
+          copyBtn.classList.add('copied-success'); // Add a class for CSS styling
+          
+          setTimeout(() => {
+            copyBtn.setAttribute('title', originalTitle);
+            copyBtn.classList.remove('copied-success');
+          }, 2000);
+
         }).catch(function(err) {
           console.error('Failed to copy: ', err);
         });
