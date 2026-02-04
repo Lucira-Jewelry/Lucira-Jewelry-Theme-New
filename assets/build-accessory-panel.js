@@ -407,10 +407,10 @@ window.MainBaseCharm = function () {
   function onCollectionTileClick(tile) {
         const targetId = tile.dataset.target;
         const isActive = tile.classList.contains('active');
-
+        console.log("I am in is collection grid");
         // CASE 1: Tile is already active → deactivate
         if (isActive) {
-          console.log("I am in is active");
+         
           tile.classList.remove('active');
           tile.setAttribute('aria-selected', 'false');
 
