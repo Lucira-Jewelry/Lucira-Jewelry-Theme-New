@@ -562,32 +562,37 @@
     const wrapper = document.querySelector('.otp-login-form-wrapper');
     if (!wrapper) return;
 
-    wrapper.classList.remove('signup-active');
+    wrapper.classList.remove('signup-active', 'auto-popup'); // Remove auto-popup class too
     document.querySelector('.signupSection')?.style.setProperty('display', 'none');
     document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
     document.getElementById('sendOtp')?.style.setProperty('display', 'block');
     document.getElementById('otpSection')?.style.setProperty('display', 'none');
 
+    // Restore original signup heading/subtitle
+    const heading = document.getElementById('signupHeading');
+    const subtitle = document.getElementById('signupSubtext');
+    if (heading) heading.textContent = ORIGINAL_SIGNUP_HEADING;
+    if (subtitle) subtitle.textContent = ORIGINAL_SIGNUP_SUBTEXT;
+
     const sendBtn = document.getElementById('sendOtp');
     if (sendBtn) {
-      sendBtn.disabled = false;
-      sendBtn.style.opacity = '1';
+    sendBtn.disabled = false;
+    sendBtn.style.opacity = '1';
     }
 
     const wheel = document.getElementById('spin-wheel-image');
-
     if (wheel) {
-      wheel.style.transition = 'none';
-      wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
-      setTimeout(() => {
-        wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
-      }, 50);
+    wheel.style.transition = 'none';
+    wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
+    setTimeout(() => {
+      wheel.style.transition = 'transform 4s cubic-bezier(0.17, 0.67, 0.12, 0.99)';
+    }, 50);
     }
 
     const wheelWrapper = document.querySelector('.spin-wheel-wrapper');
     if (wheelWrapper) {
-      wheelWrapper.style.display = 'none';
-      wheelWrapper.style.visibility = 'hidden';
+    wheelWrapper.style.display = 'none';
+    wheelWrapper.style.visibility = 'hidden';
     }
 
     document.getElementById('regFirstName').value = '';
@@ -674,7 +679,12 @@
   });
 </script>
 <script>
-  // Add this function at the top of your script section
+  // Store original signup text
+  const ORIGINAL_SIGNUP_HEADING = 'Register to Win Rewards';
+  const ORIGINAL_SIGNUP_SUBTEXT = 'Try Your Luck! Win a Diamond Pendant';
+  const SPIN_WHEEL_HEADING = '{{ section.settings.spin_heading }}';
+  const SPIN_WHEEL_SUBTEXT = '{{ section.settings.spin_subtext }}';
+
   function showSpinWheelPopup() {
     const popup = document.getElementById('login-popup');
     const wrapper = document.querySelector('.otp-login-form-wrapper');
@@ -693,12 +703,12 @@
     wheel.style.visibility = 'visible';
     wrapper.classList.add('signup-active', 'auto-popup');
 
-    // Change heading and subtitle for spin wheel
-    const heading = document.querySelector('.signupSection h2');
-    const subtitle = document.querySelector('.signupSection p');
+    // Change heading and subtitle for spin wheel (auto-popup)
+    const heading = document.getElementById('signupHeading');
+    const subtitle = document.getElementById('signupSubtext');
 
-    if (heading) heading.textContent = '{{ section.settings.spin_heading }}';
-    if (subtitle) subtitle.textContent = '{{ section.settings.spin_subtext }}';
+    if (heading) heading.textContent = SPIN_WHEEL_HEADING;
+    if (subtitle) subtitle.textContent = SPIN_WHEEL_SUBTEXT;
 
     popup.style.display = 'flex';
   }
@@ -715,10 +725,11 @@
     popup.style.display = 'flex';
   }
 
-  // Update the existing openloginPopup function
-  function openloginPopup(id) {
+  // Override the existing openloginPopup function to show login instead
+  const originalOpenLoginPopup = window.openloginPopup;
+  window.openloginPopup = function(id) {
     showLoginPopup();
-  }
+  };
 
   function setLuciraPopupCookie(days = 30) {
     const d = new Date();
@@ -743,11 +754,11 @@
       setLuciraPopupCookie();
       return;
     }
-    
+
     setTimeout(() => {
       if (hasLuciraPopupCookie()) return;
 
-      // Show spin wheel version for auto-popup
+      // Show spin wheel version for auto-popup (15 sec)
       showSpinWheelPopup();
       setLuciraPopupCookie();
     }, SHOW_DELAY);
@@ -756,9 +767,9 @@
   window.closeloginPopup = (function (originalFn) {
     return function (e, id) {
       setLuciraPopupCookie();
-      if (typeof originalFn === 'function') {
-        originalFn(e, id);
-      }
+      if (typeof id === 'undefined') id = e;
+      document.getElementById(id).style.display = 'none';
+      resetToLoginView();
     };
   })(window.closeloginPopup);
 
@@ -782,14 +793,12 @@
   document.addEventListener('DOMContentLoaded', function () {
     const copyBtn = document.getElementById('copyCoupon');
     const codeSpan = document.getElementById('couponCode');
-    const feedbackMsg = document.getElementById('copyFeedback'); // From your previous code
+    const feedbackMsg = document.getElementById('copyFeedback');
 
     if (copyBtn) {
       copyBtn.addEventListener('click', function (e) {
-        e.preventDefault(); // Prevent any default button behavior
+        e.preventDefault();
 
-        // 1. Get the text to copy
-        // We check data-coupon first, fallback to innerText
         const textToCopy = codeSpan.getAttribute('data-coupon') || codeSpan.innerText;
 
         if (!textToCopy) {
@@ -797,13 +806,9 @@
           return;
         }
 
-        // 2. Copy to Clipboard API
         navigator.clipboard
           .writeText(textToCopy)
           .then(function () {
-            // --- Success State ---
-
-            // Option A: Show the feedback text below (if you have that element)
             if (feedbackMsg) {
               feedbackMsg.style.display = 'block';
               feedbackMsg.innerText = 'Code copied!';
@@ -812,10 +817,9 @@
               }, 2000);
             }
 
-            // Option B: Visual feedback on the button itself (optional)
             const originalTitle = copyBtn.getAttribute('title');
             copyBtn.setAttribute('title', 'Copied!');
-            copyBtn.classList.add('copied-success'); // Add a class for CSS styling
+            copyBtn.classList.add('copied-success');
 
             setTimeout(() => {
               copyBtn.setAttribute('title', originalTitle);
@@ -850,6 +854,18 @@
       "id": "subtext",
       "label": "Sub Text",
       "default": "Welcome To The Jewelry World Of Lucira!"
+    },
+    {
+      "type": "text",
+      "id": "spin_heading",
+      "label": "Spin Wheel Heading (Auto Popup)",
+      "default": "Spin & Win Exciting Rewards!"
+    },
+    {
+      "type": "text",
+      "id": "spin_subtext",
+      "label": "Spin Wheel Subtitle (Auto Popup)",
+      "default": "Create your account and spin to win up to ₹10,000 OFF!"
     },
     {
       "type": "text",
