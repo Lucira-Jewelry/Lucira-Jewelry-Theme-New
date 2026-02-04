@@ -432,53 +432,62 @@ window.MainBaseCharm = function () {
 
 
   function setActiveCollectionById(targetId) {
-    console.log("This is an isuue, let me in ");
-    const wrapper = $('lf-charms-grids-wrapper');
-    if (!wrapper) return;
+  console.log("This is an issue, let me in");
 
-    wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      if (c.id === targetId) {
-        c.style.display = '';
-        c.classList.add('active');
-      } else {
-        c.style.display = 'none';
-        c.classList.remove('active');
-      }
-    });
+  // ✅ Clear previous mobile open states
+  document.querySelectorAll('.collection-tile.open-with-grid').forEach((t) => {
+    t.classList.remove('open-with-grid');
+  });
 
-    currentCollectionId = targetId;
+  // ✅ Prevent duplicate activation
+  if (currentCollectionId === targetId) return;
 
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      const active = t.dataset.target === targetId;
+  const wrapper = $('lf-charms-grids-wrapper');
+  if (!wrapper) return;
 
-      t.classList.toggle('active', active);
-      t.setAttribute('aria-selected', active ? 'true' : 'false');
-    });
+  wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
+    if (c.id === targetId) {
+      c.style.display = '';
+      c.classList.add('active');
+    } else {
+      c.style.display = 'none';
+      c.classList.remove('active');
+    }
+  });
 
-    setTimeout(() => {
-      document
-        .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
-        .forEach((each) => {
-          const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
-          const colorName =
-            document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+  currentCollectionId = targetId;
 
-          each.style.display =
-            title.includes(colorName) || colorName.includes(title)
-              ? ''
-              : 'none';
-        });
+  document.querySelectorAll('.collection-tile').forEach((t) => {
+    const active = t.dataset.target === targetId;
+    t.classList.toggle('active', active);
+    t.setAttribute('aria-selected', active ? 'true' : 'false');
+  });
 
-      filterCharmsBySelectedVariantCarat();
-    }, 500);
+  setTimeout(() => {
+    document
+      .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+      .forEach((each) => {
+        const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
+        const colorName =
+          document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
 
-    moveGridsColumnBelowTile(targetId);
+        each.style.display =
+          title.includes(colorName) || colorName.includes(title)
+            ? ''
+            : 'none';
+      });
 
-    buildColorMapForActiveGrid();
-    buildSwatchDots();
-    refreshSelectedBorders();
-    refreshCapState();
-  }
+    filterCharmsBySelectedVariantCarat();
+  }, 500);
+
+  moveGridsColumnBelowTile(targetId);
+
+  buildColorMapForActiveGrid();
+  buildSwatchDots();
+  refreshSelectedBorders();
+  refreshCapState();
+}
+
 
   (function () {
     if (window._charmCartInit) return;
