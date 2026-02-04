@@ -403,6 +403,36 @@ window.MainBaseCharm = function () {
     }
   }
 
+
+  function onCollectionTileClick(tile) {
+  const targetId = tile.dataset.target;
+  const isActive = tile.classList.contains('active');
+
+  // CASE 1: Tile is already active → deactivate
+  if (isActive) {
+    tile.classList.remove('active');
+    tile.setAttribute('aria-selected', 'false');
+
+    // Hide active grid
+    document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
+      grid.classList.remove('active');
+      grid.style.display = 'none';
+    });
+
+    // Mobile: remove grid from under tile
+    const gridsColumn = document.querySelector('.grids-column');
+    if (gridsColumn && gridsColumn.parentNode) {
+      gridsColumn.parentNode.removeChild(gridsColumn);
+    }
+
+    currentCollectionId = null;
+    return;
+  }
+
+  // CASE 2: Tile is NOT active → activate normally
+  setActiveCollectionById(targetId);
+}
+
   function setActiveCollectionById(targetId) {
     const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
