@@ -564,23 +564,11 @@
     const wrapper = document.querySelector('.otp-login-form-wrapper');
     if (!wrapper) return;
 
-    wrapper.classList.remove('signup-active', 'auto-popup');
+    wrapper.classList.remove('signup-active');
     document.querySelector('.signupSection')?.style.setProperty('display', 'none');
     document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'block');
     document.getElementById('sendOtp')?.style.setProperty('display', 'block');
     document.getElementById('otpSection')?.style.setProperty('display', 'none');
-    document.getElementById('successSection')?.style.setProperty('display', 'none');
-
-    // Restore original signup text when going back to login/OTP flow
-    const heading = document.querySelector('.signupSection h2');
-    const subtitle = document.querySelector('.signupSection p');
-    
-    if (typeof ORIGINAL_SIGNUP_HEADING !== 'undefined' && heading) {
-      heading.textContent = ORIGINAL_SIGNUP_HEADING;
-    }
-    if (typeof ORIGINAL_SIGNUP_SUBTEXT !== 'undefined' && subtitle) {
-      subtitle.textContent = ORIGINAL_SIGNUP_SUBTEXT;
-    }
 
     const sendBtn = document.getElementById('sendOtp');
     if (sendBtn) {
@@ -589,6 +577,7 @@
     }
 
     const wheel = document.getElementById('spin-wheel-image');
+
     if (wheel) {
       wheel.style.transition = 'none';
       wheel.style.transform = 'translate(-50%, -50%) rotate(0deg)';
@@ -603,7 +592,6 @@
       wheelWrapper.style.visibility = 'hidden';
     }
 
-    document.getElementById('loginMobile').value = '';
     document.getElementById('regFirstName').value = '';
     document.getElementById('regLastName').value = '';
     document.getElementById('regEmail').value = '';
@@ -688,59 +676,6 @@
   });
 </script>
 <script>
-  // Store text variations for different popup modes
-  const ORIGINAL_SIGNUP_HEADING = 'Register to Win Rewards';
-  const ORIGINAL_SIGNUP_SUBTEXT = 'Try Your Luck! Win a Diamond Pendant';
-  const SPIN_WHEEL_HEADING = '{{ section.settings.spin_heading | default: "REGISTER & WIN" }}';
-  const SPIN_WHEEL_SUBTEXT = '{{ section.settings.spin_subtext | default: "Get Assured Reward Of 500 To Lucira Coins" }}';
-
-  function showSpinWheelPopup() {
-    const popup = document.getElementById('login-popup');
-    const wrapper = document.querySelector('.otp-login-form-wrapper');
-    const wheel = document.querySelector('.spin-wheel-wrapper');
-
-    if (!popup || !wrapper || !wheel) return;
-
-    // Hide all sections first
-    document.querySelector('.otp-number-wrapper')?.style.setProperty('display', 'none');
-    document.getElementById('sendOtp')?.style.setProperty('display', 'none');
-    document.getElementById('otpSection')?.style.setProperty('display', 'none');
-    document.getElementById('successSection')?.style.setProperty('display', 'none');
-
-    // Show signup section with wheel
-    document.querySelector('.signupSection')?.style.setProperty('display', 'block');
-    wheel.style.display = 'flex';
-    wheel.style.visibility = 'visible';
-    wrapper.classList.add('signup-active', 'auto-popup');
-
-    // Update heading and subtitle for auto-popup spin wheel mode
-    const heading = document.querySelector('.signupSection h2');
-    const subtitle = document.querySelector('.signupSection p');
-    
-    if (heading) heading.textContent = SPIN_WHEEL_HEADING;
-    if (subtitle) subtitle.textContent = SPIN_WHEEL_SUBTEXT;
-
-    // Show the popup
-    popup.style.display = 'flex';
-  }
-
-  function showLoginPopup() {
-    const popup = document.getElementById('login-popup');
-    const wrapper = document.querySelector('.otp-login-form-wrapper');
-
-    if (!popup || !wrapper) return;
-
-    // Reset to login view and show
-    resetToLoginView();
-    wrapper.classList.remove('auto-popup');
-    popup.style.display = 'flex';
-  }
-
-  // Override the global openloginPopup to show login form
-  window.openloginPopup = function(id) {
-    showLoginPopup();
-  };
-
   function setLuciraPopupCookie(days = 30) {
     const d = new Date();
     d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
@@ -751,36 +686,12 @@
     return document.cookie.split('; ').some((row) => row.startsWith('lucira_login_popup_seen='));
   }
 
-  document.addEventListener('DOMContentLoaded', function () {
-    const POPUP_ID = 'login-popup';
-    const SHOW_DELAY = 15000;
-
-    const popup = document.getElementById(POPUP_ID);
-    if (!popup) return;
-
-    if (hasLuciraPopupCookie()) return;
-
-    if (document.body.classList.contains('customer-logged-in')) {
-      setLuciraPopupCookie();
-      return;
-    }
-
-    setTimeout(() => {
-      if (hasLuciraPopupCookie()) return;
-
-      // Show spin wheel with registration form (15-sec auto-popup)
-      showSpinWheelPopup();
-      setLuciraPopupCookie();
-    }, SHOW_DELAY);
-  });
-
-  // Wrap the original closeloginPopup to set cookie
   window.closeloginPopup = (function (originalFn) {
     return function (e, id) {
       setLuciraPopupCookie();
-      if (typeof id === 'undefined') id = e;
-      document.getElementById(id).style.display = 'none';
-      resetToLoginView();
+      if (typeof originalFn === 'function') {
+        originalFn(e, id);
+      }
     };
   })(window.closeloginPopup);
 
@@ -804,12 +715,14 @@
   document.addEventListener('DOMContentLoaded', function() {
     const copyBtn = document.getElementById('copyCoupon');
     const codeSpan = document.getElementById('couponCode');
-    const feedbackMsg = document.getElementById('copyFeedback');
+    const feedbackMsg = document.getElementById('copyFeedback'); // From your previous code
 
     if (copyBtn) {
       copyBtn.addEventListener('click', function(e) {
-        e.preventDefault();
+        e.preventDefault(); // Prevent any default button behavior
 
+        // 1. Get the text to copy
+        // We check data-coupon first, fallback to innerText
         const textToCopy = codeSpan.getAttribute('data-coupon') || codeSpan.innerText;
 
         if (!textToCopy) {
@@ -817,7 +730,12 @@
           return;
         }
 
+        // 2. Copy to Clipboard API
         navigator.clipboard.writeText(textToCopy).then(function() {
+          
+          // --- Success State ---
+          
+          // Option A: Show the feedback text below (if you have that element)
           if (feedbackMsg) {
             feedbackMsg.style.display = 'block';
             feedbackMsg.innerText = 'Code copied!';
@@ -826,9 +744,10 @@
             }, 2000);
           }
 
+          // Option B: Visual feedback on the button itself (optional)
           const originalTitle = copyBtn.getAttribute('title');
           copyBtn.setAttribute('title', 'Copied!');
-          copyBtn.classList.add('copied-success');
+          copyBtn.classList.add('copied-success'); // Add a class for CSS styling
           
           setTimeout(() => {
             copyBtn.setAttribute('title', originalTitle);
@@ -863,18 +782,6 @@
       "id": "subtext",
       "label": "Sub Text",
       "default": "Welcome To The Jewelry World Of Lucira!"
-    },
-    {
-      "type": "text",
-      "id": "spin_heading",
-      "label": "Spin Wheel Heading (Auto Popup)",
-      "default": "REGISTER & WIN"
-    },
-    {
-      "type": "text",
-      "id": "spin_subtext",
-      "label": "Spin Wheel Subtitle (Auto Popup)",
-      "default": "Get Assured Reward Of 500 To Lucira Coins"
     },
     {
       "type": "text",
