@@ -411,7 +411,7 @@ window.MainBaseCharm = function () {
   if (isActive) {
     tile.classList.remove('active');
     tile.setAttribute('aria-selected', 'false');
-      title.classList.remove('open-with-grid');
+    tile.classList.remove('open-with-grid');
 
     document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
       grid.classList.remove('active');
