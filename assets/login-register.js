@@ -589,12 +589,18 @@ async function isCustomerLoggedIn() {
   try {
     const res = await fetch('/account', {
       credentials: 'same-origin',
+      cache: 'no-store',
     });
-    return !res.url.includes('/account/login');
+    const text = await res.text();
+    if (text.includes('name="customer[email]"')) {
+      return false;
+    }
+    return true;
   } catch (e) {
     return false;
   }
 }
+
 
 document.addEventListener('DOMContentLoaded', async function () {
   const POPUP_ID = 'login-popup';
