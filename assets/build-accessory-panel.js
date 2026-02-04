@@ -413,8 +413,8 @@ window.MainBaseCharm = function () {
     tile.setAttribute('aria-selected', 'false');
 
     document.querySelectorAll('.charms-grid-container.active').forEach((grid) => {
-      grid.classList.remove('active');
       grid.classList.remove('open-with-grid');
+      grid.classList.remove('active');
       grid.style.display = 'none';
     });
 
