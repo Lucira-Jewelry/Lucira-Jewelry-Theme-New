@@ -432,6 +432,7 @@ window.MainBaseCharm = function () {
 
 
   function setActiveCollectionById(targetId) {
+    console.log("This is an isuue, let me in ");
     const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
 
