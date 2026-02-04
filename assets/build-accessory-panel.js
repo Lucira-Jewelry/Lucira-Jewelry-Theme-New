@@ -838,7 +838,7 @@ window.MainBaseCharm = function () {
       const minWidth = isMobileLayout() ? 260 : 300;
       width = Math.max(minWidth, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
-      const height = isMobileLayout() ? 100 : (width * (445 / 440));
+      const height = isMobileLayout() ? 300 : (width * (445 / 440));
 
       this.stageWidth = width;
       this.stageHeight = height;
