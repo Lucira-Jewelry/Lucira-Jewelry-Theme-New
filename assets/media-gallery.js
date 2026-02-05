@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [] },
+      codes: {  mv: [], mq: [], cert[], ci: [], mh: [], v360: [] },
       extras: []
     };
 
