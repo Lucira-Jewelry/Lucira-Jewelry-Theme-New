@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "cert", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
