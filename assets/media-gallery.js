@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "cert", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], cert: [], ci: [], mh: [], v360: [] },
+      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [] },
       extras: []
     };
 
@@ -174,7 +174,6 @@ if (!customElements.get('media-gallery')) {
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("mq")) buckets.codes.mq.push(item);
-        else if (alt.includes("cert")) buckets.codes.mq.push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
@@ -200,50 +199,36 @@ if (!customElements.get('media-gallery')) {
   }
 
   function buildRepeatedPattern(buckets) {
-      const isMobile = window.innerWidth < 750;
-      const slotPattern = [
-        "color", "code", "code",
-        "color", "color", "code", "code",
-        "color", "color", "code", "code",
-        "color"
-      ];
-      let ordered = [];
+    const slotPattern = [
+      "color", "code", "code",
+      "color", "color", "code", "code",
+      "color", "color", "code", "code",
+      "color"
+    ];
+    const ordered = [];
 
-      // If mobile, we want cert at index 2 (3rd position)
-      const certNode = buckets.cert.length ? buckets.cert[0] : null;
-
-      for (let i = 0; i < slotPattern.length; i++) {
-        // Mobile 3rd position logic
-        if (isMobile && i === 2 && certNode) {
-          certNode.style.display = 'block';
-          ordered.push(certNode);
-        }
-
-        let node = slotPattern[i] === "color" ? takeColor(buckets) : takeCode(buckets);
-        if (node) {
-          node.style.display = 'block';
-          ordered.push(node);
-        }
+    for (const slot of slotPattern) {
+      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+      if (node) {
+        node.style.display = 'block';
+        ordered.push(node);
       }
+    }
 
-      // Add remaining items from buckets
-      Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-        node.style.display = 'block'; 
-        ordered.push(node); 
-      }));
-      
-      buckets.color.forEach(node => { 
-        node.style.display = 'block'; 
-        ordered.push(node); 
-      });
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    }));
+    buckets.color.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    });
+    buckets.extras.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    });
 
-      // If Desktop, add cert at the very end
-      if (!isMobile && certNode) {
-        certNode.style.display = 'block';
-        ordered.push(certNode);
-      }
-
-      return ordered;
+    return ordered;
   }
 
   function reorderByColor(targetColor) {
