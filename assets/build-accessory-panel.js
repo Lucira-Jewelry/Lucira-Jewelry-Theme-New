@@ -984,7 +984,6 @@ window.MainBaseCharm = function () {
       } else {
         this._resetToBaseView(true);
       }
-
       this.stage.draw();
     }
 
