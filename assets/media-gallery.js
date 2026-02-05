@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], cert[], ci: [], mh: [], v360: [] },
+      codes: {  mv: [], mq: [], cert: [], ci: [], mh: [], v360: [] },
       extras: []
     };
 
@@ -200,36 +200,50 @@ if (!customElements.get('media-gallery')) {
   }
 
   function buildRepeatedPattern(buckets) {
-    const slotPattern = [
-      "color", "code", "code",
-      "color", "color", "code", "code",
-      "color", "color", "code", "code",
-      "color"
-    ];
-    const ordered = [];
+      const isMobile = window.innerWidth < 750;
+      const slotPattern = [
+        "color", "code", "code",
+        "color", "color", "code", "code",
+        "color", "color", "code", "code",
+        "color"
+      ];
+      let ordered = [];
 
-    for (const slot of slotPattern) {
-      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
-      if (node) {
-        node.style.display = 'block';
-        ordered.push(node);
+      // If mobile, we want cert at index 2 (3rd position)
+      const certNode = buckets.cert.length ? buckets.cert[0] : null;
+
+      for (let i = 0; i < slotPattern.length; i++) {
+        // Mobile 3rd position logic
+        if (isMobile && i === 2 && certNode) {
+          certNode.style.display = 'block';
+          ordered.push(certNode);
+        }
+
+        let node = slotPattern[i] === "color" ? takeColor(buckets) : takeCode(buckets);
+        if (node) {
+          node.style.display = 'block';
+          ordered.push(node);
+        }
       }
-    }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    });
+      // Add remaining items from buckets
+      Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
+        node.style.display = 'block'; 
+        ordered.push(node); 
+      }));
+      
+      buckets.color.forEach(node => { 
+        node.style.display = 'block'; 
+        ordered.push(node); 
+      });
 
-    return ordered;
+      // If Desktop, add cert at the very end
+      if (!isMobile && certNode) {
+        certNode.style.display = 'block';
+        ordered.push(certNode);
+      }
+
+      return ordered;
   }
 
   function reorderByColor(targetColor) {
