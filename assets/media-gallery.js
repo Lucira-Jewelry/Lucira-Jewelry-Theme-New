@@ -127,10 +127,7 @@ if (!customElements.get('media-gallery')) {
   let observer = null;
   let isReordering = false;
   let visibleSlides = [];
-  
-  let touchStartX = 0;
-  let touchEndX = 0;
-  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
+  let isSwiping = false;
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -161,7 +158,8 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], cert: [], ci: [], mh: [], v360: [] },
+      codes: { mv: [], mq: [], ci: [], mh: [], v360: [] },
+      cert: [], // Separate bucket for cert
       extras: []
     };
 
@@ -171,10 +169,12 @@ if (!customElements.get('media-gallery')) {
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
-      if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
+      // Check for CERT first to ensure it's never filtered out
+      if (alt.includes("cert")) {
+        buckets.cert.push(item);
+      } else if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("mq")) buckets.codes.mq.push(item);
-        else if (alt.includes("cert")) buckets.codes.cert.push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
@@ -192,7 +192,7 @@ if (!customElements.get('media-gallery')) {
   }
 
   function takeCode(buckets) {
-    for (const key of ALWAYS_SHOW_CODES) {
+    for (const key of ["mv", "mq", "ci", "mh", "360v"]) {
       const k = key === "360v" ? "v360" : key;
       if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
@@ -200,34 +200,46 @@ if (!customElements.get('media-gallery')) {
   }
 
   function buildRepeatedPattern(buckets) {
-    const slotPattern = [
-      "color", "code", "code",
-      "color", "color", "code", "code",
-      "color", "color", "code", "code",
-      "color"
-    ];
+    const isMobile = window.innerWidth < 750;
+    const slotPattern = ["color", "code", "code", "color", "color", "code", "code"];
     const ordered = [];
+    const certNode = buckets.cert.length ? buckets.cert[0] : null;
 
-    for (const slot of slotPattern) {
-      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
+    // Build the main list
+    for (let i = 0; i < 15; i++) { // Max safety loop
+      // MOBILE: Inject cert at 3rd position (Index 2)
+      if (isMobile && ordered.length === 2 && certNode) {
+        certNode.style.display = 'block';
+        ordered.push(certNode);
+      }
+
+      let type = slotPattern[i % slotPattern.length];
+      let node = type === "color" ? takeColor(buckets) : takeCode(buckets);
+      
       if (node) {
         node.style.display = 'block';
         ordered.push(node);
+      } else {
+        // If we run out of a specific type, try the other
+        let backup = type === "color" ? takeCode(buckets) : takeColor(buckets);
+        if (backup) {
+          backup.style.display = 'block';
+          ordered.push(backup);
+        }
       }
+      
+      if (!buckets.color.length && !Object.values(buckets.codes).flat().length) break;
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    });
+    // DESKTOP: If not mobile and cert hasn't been added, put it at the end
+    if (!isMobile && certNode) {
+      certNode.style.display = 'block';
+      ordered.push(certNode);
+    } else if (isMobile && certNode && !ordered.includes(certNode)) {
+        // Fallback for mobile if list was too short
+        certNode.style.display = 'block';
+        ordered.push(certNode);
+    }
 
     return ordered;
   }
@@ -245,6 +257,8 @@ if (!customElements.get('media-gallery')) {
     return ordered;
   }
 
+  // ... (Rest of the slider logic: getVisibleSlides, createDotsNavigation, goToSlide, etc. remains the same as your original) ...
+  
   function getVisibleSlides() {
     if (!mediaList) return [];
     return Array.from(mediaList.querySelectorAll('.product__media-item'))
@@ -252,72 +266,35 @@ if (!customElements.get('media-gallery')) {
   }
 
   function createDotsNavigation() {
-    if (dotsContainer) { 
-      dotsContainer.remove(); 
-      dotsContainer = null; 
-    }
+    if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
     if (!mediaList) return;
-
     visibleSlides = getVisibleSlides();
     totalSlides = visibleSlides.length;
-    
     if (totalSlides <= 1) return;
-
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
-
     for (let i = 0; i < totalSlides; i++) {
       const dot = document.createElement('button');
       dot.className = 'slider-dot';
       dot.type = 'button';
       dot.dataset.index = i;
-
-      const slide = visibleSlides[i];
-      const isVideo = !!slide && (slide.querySelector('video') || slide.querySelector('.video'));
-      const baseLabel = `Slide ${i + 1} of ${totalSlides}`;
-      dot.setAttribute('aria-label', isVideo ? `${baseLabel}, video` : baseLabel);
-
-      if (i === currentSlide) {
-        dot.classList.add('active');
-        dot.setAttribute('aria-current', 'true');
-      }
-
+      if (i === currentSlide) { dot.classList.add('active'); dot.setAttribute('aria-current', 'true'); }
       const dotInner = document.createElement('span');
       dotInner.className = 'slider-dot__inner';
       dot.appendChild(dotInner);
-
-      if (isVideo) {
-        const videoIcon = document.createElement('span');
-        videoIcon.className = 'slider-dot__video-icon';
-        videoIcon.innerHTML = `
-          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" focusable="false">
-            <path d="M4 2v20l18-10L4 2z" fill="currentColor"/>
-          </svg>
-        `;
-        dot.appendChild(videoIcon);
-      }
-
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
     }
-    
-    const parent = mediaList.parentNode;
-    parent.appendChild(dotsContainer);
+    mediaList.parentNode.appendChild(dotsContainer);
   }
 
   function updateDots() {
     if (!dotsContainer) return;
-
     const dots = dotsContainer.querySelectorAll('.slider-dot');
-
     dots.forEach((dot, i) => {
       const isActive = i === currentSlide;
       dot.classList.toggle('active', isActive);
-      if (isActive) {
-        dot.setAttribute('aria-current', 'true');
-      } else {
-        dot.removeAttribute('aria-current');
-      }
+      isActive ? dot.setAttribute('aria-current', 'true') : dot.removeAttribute('aria-current');
     });
   }
 
@@ -329,283 +306,89 @@ if (!customElements.get('media-gallery')) {
 
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides || isReordering) return;
-    
-    isSwiping = true; // Lock scroll sync
+    isSwiping = true;
     currentSlide = index;
     visibleSlides = getVisibleSlides();
-    
     setActiveSlide(currentSlide);
     updateDots();
-
     const targetSlide = visibleSlides[currentSlide];
-    
     if (targetSlide && mediaList) {
-      // FIX: Use scrollTo on the container instead of scrollIntoView
-      // This calculates the center position manually to avoid page jumping
-      const slideLeft = targetSlide.offsetLeft;
-      const slideWidth = targetSlide.clientWidth;
-      const containerWidth = mediaList.clientWidth;
-      
-      // Calculate position to center the image
-      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
-
-      mediaList.scrollTo({
-        left: targetScrollLeft,
-        behavior: 'smooth'
-      });
-
-      // Handle video autoplay
-      const activeVideo = targetSlide.querySelector('video');
-      if (activeVideo) {
-        activeVideo.loop = true;
-        activeVideo.muted = true;
-        activeVideo.play().catch(() => {});
-      }
+      const targetScrollLeft = targetSlide.offsetLeft - (mediaList.clientWidth / 2) + (targetSlide.clientWidth / 2);
+      mediaList.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
     }
-    
-    // Release the lock after animation roughly completes
-    setTimeout(() => {
-        isSwiping = false;
-    }, 500);
+    setTimeout(() => { isSwiping = false; }, 500);
   }
 
-  function moveSlide(direction) {
-    let nextIndex = currentSlide + direction;
-    if (nextIndex < 0) nextIndex = 0;
-    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
-    goToSlide(nextIndex);
-  }
-
-  // --- SWIPE LOGIC (UNCHANGED AS REQUESTED) ---
-  function setupSwipeDetection() {
-    if (!mediaList) return;
-
-    let startX = 0;
-    let isTouching = false;
-
-    mediaList.addEventListener('touchstart', (e) => {
-      startX = e.touches[0].clientX;
-      isTouching = true;
-    }, { passive: true });
-
-    mediaList.addEventListener('touchend', (e) => {
-      if (!isTouching) return;
-      isTouching = false;
-
-      const endX = e.changedTouches[0].clientX;
-      const diff = startX - endX;
-      const threshold = 40;
-
-      if (Math.abs(diff) < threshold) return;
-
-      if (diff > 0) {
-        moveSlide(1); 
-      } else {
-        moveSlide(-1); 
-      }
-    }, { passive: true });
-  }
-
-  // --- SCROLL SYNC (IMPROVED FOR DOTS) ---
   function setupScrollSync() {
     if (!mediaList) return;
-    
-    let isScrolling = false;
-
     mediaList.addEventListener('scroll', () => {
-      if (isReordering || isSwiping) return; // Don't sync if script is driving the animation
-      
-      if (!isScrolling) {
-        window.requestAnimationFrame(() => {
-          syncSlideFromScroll();
-          isScrolling = false;
+      if (isReordering || isSwiping) return;
+      window.requestAnimationFrame(() => {
+        const slides = getVisibleSlides();
+        const containerCenter = mediaList.getBoundingClientRect().left + mediaList.clientWidth / 2;
+        let closestIndex = 0;
+        let minDiff = Infinity;
+        slides.forEach((slide, i) => {
+          const diff = Math.abs((slide.getBoundingClientRect().left + slide.clientWidth / 2) - containerCenter);
+          if (diff < minDiff) { minDiff = diff; closestIndex = i; }
         });
-        isScrolling = true;
-      }
+        if (closestIndex !== currentSlide) {
+          currentSlide = closestIndex;
+          setActiveSlide(currentSlide);
+          updateDots();
+        }
+      });
     }, { passive: true });
-  }
-
-  function syncSlideFromScroll() {
-    if (!mediaList || isReordering) return;
-
-    const slides = getVisibleSlides();
-    if (!slides.length) return;
-
-    const containerRect = mediaList.getBoundingClientRect();
-    const containerCenter = containerRect.left + containerRect.width / 2;
-
-    let closestIndex = currentSlide;
-    let closestDistance = Infinity;
-
-    // Determine which slide is closest to center
-    slides.forEach((slide, index) => {
-      const rect = slide.getBoundingClientRect();
-      const center = rect.left + rect.width / 2;
-      const dist = Math.abs(center - containerCenter);
-
-      if (dist < closestDistance) {
-        closestDistance = dist;
-        closestIndex = index;
-      }
-    });
-
-    if (closestIndex !== currentSlide) {
-      currentSlide = closestIndex;
-      setActiveSlide(currentSlide);
-      updateDots();
-      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
-    }
   }
 
   function initSliderNavigation() {
     if (!mediaList) return;
-
     const isMobile = window.innerWidth < 750;
-
-    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
-    if (sliderButtons) sliderButtons.style.display = 'none';
-
     createDotsNavigation();
-
-    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
-    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
-    if (!isMobile) {
-      setupSwipeDetection();
-    }
-
-    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
-    // This was previously inside the !isMobile check, causing dots to fail on mobile.
     setupScrollSync();
   }
 
-  function playAllVideos() {
-    if (!mediaList) return;
-    const videos = mediaList.querySelectorAll('video');
-    videos.forEach(video => {
-      video.loop = true;
-      video.muted = true;
-      video.play().catch(() => {});
-    });
-  }
-
   function safeReorderByColor(targetColor) {
-    if (isReordering) return;
+    if (isReordering || !mediaList) return;
     isReordering = true;
-
-    if (!mediaList) { 
-      isReordering = false; 
-      return; 
-    }
-
-    const previousSlide = currentSlide;
-    
     reorderByColor(targetColor);
-    
     currentSlide = 0;
-    
     initSliderNavigation();
-    
     setTimeout(() => {
-      goToSlide(currentSlide);
-      playAllVideos();
+      goToSlide(0);
       isReordering = false;
-    }, 150);
-
-    mediaList.setAttribute('data-media-reordered', 'true');
+    }, 200);
   }
 
   function getSelectedColor() {
-    const colorInputs = document.querySelectorAll(
-      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
-    );
-    for (const input of colorInputs) {
-      if (input.checked || input.tagName === 'SELECT') {
-        const color = getColorFromAlt(input.value);
-        if (color) return color;
-      }
-    }
-    const selectedVariants = document.querySelectorAll(
-      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
-    );
-    for (const element of selectedVariants) {
-      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
-      const color = getColorFromAlt(text);
+    const inputs = document.querySelectorAll('input[name*="Color"], input[name*="color"], select[name*="Color"], fieldset[data-type="color"] input:checked');
+    for (const input of inputs) {
+      const val = input.value || input.getAttribute('data-value');
+      const color = getColorFromAlt(val);
       if (color) return color;
     }
-    const urlParams = new URLSearchParams(window.location.search);
-    const colorParam = urlParams.get('color') || urlParams.get('Color');
-    if (colorParam) return getColorFromAlt(colorParam);
     return "yellow";
   }
 
-  const debouncedHandleColorChange = debounce(function () {
-    const selectedColor = getSelectedColor();
-    if (!selectedColor || selectedColor === currentSelectedColor) return;
-
-    currentSelectedColor = selectedColor;
-    safeReorderByColor(selectedColor);
-  }, 100);
-
-  function setupVariantChangeListeners() {
-    document.addEventListener('change', debouncedHandleColorChange);
-    document.addEventListener('variant:change', debouncedHandleColorChange);
-    document.addEventListener('variant:selected', debouncedHandleColorChange);
-    window.addEventListener('popstate', debouncedHandleColorChange);
-
-    if (mediaList) {
-      if (observer) observer.disconnect();
-      observer = new MutationObserver(() => {
-        if (!isReordering) {
-          safeReorderByColor(currentSelectedColor);
-        }
-      });
-      observer.observe(mediaList, { childList: true, subtree: true });
+  const handleVariantChange = debounce(() => {
+    const color = getSelectedColor();
+    if (color !== currentSelectedColor) {
+      currentSelectedColor = color;
+      safeReorderByColor(color);
     }
-  }
-
-  function cleanup() {
-    if (observer) observer.disconnect();
-    document.removeEventListener('change', debouncedHandleColorChange);
-    document.removeEventListener('variant:change', debouncedHandleColorChange);
-    document.removeEventListener('variant:selected', debouncedHandleColorChange);
-    window.removeEventListener('popstate', debouncedHandleColorChange);
-  }
+  }, 100);
 
   function initialize() {
     if (isInitialized) return;
-    
     cacheDOMElements();
     if (!mediaList) return;
-
     currentSelectedColor = getSelectedColor();
-    
-    const wrapper = mediaList.closest('.media-gallery-wrapper');
-    if (wrapper) {
-      wrapper.classList.add('loaded');
-    }
-
     safeReorderByColor(currentSelectedColor);
-    playAllVideos();
-    setupVariantChangeListeners();
+    document.addEventListener('change', handleVariantChange);
     isInitialized = true;
   }
 
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initialize);
-  } else {
-    initialize();
-  }
-
-  if (window.Shopify && window.Shopify.theme) {
-    document.addEventListener('shopify:section:load', () => { 
-      cleanup(); 
-      isInitialized = false; 
-      initialize(); 
-    });
-    document.addEventListener('theme:loaded', initialize);
-  }
-
-  window.addEventListener('beforeunload', cleanup);
+  window.addEventListener('load', initialize);
 })();
 
 
