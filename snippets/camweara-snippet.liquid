@@ -467,9 +467,6 @@
 
 
 
-
-
-
 {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
@@ -654,8 +651,24 @@
         align-items:center;
     }
 
+    /* Styles for second button - text only */
+    .tryon-text-only {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .tryon-text-only span {
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        color: #000 !important;
+        letter-spacing: 1px !important;
+        font-family: 'Futura Std' !important;
+        display: inline-block !important;
+    }
+
     /* Hide any default content */
-    #tryonButton > *:not(.tryon-button-wrapper) {
+    #tryonButton > *:not(.tryon-button-wrapper):not(.tryon-text-only) {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
@@ -699,6 +712,10 @@
         }
 
         .tryon-text-content span {
+            font-size: 12px !important;
+        }
+
+        .tryon-text-only span {
             font-size: 12px !important;
         }
     }
@@ -774,7 +791,7 @@
       }
     });
 
-    // Function to completely clean and transform button
+    // Function to completely clean and transform button (FIRST BUTTON - WITH ANIMATION)
     function transformTryOnButton(buttonElement) {
       if (!buttonElement) return false;
 
@@ -870,7 +887,59 @@
       return true;
     }
 
-    // Animation function
+    // Function for second button - TEXT ONLY, NO ANIMATION
+    function transformSecondButton(buttonElement) {
+      if (!buttonElement) return false;
+      
+      // Check if already transformed
+      if (buttonElement.querySelector('.tryon-text-only')) {
+        return true;
+      }
+
+      console.log('🔄 Transforming second Try On button (text only)');
+
+      // Store click handler
+      const originalOnClick = buttonElement.onclick;
+      
+      // Clear button content
+      buttonElement.textContent = '';
+      buttonElement.innerHTML = '';
+      buttonElement.style.cssText = '';
+      
+      // Create simple text wrapper
+      const textWrapper = document.createElement('div');
+      textWrapper.className = 'tryon-text-only';
+      textWrapper.innerHTML = '<span>Try Them On</span>';
+      textWrapper.style.cssText = 'font-size:15px;font-weight:500;color:#000;letter-spacing:1px;font-family:"Futura Std";white-space:nowrap;display:inline-block;';
+      
+      buttonElement.appendChild(textWrapper);
+      
+      // Force visibility
+      buttonElement.style.visibility = 'visible';
+      buttonElement.style.opacity = '1';
+      buttonElement.style.display = 'inline-block';
+      buttonElement.style.background = 'transparent';
+      buttonElement.style.border = 'none';
+      buttonElement.style.padding = '0';
+      buttonElement.style.cursor = 'pointer';
+      
+      // Restore click functionality
+      const clickHandler = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('👆 Second Try On button clicked');
+        if (originalOnClick) {
+          originalOnClick.call(buttonElement, e);
+        }
+      };
+      
+      buttonElement.addEventListener('click', clickHandler);
+      buttonElement.addEventListener('touchstart', clickHandler);
+      
+      return true;
+    }
+
+    // Animation function (for first button only)
     function startButtonAnimation(panel) {
       if (!panel) return;
       
@@ -887,7 +956,7 @@
       }, 1000);
     }
 
-    // Aggressive transformation strategy for mobile
+    // Aggressive transformation strategy for mobile (first button)
     function findAndTransformButton() {
       // Try multiple selectors
       const selectors = [
@@ -900,7 +969,7 @@
       
       for (const selector of selectors) {
         const button = document.querySelector(selector);
-        if (button && !button.querySelector('.tryon-button-wrapper')) {
+        if (button && !button.querySelector('.tryon-button-wrapper') && !button.querySelector('.tryon-text-only')) {
           console.log('✅ Found button with selector:', selector);
           const success = transformTryOnButton(button);
           if (success) {
@@ -967,44 +1036,26 @@
       }, 1000);
     }
 
-    // Second button handling
-    {% comment %} getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
+    // SECOND BUTTON HANDLING - TEXT ONLY, NO ANIMATION
+    getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
       .then((skusList) => {
         console.log("all skus", skusList);
         if (skusList.includes(productSKUTryOn)){
-          const secondBtn = document.getElementById("second-tryon-button");
-          const virtualContent = document.getElementById("virtual-try-on-content");
-          
-          if (secondBtn) secondBtn.style.display = "block";
-          if (virtualContent) virtualContent.style.display = "flex";
+          document.getElementById("second-tryon-button").style.display = "block";
+          document.getElementById("virtual-try-on-content").style.display = "flex";
 
+          // Transform the second button with text-only style
           setTimeout(() => {
-            const secondButton = document.querySelector('#second-tryon-button button[id*="tryon"], #virtual-try-on-content button[id*="tryon"]');
-            if (secondButton) {
-              transformTryOnButton(secondButton);
+            const secondTryonButton = document.querySelector('#second-tryon-button #tryonButton, #virtual-try-on-content #tryonButton');
+            if (secondTryonButton) {
+              console.log('✅ Found second button, transforming to text-only');
+              transformSecondButton(secondTryonButton);
             }
           }, 800);
         }
       })
-      .catch(err => console.error('Error loading SKUs:', err)); {% endcomment %}
+      .catch(err => console.error('Error loading SKUs:', err));
 
-getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
-  .then((skusList) => {
-    console.log("all skus", skusList);
-    if (skusList.includes(productSKUTryOn)){
-      document.getElementById("second-tryon-button").style.display = "block";
-      document.getElementById("virtual-try-on-content").style.display = "flex";
-
-      // Transform the second button with proper element reference
-      setTimeout(() => {
-        const secondTryonButton = document.querySelector('#second-tryon-button ');
-        if (secondTryonButton) {
-          // Pass the button element to the function
-          transformTryOnButton(secondTryonButton);
-        }
-      }, 500);
-    }
-  });
   }
 
   // Initialize on various events
@@ -1020,4 +1071,4 @@ getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
 
   // Fallback for mobile browsers
   setTimeout(initTryOnButton, 1000);
-</script> 
+</script>
