@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v", "Cert"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [], cert: [] },
+      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [] },
       extras: []
     };
 
@@ -177,7 +177,6 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
-        else if (alt.includes("cert")) buckets.codes.cert.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
         item.style.display = 'none';
@@ -193,14 +192,11 @@ if (!customElements.get('media-gallery')) {
 
   function takeCode(buckets) {
     for (const key of ALWAYS_SHOW_CODES) {
-      if (key === "Cert") continue; // 🚫 skip cert here
-      const k = key === "360v" ? "v360" : key.toLowerCase();
-      if (buckets.codes[k]?.length) return buckets.codes[k].shift();
+      const k = key === "360v" ? "v360" : key;
+      if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
     return null;
   }
-
-
 
   function buildRepeatedPattern(buckets) {
     const slotPattern = [
@@ -219,20 +215,10 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.entries(buckets.codes).forEach(([key, arr]) => {
-      if (key === 'cert') return;
-      arr.forEach(node => {
-        node.style.display = 'block';
-        ordered.push(node);
-      });
-    });
-
-    buckets.codes.cert.forEach(node => {
-      node.style.display = 'block';
-      ordered.push(node);
-    });
-
-
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    }));
     buckets.color.forEach(node => { 
       node.style.display = 'block'; 
       ordered.push(node); 
@@ -684,15 +670,19 @@ document.addEventListener('DOMContentLoaded', () => {
       // hide poster quickly (so it doesn't cover the injected iframe) — we'll still trigger click so Shopify loads the media
       posterBtn.classList.add('deferred-media__poster--hidden');
       const spinner = modalEl.querySelector('.loading__spinner');
-      if (spinner) spinner.classList.remove('hidden');
-      try { posterBtn.click(); } catch (e) { }
+      if (spinner) spinner.classList.remove('hidden'); // show spinner while loading
+      try { posterBtn.click(); } catch (e) { /* ignore */ }
     } else if (deferred) {
+      // if deferred tag present but no poster btn, we'll continue to look for iframe/video
     } else {
+      // no deferred media found
       return;
     }
 
+    // After injection, attempt to autoplay. Use MutationObserver to detect insertion of iframe/video
     const observerTarget = deferred || modalEl;
     const observer = new MutationObserver((mutations, obs) => {
+      // look for iframe/video now
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
 
@@ -703,6 +693,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     observer.observe(observerTarget, { childList: true, subtree: true });
+
+    // also fallback: try after fixed delay if MutationObserver didn't trigger
     setTimeout(() => {
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
@@ -710,23 +702,28 @@ document.addEventListener('DOMContentLoaded', () => {
         try { observer.disconnect() } catch(e){}
         finalizeAutoplay(modalEl, iframe, video);
       } else {
+        // give one more attempt: unhide poster if still nothing
         const posterBtn2 = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
         if (posterBtn2) posterBtn2.classList.remove('deferred-media__poster--hidden');
         const spinner2 = modalEl.querySelector('.loading__spinner');
         if (spinner2) spinner2.classList.add('hidden');
       }
-    }, 700);
+    }, 700); // tune this if needed
   }
 
   function finalizeAutoplay(modalEl, iframe, video) {
+    // Hide poster/spinner
     const poster = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
     if (poster) poster.classList.add('hidden');
 
     const spinner = modalEl.querySelector('.loading__spinner');
     if (spinner) spinner.classList.add('hidden');
+
+    // If iframe (YouTube/Vimeo), append autoplay param
     if (iframe) {
       const src = iframe.getAttribute('src') || iframe.src || '';
       if (!src) return;
+      // If src already contains autoplay=, still try to ensure it's 1
       let newSrc;
       if (src.includes('autoplay=')) {
         newSrc = src.replace(/autoplay=\d/, 'autoplay=1');
@@ -734,19 +731,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const connector = src.includes('?') ? '&' : '?';
         newSrc = src + connector + 'autoplay=1';
       }
+      // assign only if changed (reassigning will reload iframe which stops previous play; that's OK)
       if (newSrc !== src) {
         iframe.setAttribute('src', newSrc);
       } else {
+        // If same, force a reload to ensure autoplay param recognized
         iframe.setAttribute('src', src);
       }
+      // For YouTube, ensure muted for autoplay on some browsers:
+      // YouTube autoplay respects the URL param 'mute=1' in some players; add if missing
       if (!/mute=1/.test(newSrc)) {
         const connector2 = newSrc.includes('?') ? '&' : '?';
         iframe.setAttribute('src', newSrc + connector2 + 'mute=1');
       }
     }
 
+    // If native video element
     if (video) {
+      // browsers usually require muted to allow autoplay
       video.muted = true;
+      // try to play
       const p = video.play();
       if (p && p.catch) {
         p.catch(err => {
