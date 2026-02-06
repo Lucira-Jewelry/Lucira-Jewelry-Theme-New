@@ -193,11 +193,14 @@ if (!customElements.get('media-gallery')) {
 
   function takeCode(buckets) {
     for (const key of ALWAYS_SHOW_CODES) {
-      const k = key === "360v" ? "v360" : key;
-      if (buckets.codes[k].length) return buckets.codes[k].shift();
+      if (key === "Cert") continue; // 🚫 skip cert here
+      const k = key === "360v" ? "v360" : key.toLowerCase();
+      if (buckets.codes[k]?.length) return buckets.codes[k].shift();
     }
     return null;
   }
+
+
 
   function buildRepeatedPattern(buckets) {
     const slotPattern = [
@@ -216,10 +219,20 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
+    Object.entries(buckets.codes).forEach(([key, arr]) => {
+      if (key === 'cert') return;
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      });
+    });
+
+    buckets.codes.cert.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
+
     buckets.color.forEach(node => { 
       node.style.display = 'block'; 
       ordered.push(node); 
