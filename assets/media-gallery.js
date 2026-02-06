@@ -204,7 +204,7 @@ if (!customElements.get('media-gallery')) {
     const ordered = [];
     const certNode = buckets.cert.length ? buckets.cert[0] : null;
 
-    // Build main list (WITHOUT cert)
+    // Build list exactly like other media
     for (let i = 0; i < 15; i++) {
       let type = slotPattern[i % slotPattern.length];
       let node = type === "color" ? takeColor(buckets) : takeCode(buckets);
@@ -218,10 +218,13 @@ if (!customElements.get('media-gallery')) {
         ordered.push(node);
       }
 
-      if (!buckets.color.length && !Object.values(buckets.codes).flat().length) break;
+      if (
+        !buckets.color.length &&
+        !Object.values(buckets.codes).flat().length
+      ) break;
     }
 
-    // ✅ ALWAYS append cert at the very end
+    // ✅ cert behaves like others, but position is fixed (last)
     if (certNode) {
       certNode.style.display = 'block';
       ordered.push(certNode);
@@ -229,6 +232,7 @@ if (!customElements.get('media-gallery')) {
 
     return ordered;
   }
+
 
 
   function reorderByColor(targetColor) {
