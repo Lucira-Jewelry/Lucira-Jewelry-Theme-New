@@ -333,11 +333,15 @@ $(document).ready(function () {
   $(window).on("resize", setupBradAccordion);
 });
 
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', function () {
   const video = document.getElementById('delayedLoopVideo');
 
-  video.addEventListener('ended', () => {
-    setTimeout(() => {
+  if (!video) return;
+
+  video.addEventListener('ended', function () {
+    video.pause();
+
+    setTimeout(function () {
       video.currentTime = 0;
       video.play();
     }, 15000); // 15 seconds delay
