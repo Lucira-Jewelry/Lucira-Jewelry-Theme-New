@@ -200,40 +200,49 @@ if (!customElements.get('media-gallery')) {
   }
 
   function buildRepeatedPattern(buckets) {
+    const isMobile = window.innerWidth < 750;
     const slotPattern = ["color", "code", "code", "color", "color", "code", "code"];
     const ordered = [];
     const certNode = buckets.cert.length ? buckets.cert[0] : null;
 
-    // Build list exactly like other media
-    for (let i = 0; i < 15; i++) {
-      let type = slotPattern[i % slotPattern.length];
-      let node = type === "color" ? takeColor(buckets) : takeCode(buckets);
-
-      if (!node) {
-        node = type === "color" ? takeCode(buckets) : takeColor(buckets);
+    // Build the main list
+    for (let i = 0; i < 15; i++) { // Max safety loop
+      // MOBILE: Inject cert at 3rd position (Index 2)
+      if (isMobile && ordered.length === 2 && certNode) {
+        certNode.style.display = 'block';
+        ordered.push(certNode);
       }
 
+      let type = slotPattern[i % slotPattern.length];
+      let node = type === "color" ? takeColor(buckets) : takeCode(buckets);
+      
       if (node) {
         node.style.display = 'block';
         ordered.push(node);
+      } else {
+        // If we run out of a specific type, try the other
+        let backup = type === "color" ? takeCode(buckets) : takeColor(buckets);
+        if (backup) {
+          backup.style.display = 'block';
+          ordered.push(backup);
+        }
       }
-
-      if (
-        !buckets.color.length &&
-        !Object.values(buckets.codes).flat().length
-      ) break;
+      
+      if (!buckets.color.length && !Object.values(buckets.codes).flat().length) break;
     }
 
-    // ✅ cert behaves like others, but position is fixed (last)
-    if (certNode) {
+    // DESKTOP: If not mobile and cert hasn't been added, put it at the end
+    if (!isMobile && certNode) {
       certNode.style.display = 'block';
       ordered.push(certNode);
+    } else if (isMobile && certNode && !ordered.includes(certNode)) {
+        // Fallback for mobile if list was too short
+        certNode.style.display = 'block';
+        ordered.push(certNode);
     }
 
     return ordered;
   }
-
-
 
   function reorderByColor(targetColor) {
     const { buckets, allItems } = classifyItemsByColor(targetColor);
