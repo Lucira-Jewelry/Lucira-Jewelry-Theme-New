@@ -654,7 +654,6 @@
   setTimeout(initTryOnButton, 1000);
 </script> {% endcomment %}
 
-
 {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
@@ -709,6 +708,65 @@
 </script>
 
 <style>
+    /* MOBILE CRITICAL FIX - Maximum specificity for mobile visibility */
+    @media (max-width: 768px) {
+        /* Force button visibility with maximum specificity */
+        .product__media-list button#tryonButton,
+        .product__media-list button[id="tryonButton"],
+        .product__media-list #tryonButton,
+        body .product__media-list button#tryonButton {
+            visibility: visible !important;
+            display: block !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            width: 30px !important;
+            height: 30px !important;
+            min-width: 30px !important;
+            min-height: 30px !important;
+            max-width: 30px !important;
+            max-height: 30px !important;
+        }
+        
+        /* Force wrapper visibility */
+        .product__media-list .tryon-button-wrapper,
+        body .product__media-list .tryon-button-wrapper {
+            visibility: visible !important;
+            display: block !important;
+            opacity: 1 !important;
+            width: 30px !important;
+            height: 30px !important;
+        }
+        
+        .product__media-list .tryon-sliding-panel,
+        body .product__media-list .tryon-sliding-panel {
+            visibility: visible !important;
+            display: flex !important;
+            opacity: 1 !important;
+        }
+        
+        .product__media-list .tryon-icon-circle,
+        body .product__media-list .tryon-icon-circle {
+            visibility: visible !important;
+            display: block !important;
+            opacity: 1 !important;
+        }
+        
+        /* Force SVG visibility */
+        .product__media-list .tryon-icon-circle svg,
+        .product__media-list .tryon-icon-circle svg *,
+        body .product__media-list .tryon-icon-circle svg,
+        body .product__media-list .tryon-icon-circle svg * {
+            visibility: visible !important;
+            opacity: 1 !important;
+            display: block !important;
+        }
+        
+        /* Ensure proper stacking */
+        .product__media-list {
+            position: relative !important;
+        }
+    }
+
     /* CRITICAL: High specificity overrides for the button - RESIZED TO 30px */
     button#tryonButton,
     button[id="tryonButton"],
@@ -1089,10 +1147,23 @@
       buttonWrapper.appendChild(buttonContainer);
       buttonElement.appendChild(buttonWrapper);
       
-      // Force visibility
-      buttonElement.style.visibility = 'visible';
-      buttonElement.style.opacity = '1';
-      buttonElement.style.display = 'block';
+      // Force visibility with inline styles (CRITICAL for mobile - using setProperty with important flag)
+      buttonElement.style.setProperty('visibility', 'visible', 'important');
+      buttonElement.style.setProperty('opacity', '1', 'important');
+      buttonElement.style.setProperty('display', 'block', 'important');
+      buttonElement.style.setProperty('pointer-events', 'auto', 'important');
+
+      buttonWrapper.style.setProperty('visibility', 'visible', 'important');
+      buttonWrapper.style.setProperty('opacity', '1', 'important');
+      buttonWrapper.style.setProperty('display', 'block', 'important');
+
+      slidingPanel.style.setProperty('visibility', 'visible', 'important');
+      slidingPanel.style.setProperty('opacity', '1', 'important');
+      slidingPanel.style.setProperty('display', 'flex', 'important');
+
+      iconCircle.style.setProperty('visibility', 'visible', 'important');
+      iconCircle.style.setProperty('opacity', '1', 'important');
+      iconCircle.style.setProperty('display', 'block', 'important');
       
       // Restore click functionality
       const clickHandler = function(e) {
@@ -1218,6 +1289,50 @@
       }, { passive: true });
     }
 
+    // Debug function to check button visibility
+    function debugButtonVisibility() {
+      const button = document.querySelector('.product__media-list #tryonButton');
+      if (button) {
+        const computed = window.getComputedStyle(button);
+        console.log('🔍 Button Debug:', {
+          display: computed.display,
+          visibility: computed.visibility,
+          opacity: computed.opacity,
+          width: computed.width,
+          height: computed.height,
+          position: computed.position,
+          zIndex: computed.zIndex,
+          pointerEvents: computed.pointerEvents,
+          left: computed.left,
+          top: computed.top
+        });
+        
+        // Check wrapper
+        const wrapper = button.querySelector('.tryon-button-wrapper');
+        if (wrapper) {
+          const wrapperComputed = window.getComputedStyle(wrapper);
+          console.log('🔍 Wrapper Debug:', {
+            display: wrapperComputed.display,
+            visibility: wrapperComputed.visibility,
+            opacity: wrapperComputed.opacity
+          });
+        }
+        
+        // Check icon
+        const icon = button.querySelector('.tryon-icon-circle');
+        if (icon) {
+          const iconComputed = window.getComputedStyle(icon);
+          console.log('🔍 Icon Debug:', {
+            display: iconComputed.display,
+            visibility: iconComputed.visibility,
+            opacity: iconComputed.opacity
+          });
+        }
+      } else {
+        console.log('❌ Button not found in DOM');
+      }
+    }
+
     // Aggressive transformation strategy for mobile (first button ONLY)
     function findAndTransformButton() {
       // Try multiple selectors but EXCLUDE second button containers
@@ -1241,6 +1356,8 @@
             const success = transformTryOnButton(button);
             if (success) {
               console.log('✅ First button transformed successfully');
+              // Run debug after transformation
+              setTimeout(debugButtonVisibility, 500);
               return true;
             }
           }
@@ -1265,6 +1382,8 @@
         console.log('🎉 First button transformation complete!');
       } else {
         console.warn('⚠️ Could not transform first button after all attempts');
+        // Run final debug to see what's wrong
+        debugButtonVisibility();
       }
     }
 
