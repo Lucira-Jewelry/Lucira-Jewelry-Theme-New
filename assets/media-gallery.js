@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v", "cert"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -161,7 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [] },
+      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [], cert: [] },
       extras: []
     };
 
@@ -177,6 +177,7 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
+        else if (alt.includes("cert")) buckets.codes.cert.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
         item.style.display = 'none';
