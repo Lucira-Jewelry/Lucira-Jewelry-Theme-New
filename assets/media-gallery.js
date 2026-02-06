@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mv", "mq", "cert", "mh", "ci", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v", "Cert"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -127,7 +127,10 @@ if (!customElements.get('media-gallery')) {
   let observer = null;
   let isReordering = false;
   let visibleSlides = [];
-  let isSwiping = false;
+  
+  let touchStartX = 0;
+  let touchEndX = 0;
+  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -158,8 +161,7 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mv: [], mq: [], ci: [], mh: [], v360: [] },
-      cert: [], // Separate bucket for cert
+      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [], cert: [] },
       extras: []
     };
 
@@ -169,15 +171,13 @@ if (!customElements.get('media-gallery')) {
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
-      // Check for CERT first to ensure it's never filtered out
-      if (alt.includes("cert")) {
-        buckets.cert.push(item);
-      } else if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
+      if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("mq")) buckets.codes.mq.push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
+        else if (alt.includes("cert")) buckets.codes.cert.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
         item.style.display = 'none';
@@ -192,7 +192,7 @@ if (!customElements.get('media-gallery')) {
   }
 
   function takeCode(buckets) {
-    for (const key of ["mv", "mq", "ci", "mh", "360v"]) {
+    for (const key of ALWAYS_SHOW_CODES) {
       const k = key === "360v" ? "v360" : key;
       if (buckets.codes[k].length) return buckets.codes[k].shift();
     }
@@ -200,30 +200,33 @@ if (!customElements.get('media-gallery')) {
   }
 
   function buildRepeatedPattern(buckets) {
-    const slotPattern = ["color", "code", "code", "color", "color", "code", "code"];
+    const slotPattern = [
+      "color", "code", "code",
+      "color", "color", "code", "code",
+      "color", "color", "code", "code",
+      "color"
+    ];
     const ordered = [];
 
-    for (let i = 0; i < 25; i++) {
-      let type = slotPattern[i % slotPattern.length];
-      let node = type === "color" ? takeColor(buckets) : takeCode(buckets);
-      
+    for (const slot of slotPattern) {
+      let node = slot === "color" ? takeColor(buckets) : takeCode(buckets);
       if (node) {
         node.style.display = 'block';
         ordered.push(node);
-      } else {
-        let backup = type === "color" ? takeCode(buckets) : takeColor(buckets);
-        if (backup) {
-          backup.style.display = 'block';
-          ordered.push(backup);
-        }
       }
-      
-      if (!buckets.color.length && !Object.values(buckets.codes).flat().length) break;
     }
-    
-    buckets.cert.forEach(certNode => {
-      certNode.style.display = 'block';
-      ordered.push(certNode);
+
+    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    }));
+    buckets.color.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
+    });
+    buckets.extras.forEach(node => { 
+      node.style.display = 'block'; 
+      ordered.push(node); 
     });
 
     return ordered;
@@ -242,8 +245,6 @@ if (!customElements.get('media-gallery')) {
     return ordered;
   }
 
-  // ... (Rest of the slider logic: getVisibleSlides, createDotsNavigation, goToSlide, etc. remains the same as your original) ...
-  
   function getVisibleSlides() {
     if (!mediaList) return [];
     return Array.from(mediaList.querySelectorAll('.product__media-item'))
@@ -251,35 +252,72 @@ if (!customElements.get('media-gallery')) {
   }
 
   function createDotsNavigation() {
-    if (dotsContainer) { dotsContainer.remove(); dotsContainer = null; }
+    if (dotsContainer) { 
+      dotsContainer.remove(); 
+      dotsContainer = null; 
+    }
     if (!mediaList) return;
+
     visibleSlides = getVisibleSlides();
     totalSlides = visibleSlides.length;
+    
     if (totalSlides <= 1) return;
+
     dotsContainer = document.createElement('div');
     dotsContainer.className = 'custom-slider-dots';
+
     for (let i = 0; i < totalSlides; i++) {
       const dot = document.createElement('button');
       dot.className = 'slider-dot';
       dot.type = 'button';
       dot.dataset.index = i;
-      if (i === currentSlide) { dot.classList.add('active'); dot.setAttribute('aria-current', 'true'); }
+
+      const slide = visibleSlides[i];
+      const isVideo = !!slide && (slide.querySelector('video') || slide.querySelector('.video'));
+      const baseLabel = `Slide ${i + 1} of ${totalSlides}`;
+      dot.setAttribute('aria-label', isVideo ? `${baseLabel}, video` : baseLabel);
+
+      if (i === currentSlide) {
+        dot.classList.add('active');
+        dot.setAttribute('aria-current', 'true');
+      }
+
       const dotInner = document.createElement('span');
       dotInner.className = 'slider-dot__inner';
       dot.appendChild(dotInner);
+
+      if (isVideo) {
+        const videoIcon = document.createElement('span');
+        videoIcon.className = 'slider-dot__video-icon';
+        videoIcon.innerHTML = `
+          <svg viewBox="0 0 24 24" width="10" height="10" aria-hidden="true" focusable="false">
+            <path d="M4 2v20l18-10L4 2z" fill="currentColor"/>
+          </svg>
+        `;
+        dot.appendChild(videoIcon);
+      }
+
       dot.addEventListener('click', () => goToSlide(i));
       dotsContainer.appendChild(dot);
     }
-    mediaList.parentNode.appendChild(dotsContainer);
+    
+    const parent = mediaList.parentNode;
+    parent.appendChild(dotsContainer);
   }
 
   function updateDots() {
     if (!dotsContainer) return;
+
     const dots = dotsContainer.querySelectorAll('.slider-dot');
+
     dots.forEach((dot, i) => {
       const isActive = i === currentSlide;
       dot.classList.toggle('active', isActive);
-      isActive ? dot.setAttribute('aria-current', 'true') : dot.removeAttribute('aria-current');
+      if (isActive) {
+        dot.setAttribute('aria-current', 'true');
+      } else {
+        dot.removeAttribute('aria-current');
+      }
     });
   }
 
@@ -291,89 +329,283 @@ if (!customElements.get('media-gallery')) {
 
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides || isReordering) return;
-    isSwiping = true;
+    
+    isSwiping = true; // Lock scroll sync
     currentSlide = index;
     visibleSlides = getVisibleSlides();
+    
     setActiveSlide(currentSlide);
     updateDots();
+
     const targetSlide = visibleSlides[currentSlide];
+    
     if (targetSlide && mediaList) {
-      const targetScrollLeft = targetSlide.offsetLeft - (mediaList.clientWidth / 2) + (targetSlide.clientWidth / 2);
-      mediaList.scrollTo({ left: targetScrollLeft, behavior: 'smooth' });
+      // FIX: Use scrollTo on the container instead of scrollIntoView
+      // This calculates the center position manually to avoid page jumping
+      const slideLeft = targetSlide.offsetLeft;
+      const slideWidth = targetSlide.clientWidth;
+      const containerWidth = mediaList.clientWidth;
+      
+      // Calculate position to center the image
+      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
+
+      mediaList.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
+      });
+
+      // Handle video autoplay
+      const activeVideo = targetSlide.querySelector('video');
+      if (activeVideo) {
+        activeVideo.loop = true;
+        activeVideo.muted = true;
+        activeVideo.play().catch(() => {});
+      }
     }
-    setTimeout(() => { isSwiping = false; }, 500);
+    
+    // Release the lock after animation roughly completes
+    setTimeout(() => {
+        isSwiping = false;
+    }, 500);
   }
 
+  function moveSlide(direction) {
+    let nextIndex = currentSlide + direction;
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
+    goToSlide(nextIndex);
+  }
+
+  // --- SWIPE LOGIC (UNCHANGED AS REQUESTED) ---
+  function setupSwipeDetection() {
+    if (!mediaList) return;
+
+    let startX = 0;
+    let isTouching = false;
+
+    mediaList.addEventListener('touchstart', (e) => {
+      startX = e.touches[0].clientX;
+      isTouching = true;
+    }, { passive: true });
+
+    mediaList.addEventListener('touchend', (e) => {
+      if (!isTouching) return;
+      isTouching = false;
+
+      const endX = e.changedTouches[0].clientX;
+      const diff = startX - endX;
+      const threshold = 40;
+
+      if (Math.abs(diff) < threshold) return;
+
+      if (diff > 0) {
+        moveSlide(1); 
+      } else {
+        moveSlide(-1); 
+      }
+    }, { passive: true });
+  }
+
+  // --- SCROLL SYNC (IMPROVED FOR DOTS) ---
   function setupScrollSync() {
     if (!mediaList) return;
+    
+    let isScrolling = false;
+
     mediaList.addEventListener('scroll', () => {
-      if (isReordering || isSwiping) return;
-      window.requestAnimationFrame(() => {
-        const slides = getVisibleSlides();
-        const containerCenter = mediaList.getBoundingClientRect().left + mediaList.clientWidth / 2;
-        let closestIndex = 0;
-        let minDiff = Infinity;
-        slides.forEach((slide, i) => {
-          const diff = Math.abs((slide.getBoundingClientRect().left + slide.clientWidth / 2) - containerCenter);
-          if (diff < minDiff) { minDiff = diff; closestIndex = i; }
+      if (isReordering || isSwiping) return; // Don't sync if script is driving the animation
+      
+      if (!isScrolling) {
+        window.requestAnimationFrame(() => {
+          syncSlideFromScroll();
+          isScrolling = false;
         });
-        if (closestIndex !== currentSlide) {
-          currentSlide = closestIndex;
-          setActiveSlide(currentSlide);
-          updateDots();
-        }
-      });
+        isScrolling = true;
+      }
     }, { passive: true });
+  }
+
+  function syncSlideFromScroll() {
+    if (!mediaList || isReordering) return;
+
+    const slides = getVisibleSlides();
+    if (!slides.length) return;
+
+    const containerRect = mediaList.getBoundingClientRect();
+    const containerCenter = containerRect.left + containerRect.width / 2;
+
+    let closestIndex = currentSlide;
+    let closestDistance = Infinity;
+
+    // Determine which slide is closest to center
+    slides.forEach((slide, index) => {
+      const rect = slide.getBoundingClientRect();
+      const center = rect.left + rect.width / 2;
+      const dist = Math.abs(center - containerCenter);
+
+      if (dist < closestDistance) {
+        closestDistance = dist;
+        closestIndex = index;
+      }
+    });
+
+    if (closestIndex !== currentSlide) {
+      currentSlide = closestIndex;
+      setActiveSlide(currentSlide);
+      updateDots();
+      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
+    }
   }
 
   function initSliderNavigation() {
     if (!mediaList) return;
+
     const isMobile = window.innerWidth < 750;
+
+    const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
+    if (sliderButtons) sliderButtons.style.display = 'none';
+
     createDotsNavigation();
+
+    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
+    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
+    if (!isMobile) {
+      setupSwipeDetection();
+    }
+
+    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
+    // This was previously inside the !isMobile check, causing dots to fail on mobile.
     setupScrollSync();
   }
 
+  function playAllVideos() {
+    if (!mediaList) return;
+    const videos = mediaList.querySelectorAll('video');
+    videos.forEach(video => {
+      video.loop = true;
+      video.muted = true;
+      video.play().catch(() => {});
+    });
+  }
+
   function safeReorderByColor(targetColor) {
-    if (isReordering || !mediaList) return;
+    if (isReordering) return;
     isReordering = true;
+
+    if (!mediaList) { 
+      isReordering = false; 
+      return; 
+    }
+
+    const previousSlide = currentSlide;
+    
     reorderByColor(targetColor);
+    
     currentSlide = 0;
+    
     initSliderNavigation();
+    
     setTimeout(() => {
-      goToSlide(0);
+      goToSlide(currentSlide);
+      playAllVideos();
       isReordering = false;
-    }, 200);
+    }, 150);
+
+    mediaList.setAttribute('data-media-reordered', 'true');
   }
 
   function getSelectedColor() {
-    const inputs = document.querySelectorAll('input[name*="Color"], input[name*="color"], select[name*="Color"], fieldset[data-type="color"] input:checked');
-    for (const input of inputs) {
-      const val = input.value || input.getAttribute('data-value');
-      const color = getColorFromAlt(val);
+    const colorInputs = document.querySelectorAll(
+      'input[name*="Color"], input[name*="color"], select[name*="Color"], select[name*="color"], fieldset[data-type="color"] input[type="radio"]:checked, .variant-input-wrapper input[type="radio"]:checked'
+    );
+    for (const input of colorInputs) {
+      if (input.checked || input.tagName === 'SELECT') {
+        const color = getColorFromAlt(input.value);
+        if (color) return color;
+      }
+    }
+    const selectedVariants = document.querySelectorAll(
+      '[data-selected-value], .variant-input-wrapper .selected, .product-form__buttons [data-value], .variant-selector__button.selected'
+    );
+    for (const element of selectedVariants) {
+      const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
+      const color = getColorFromAlt(text);
       if (color) return color;
     }
+    const urlParams = new URLSearchParams(window.location.search);
+    const colorParam = urlParams.get('color') || urlParams.get('Color');
+    if (colorParam) return getColorFromAlt(colorParam);
     return "yellow";
   }
 
-  const handleVariantChange = debounce(() => {
-    const color = getSelectedColor();
-    if (color !== currentSelectedColor) {
-      currentSelectedColor = color;
-      safeReorderByColor(color);
-    }
+  const debouncedHandleColorChange = debounce(function () {
+    const selectedColor = getSelectedColor();
+    if (!selectedColor || selectedColor === currentSelectedColor) return;
+
+    currentSelectedColor = selectedColor;
+    safeReorderByColor(selectedColor);
   }, 100);
+
+  function setupVariantChangeListeners() {
+    document.addEventListener('change', debouncedHandleColorChange);
+    document.addEventListener('variant:change', debouncedHandleColorChange);
+    document.addEventListener('variant:selected', debouncedHandleColorChange);
+    window.addEventListener('popstate', debouncedHandleColorChange);
+
+    if (mediaList) {
+      if (observer) observer.disconnect();
+      observer = new MutationObserver(() => {
+        if (!isReordering) {
+          safeReorderByColor(currentSelectedColor);
+        }
+      });
+      observer.observe(mediaList, { childList: true, subtree: true });
+    }
+  }
+
+  function cleanup() {
+    if (observer) observer.disconnect();
+    document.removeEventListener('change', debouncedHandleColorChange);
+    document.removeEventListener('variant:change', debouncedHandleColorChange);
+    document.removeEventListener('variant:selected', debouncedHandleColorChange);
+    window.removeEventListener('popstate', debouncedHandleColorChange);
+  }
 
   function initialize() {
     if (isInitialized) return;
+    
     cacheDOMElements();
     if (!mediaList) return;
+
     currentSelectedColor = getSelectedColor();
+    
+    const wrapper = mediaList.closest('.media-gallery-wrapper');
+    if (wrapper) {
+      wrapper.classList.add('loaded');
+    }
+
     safeReorderByColor(currentSelectedColor);
-    document.addEventListener('change', handleVariantChange);
+    playAllVideos();
+    setupVariantChangeListeners();
     isInitialized = true;
   }
 
-  window.addEventListener('load', initialize);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize);
+  } else {
+    initialize();
+  }
+
+  if (window.Shopify && window.Shopify.theme) {
+    document.addEventListener('shopify:section:load', () => { 
+      cleanup(); 
+      isInitialized = false; 
+      initialize(); 
+    });
+    document.addEventListener('theme:loaded', initialize);
+  }
+
+  window.addEventListener('beforeunload', cleanup);
 })();
 
 
@@ -439,19 +671,15 @@ document.addEventListener('DOMContentLoaded', () => {
       // hide poster quickly (so it doesn't cover the injected iframe) — we'll still trigger click so Shopify loads the media
       posterBtn.classList.add('deferred-media__poster--hidden');
       const spinner = modalEl.querySelector('.loading__spinner');
-      if (spinner) spinner.classList.remove('hidden'); // show spinner while loading
-      try { posterBtn.click(); } catch (e) { /* ignore */ }
+      if (spinner) spinner.classList.remove('hidden');
+      try { posterBtn.click(); } catch (e) { }
     } else if (deferred) {
-      // if deferred tag present but no poster btn, we'll continue to look for iframe/video
     } else {
-      // no deferred media found
       return;
     }
 
-    // After injection, attempt to autoplay. Use MutationObserver to detect insertion of iframe/video
     const observerTarget = deferred || modalEl;
     const observer = new MutationObserver((mutations, obs) => {
-      // look for iframe/video now
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
 
@@ -462,8 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     observer.observe(observerTarget, { childList: true, subtree: true });
-
-    // also fallback: try after fixed delay if MutationObserver didn't trigger
     setTimeout(() => {
       const iframe = modalEl.querySelector('iframe');
       const video = modalEl.querySelector('video');
@@ -471,28 +697,23 @@ document.addEventListener('DOMContentLoaded', () => {
         try { observer.disconnect() } catch(e){}
         finalizeAutoplay(modalEl, iframe, video);
       } else {
-        // give one more attempt: unhide poster if still nothing
         const posterBtn2 = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
         if (posterBtn2) posterBtn2.classList.remove('deferred-media__poster--hidden');
         const spinner2 = modalEl.querySelector('.loading__spinner');
         if (spinner2) spinner2.classList.add('hidden');
       }
-    }, 700); // tune this if needed
+    }, 700);
   }
 
   function finalizeAutoplay(modalEl, iframe, video) {
-    // Hide poster/spinner
     const poster = modalEl.querySelector('.deferred-media__poster, button[id^="Deferred-Poster-"]');
     if (poster) poster.classList.add('hidden');
 
     const spinner = modalEl.querySelector('.loading__spinner');
     if (spinner) spinner.classList.add('hidden');
-
-    // If iframe (YouTube/Vimeo), append autoplay param
     if (iframe) {
       const src = iframe.getAttribute('src') || iframe.src || '';
       if (!src) return;
-      // If src already contains autoplay=, still try to ensure it's 1
       let newSrc;
       if (src.includes('autoplay=')) {
         newSrc = src.replace(/autoplay=\d/, 'autoplay=1');
@@ -500,26 +721,19 @@ document.addEventListener('DOMContentLoaded', () => {
         const connector = src.includes('?') ? '&' : '?';
         newSrc = src + connector + 'autoplay=1';
       }
-      // assign only if changed (reassigning will reload iframe which stops previous play; that's OK)
       if (newSrc !== src) {
         iframe.setAttribute('src', newSrc);
       } else {
-        // If same, force a reload to ensure autoplay param recognized
         iframe.setAttribute('src', src);
       }
-      // For YouTube, ensure muted for autoplay on some browsers:
-      // YouTube autoplay respects the URL param 'mute=1' in some players; add if missing
       if (!/mute=1/.test(newSrc)) {
         const connector2 = newSrc.includes('?') ? '&' : '?';
         iframe.setAttribute('src', newSrc + connector2 + 'mute=1');
       }
     }
 
-    // If native video element
     if (video) {
-      // browsers usually require muted to allow autoplay
       video.muted = true;
-      // try to play
       const p = video.play();
       if (p && p.catch) {
         p.catch(err => {
