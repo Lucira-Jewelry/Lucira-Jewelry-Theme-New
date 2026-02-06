@@ -222,17 +222,27 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+    Object.values(buckets.codes).forEach(arr =>
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      })
+    );
+
+    buckets.color.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+
+    buckets.extras.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
+    // ✅ CERT — always last
+    buckets.cert.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
 
     return ordered;
