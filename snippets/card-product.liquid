@@ -613,28 +613,22 @@
         {% endif %}
 
         {% assign target_variant = card_product.selected_or_first_available_variant %}
-        {% if forced_variant %}{% assign target_variant = forced_variant %}{% endif %}
+        {% if forced_variant %}
+          {% assign target_variant = forced_variant %} 
+        {% endif %}
 
         {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
         {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
 
         {% assign diamond_final = 0.0 %}
         {% assign diamond_original = 0.0 %}
-        {% assign total_diamond_weight = 0.0 %}
-        {% assign has_promo_stone = false %}
 
         {% if config %}
           {% for stone_item in config.advanced_stone_config %}
             {% if stone_item.stone_type == 'diamond' %}
-              
-              {% comment %} --- CHECK FOR SC or E-F STONES --- {% endcomment %}
-              {% assign s_id_check = stone_item.pricing_id | upcase %}
-              {% if s_id_check contains 'SC' or s_id_check contains 'E-F' %}
-                {% assign has_promo_stone = true %}
-              {% endif %}
-
               {% assign slab_rate = 0 %}
               {% assign slab_discount = 0 %}
+              
               {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
 
               {% if pricing_ref %}
@@ -650,27 +644,23 @@
 
               {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
               {% assign applied_discount = config.diamond_discount | default: slab_discount %}
-              {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
               
-              {% assign diamond_final = diamond_final | plus: item_base_cost | minus: discount_amount %}
+              {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
+              {% assign item_final_cost = item_base_cost | minus: discount_amount %}
+
+              {% assign diamond_final = diamond_final | plus: item_final_cost %}
               {% assign diamond_original = diamond_original | plus: item_base_cost %}
-              {% assign total_diamond_weight = total_diamond_weight | plus: stone_item.stone_weight %}
             {% endif %}
           {% endfor %}
         {% endif %}
 
         {% assign diamond_percent = 0 %}
         {% if diamond_original > diamond_final and diamond_original > 0 %}
-          {% assign diamond_percent = diamond_original | minus: diamond_final | times: 100 | divided_by: diamond_original | round %}
-        {% endif %}
-
-        {% assign labor_discount_percent = 0 %}
-        {% if has_promo_stone %}
-          {% if total_diamond_weight >= 1.0 %}{% assign labor_discount_percent = 100 %}
-          {% elsif total_diamond_weight >= 0.50 %}{% assign labor_discount_percent = 75 %}
-          {% elsif total_diamond_weight >= 0.25 %}{% assign labor_discount_percent = 50 %}
-          {% elsif total_diamond_weight >= 0.15 %}{% assign labor_discount_percent = 20 %}
-          {% endif %}
+          {% assign diamond_percent = diamond_original 
+            | minus: diamond_final 
+            | times: 100 
+            | divided_by: diamond_original 
+            | round %}
         {% endif %}
 
         <div class="card__information">
@@ -690,10 +680,14 @@
             </a>
           </h3>
 
-          {% assign diamond_color = '#4CBC7F' %}
-          {% if diamond_percent >= 35 %}{% assign diamond_color = '#009147' %}
-          {% elsif diamond_percent >= 25 %}{% assign diamond_color = '#01A652' %}
-          {% elsif diamond_percent >= 20 %}{% assign diamond_color = '#27B169' %}
+          {% assign discount_color = '#4CBC7F' %}
+
+          {% if diamond_percent >= 35 %}
+            {% assign discount_color = '#009147' %}
+          {% elsif diamond_percent >= 25 %}
+            {% assign discount_color = '#01A652' %}
+          {% elsif diamond_percent >= 20 %}
+            {% assign discount_color = '#27B169' %}
           {% endif %}
 
           
@@ -719,41 +713,15 @@
             </a>
           </div>
 
-          <style>
-            .discount-text { display: block; font-weight: bold; margin-top: 4px; font-size: 1.2rem; }
-            .promo-rotator { position: relative; height: 1.4em; overflow: hidden; }
-            .promo-msg { position: absolute; width: 100%; opacity: 0; animation: promoFade 6s infinite; }
-            .promo-msg:nth-child(2) { animation-delay: 3s; }
-            @keyframes promoFade {
-              0%, 45% { opacity: 1; transform: translateY(0); }
-              50%, 100% { opacity: 0; transform: translateY(-5px); }
-            }
-          </style>
-
-          <div class="card-promo-container">
-            {% if diamond_percent > 0 and labor_discount_percent > 0 %}
-              <div class="promo-rotator">
-                <small class="discount-text promo-msg" style="color: {{ diamond_color }};">
-                  {{ diamond_percent }}% OFF on Diamond Price
-                </small>
-                <small class="discount-text promo-msg" style="color: #27B169;">
-                  {{ labor_discount_percent }}% OFF on Labor Charges
-                </small>
-              </div>
-            {% elsif diamond_percent > 0 %}
-              <small class="discount-text" style="color: {{ diamond_color }};">
-                {{ diamond_percent }}% OFF on Diamond Price
-              </small>
-            {% elsif labor_discount_percent > 0 %}
-              <small class="discount-text" style="color: #27B169;">
-                {{ labor_discount_percent }}% OFF on Labor Charges
-              </small>
-            {% else %}
-              {% comment %} <small class="discount-text" style="color: #b3b3b3;">
-                Everyday Price
-              </small> {% endcomment %}
-            {% endif %}
-          </div>
+          {% if diamond_percent > 0 %}
+            <small class="discount-text" style="color: {{ discount_color }};">
+              {{ diamond_percent }}% OFF on Diamond Price
+            </small>
+          {% else %}
+            {% comment %} <small class="discount-text" style="color: #b3b3b3;">
+              Everyday Price
+            </small> {% endcomment %}
+          {% endif %}
 
           
 
