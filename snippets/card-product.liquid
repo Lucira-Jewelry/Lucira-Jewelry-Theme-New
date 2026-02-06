@@ -612,6 +612,57 @@
           </div>
         {% endif %}
 
+        {% assign target_variant = card_product.selected_or_first_available_variant %}
+        {% if forced_variant %}
+          {% assign target_variant = forced_variant %} 
+        {% endif %}
+
+        {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
+        {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
+
+        {% assign diamond_final = 0.0 %}
+        {% assign diamond_original = 0.0 %}
+
+        {% if config %}
+          {% for stone_item in config.advanced_stone_config %}
+            {% if stone_item.stone_type == 'diamond' %}
+              {% assign slab_rate = 0 %}
+              {% assign slab_discount = 0 %}
+              
+              {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
+
+              {% if pricing_ref %}
+                {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
+                {% for slab in pricing_ref.slabs %}
+                  {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
+                    {% assign slab_rate = slab.price | times: 100 %}
+                    {% assign slab_discount = slab.discount | default: 0 %}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+              {% endif %}
+
+              {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
+              {% assign applied_discount = config.diamond_discount | default: slab_discount %}
+              
+              {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
+              {% assign item_final_cost = item_base_cost | minus: discount_amount %}
+
+              {% assign diamond_final = diamond_final | plus: item_final_cost %}
+              {% assign diamond_original = diamond_original | plus: item_base_cost %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {% assign diamond_percent = 0 %}
+        {% if diamond_original > diamond_final and diamond_original > 0 %}
+          {% assign diamond_percent = diamond_original 
+            | minus: diamond_final 
+            | times: 100 
+            | divided_by: diamond_original 
+            | round %}
+        {% endif %}
+
         <div class="card__information">
           <h3
             class="card__heading{% if card_product.featured_media or settings.card_style == 'standard' %} h5{% endif %}"
@@ -628,6 +679,18 @@
               {{ card_product.title | escape }}
             </a>
           </h3>
+
+          {% assign discount_color = '#4CBC7F' %}
+
+          {% if diamond_percent >= 35 %}
+            {% assign discount_color = '#009147' %}
+          {% elsif diamond_percent >= 25 %}
+            {% assign discount_color = '#01A652' %}
+          {% elsif diamond_percent >= 20 %}
+            {% assign discount_color = '#27B169' %}
+          {% endif %}
+
+          
 
           <div class="card-information price-details-wrapper">
             {%- if show_vendor -%}
@@ -650,112 +713,17 @@
             </a>
           </div>
 
-
-          {% assign target_variant = card_product.selected_or_first_available_variant %}
-          {% if forced_variant %}
-            {% assign target_variant = forced_variant %} 
+          {% if diamond_percent > 0 %}
+            <small class="discount-text" style="color: {{ discount_color }};">
+              {{ diamond_percent }}% OFF on Diamond Price
+            </small>
+          {% else %}
+            {% comment %} <small class="discount-text" style="color: #b3b3b3;">
+              Everyday Price
+            </small> {% endcomment %}
           {% endif %}
 
-          {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
-          {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
-
-          {% assign diamond_final = 0.0 %}
-          {% assign diamond_original = 0.0 %}
-          {% assign total_diamond_weight = 0.0 %}
-          {% assign has_promo_stone = false %}
-
-          {% if config %}
-            {% for stone_item in config.advanced_stone_config %}
-              {% if stone_item.stone_type == 'diamond' %}
-                
-                {% assign s_id_check = stone_item.pricing_id | upcase %}
-                {% if s_id_check contains 'SC' or s_id_check contains 'E-F' %}
-                  {% assign has_promo_stone = true %}
-                {% endif %}
-
-                {% assign slab_rate = 0 %}
-                {% assign slab_discount = 0 %}
-                
-                {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
-
-                {% if pricing_ref %}
-                  {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
-                  {% for slab in pricing_ref.slabs %}
-                    {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
-                      {% assign slab_rate = slab.price | times: 100 %}
-                      {% assign slab_discount = slab.discount | default: 0 %}
-                      {% break %}
-                    {% endif %}
-                  {% endfor %}
-                {% endif %}
-
-                {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
-                {% assign applied_discount = config.diamond_discount | default: slab_discount %}
-                
-                {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
-                {% assign item_final_cost = item_base_cost | minus: discount_amount %}
-
-                {% assign diamond_final = diamond_final | plus: item_final_cost %}
-                {% assign diamond_original = diamond_original | plus: item_base_cost %}
-                
-                {% assign total_diamond_weight = total_diamond_weight | plus: stone_item.stone_weight %}
-              {% endif %}
-            {% endfor %}
-          {% endif %}
-
-          {% assign diamond_percent = 0 %}
-          {% if diamond_original > diamond_final and diamond_original > 0 %}
-            {% assign diamond_percent = diamond_original 
-              | minus: diamond_final 
-              | times: 100 
-              | divided_by: diamond_original 
-              | round %}
-          {% endif %}
-
-          {% assign labor_discount_percent = 0 %}
-          {% if has_promo_stone %}
-            {% if total_diamond_weight >= 1.0 %}
-              {% assign labor_discount_percent = 100 %}
-            {% elsif total_diamond_weight >= 0.50 %}
-              {% assign labor_discount_percent = 75 %}
-            {% elsif total_diamond_weight >= 0.25 %}
-              {% assign labor_discount_percent = 50 %}
-            {% elsif total_diamond_weight >= 0.15 %}
-              {% assign labor_discount_percent = 20 %}
-            {% endif %}
-          {% endif %}
-
-          {% assign diamond_color = '#4CBC7F' %}
-          {% if diamond_percent >= 35 %} {% assign diamond_color = '#009147' %}
-          {% elsif diamond_percent >= 25 %} {% assign diamond_color = '#01A652' %}
-          {% elsif diamond_percent >= 20 %} {% assign diamond_color = '#27B169' %}
-          {% endif %}
-
-          <style>
-            .promo-rotator { position: relative; height: 1.5em; overflow: hidden; }
-            .promo-msg { 
-              position: absolute; width: 100%; opacity: 0; 
-              animation: promoFade 6s infinite; font-size: 14px; font-weight: 500;
-            }
-            .promo-msg:nth-child(2) { animation-delay: 3s; }
-            @keyframes promoFade {
-              0%, 45% { opacity: 1; transform: translateY(0); }
-              50%, 100% { opacity: 0; transform: translateY(-10px); }
-            }
-          </style>
-
-          <div class="promo-container" style="margin-top: 5px;">
-            {% if diamond_percent > 0 and labor_discount_percent > 0 %}
-              <div class="promo-rotator">
-                <div class="promo-msg" style="color: {{ diamond_color }};">{{ diamond_percent }}% OFF on Diamond Price</div>
-                <div class="promo-msg" style="color: #27B169;">{{ labor_discount_percent }}% OFF on Labor Charges</div>
-              </div>
-            {% elsif diamond_percent > 0 %}
-              <small style="color: {{ diamond_color }};">{{ diamond_percent }}% OFF on Diamond Price</small>
-            {% elsif labor_discount_percent > 0 %}
-              <small style="color: #27B169;">{{ labor_discount_percent }}% OFF on Labor Charges</small>
-            {% endif %}
-          </div>
+          
 
         </div>
 
