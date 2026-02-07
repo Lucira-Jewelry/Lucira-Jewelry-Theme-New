@@ -1,4 +1,4 @@
-{% comment %}
+{% comment %} {% comment %}
   SHOPIFY LIQUID TEMPLATE - Nested Information Page
   
   File location: sections/nested-info-page.liquid
@@ -772,6 +772,919 @@ document.addEventListener('DOMContentLoaded', function() {
       "id": "active_tab_color",
       "label": "Active Tab Indicator Color",
       "default": "#c9a05f"
+    }
+  ],
+  "presets": [
+    {
+      "name": "Nested Information Page"
+    }
+  ]
+}
+{% endschema %} {% endcomment %}
+
+
+{% comment %}
+  SHOPIFY LIQUID TEMPLATE - Nested Information Page
+  
+  File location: sections/nested-info-page.liquid
+  
+  This section fetches data from Shopify metaobjects and renders
+  the nested information page with two levels of tabs.
+  
+  Setup required:
+  1. Create metaobject definitions (see SHOPIFY_METAOBJECT_SCHEMA.md)
+  2. Add this file to your theme's sections folder
+  3. Add to a page template or use in theme editor
+{% endcomment %}
+
+{% comment %} ==================== FETCH DATA FROM METAOBJECTS ==================== {% endcomment %}
+
+{% comment %} Get all active primary tabs, sorted by order {% endcomment %}
+{% assign primary_tabs = shop.metaobjects.primary_tab.values 
+  | where: "is_active", true 
+  | sort: "tab_order" %}
+
+{% comment %} Set initial active tabs {% endcomment %}
+{% assign initial_primary = primary_tabs.first %}
+
+{% comment %} ==================== SECTION SETTINGS ==================== {% endcomment %}
+
+<div class="nested-info-page" data-section-id="{{ section.id }}">
+  
+  {% comment %} ==================== HEADER ==================== {% endcomment %}
+  
+  {% comment %} <header class="nested-info-header">
+    <div class="container">
+      <div class="header-wrapper">
+        <h1 class="site-logo">
+          <a href="/">{{ shop.name }}</a>
+        </h1>
+        
+        <div class="header-search">
+          <form action="/search" method="get">
+            <input 
+              type="search" 
+              name="q" 
+              placeholder="Search for a product"
+              class="search-input"
+            >
+          </form>
+        </div>
+        
+        <nav class="header-nav">
+          <a href="/pages/favorites">Favorites</a>
+          <a href="/pages/how-it-works">How It Works</a>
+          <a href="/account">Login</a>
+        </nav>
+      </div>
+    </div>
+  </header> {% endcomment %}
+
+  {% comment %} ==================== TAB CONTENT WRAPPER ==================== {% endcomment %}
+  
+  {% for primary_tab in primary_tabs %}
+    <div 
+      class="tab-content{% if forloop.first %} active{% endif %}"
+      data-primary-content="{{ primary_tab.tab_key.value }}"
+    >
+      
+      {% comment %} Banner {% endcomment %}
+      <div class="banner-section" 
+        {% if primary_tab.banner_image.value %}
+          style="background-image: url('{{ primary_tab.banner_image.value | image_url: width: 1600 }}');"
+        {% endif %}
+      >
+        <div class="banner-overlay">
+          <h2 class="banner-title">{{ primary_tab.banner_title.value }}</h2>
+          {% if primary_tab.banner_subtitle.value != blank %}
+            <p class="banner-subtitle">{{ primary_tab.banner_subtitle.value }}</p>
+          {% endif %}
+        </div>
+      </div>
+
+      {% comment %} PRIMARY NAVIGATION (STICKY) {% endcomment %}
+      <div class="nav-sticky-wrapper" data-primary-nav="{{ primary_tab.tab_key.value }}">
+        <nav class="primary-nav">
+          <div class="container">
+            <div class="primary-nav-wrapper">
+              {% for tab in primary_tabs %}
+                <button 
+                  class="primary-nav-item{% if tab.tab_key.value == primary_tab.tab_key.value %} active{% endif %}"
+                  data-primary-tab="{{ tab.tab_key.value }}"
+                  data-tab-index="{{ forloop.index0 }}"
+                >
+                  {{ tab.display_label.value }}
+                </button>
+              {% endfor %}
+              <a href="/collections/all" class="browse-btn">Browse</a>
+            </div>
+          </div>
+        </nav>
+      </div>
+
+      {% comment %} Secondary Navigation {% endcomment %}
+      {% assign secondary_tabs = primary_tab.secondary_tabs.value 
+        | where: "is_active", true 
+        | sort: "tab_order" %}
+      
+      <nav class="secondary-nav">
+        <div class="container">
+          <div class="secondary-nav-wrapper">
+            {% for secondary_tab in secondary_tabs %}
+              <button 
+                class="secondary-nav-item{% if forloop.first %} active{% endif %}"
+                data-secondary-tab="{{ secondary_tab.tab_key.value }}"
+                data-parent="{{ primary_tab.tab_key.value }}"
+                data-tab-index="{{ forloop.index0 }}"
+              >
+                {{ secondary_tab.display_label.value }}
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      </nav>
+
+      {% comment %} Content Sections {% endcomment %}
+      {% for secondary_tab in secondary_tabs %}
+        <section 
+          class="content-section{% if forloop.first %} active{% endif %}"
+          data-secondary-content="{{ secondary_tab.tab_key.value }}"
+          data-parent="{{ primary_tab.tab_key.value }}"
+        >
+          <div class="container">
+            <div class="content-grid">
+              
+              {% comment %} Left: Product Image + CTA {% endcomment %}
+              <div class="product-wrapper">
+                {% if secondary_tab.product_image.value %}
+                  <img 
+                    src="{{ secondary_tab.product_image.value | image_url: width: 800 }}"
+                    srcset="{{ secondary_tab.product_image.value | image_url: width: 400 }} 400w,
+                            {{ secondary_tab.product_image.value | image_url: width: 800 }} 800w"
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    alt="{{ secondary_tab.content_title.value }}"
+                    class="product-image"
+                    loading="lazy"
+                  >
+                {% endif %}
+                
+                {% if secondary_tab.cta_text.value and secondary_tab.cta_link.value %}
+                  <a 
+                    href="{{ secondary_tab.cta_link.value }}" 
+                    class="cta-button"
+                  >
+                    {{ secondary_tab.cta_text.value }}
+                  </a>
+                {% endif %}
+              </div>
+
+              {% comment %} Right: Content Info {% endcomment %}
+              <div class="content-info">
+                <h2 class="content-title">{{ secondary_tab.content_title.value }}</h2>
+                
+                {% if secondary_tab.content_description.value %}
+                  <div class="content-description rte">
+                    {{ secondary_tab.content_description.value }}
+                  </div>
+                {% endif %}
+
+                {% comment %} Related Topics {% endcomment %}
+                {% if secondary_tab.related_topics.value.size > 0 %}
+                  <div class="related-topics">
+                    <h3 class="related-topics-title">RELATED TOPICS</h3>
+                    <ul class="related-topics-list">
+                      {% assign topics = secondary_tab.related_topics.value | sort: "topic_order" %}
+                      {% for topic in topics %}
+                        <li class="related-topic-item">
+                          <a 
+                            href="{{ topic.topic_link.value }}" 
+                            class="related-topic-link"
+                          >
+                            {{ topic.topic_text.value }}
+                          </a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </div>
+
+            </div>
+          </div>
+        </section>
+      {% endfor %}
+
+    </div>
+  {% endfor %}
+
+</div>
+
+{% comment %} ==================== JAVASCRIPT ==================== {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const nestedInfoPage = document.querySelector('.nested-info-page');
+  if (!nestedInfoPage) return;
+
+  // ========== STICKY NAV ON SCROLL ==========
+  const observerOptions = {
+    threshold: [0, 1],
+    rootMargin: '-1px 0px 0px 0px'
+  };
+
+  document.querySelectorAll('.banner-section').forEach(banner => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        const navWrapper = entry.target.nextElementSibling;
+        if (navWrapper && navWrapper.classList.contains('nav-sticky-wrapper')) {
+          if (!entry.isIntersecting) {
+            navWrapper.classList.add('is-sticky');
+          } else {
+            navWrapper.classList.remove('is-sticky');
+          }
+        }
+      });
+    }, observerOptions);
+
+    observer.observe(banner);
+  });
+
+  // ========== PRIMARY TAB SWITCHING ==========
+  const primaryNavItems = nestedInfoPage.querySelectorAll('.primary-nav-item');
+  
+  primaryNavItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const targetTab = this.dataset.primaryTab;
+      
+      // Update active primary nav
+      primaryNavItems.forEach(nav => nav.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Show corresponding content
+      const allPrimaryContent = nestedInfoPage.querySelectorAll('[data-primary-content]');
+      allPrimaryContent.forEach(content => {
+        if (content.dataset.primaryContent === targetTab) {
+          content.classList.add('active');
+          
+          // Activate first secondary tab
+          const firstSecondaryNav = content.querySelector('.secondary-nav-item');
+          const firstSecondaryContent = content.querySelector('.content-section');
+          
+          if (firstSecondaryNav) {
+            // Reset all secondary navs in this primary tab
+            content.querySelectorAll('.secondary-nav-item').forEach(nav => 
+              nav.classList.remove('active')
+            );
+            firstSecondaryNav.classList.add('active');
+          }
+          
+          if (firstSecondaryContent) {
+            // Reset all secondary contents in this primary tab
+            content.querySelectorAll('.content-section').forEach(section => 
+              section.classList.remove('active')
+            );
+            firstSecondaryContent.classList.add('active');
+          }
+        } else {
+          content.classList.remove('active');
+        }
+      });
+      
+      // Scroll to top of banner
+      const targetContent = nestedInfoPage.querySelector(`[data-primary-content="${targetTab}"]`);
+      if (targetContent) {
+        const banner = targetContent.querySelector('.banner-section');
+        if (banner) {
+          banner.scrollIntoView({ behavior: 'smooth' });
+        }
+      }
+    });
+  });
+
+  // ========== SECONDARY TAB SWITCHING ==========
+  const secondaryNavItems = nestedInfoPage.querySelectorAll('.secondary-nav-item');
+  
+  secondaryNavItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const targetTab = this.dataset.secondaryTab;
+      const parentTab = this.dataset.parent;
+      
+      // Update active secondary nav (only within same parent)
+      const siblingNavs = nestedInfoPage.querySelectorAll(
+        `.secondary-nav-item[data-parent="${parentTab}"]`
+      );
+      siblingNavs.forEach(nav => nav.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Show corresponding content
+      const allSecondaryContent = nestedInfoPage.querySelectorAll(
+        `.content-section[data-parent="${parentTab}"]`
+      );
+      allSecondaryContent.forEach(content => {
+        if (content.dataset.secondaryContent === targetTab) {
+          content.classList.add('active');
+        } else {
+          content.classList.remove('active');
+        }
+      });
+      
+      // Smooth scroll to content
+      const activeContent = nestedInfoPage.querySelector(
+        `.content-section[data-secondary-content="${targetTab}"][data-parent="${parentTab}"]`
+      );
+      if (activeContent) {
+        activeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  // ========== KEYBOARD NAVIGATION ==========
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const activeNav = document.activeElement;
+      
+      if (activeNav.classList.contains('primary-nav-item')) {
+        const allNavs = Array.from(primaryNavItems);
+        const currentIndex = allNavs.indexOf(activeNav);
+        
+        if (e.key === 'ArrowRight' && currentIndex < allNavs.length - 1) {
+          allNavs[currentIndex + 1].focus();
+          allNavs[currentIndex + 1].click();
+        } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+          allNavs[currentIndex - 1].focus();
+          allNavs[currentIndex - 1].click();
+        }
+      }
+    }
+  });
+});
+</script>
+
+{% comment %} ==================== STYLES ==================== {% endcomment %}
+
+<style>
+/* ========== RESET & BASE ========== */
+.nested-info-page * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.nested-info-page {
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', 'Trebuchet MS', sans-serif;
+  color: #1a1a1a;
+  background: #ffffff;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ========== HEADER ========== */
+.nested-info-header {
+  background: #000000;
+  color: #fff;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.site-logo {
+  font-size: 1.8rem;
+  font-weight: 400;
+  letter-spacing: 2px;
+  margin: 0;
+}
+
+.site-logo a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.header-search {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', sans-serif;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.header-nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.header-nav a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  transition: opacity 0.3s;
+}
+
+.header-nav a:hover {
+  opacity: 0.7;
+}
+
+/* ========== TAB CONTENT VISIBILITY ========== */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ========== BANNER ========== */
+.banner-section {
+  height: 500px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-overlay {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.3), rgba(0, 0, 0, 0.5));
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #fff;
+  padding: 2rem;
+}
+
+.banner-title {
+  font-size: 3rem;
+  font-weight: 300;
+  letter-spacing: 3px;
+  margin-bottom: 1rem;
+  text-transform: uppercase;
+}
+
+.banner-subtitle {
+  font-size: 1.1rem;
+  font-weight: 300;
+  letter-spacing: 1px;
+  max-width: 700px;
+  opacity: 0.95;
+  line-height: 1.6;
+}
+
+/* ========== STICKY NAVIGATION WRAPPER ========== */
+.nav-sticky-wrapper {
+  position: relative;
+  z-index: 999;
+}
+
+.nav-sticky-wrapper.is-sticky .primary-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ========== PRIMARY NAVIGATION ========== */
+.primary-nav {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e5e5;
+  z-index: 998;
+}
+
+.primary-nav-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.primary-nav-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.primary-nav-item {
+  background: none;
+  border: none;
+  padding: 1.2rem 1.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #666666;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', sans-serif;
+  font-weight: 400;
+  border-right: 1px solid #e5e5e5;
+}
+
+.primary-nav-item:first-child {
+  border-left: 1px solid #e5e5e5;
+}
+
+.primary-nav-item:hover {
+  color: #1a1a1a;
+  background: #f9f9f9;
+}
+
+.primary-nav-item.active {
+  color: #ffffff;
+  background: #1a1a1a;
+  font-weight: 500;
+}
+
+.browse-btn {
+  background: none;
+  border: 1px solid #1a1a1a;
+  padding: 0.6rem 1.8rem;
+  font-size: 0.75rem;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  color: #1a1a1a;
+  display: inline-block;
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', sans-serif;
+  font-weight: 400;
+}
+
+.browse-btn:hover {
+  background: #1a1a1a;
+  color: #fff;
+}
+
+/* ========== SECONDARY NAVIGATION ========== */
+.secondary-nav {
+  background: #fafafa;
+  border-bottom: 1px solid #e5e5e5;
+  position: sticky;
+  top: 0;
+  z-index: 997;
+}
+
+.nav-sticky-wrapper.is-sticky ~ .secondary-nav {
+  top: 57px;
+}
+
+.secondary-nav-wrapper {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 0.5rem 0;
+}
+
+.secondary-nav-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.secondary-nav-item {
+  background: none;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: #999999;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: all 0.3s ease;
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', sans-serif;
+  font-weight: 400;
+  border-bottom: 2px solid transparent;
+}
+
+.secondary-nav-item:hover {
+  color: #333333;
+}
+
+.secondary-nav-item.active {
+  color: #1a1a1a;
+  border-bottom-color: #1a1a1a;
+  font-weight: 500;
+}
+
+/* ========== CONTENT SECTION ========== */
+.content-section {
+  display: none;
+  padding: 4rem 0 6rem;
+  background: #ffffff;
+  animation: fadeIn 0.4s ease-in;
+}
+
+.content-section.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 420px 1fr;
+  gap: 5rem;
+  align-items: start;
+}
+
+/* ========== PRODUCT IMAGE + CTA ========== */
+.product-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  position: sticky;
+  top: 150px;
+}
+
+.product-image {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 2px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+.cta-button {
+  background: #1a1a1a;
+  color: #fff;
+  border: none;
+  padding: 1.1rem 2.5rem;
+  font-size: 0.8rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  font-family: 'Futura Std', 'Futura', 'Century Gothic', sans-serif;
+  font-weight: 500;
+  border-radius: 0;
+}
+
+.cta-button:hover {
+  background: #333333;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ========== CONTENT INFO ========== */
+.content-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.content-title {
+  font-size: 2.2rem;
+  font-weight: 400;
+  letter-spacing: 1px;
+  color: #1a1a1a;
+  text-transform: uppercase;
+  line-height: 1.3;
+}
+
+.content-description {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #4a4a4a;
+  font-weight: 300;
+}
+
+.content-description p {
+  margin-bottom: 1.2rem;
+}
+
+/* ========== RELATED TOPICS ========== */
+.related-topics {
+  margin-top: 2.5rem;
+  padding-top: 2.5rem;
+  border-top: 1px solid #e5e5e5;
+}
+
+.related-topics-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: #1a1a1a;
+  margin-bottom: 1.5rem;
+  text-transform: uppercase;
+}
+
+.related-topics-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.related-topic-item {
+  background: transparent;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+.related-topic-link {
+  color: #4a4a4a;
+  text-decoration: none;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+  display: block;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+  font-weight: 300;
+}
+
+.related-topic-link:hover {
+  color: #1a1a1a;
+  padding-left: 0.5rem;
+  border-bottom-color: #1a1a1a;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 3rem;
+  }
+
+  .product-wrapper {
+    position: relative;
+    top: 0;
+    max-width: 500px;
+    margin: 0 auto;
+  }
+
+  .banner-title {
+    font-size: 2.2rem;
+  }
+
+  .content-title {
+    font-size: 1.8rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-wrapper {
+    flex-wrap: wrap;
+  }
+
+  .header-search {
+    order: 3;
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+
+  .banner-section {
+    height: 350px;
+  }
+
+  .banner-title {
+    font-size: 1.8rem;
+    letter-spacing: 2px;
+  }
+
+  .banner-subtitle {
+    font-size: 0.95rem;
+  }
+
+  .primary-nav-wrapper,
+  .secondary-nav-wrapper {
+    gap: 0;
+  }
+
+  .primary-nav-item {
+    padding: 1rem 1.2rem;
+    font-size: 0.7rem;
+  }
+
+  .secondary-nav-item {
+    padding: 0.7rem 1.2rem;
+    font-size: 0.75rem;
+  }
+
+  .content-section {
+    padding: 2rem 0 3rem;
+  }
+
+  .content-title {
+    font-size: 1.5rem;
+  }
+
+  .content-description {
+    font-size: 0.95rem;
+  }
+
+  .container {
+    padding: 0 1.2rem;
+  }
+
+  .content-grid {
+    gap: 2rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .banner-section {
+    height: 280px;
+  }
+
+  .banner-title {
+    font-size: 1.4rem;
+  }
+
+  .primary-nav-item {
+    padding: 0.9rem 1rem;
+    font-size: 0.65rem;
+  }
+
+  .browse-btn {
+    padding: 0.5rem 1.2rem;
+    font-size: 0.65rem;
+  }
+}
+</style>
+
+{% comment %} ==================== SECTION SCHEMA ==================== {% endcomment %}
+
+{% schema %}
+{
+  "name": "Nested Information Page",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "This section automatically loads content from your Primary Tab metaobjects. To manage content, go to: Settings → Custom data → Metaobjects → Primary Tab"
+    },
+    {
+      "type": "header",
+      "content": "Optional Settings"
+    },
+    {
+      "type": "color",
+      "id": "cta_button_color",
+      "label": "CTA Button Color",
+      "default": "#1a1a1a"
+    },
+    {
+      "type": "color",
+      "id": "active_tab_color",
+      "label": "Active Tab Indicator Color",
+      "default": "#1a1a1a"
     }
   ],
   "presets": [
