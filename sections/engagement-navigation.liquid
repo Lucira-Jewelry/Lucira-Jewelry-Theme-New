@@ -1,387 +1,782 @@
-
-
-{% comment %} 
-{{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
-
-{% comment %} Metaobjects logic {% endcomment %}
-{% assign current_slug = request.path | split: '/' | last %}
-{% assign main_tab_slug = request.path | split: '/' | last | default: 'engagement' %}
-
-{% comment %} Get main tab data {% endcomment %}
-{% assign main_tab = shop.metaobjects.navigation_tab.values 
-  | where: "slug", main_tab_slug 
-  | first 
-  | default: shop.metaobjects.navigation_tab.values 
-  | where: "slug", "engagement" 
-  | first %}
-
-{% comment %} Get all main tabs (tabs without parent) {% endcomment %}
-{% assign main_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab", blank 
-  | where: "is_active", true 
-  | sort: "sort_order" %}
-
-{% comment %} Get sub-tabs for current main tab {% endcomment %}
-{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab.slug", main_tab_slug 
-  | where: "is_active", true 
-  | sort: "sort_order" %}
-
-{% comment %} Get current content page if sub-tab is selected {% endcomment %}
-{% assign current_content_page = nil %}
-{% if request.path contains '/pages/' %}
-  {% assign path_parts = request.path | split: '/' %}
-  {% assign content_slug = path_parts[3] | default: path_parts[2] %}
+{% comment %}
+  SHOPIFY LIQUID TEMPLATE - Nested Information Page
   
-  {% if content_slug != main_tab_slug %}
-    {% assign current_content_page = shop.metaobjects.content_page.values 
-      | where: "slug", content_slug 
-      | where: "parent_tab.slug", main_tab_slug 
-      | first %}
-  {% endif %}
-{% endif %}
-
-{% comment %} Set meta information {% endcomment %}
-{% if current_content_page %}
-  {% assign page_title = current_content_page.meta_title | default: current_content_page.content_header %}
-  {% assign page_description = current_content_page.meta_description | default: current_content_page.content_body | strip_html | truncate: 160 %}
-{% else %}
-  {% assign page_title = main_tab.title %}
-  {% assign page_description = main_tab.description | strip_html | truncate: 160 %}
-{% endif %}
-
-{% assign featured_image = current_content_page.banner_image | default: main_tab.banner_image %} {% endcomment %}
- {{ 'section-engagement-navigation.css' | asset_url | stylesheet_tag }}
-
-{% comment %} ========== DEBUG SECTION ========== {% endcomment %}
-{% if section.settings.show_debug %}
-<div style="background: #ffebee; padding: 15px; margin-bottom: 20px; border: 1px solid #f44336;">
-  <h3>🔍 DEBUG MODE</h3>
+  File location: sections/nested-info-page.liquid
   
-  <p><strong>Page Info:</strong></p>
-  <p>Page Title: {{ page.title }}</p>
-  <p>Page Handle: {{ page.handle }}</p>
-  <p>Page URL: {{ page.url }}</p>
+  This section fetches data from Shopify metaobjects and renders
+  the nested information page with two levels of tabs.
   
-  <p><strong>All Navigation Tabs:</strong></p>
-  <ul>
-  {% for tab in shop.metaobjects.navigation_tab.values %}
-    <li>
-      <strong>{{ tab.title }}</strong> 
-      (slug: {{ tab.slug }}) 
-      - Parent: {% if tab.parent_tab %}{{ tab.parent_tab.slug }}{% else %}None (MAIN TAB){% endif %}
-      - Active: {{ tab.is_active }}
-    </li>
-  {% endfor %}
-  </ul>
-</div>
-{% endif %}
-{% comment %} ========== END DEBUG ========== {% endcomment %}
+  Setup required:
+  1. Create metaobject definitions (see SHOPIFY_METAOBJECT_SCHEMA.md)
+  2. Add this file to your theme's sections folder
+  3. Add to a page template or use in theme editor
+{% endcomment %}
 
-{% comment %} ========== MAIN LOGIC ========== {% endcomment %}
+{% comment %} ==================== FETCH DATA FROM METAOBJECTS ==================== {% endcomment %}
 
-{% comment %} Extract rich text from metaobject {% endcomment %}
-{% assign main_tab = nil %}
-{% assign main_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab", blank 
+{% comment %} Get all active primary tabs, sorted by order {% endcomment %}
+{% assign primary_tabs = shop.metaobjects.primary_tab.values 
   | where: "is_active", true 
-  | sort: "sort_order" %}
+  | sort: "tab_order" %}
 
-{% comment %} Find current tab based on page handle {% endcomment %}
-{% assign current_slug = page.handle %}
-{% for tab in main_tabs %}
-  {% if tab.slug == current_slug %}
-    {% assign main_tab = tab %}
-    {% break %}
-  {% endif %}
-{% endfor %}
+{% comment %} Set initial active tabs {% endcomment %}
+{% assign initial_primary = primary_tabs.first %}
 
-{% if main_tab == nil and main_tabs.size > 0 %}
-  {% assign main_tab = main_tabs.first %}
-{% endif %}
+{% comment %} ==================== SECTION SETTINGS ==================== {% endcomment %}
 
-{% comment %} Get description from rich text field {% endcomment %}
-{% assign tab_description = '' %}
-{% if main_tab.description %}
-  {% assign desc_json = main_tab.description | parse_json %}
-  {% if desc_json %}
-    {% assign tab_description = desc_json.children[0].children[0].value %}
-  {% else %}
-    {% assign tab_description = main_tab.description %}
-  {% endif %}
-{% endif %}
-
-{% comment %} Get sub-tabs for current main tab {% endcomment %}
-{% assign sub_tabs = shop.metaobjects.navigation_tab.values 
-  | where: "parent_tab.slug", main_tab.slug 
-  | where: "is_active", true 
-  | sort: "sort_order" %}
-
-{% comment %} Get content page if URL has sub-tab {% endcomment %}
-{% assign current_content_page = nil %}
-{% assign url_path = request.path %}
-{% if url_path contains '/' %}
-  {% assign path_parts = url_path | split: '/' %}
-  {% if path_parts.size >= 4 %}
-    {% assign content_slug = path_parts[3] %}
-    {% assign current_content_page = shop.metaobjects.content_page.values 
-      | where: "slug", content_slug 
-      | where: "parent_tab.slug", main_tab.slug 
-      | first %}
-  {% endif %}
-{% endif %}
-
-{% comment %} ========== RENDER CONTENT ========== {% endcomment %}
-
-<div class="page-width">
-  {% if main_tab %}
-    <!-- Banner Section -->
-    <section class="tab-banner">
-      <div class="banner-image-container">
-        {% if main_tab.banner_image %}
-          <img src="{{ main_tab.banner_image | image_url: width: 2000 }}" 
-               alt="{{ main_tab.title }}" 
-               class="banner-image"
-               loading="eager">
-        {% endif %}
+<div class="nested-info-page" data-section-id="{{ section.id }}">
+  
+  {% comment %} ==================== HEADER ==================== {% endcomment %}
+  
+  <header class="nested-info-header">
+    <div class="container">
+      <div class="header-wrapper">
+        <h1 class="site-logo">
+          <a href="/">{{ shop.name }}</a>
+        </h1>
         
-        <div class="banner-content">
-          <h1 class="banner-title">
-            {{ main_tab.header | default: main_tab.title }}
-          </h1>
-          
-          <p class="banner-description">
-            {{ tab_description }}
-          </p>
-          
-          {% if main_tab.cta_text and main_tab.cta_link %}
-            <a href="{{ main_tab.cta_link }}" class="button button--primary">
-              {{ main_tab.cta_text }}
-            </a>
+        <div class="header-search">
+          <form action="/search" method="get">
+            <input 
+              type="search" 
+              name="q" 
+              placeholder="Search for a product"
+              class="search-input"
+            >
+          </form>
+        </div>
+        
+        <nav class="header-nav">
+          <a href="/pages/favorites">Favorites</a>
+          <a href="/pages/how-it-works">How It Works</a>
+          <a href="/account">Login</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  {% comment %} ==================== PRIMARY NAVIGATION ==================== {% endcomment %}
+  
+  <nav class="primary-nav">
+    <div class="container">
+      <div class="primary-nav-wrapper">
+        {% for primary_tab in primary_tabs %}
+          <button 
+            class="primary-nav-item{% if forloop.first %} active{% endif %}"
+            data-primary-tab="{{ primary_tab.tab_key.value }}"
+            data-tab-index="{{ forloop.index0 }}"
+          >
+            {{ primary_tab.display_label.value }}
+          </button>
+        {% endfor %}
+        <a href="/collections/all" class="browse-btn">Browse</a>
+      </div>
+    </div>
+  </nav>
+
+  {% comment %} ==================== BANNER + SECONDARY NAV + CONTENT ==================== {% endcomment %}
+  
+  {% for primary_tab in primary_tabs %}
+    <div 
+      class="tab-content{% if forloop.first %} active{% endif %}"
+      data-primary-content="{{ primary_tab.tab_key.value }}"
+    >
+      
+      {% comment %} Banner {% endcomment %}
+      <div class="banner-section" 
+        {% if primary_tab.banner_image.value %}
+          style="background-image: url('{{ primary_tab.banner_image.value | image_url: width: 1600 }}');"
+        {% endif %}
+      >
+        <div class="banner-overlay">
+          <h2 class="banner-title">{{ primary_tab.banner_title.value }}</h2>
+          {% if primary_tab.banner_subtitle.value != blank %}
+            <p class="banner-subtitle">{{ primary_tab.banner_subtitle.value }}</p>
           {% endif %}
         </div>
       </div>
-    </section>
 
-    <!-- Main Tabs -->
-    {% if main_tabs.size > 1 %}
-      <nav class="main-tabs-navigation">
-        <ul class="main-tabs-list">
-          {% for tab in main_tabs %}
-            <li class="main-tab-item {% if tab.slug == main_tab.slug %}active{% endif %}">
-              <a href="/pages/{{ tab.slug }}" class="main-tab-link">
-                {{ tab.title }}
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </nav>
-    {% endif %}
-
-    <!-- Sub Tabs -->
-    {% if sub_tabs.size > 0 %}
-      <nav class="sub-tabs-navigation">
-        <ul class="sub-tabs-list">
-          {% for sub_tab in sub_tabs %}
-            <li class="sub-tab-item">
-              <a href="/pages/{{ main_tab.slug }}/{{ sub_tab.slug }}" class="sub-tab-link">
-                {{ sub_tab.title }}
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </nav>
-    {% endif %}
-
-    <!-- Content Area -->
-    <section class="tab-content-area">
-      {% if current_content_page %}
-        <!-- Sub-tab Content -->
-        <article class="content-page">
-          <h2>{{ current_content_page.content_header | default: current_content_page.title }}</h2>
-          <div class="rte">
-            {{ current_content_page.content_body }}
+      {% comment %} Secondary Navigation {% endcomment %}
+      {% assign secondary_tabs = primary_tab.secondary_tabs.value 
+        | where: "is_active", true 
+        | sort: "tab_order" %}
+      
+      <nav class="secondary-nav">
+        <div class="container">
+          <div class="secondary-nav-wrapper">
+            {% for secondary_tab in secondary_tabs %}
+              <button 
+                class="secondary-nav-item{% if forloop.first %} active{% endif %}"
+                data-secondary-tab="{{ secondary_tab.tab_key.value }}"
+                data-parent="{{ primary_tab.tab_key.value }}"
+                data-tab-index="{{ forloop.index0 }}"
+              >
+                {{ secondary_tab.display_label.value }}
+              </button>
+            {% endfor %}
           </div>
-        </article>
-      {% else %}
-        <!-- Main Tab Content -->
-        <article class="default-content">
-          {% if page.content %}
-            {{ page.content }}
-          {% else %}
-            <h2>Welcome to {{ main_tab.title }}</h2>
-            <p>{{ tab_description }}</p>
-          {% endif %}
-        </article>
-      {% endif %}
-    </section>
+        </div>
+      </nav>
 
-  {% else %}
-    <!-- No tabs found -->
-    <div style="text-align: center; padding: 50px;">
-      <h2>No tabs configured</h2>
-      <p>Please create Navigation Tab metaobjects in Shopify admin.</p>
-      <p>Go to: <strong>Settings → Custom Data</strong></p>
+      {% comment %} Content Sections {% endcomment %}
+      {% for secondary_tab in secondary_tabs %}
+        <section 
+          class="content-section{% if forloop.first %} active{% endif %}"
+          data-secondary-content="{{ secondary_tab.tab_key.value }}"
+          data-parent="{{ primary_tab.tab_key.value }}"
+        >
+          <div class="container">
+            <div class="content-grid">
+              
+              {% comment %} Left: Product Image + CTA {% endcomment %}
+              <div class="product-wrapper">
+                {% if secondary_tab.product_image.value %}
+                  <img 
+                    src="{{ secondary_tab.product_image.value | image_url: width: 800 }}"
+                    srcset="{{ secondary_tab.product_image.value | image_url: width: 400 }} 400w,
+                            {{ secondary_tab.product_image.value | image_url: width: 800 }} 800w"
+                    sizes="(max-width: 768px) 100vw, 400px"
+                    alt="{{ secondary_tab.content_title.value }}"
+                    class="product-image"
+                    loading="lazy"
+                  >
+                {% endif %}
+                
+                {% if secondary_tab.cta_text.value and secondary_tab.cta_link.value %}
+                  <a 
+                    href="{{ secondary_tab.cta_link.value }}" 
+                    class="cta-button"
+                  >
+                    {{ secondary_tab.cta_text.value }}
+                  </a>
+                {% endif %}
+              </div>
+
+              {% comment %} Right: Content Info {% endcomment %}
+              <div class="content-info">
+                <h2 class="content-title">{{ secondary_tab.content_title.value }}</h2>
+                
+                {% if secondary_tab.content_description.value %}
+                  <div class="content-description rte">
+                    {{ secondary_tab.content_description.value }}
+                  </div>
+                {% endif %}
+
+                {% comment %} Related Topics {% endcomment %}
+                {% if secondary_tab.related_topics.value.size > 0 %}
+                  <div class="related-topics">
+                    <h3 class="related-topics-title">RELATED TOPICS</h3>
+                    <ul class="related-topics-list">
+                      {% assign topics = secondary_tab.related_topics.value | sort: "topic_order" %}
+                      {% for topic in topics %}
+                        <li class="related-topic-item">
+                          <a 
+                            href="{{ topic.topic_link.value }}" 
+                            class="related-topic-link"
+                          >
+                            {{ topic.topic_text.value }}
+                          </a>
+                        </li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                {% endif %}
+              </div>
+
+            </div>
+          </div>
+        </section>
+      {% endfor %}
+
     </div>
-  {% endif %}
+  {% endfor %}
+
 </div>
 
+{% comment %} ==================== JAVASCRIPT ==================== {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const nestedInfoPage = document.querySelector('.nested-info-page');
+  if (!nestedInfoPage) return;
+
+  // ========== PRIMARY TAB SWITCHING ==========
+  const primaryNavItems = nestedInfoPage.querySelectorAll('.primary-nav-item');
+  
+  primaryNavItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const targetTab = this.dataset.primaryTab;
+      
+      // Update active primary nav
+      primaryNavItems.forEach(nav => nav.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Show corresponding content
+      const allPrimaryContent = nestedInfoPage.querySelectorAll('[data-primary-content]');
+      allPrimaryContent.forEach(content => {
+        if (content.dataset.primaryContent === targetTab) {
+          content.classList.add('active');
+          
+          // Activate first secondary tab
+          const firstSecondaryNav = content.querySelector('.secondary-nav-item');
+          const firstSecondaryContent = content.querySelector('.content-section');
+          
+          if (firstSecondaryNav) {
+            // Reset all secondary navs in this primary tab
+            content.querySelectorAll('.secondary-nav-item').forEach(nav => 
+              nav.classList.remove('active')
+            );
+            firstSecondaryNav.classList.add('active');
+          }
+          
+          if (firstSecondaryContent) {
+            // Reset all secondary contents in this primary tab
+            content.querySelectorAll('.content-section').forEach(section => 
+              section.classList.remove('active')
+            );
+            firstSecondaryContent.classList.add('active');
+          }
+        } else {
+          content.classList.remove('active');
+        }
+      });
+      
+      // Scroll to top of content
+      const banner = this.closest('.nested-info-page').querySelector('.banner-section');
+      if (banner) {
+        banner.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  // ========== SECONDARY TAB SWITCHING ==========
+  const secondaryNavItems = nestedInfoPage.querySelectorAll('.secondary-nav-item');
+  
+  secondaryNavItems.forEach(item => {
+    item.addEventListener('click', function() {
+      const targetTab = this.dataset.secondaryTab;
+      const parentTab = this.dataset.parent;
+      
+      // Update active secondary nav (only within same parent)
+      const siblingNavs = nestedInfoPage.querySelectorAll(
+        `.secondary-nav-item[data-parent="${parentTab}"]`
+      );
+      siblingNavs.forEach(nav => nav.classList.remove('active'));
+      this.classList.add('active');
+      
+      // Show corresponding content
+      const allSecondaryContent = nestedInfoPage.querySelectorAll(
+        `.content-section[data-parent="${parentTab}"]`
+      );
+      allSecondaryContent.forEach(content => {
+        if (content.dataset.secondaryContent === targetTab) {
+          content.classList.add('active');
+        } else {
+          content.classList.remove('active');
+        }
+      });
+      
+      // Smooth scroll to content
+      const activeContent = nestedInfoPage.querySelector(
+        `.content-section[data-secondary-content="${targetTab}"][data-parent="${parentTab}"]`
+      );
+      if (activeContent) {
+        activeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    });
+  });
+
+  // ========== KEYBOARD NAVIGATION ==========
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      const activeNav = document.activeElement;
+      
+      if (activeNav.classList.contains('primary-nav-item')) {
+        const allNavs = Array.from(primaryNavItems);
+        const currentIndex = allNavs.indexOf(activeNav);
+        
+        if (e.key === 'ArrowRight' && currentIndex < allNavs.length - 1) {
+          allNavs[currentIndex + 1].focus();
+          allNavs[currentIndex + 1].click();
+        } else if (e.key === 'ArrowLeft' && currentIndex > 0) {
+          allNavs[currentIndex - 1].focus();
+          allNavs[currentIndex - 1].click();
+        }
+      }
+    }
+  });
+});
+</script>
+
+{% comment %} ==================== STYLES ==================== {% endcomment %}
+
 <style>
-  .tab-banner {
-    position: relative;
-    margin-bottom: 40px;
+/* ========== RESET & BASE ========== */
+.nested-info-page * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.nested-info-page {
+  font-family: var(--font-body-family, 'Georgia', serif);
+  color: #2c2c2c;
+  background: #fafafa;
+}
+
+.container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 2rem;
+}
+
+/* ========== HEADER ========== */
+.nested-info-header {
+  background: #1a1a1a;
+  color: #fff;
+  padding: 1rem 0;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.header-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.site-logo {
+  font-size: 1.8rem;
+  font-weight: 300;
+  letter-spacing: 2px;
+  margin: 0;
+}
+
+.site-logo a {
+  color: #fff;
+  text-decoration: none;
+}
+
+.header-search {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.6rem 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+.search-input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.header-nav {
+  display: flex;
+  gap: 2rem;
+}
+
+.header-nav a {
+  color: #fff;
+  text-decoration: none;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  transition: opacity 0.3s;
+}
+
+.header-nav a:hover {
+  opacity: 0.7;
+}
+
+/* ========== PRIMARY NAVIGATION ========== */
+.primary-nav {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 60px;
+  z-index: 999;
+}
+
+.primary-nav-wrapper {
+  display: flex;
+  gap: 3rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.primary-nav-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.primary-nav-item {
+  background: none;
+  border: none;
+  padding: 1.2rem 0;
+  font-size: 0.85rem;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #666;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: color 0.3s;
+  font-family: var(--font-heading-family, 'Helvetica Neue', sans-serif);
+}
+
+.primary-nav-item:hover {
+  color: #2c2c2c;
+}
+
+.primary-nav-item.active {
+  color: #2c2c2c;
+  font-weight: 500;
+}
+
+.primary-nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #2c2c2c;
+}
+
+.browse-btn {
+  background: none;
+  border: 1px solid #2c2c2c;
+  padding: 0.5rem 1.5rem;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.3s;
+  text-decoration: none;
+  color: #2c2c2c;
+  display: inline-block;
+}
+
+.browse-btn:hover {
+  background: #2c2c2c;
+  color: #fff;
+}
+
+/* ========== TAB CONTENT VISIBILITY ========== */
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* ========== BANNER ========== */
+.banner-section {
+  height: 400px;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.banner-overlay {
+  background: rgba(0, 0, 0, 0.3);
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #fff;
+  padding: 2rem;
+}
+
+.banner-title {
+  font-size: 2.5rem;
+  font-weight: 300;
+  letter-spacing: 4px;
+  margin-bottom: 1rem;
+}
+
+.banner-subtitle {
+  font-size: 1rem;
+  font-weight: 300;
+  letter-spacing: 1px;
+  max-width: 600px;
+  opacity: 0.9;
+}
+
+/* ========== SECONDARY NAVIGATION ========== */
+.secondary-nav {
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 120px;
+  z-index: 998;
+}
+
+.secondary-nav-wrapper {
+  display: flex;
+  gap: 3rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.secondary-nav-wrapper::-webkit-scrollbar {
+  display: none;
+}
+
+.secondary-nav-item {
+  background: none;
+  border: none;
+  padding: 1rem 0;
+  font-size: 0.9rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #999;
+  cursor: pointer;
+  position: relative;
+  white-space: nowrap;
+  transition: color 0.3s;
+  font-family: var(--font-heading-family, 'Helvetica Neue', sans-serif);
+}
+
+.secondary-nav-item:hover {
+  color: #666;
+}
+
+.secondary-nav-item.active {
+  color: #2c2c2c;
+}
+
+.secondary-nav-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #c9a05f;
+}
+
+/* ========== CONTENT SECTION ========== */
+.content-section {
+  display: none;
+  padding: 4rem 0;
+  background: #fff;
+  animation: fadeIn 0.5s ease-in;
+}
+
+.content-section.active {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
   }
-  
-  .banner-image-container {
-    position: relative;
-    height: 400px;
-    overflow: hidden;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  
-  .banner-image {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  gap: 4rem;
+}
+
+/* ========== PRODUCT IMAGE + CTA ========== */
+.product-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.product-image {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.cta-button {
+  background: #c9a05f;
+  color: #fff;
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-decoration: none;
+  text-align: center;
+  display: inline-block;
+  font-family: var(--font-heading-family, 'Helvetica Neue', sans-serif);
+}
+
+.cta-button:hover {
+  background: #b38f4f;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(201, 160, 95, 0.3);
+}
+
+/* ========== CONTENT INFO ========== */
+.content-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.content-title {
+  font-size: 2rem;
+  font-weight: 300;
+  letter-spacing: 3px;
+  color: #2c2c2c;
+}
+
+.content-description {
+  font-size: 1rem;
+  line-height: 1.8;
+  color: #666;
+}
+
+.content-description p {
+  margin-bottom: 1rem;
+}
+
+/* ========== RELATED TOPICS ========== */
+.related-topics {
+  margin-top: 2rem;
+}
+
+.related-topics-title {
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 2px;
+  color: #2c2c2c;
+  margin-bottom: 1.5rem;
+}
+
+.related-topics-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.related-topic-item {
+  background: #f8f8f8;
+  padding: 1rem 1.5rem;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.related-topic-item:hover {
+  background: #f0f0f0;
+  transform: translateX(4px);
+}
+
+.related-topic-link {
+  color: #2c2c2c;
+  text-decoration: none;
+  font-size: 0.95rem;
+  letter-spacing: 0.5px;
+}
+
+/* ========== RESPONSIVE ========== */
+@media (max-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+    gap: 3rem;
   }
-  
-  .banner-content {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: linear-gradient(transparent, rgba(0,0,0,0.7));
-    color: white;
-    padding: 40px;
+
+  .product-wrapper {
+    max-width: 500px;
+    margin: 0 auto;
   }
-  
+}
+
+@media (max-width: 768px) {
+  .header-wrapper {
+    flex-wrap: wrap;
+  }
+
+  .header-search {
+    order: 3;
+    max-width: 100%;
+    flex-basis: 100%;
+  }
+
+  .banner-section {
+    height: 300px;
+  }
+
   .banner-title {
-    font-size: 2.5rem;
-    margin-bottom: 15px;
+    font-size: 1.8rem;
   }
-  
-  .banner-description {
-    font-size: 1.1rem;
-    max-width: 600px;
-    margin-bottom: 20px;
+
+  .primary-nav-wrapper,
+  .secondary-nav-wrapper {
+    gap: 1.5rem;
   }
-  
-  .button--primary {
-    background: #000;
-    color: white;
-    padding: 12px 30px;
-    text-decoration: none;
-    border-radius: 4px;
-    display: inline-block;
+
+  .content-section {
+    padding: 2rem 0;
   }
-  
-  .main-tabs-navigation {
-    margin: 40px 0;
-    border-bottom: 1px solid #e0e0e0;
+
+  .container {
+    padding: 0 1rem;
   }
-  
-  .main-tabs-list {
-    display: flex;
-    justify-content: center;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  
-  .main-tab-item {
-    margin: 0 5px;
-  }
-  
-  .main-tab-link {
-    padding: 15px 30px;
-    text-decoration: none;
-    color: #333;
-    border-bottom: 3px solid transparent;
-    font-weight: 500;
-    transition: all 0.3s ease;
-  }
-  
-  .main-tab-item.active .main-tab-link {
-    border-bottom-color: {{ section.settings.tab_active_color }};
-    color: {{ section.settings.tab_active_color }};
-  }
-  
-  .main-tab-link:hover {
-    border-bottom-color: {{ section.settings.tab_hover_color }};
-    color: {{ section.settings.tab_hover_color }};
-  }
-  
-  .sub-tabs-navigation {
-    margin: 20px 0 40px;
-  }
-  
-  .sub-tabs-list {
-    display: flex;
-    justify-content: center;
-    list-style: none;
-    padding: 0;
-    margin: 0;
-    flex-wrap: wrap;
-    gap: 15px;
-  }
-  
-  .sub-tab-link {
-    padding: 10px 20px;
-    text-decoration: none;
-    color: #666;
-    background: #f5f5f5;
-    border-radius: 4px;
-    transition: all 0.3s ease;
-  }
-  
-  .sub-tab-link:hover {
-    background: {{ section.settings.tab_active_color }};
-    color: white;
-  }
-  
-  .tab-content-area {
-    margin: 60px 0;
-  }
+}
 </style>
+
+{% comment %} ==================== SECTION SCHEMA ==================== {% endcomment %}
 
 {% schema %}
 {
-  "name": "Tab Navigation System",
+  "name": "Nested Information Page",
   "settings": [
     {
-      "type": "checkbox",
-      "id": "show_debug",
-      "label": "Show Debug Information",
-      "default": true
+      "type": "paragraph",
+      "content": "This section automatically loads content from your Primary Tab metaobjects. To manage content, go to: Settings → Custom data → Metaobjects → Primary Tab"
+    },
+    {
+      "type": "header",
+      "content": "Optional Settings"
     },
     {
       "type": "color",
-      "id": "tab_active_color",
-      "label": "Active Tab Color",
-      "default": "#000000"
+      "id": "cta_button_color",
+      "label": "CTA Button Color",
+      "default": "#c9a05f"
     },
     {
       "type": "color",
-      "id": "tab_hover_color",
-      "label": "Tab Hover Color",
-      "default": "#333333"
-    },
-    {
-      "type": "range",
-      "id": "banner_height",
-      "label": "Banner Height",
-      "min": 300,
-      "max": 800,
-      "step": 50,
-      "default": 500,
-      "unit": "px"
+      "id": "active_tab_color",
+      "label": "Active Tab Indicator Color",
+      "default": "#c9a05f"
     }
   ],
   "presets": [
     {
-      "name": "Tab Navigation System",
-      "category": "Navigation"
+      "name": "Nested Information Page"
     }
   ]
 }
