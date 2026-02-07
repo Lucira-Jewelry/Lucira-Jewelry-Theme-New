@@ -264,15 +264,32 @@
     if (firstOtp) firstOtp.focus();
   }
 
+  // --- HELPER: Retry Fetch Wrapper ---
+  async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
+    try {
+      const response = await fetch(url, options);
+      // If server returns 500/502/503/504, throw error to trigger retry
+      if (!response.ok && response.status >= 500) {
+        throw new Error(`Server Error: ${response.status}`);
+      }
+      return response;
+    } catch (err) {
+      if (retries > 0) {
+        console.warn(`Fetch failed. Retrying... (${retries} attempts left)`);
+        await new Promise((resolve) => setTimeout(resolve, backoff));
+        return fetchWithRetry(url, options, retries - 1, backoff * 2); // Double wait time
+      }
+      throw err; // Out of retries, throw final error
+    }
+  }
+
   const sendBtn = document.getElementById('sendOtp');
   if (sendBtn) {
     sendBtn.addEventListener('click', async () => {
       const rawInput = document.getElementById('loginMobile').value;
-      let cleanMobile = rawInput.replace(/\D/g, ''); 
+      let cleanMobile = rawInput.replace(/\D/g, '');
 
-      if (cleanMobile.length === 10) {
-        cleanMobile = '91' + cleanMobile;
-      }
+      if (cleanMobile.length === 10) cleanMobile = '91' + cleanMobile;
 
       if (cleanMobile.length < 10) {
         showError('mobileError', 'Please enter a valid phone number');
@@ -280,43 +297,50 @@
       }
       hideError('mobileError');
 
+      // UI Updates
       sendBtn.disabled = true;
       sendBtn.style.opacity = '0.6';
-
-      document.querySelector('.otp-number-wrapper').style.display = 'none';
-      sendBtn.style.display = 'none';
-      document.getElementById('otpSection').style.display = 'block';
-      
-      document.getElementById('otpMobile').value = rawInput; 
-      focusOtp();
-      startTimer();
+      sendBtn.textContent = 'Sending...';
 
       try {
-          const response = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ mobile: cleanMobile }), 
-          });
-          
-          const data = await response.json();
-          
-          if (data.type !== 'success') {
-              showError('mobileError', data.message || 'Failed to send OTP');
-              sendBtn.disabled = false;
-              sendBtn.style.opacity = '1';
-              document.querySelector('.otp-number-wrapper').style.display = 'block';
-              sendBtn.style.display = 'block';
-              document.getElementById('otpSection').style.display = 'none';
-              return;
-          }
+        // USE THE RETRY FUNCTION HERE
+        const response = await fetchWithRetry('https://login-otp-385594025448.asia-south1.run.app', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mobile: cleanMobile }),
+        });
+
+        const data = await response.json();
+
+        if (data.type !== 'success') {
+          throw new Error(data.message || 'Failed to send OTP');
+        }
+
+        // --- Success ---
+        document.querySelector('.otp-number-wrapper').style.display = 'none';
+        sendBtn.style.display = 'none';
+        document.getElementById('otpSection').style.display = 'block';
+
+        document.getElementById('otpMobile').value = rawInput;
+        focusOtp();
+        startTimer();
       } catch (e) {
-          console.error('OTP Send Error:', e);
-          showError('mobileError', 'Failed to send OTP. Please try again.');
-          sendBtn.disabled = false;
-          sendBtn.style.opacity = '1';
-          document.querySelector('.otp-number-wrapper').style.display = 'block';
-          sendBtn.style.display = 'block';
-          document.getElementById('otpSection').style.display = 'none';
+        console.error('OTP Critical Error:', e);
+
+        // Determine user-friendly message
+        let msg = 'Connection failed. Please check your internet.';
+        if (e.message.includes('Server Error')) msg = 'Server is busy. Please try again.';
+        if (e.message.includes('Failed to send OTP')) msg = e.message;
+
+        showError('mobileError', msg);
+
+        // Reset UI
+        sendBtn.disabled = false;
+        sendBtn.style.opacity = '1';
+        sendBtn.textContent = 'SEND OTP';
+        document.querySelector('.otp-number-wrapper').style.display = 'block';
+        sendBtn.style.display = 'block';
+        document.getElementById('otpSection').style.display = 'none';
       }
     });
   }
@@ -356,11 +380,10 @@
               mobile: mobile || '',
               source: params.get('utm_source') || '',
               medium: params.get('utm_medium') || '',
-              campaign: params.get('utm_campaign') || ''
-            }
+              campaign: params.get('utm_campaign') || '',
+            },
           });
         }
-
 
         if (data.type === 'success' && data.credentials) {
           const email = data.credentials.email;
@@ -370,7 +393,6 @@
           shopifyAutoLogin(email, data.credentials.password);
           return;
         }
-
 
         if (data.type === 'register') {
           document.getElementById('signupMobile').value = mobile;
@@ -748,9 +770,9 @@
 
         // 2. Copy to Clipboard API
         navigator.clipboard.writeText(textToCopy).then(function() {
-          
+
           // --- Success State ---
-          
+
           // Option A: Show the feedback text below (if you have that element)
           if (feedbackMsg) {
             feedbackMsg.style.display = 'block';
@@ -764,7 +786,7 @@
           const originalTitle = copyBtn.getAttribute('title');
           copyBtn.setAttribute('title', 'Copied!');
           copyBtn.classList.add('copied-success'); // Add a class for CSS styling
-          
+
           setTimeout(() => {
             copyBtn.setAttribute('title', originalTitle);
             copyBtn.classList.remove('copied-success');
