@@ -494,7 +494,7 @@ function closePopup() {
             each.style.height = canvasSize + 'px';
           });
           document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          //document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
+          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
           document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
           document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         } else {
@@ -509,7 +509,7 @@ function closePopup() {
             each.style.height = canvasSize + 'px';
           });
           document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          //document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
+          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
           document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
           document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         }
