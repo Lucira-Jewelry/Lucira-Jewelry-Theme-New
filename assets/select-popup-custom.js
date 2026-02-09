@@ -484,7 +484,7 @@ function closePopup() {
       function resizeKonvaCanvas() {
         if(window.innerWidth > 768){
           const baseScreen = 1920;   
-          const baseSize = 550;     
+          const baseSize = 600;     
 
           let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
