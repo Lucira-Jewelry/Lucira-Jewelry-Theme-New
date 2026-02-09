@@ -520,7 +520,7 @@ function closePopup() {
 
       const tileHeight = tile.offsetHeight;
       targets.forEach(target => {
-        target.style.maxHeight = `calc(100vh - ${tileHeight}px)`;
+        target.style.maxHeight = `calc(400px - ${tileHeight}px)`;
       });
 
     resizeKonvaCanvas();
