@@ -655,7 +655,15 @@
 </script> {% endcomment %}
 
 
-{% assign is_product_available = product.available %}
+
+
+
+
+
+
+
+
+{% comment %} {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
 <script>
@@ -1332,7 +1340,7 @@
 
   // Fallback for mobile browsers
   setTimeout(initTryOnButton, 1000);
-</script>
+</script> {% endcomment %}
 
 
 
@@ -1347,9 +1355,7 @@
 
 
 
-
-
-{% comment %} {% assign is_product_available = product.available %}
+{% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
 
 <script>
@@ -1403,19 +1409,30 @@
 </script>
 
 <style>
-    /* CRITICAL: Force parent container to show button on mobile */
-    .product__media-list,
-    .product__media-list.contains-media,
-    .slider-mobile-gutter {
-        position: relative !important;
-        overflow: visible !important;
+    /* CRITICAL: DO NOT TOUCH SLIDER OVERFLOW - Let slider work naturally */
+    /* Instead, we'll use a wrapper that positions the button outside the slider flow */
+    
+    /* Wrapper for try-on button - positioned relative to media gallery */
+    .tryon-absolute-wrapper {
+        position: absolute !important;
+        top: 10px !important;
+        left: 10px !important;
+        width: 30px !important;
+        height: 30px !important;
+        z-index: 9999 !important;
+        pointer-events: none !important;
+    }
+    
+    /* Make the button itself clickable */
+    .tryon-absolute-wrapper * {
+        pointer-events: auto !important;
     }
 
     /* CRITICAL: High specificity overrides for the button - RESIZED TO 30px */
     button#tryonButton,
     button[id="tryonButton"],
     #tryonButton {
-        position: absolute !important;
+        position: relative !important;
         width: 30px !important;
         height: 30px !important;
         min-width: 30px !important;
@@ -1425,14 +1442,14 @@
         background: transparent !important;
         border: none !important;
         padding: 0 !important;
-        margin: 10px !important;
+        margin: 0 !important;
         overflow: visible !important;
         z-index: 9999 !important;
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
-        left: 10px !important;
-        top: 10px !important;
+        left: 0 !important;
+        top: 0 !important;
         cursor: pointer !important;
         pointer-events: auto !important;
         transform: translateZ(0) !important;
@@ -1602,39 +1619,27 @@
         content: none !important;
     }
 
-    /* Mobile specific styles with higher specificity - CRITICAL FIXES */
+    /* Mobile specific styles with higher specificity */
     @media (max-width: 768px) {
-        /* Force parent containers to be visible */
-        .product__media-list,
-        .product__media-list.contains-media,
-        .slider-mobile-gutter,
-        .slider-mobile-gutter > * {
-            overflow: visible !important;
-            position: relative !important;
+        .tryon-absolute-wrapper {
+            top: 10px !important;
+            left: 10px !important;
         }
-       .product .skip-to-content-link{
-      display:none;
-      }
-
-
-
 
         button#tryonButton,
         button[id="tryonButton"],
         #tryonButton {
-            position: absolute !important;
+            position: relative !important;
             width: 30px !important;
             height: 30px !important;
-            left: 10px !important;
-            top: 10px !important;
-            margin: 10px !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
             z-index: 9999 !important;
             display: block !important;
             visibility: visible !important;
             opacity: 1 !important;
             pointer-events: auto !important;
-            transform: translateZ(0) !important;
-            -webkit-transform: translateZ(0) !important;
         }
 
         .tryon-button-wrapper {
@@ -1686,12 +1691,9 @@
 
     /* Extra small mobile devices */
     @media (max-width: 480px) {
-        button#tryonButton,
-        button[id="tryonButton"],
-        #tryonButton {
-            left: 5px !important;
+        .tryon-absolute-wrapper {
             top: 5px !important;
-            margin: 5px !important;
+            left: 5px !important;
         }
     }
 
@@ -1731,10 +1733,10 @@
           color: "transparent",
           border: "none",
           borderRadius: "15px",
-          margin: "10px",
-          left: "10px",
-          top: "10px",
-          position: "absolute",
+          margin: "0",
+          left: "0",
+          top: "0",
+          position: "relative",
           zIndex: "9999",
           width: "30px",
           height: "30px",
@@ -1748,13 +1750,13 @@
         MBtryonbutton: {
           width: "30px",
           height: "30px",
-          margin: "10px",
-          left: "10px",
-          top: "10px",
+          margin: "0",
+          left: "0",
+          top: "0",
           padding: "0",
           backgroundColor: "transparent",
           border: "none",
-          position: "absolute",
+          position: "relative",
           color: "transparent",
           fontSize: "0",
           lineHeight: "0",
@@ -1778,31 +1780,29 @@
     // Track which buttons have been transformed
     const transformedButtons = new WeakSet();
 
-    // Function to force parent visibility
-    function ensureParentVisibility(element) {
-      let parent = element.parentElement;
-      let depth = 0;
-      const maxDepth = 10;
-      
-      while (parent && depth < maxDepth) {
-        const computed = window.getComputedStyle(parent);
-        
-        // Fix overflow hidden issues
-        if (computed.overflow === 'hidden' || computed.overflowX === 'hidden' || computed.overflowY === 'hidden') {
-          parent.style.overflow = 'visible';
-          parent.style.overflowX = 'visible';
-          parent.style.overflowY = 'visible';
-          console.log('🔧 Fixed overflow on parent:', parent.className);
-        }
-        
-        // Ensure parent is positioned
-        if (computed.position === 'static') {
-          parent.style.position = 'relative';
-        }
-        
-        parent = parent.parentElement;
-        depth++;
+    // Function to wrap button in absolute positioned container
+    function wrapButtonInAbsoluteContainer(buttonElement) {
+      // Don't wrap if already wrapped or if it's the second button
+      if (buttonElement.closest('.tryon-absolute-wrapper') || 
+          buttonElement.closest('#second-tryon-button-1') || 
+          buttonElement.closest('#virtual-try-on-content')) {
+        return;
       }
+
+      console.log('📦 Wrapping button in absolute container');
+
+      // Create wrapper
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tryon-absolute-wrapper';
+      wrapper.style.cssText = 'position:absolute !important;top:10px !important;left:10px !important;width:30px !important;height:30px !important;z-index:9999 !important;pointer-events:none !important;';
+
+      // Insert wrapper before button
+      buttonElement.parentNode.insertBefore(wrapper, buttonElement);
+      
+      // Move button into wrapper
+      wrapper.appendChild(buttonElement);
+
+      console.log('✅ Button wrapped successfully');
     }
 
     // Function to completely clean and transform button (FIRST BUTTON - WITH ANIMATION)
@@ -1827,9 +1827,6 @@
 
       console.log('🔄 Transforming Try On button');
 
-      // CRITICAL: Fix parent container overflow issues
-      ensureParentVisibility(buttonElement);
-
       // Store click handler
       const originalOnClick = buttonElement.onclick;
       
@@ -1837,18 +1834,18 @@
       buttonElement.textContent = '';
       buttonElement.innerHTML = '';
       
-      // Apply critical inline styles first
+      // Apply critical inline styles - RELATIVE positioning since we're in absolute wrapper
       buttonElement.style.cssText = `
-        position: absolute !important;
+        position: relative !important;
         width: 30px !important;
         height: 30px !important;
-        left: 10px !important;
-        top: 10px !important;
+        left: 0 !important;
+        top: 0 !important;
         z-index: 9999 !important;
         display: block !important;
         visibility: visible !important;
         opacity: 1 !important;
-        margin: 10px !important;
+        margin: 0 !important;
         padding: 0 !important;
         background: transparent !important;
         border: none !important;
@@ -1856,7 +1853,7 @@
         transform: translateZ(0) !important;
       `;
       
-      // Create structure - UPDATED TO 30px
+      // Create structure
       const buttonWrapper = document.createElement('div');
       buttonWrapper.className = 'tryon-button-wrapper';
       buttonWrapper.style.cssText = 'position:relative !important;width:30px !important;height:30px !important;display:block !important;visibility:visible !important;opacity:1 !important;z-index:9999 !important;pointer-events:auto !important;';
@@ -1878,7 +1875,7 @@
       iconCircle.className = 'tryon-icon-circle';
       iconCircle.style.cssText = 'position:absolute !important;left:0 !important;top:0 !important;width:30px !important;height:30px !important;display:block !important;visibility:visible !important;opacity:1 !important;z-index:10000 !important;pointer-events:auto !important;';
       
-      // Inline SVG - UPDATED with thinner stroke (0.5px border)
+      // Inline SVG
       iconCircle.innerHTML = `
         <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block !important;width:100% !important;height:100% !important;visibility:visible !important;">
             <rect x="0.25" y="0.25" width="29.5" height="29.5" rx="14.75" fill="white" stroke="black" stroke-width="0.5"/>
@@ -1927,36 +1924,13 @@
       // Mark as transformed
       transformedButtons.add(buttonElement);
       
-      // NEW: Setup hover-based animation
+      // Wrap in absolute container AFTER transformation
+      wrapButtonInAbsoluteContainer(buttonElement);
+      
+      // Setup hover-based animation
       setTimeout(() => {
         setupHoverAnimation(slidingPanel, buttonWrapper);
       }, 500);
-      
-      // CRITICAL: Periodic visibility check for mobile
-      if (window.innerWidth <= 768) {
-        const visibilityInterval = setInterval(() => {
-          if (!document.body.contains(buttonElement)) {
-            clearInterval(visibilityInterval);
-            return;
-          }
-          
-          const rect = buttonElement.getBoundingClientRect();
-          if (rect.width === 0 || rect.height === 0 || rect.top < 0 || rect.left < 0) {
-            console.warn('⚠️ Button not visible, forcing styles');
-            buttonElement.style.visibility = 'visible';
-            buttonElement.style.opacity = '1';
-            buttonElement.style.display = 'block';
-            buttonElement.style.zIndex = '9999';
-            buttonElement.style.position = 'absolute';
-            buttonElement.style.left = '10px';
-            buttonElement.style.top = '10px';
-            ensureParentVisibility(buttonElement);
-          }
-        }, 2000);
-        
-        // Clear interval after 30 seconds
-        setTimeout(() => clearInterval(visibilityInterval), 30000);
-      }
       
       return true;
     }
@@ -2019,7 +1993,7 @@
       return true;
     }
 
-    // NEW: Animation function - plays once on load, then on hover
+    // Animation function - plays once on load, then on hover
     function setupHoverAnimation(panel, wrapper) {
       if (!panel || !wrapper) return;
       
@@ -2038,7 +2012,7 @@
         hasPlayedInitial = true;
       }, 500);
       
-      // Setup hover listeners (both mouseenter and touchstart for mobile)
+      // Setup hover listeners
       const hoverHandler = () => {
         if (hasPlayedInitial && !panel.classList.contains('expanded')) {
           animateButton();
@@ -2050,7 +2024,6 @@
       
       // For touch devices
       wrapper.addEventListener('touchstart', (e) => {
-        // Don't prevent default or stop propagation - let click through
         if (hasPlayedInitial && !panel.classList.contains('expanded')) {
           animateButton();
         }
@@ -2080,32 +2053,9 @@
               !button.querySelector('.tryon-text-only')) {
             console.log('✅ Found first button with selector:', selector);
             
-            // Log button position for debugging
-            const rect = button.getBoundingClientRect();
-            console.log('📍 Button position:', {
-              top: rect.top,
-              left: rect.left,
-              width: rect.width,
-              height: rect.height,
-              visible: rect.width > 0 && rect.height > 0
-            });
-            
             const success = transformTryOnButton(button);
             if (success) {
               console.log('✅ First button transformed successfully');
-              
-              // Final visibility check after transformation
-              setTimeout(() => {
-                const newRect = button.getBoundingClientRect();
-                console.log('📍 Button position after transform:', {
-                  top: newRect.top,
-                  left: newRect.left,
-                  width: newRect.width,
-                  height: newRect.height,
-                  visible: newRect.width > 0 && newRect.height > 0
-                });
-              }, 100);
-              
               return true;
             }
           }
@@ -2114,7 +2064,7 @@
       return false;
     }
 
-    // Multiple transformation attempts with longer delays for mobile
+    // Multiple transformation attempts
     let attempts = 0;
     const maxAttempts = 25;
     
@@ -2125,7 +2075,6 @@
       const success = findAndTransformButton();
       
       if (!success && attempts < maxAttempts) {
-        // Increase delay for mobile devices
         const delay = window.innerWidth <= 768 ? 500 : 300;
         setTimeout(attemptTransform, delay);
       } else if (success) {
@@ -2135,7 +2084,7 @@
       }
     }
 
-    // Start after initial delay - longer for mobile
+    // Start after initial delay
     const initialDelay = window.innerWidth <= 768 ? 1000 : 500;
     setTimeout(attemptTransform, initialDelay);
 
@@ -2150,17 +2099,6 @@
         setTimeout(findAndTransformButton, 200);
       }
     });
-
-    // Mobile-specific: Check on scroll end
-    if (window.innerWidth <= 768) {
-      let scrollTimeout;
-      window.addEventListener('scroll', () => {
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-          findAndTransformButton();
-        }, 500);
-      }, { passive: true });
-    }
 
     // SECOND BUTTON HANDLING - TEXT ONLY, NO ANIMATION
     function setupSecondButton() {
@@ -2193,7 +2131,7 @@
         .catch(err => console.error('Error loading SKUs:', err));
     }
 
-    // Initialize second button after a short delay to ensure loadTryOnButton has created buttons
+    // Initialize second button
     setTimeout(setupSecondButton, 1500);
 
   }
@@ -2210,9 +2148,9 @@
     setTimeout(initTryOnButton, delay);
   });
 
-  // Fallback for mobile browsers - extended timing
+  // Fallback for mobile browsers
   setTimeout(initTryOnButton, 1000);
   if (window.innerWidth <= 768) {
     setTimeout(initTryOnButton, 2000);
   }
-</script> {% endcomment %}
+</script>
