@@ -798,7 +798,7 @@ window.MainBaseCharm = function () {
       } else {
         // Desktop: Increase main container height to prevent cropping
         if (wrapper) {
-          wrapper.style.setProperty('height', '310px', 'important');
+          //wrapper.style.setProperty('height', '470px', 'important');
         }
       }
 

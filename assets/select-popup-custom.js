@@ -481,64 +481,47 @@ function closePopup() {
       
       
       
-    function resizeKonvaCanvas() {
-      if (window.innerWidth > 768) {
-        // --- DESKTOP LOGIC ---
-        const baseScreen = 1920;
-        const baseSize = 550;
-        let canvasSize = (window.innerWidth / baseScreen) * baseSize;
-        canvasSize = Math.max(350, Math.min(canvasSize, 700));
+      function resizeKonvaCanvas() {
+        if(window.innerWidth > 768){
+          const baseScreen = 1920;   
+          const baseSize = 550;     
 
-        // Update Konva Stage directly (This fixes the clipping/resolution)
-        if (typeof Konva !== 'undefined' && Konva.stages.length > 0) {
-          Konva.stages.forEach(stage => {
-            stage.width(canvasSize);
-            stage.height(canvasSize);
+          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+
+          canvasSize = Math.max(350, Math.min(canvasSize, 700));
+          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
+            each.style.width = canvasSize + 'px';
+            each.style.height = canvasSize + 'px';
           });
-        }
+          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
+          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
+          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
+          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
+        } else {
+          const baseScreen = 768;   
+          const baseSize = 400;     
 
-        // Update Containers
-        document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-        document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
-        document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-        document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
+          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
 
-      } else {
-        // --- MOBILE LOGIC ---
-        const baseScreen = 768;
-        const baseSize = 400;
-        let canvasSize = (window.innerWidth / baseScreen) * baseSize;
-        canvasSize = Math.max(180, Math.min(canvasSize, 550));
-
-        // 1. Define a specific, taller height for mobile
-        // 1.5 multiplier gives 50% more vertical space. Adjust this number if needed.
-        let mobileHeight = canvasSize * 1.5; 
-
-        // 2. Update Konva Stage Dimensions (CRITICAL STEP)
-        // This stops Konva from "cutting" the image
-        if (typeof Konva !== 'undefined' && Konva.stages.length > 0) {
-          Konva.stages.forEach(stage => {
-            stage.width(canvasSize);
-            stage.height(mobileHeight); 
-            stage.draw(); // Force a redraw
+          canvasSize = Math.max(180, Math.min(canvasSize, 550));
+          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
+            each.style.width = canvasSize + 'px';
+            each.style.height = canvasSize + 'px';
           });
+          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
+          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
+          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
+          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         }
-
-        // 3. Update the Container divs to match the new stage height
-        document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-        document.querySelector('.variant-img-wrap').style.height = mobileHeight + 'px';
         
-        document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-        document.querySelector('.konvajs-content').style.height = mobileHeight + 'px';
       }
-    }
-    const tile = document.querySelector('.main-collection-tile-div');
-    const targets = document.querySelectorAll('.scrollable');
+      const tile = document.querySelector('.main-collection-tile-div');
+      const targets = document.querySelectorAll('.scrollable');
 
-    const tileHeight = tile.offsetHeight;
-    targets.forEach(target => {
-      target.style.maxHeight = `calc(100vh - ${tileHeight}px)`;
-    });
+      const tileHeight = tile.offsetHeight;
+      targets.forEach(target => {
+        target.style.maxHeight = `calc(100vh - ${tileHeight}px)`;
+      });
 
     resizeKonvaCanvas();
     if (window.innerWidth <= 768) {
