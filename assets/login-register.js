@@ -52,7 +52,7 @@ function closeloginPopup(e, id) {
   resetToLoginView();
   const popup = document.getElementById('login-popup');
   if (!popup) return;
-  const h2 = popup.querySelector('.otp-number-wrapper h2');
+  const h2 = popup.querySelector('.otp-number-wrapper p.heading');
   const p = popup.querySelector('.otp-number-wrapper p');
   if (h2) h2.innerText = ORIGINAL_POPUP_HEADING;
   if (p) p.innerText = ORIGINAL_POPUP_SUBTEXT;
@@ -654,7 +654,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
 
-  const h2 = popup.querySelector('.otp-number-wrapper h2');
+  const h2 = popup.querySelector('.otp-number-wrapper p.heading');
   const p = popup.querySelector('.otp-number-wrapper p');
 
   if (h2) ORIGINAL_POPUP_HEADING = h2.innerText;
