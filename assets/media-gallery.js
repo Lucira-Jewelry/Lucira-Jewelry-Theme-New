@@ -161,7 +161,8 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: {  mv: [], mq: [], ci: [], mh: [], v360: [] },
+      codes: { mv: [], mq: [], ci: [], mh: [], v360: [] },
+      cert: [],   // ✅ ADD
       extras: []
     };
 
@@ -170,6 +171,12 @@ if (!customElements.get('media-gallery')) {
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
+
+      // ✅ CERT detection (only classification, no reordering logic)
+      if (alt.includes("cert")) {
+        buckets.cert.push(item);
+        return;
+      }
 
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
@@ -215,17 +222,27 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+    Object.values(buckets.codes).forEach(arr =>
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      })
+    );
+
+    buckets.color.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+
+    buckets.extras.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
+    // ✅ CERT — always last
+    buckets.cert.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
 
     return ordered;
