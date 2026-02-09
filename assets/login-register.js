@@ -1,7 +1,7 @@
 const spinPrizes = [
-{ label: '₹1,500 OFF', value: '1500_off', chance: 20 },
-{ label: '₹1,000 OFF', value: '1000_off', chance: 20 },
-{ label: '₹750 OFF', value: '750_off', chance: 60 },
+{ label: '₹1,500 OFF', value: '1500_off', chance: 33.33 },
+{ label: '₹1,000 OFF', value: '1000_off', chance: 33.33 },
+{ label: '₹750 OFF', value: '750_off', chance: 33.34 },
 { label: 'Diamond Pendant', value: 'diamond_pendant', chance: 0 },
 { label: '₹5,000 OFF', value: '5000_off', chance: 0 },
 { label: '₹10,000 OFF', value: '10000_off', chance: 0 },
