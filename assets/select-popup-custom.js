@@ -482,39 +482,41 @@ function closePopup() {
       
       
       function resizeKonvaCanvas() {
-        if(window.innerWidth > 768){
-          const baseScreen = 1920;   
-          const baseSize = 600;     
+        let canvasSize;
 
-          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+        if (window.innerWidth > 768) {
+          const baseScreen = 1920;
+          const baseSize = 550;
 
+          canvasSize = (window.innerWidth / baseScreen) * baseSize;
           canvasSize = Math.max(350, Math.min(canvasSize, 700));
-          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-            each.style.width = canvasSize + 'px';
-            each.style.height = canvasSize + 'px';
-          });
-          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         } else {
-          const baseScreen = 768;   
-          const baseSize = 400;     
+          const baseScreen = 768;
+          const baseSize = 400;
 
-          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
-
+          canvasSize = (window.innerWidth / baseScreen) * baseSize;
           canvasSize = Math.max(180, Math.min(canvasSize, 550));
-          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-            each.style.width = canvasSize + 'px';
-            each.style.height = canvasSize + 'px';
-          });
-          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
         }
-        
+
+        /* 🔥 THIS IS THE IMPORTANT PART */
+        const dpr = window.devicePixelRatio || 1;
+
+        stage.width(canvasSize);
+        stage.height(canvasSize);
+
+        stage.scale({ x: 1, y: 1 });
+        stage.batchDraw();
+
+        /* Optional: container sizing */
+        const container = document.querySelector('.konvajs-content');
+        container.style.width = canvasSize + 'px';
+        container.style.height = canvasSize + 'px';
+
+        const variantWrap = document.querySelector('.variant-img-wrap');
+        variantWrap.style.width = canvasSize + 'px';
+        variantWrap.style.height = canvasSize + 'px';
       }
+
       const tile = document.querySelector('.main-collection-tile-div');
       const targets = document.querySelectorAll('.scrollable');
 
