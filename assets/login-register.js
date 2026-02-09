@@ -142,8 +142,13 @@ sendBtn.addEventListener('click', async () => {
     try {
         const response = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ mobile: cleanMobile }), 
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                // Some mobile gateways block requests without a User-Agent
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            body: JSON.stringify({ mobile: cleanMobile }),
         });
         
         const data = await response.json();
@@ -186,7 +191,11 @@ verifyBtn.addEventListener('click', async () => {
     try {
     const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
         body: JSON.stringify({ otp, mobile }),
     });
 
@@ -334,7 +343,11 @@ regBtn.textContent = 'Creating Account...';
 try {
     const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+    },
     body: JSON.stringify({
         mobile: mobile,
         otp: otp,
@@ -488,16 +501,24 @@ timerInterval = setInterval(() => {
 }, 1000);
 }
 async function resendOtp() {
-const mobile = document.getElementById('otpMobile').value.trim();
+    const rawMobile = document.getElementById('otpMobile').value.trim();
+    let mobileToVerify = rawMobile.replace(/\D/g, '');
 
-await fetch('https://login-otp-385594025448.asia-south1.run.app', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ mobile }),
-});
+    // Normalize to 91 prefix
+    if (mobileToVerify.length === 10) mobileToVerify = '91' + mobileToVerify;
 
-document.getElementById('otp-timer').innerText = 'Resend OTP in 00:30';
-startTimer(); // ✅ restart properly
+    await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        },
+        body: JSON.stringify({ mobile: mobileToVerify }), // Use the local variable
+    });
+
+    document.getElementById('otp-timer').innerText = 'Resend OTP in 00:30';
+    startTimer(); 
 }
 
 document.addEventListener('DOMContentLoaded', function () {
