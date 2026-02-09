@@ -481,47 +481,55 @@ function closePopup() {
       
       
       
-      function resizeKonvaCanvas() {
-        if(window.innerWidth > 768){
-          const baseScreen = 1920;   
-          const baseSize = 550;     
+    function resizeKonvaCanvas() {
+      if (window.innerWidth > 768) {
+        // --- DESKTOP LOGIC (Unchanged) ---
+        const baseScreen = 1920;
+        const baseSize = 550;
+        let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+        canvasSize = Math.max(350, Math.min(canvasSize, 700));
 
-          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+        document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
+          each.style.width = canvasSize + 'px';
+          each.style.height = canvasSize + 'px';
+        });
+        document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
+        document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
+        document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
+        document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
 
-          canvasSize = Math.max(350, Math.min(canvasSize, 700));
-          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-            each.style.width = canvasSize + 'px';
-            each.style.height = canvasSize + 'px';
-          });
-          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
-        } else {
-          const baseScreen = 768;   
-          const baseSize = 400;     
+      } else {
+        // --- MOBILE LOGIC (Updated) ---
+        const baseScreen = 768;
+        const baseSize = 400;
+        let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+        canvasSize = Math.max(180, Math.min(canvasSize, 550));
 
-          let canvasSize = (window.innerWidth / baseScreen) * baseSize;
+        // FIX: Calculate a separate height for mobile
+        // Currently set to 1.25x the width (25% taller). 
+        // You can change 1.25 to 1.4 for more height, or just add pixels (e.g., canvasSize + 50)
+        let canvasHeight = canvasSize * 1.25; 
 
-          canvasSize = Math.max(180, Math.min(canvasSize, 550));
-          document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-            each.style.width = canvasSize + 'px';
-            each.style.height = canvasSize + 'px';
-          });
-          document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-          document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-          document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
-        }
+        document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
+          each.style.width = canvasSize + 'px';
+          each.style.height = canvasHeight + 'px'; // Updated to use canvasHeight
+        });
         
+        // Update wrappers to use the new taller height
+        document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
+        document.querySelector('.variant-img-wrap').style.height = canvasHeight + 'px';
+        
+        document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
+        document.querySelector('.konvajs-content').style.height = canvasHeight + 'px';
       }
-      const tile = document.querySelector('.main-collection-tile-div');
-      const targets = document.querySelectorAll('.scrollable');
+    }
+    const tile = document.querySelector('.main-collection-tile-div');
+    const targets = document.querySelectorAll('.scrollable');
 
-      const tileHeight = tile.offsetHeight;
-      targets.forEach(target => {
-        target.style.maxHeight = `calc(100vh - ${tileHeight}px)`;
-      });
+    const tileHeight = tile.offsetHeight;
+    targets.forEach(target => {
+      target.style.maxHeight = `calc(100vh - ${tileHeight}px)`;
+    });
 
     resizeKonvaCanvas();
     if (window.innerWidth <= 768) {
