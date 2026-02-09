@@ -53,7 +53,7 @@ function closeloginPopup(e, id) {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
   const h2 = popup.querySelector('.otp-number-wrapper p.heading');
-  const p = popup.querySelector('.otp-number-wrapper p');
+  const p = popup.querySelector('.otp-number-wrapper p:not(.heading)');
   if (h2) h2.innerText = ORIGINAL_POPUP_HEADING;
   if (p) p.innerText = ORIGINAL_POPUP_SUBTEXT;
 }
@@ -640,7 +640,7 @@ setTimeout(() => {
     wheelWrapper.style.visibility = 'visible';
     }
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
-    const subtext = popup.querySelector('.otp-number-wrapper p');
+    const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
     if (heading) heading.innerText = 'REGISTER & WIN';
     if (subtext) subtext.innerText = 'Get assured reward of ₹750';
     setLuciraSessionPopup();
@@ -654,9 +654,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
 
-  const h2 = popup.querySelector('.otp-number-wrapper p.heading');
-  const p = popup.querySelector('.otp-number-wrapper p');
+  const heading = popup.querySelector('.otp-number-wrapper p.heading');
+  const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
 
-  if (h2) ORIGINAL_POPUP_HEADING = h2.innerText;
-  if (p) ORIGINAL_POPUP_SUBTEXT = p.innerText;
+  if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
+  if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
+
