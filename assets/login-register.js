@@ -639,7 +639,7 @@ setTimeout(() => {
     wheelWrapper.style.display = 'flex';
     wheelWrapper.style.visibility = 'visible';
     }
-    const heading = popup.querySelector('.otp-number-wrapper h2');
+    const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p');
     if (heading) heading.innerText = 'REGISTER & WIN';
     if (subtext) subtext.innerText = 'Get assured reward of ₹750';
