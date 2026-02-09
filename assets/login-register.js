@@ -641,7 +641,7 @@ setTimeout(() => {
     }
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
-    if (heading) heading.innerText = 'Register to Win';
+    if (heading) heading.innerText = 'Register to Win a Reward';
     if (subtext) subtext.innerText = 'Get assured reward of ₹750';
     setLuciraSessionPopup();
 }, SHOW_DELAY);
