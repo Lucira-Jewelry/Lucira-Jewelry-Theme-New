@@ -793,7 +793,7 @@ window.MainBaseCharm = function () {
       if (isMobileLayout()) {
         if (wrapper) {
           wrapper.style.setProperty('width', '350px', 'important');
-          wrapper.style.setProperty('height', '310px', 'important');
+          wrapper.style.setProperty('height', '380px', 'important');
         }
       } else {
         // Desktop: Increase main container height to prevent cropping
