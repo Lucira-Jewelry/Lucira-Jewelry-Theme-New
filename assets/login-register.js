@@ -140,7 +140,7 @@ sendBtn.addEventListener('click', async () => {
     startTimer();
 
     try {
-        const response = await fetch('https://app.lucirajewelry.com/otp.php', {
+        const response = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -506,7 +506,7 @@ async function resendOtp() {
     // Normalize to 91 prefix
     if (mobileToVerify.length === 10) mobileToVerify = '91' + mobileToVerify;
 
-    await fetch('https://app.lucirajewelry.com/otp.php', {
+    await fetch('https://login-otp-385594025448.asia-south1.run.app', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
