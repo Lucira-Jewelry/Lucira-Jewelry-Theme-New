@@ -483,44 +483,53 @@ function closePopup() {
       
     function resizeKonvaCanvas() {
       if (window.innerWidth > 768) {
-        // --- DESKTOP LOGIC (Unchanged) ---
+        // --- DESKTOP LOGIC ---
         const baseScreen = 1920;
         const baseSize = 550;
         let canvasSize = (window.innerWidth / baseScreen) * baseSize;
         canvasSize = Math.max(350, Math.min(canvasSize, 700));
 
-        document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-          each.style.width = canvasSize + 'px';
-          each.style.height = canvasSize + 'px';
-        });
+        // Update Konva Stage directly (This fixes the clipping/resolution)
+        if (typeof Konva !== 'undefined' && Konva.stages.length > 0) {
+          Konva.stages.forEach(stage => {
+            stage.width(canvasSize);
+            stage.height(canvasSize);
+          });
+        }
+
+        // Update Containers
         document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
         document.querySelector('.variant-img-wrap').style.height = canvasSize + 'px';
         document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
         document.querySelector('.konvajs-content').style.height = canvasSize + 'px';
 
       } else {
-        // --- MOBILE LOGIC (Updated) ---
+        // --- MOBILE LOGIC ---
         const baseScreen = 768;
         const baseSize = 400;
         let canvasSize = (window.innerWidth / baseScreen) * baseSize;
         canvasSize = Math.max(180, Math.min(canvasSize, 550));
 
-        // FIX: Calculate a separate height for mobile
-        // Currently set to 1.25x the width (25% taller). 
-        // You can change 1.25 to 1.4 for more height, or just add pixels (e.g., canvasSize + 50)
-        let canvasHeight = canvasSize * 1.25; 
+        // 1. Define a specific, taller height for mobile
+        // 1.5 multiplier gives 50% more vertical space. Adjust this number if needed.
+        let mobileHeight = canvasSize * 1.5; 
 
-        document.querySelectorAll('.konvajs-content canvas').forEach((each) => {
-          each.style.width = canvasSize + 'px';
-          each.style.height = canvasHeight + 'px'; // Updated to use canvasHeight
-        });
-        
-        // Update wrappers to use the new taller height
+        // 2. Update Konva Stage Dimensions (CRITICAL STEP)
+        // This stops Konva from "cutting" the image
+        if (typeof Konva !== 'undefined' && Konva.stages.length > 0) {
+          Konva.stages.forEach(stage => {
+            stage.width(canvasSize);
+            stage.height(mobileHeight); 
+            stage.draw(); // Force a redraw
+          });
+        }
+
+        // 3. Update the Container divs to match the new stage height
         document.querySelector('.variant-img-wrap').style.width = canvasSize + 'px';
-        document.querySelector('.variant-img-wrap').style.height = canvasHeight + 'px';
+        document.querySelector('.variant-img-wrap').style.height = mobileHeight + 'px';
         
         document.querySelector('.konvajs-content').style.width = canvasSize + 'px';
-        document.querySelector('.konvajs-content').style.height = canvasHeight + 'px';
+        document.querySelector('.konvajs-content').style.height = mobileHeight + 'px';
       }
     }
     const tile = document.querySelector('.main-collection-tile-div');
