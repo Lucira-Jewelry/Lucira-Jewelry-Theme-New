@@ -490,7 +490,7 @@ timerInterval = setInterval(() => {
 async function resendOtp() {
 const mobile = document.getElementById('otpMobile').value.trim();
 
-await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+await fetch('https://send-otp-node-385594025448.asia-south1.run.app', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ mobile }),
