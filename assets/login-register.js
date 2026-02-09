@@ -140,7 +140,7 @@ sendBtn.addEventListener('click', async () => {
     startTimer();
 
     try {
-        const response = await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+        const response = await fetch('https://api.lucirajewelry.com/send-otp.php', {
             method: 'POST',
             headers: { 
                 'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ verifyBtn.addEventListener('click', async () => {
     verifyBtn.disabled = true;
 
     try {
-    const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
+    const res = await fetch('https://api.lucirajewelry.com/otp-verify-register.php', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
@@ -340,7 +340,7 @@ const regBtn = document.getElementById('completeRegistration');
 regBtn.textContent = 'Creating Account...';
 
 try {
-    const res = await fetch('https://otp-verification-385594025448.asia-south1.run.app', {
+    const res = await fetch('https://api.lucirajewelry.com/otp-verify-register.php', {
     method: 'POST',
     headers: { 
         'Content-Type': 'application/json',
@@ -506,7 +506,7 @@ async function resendOtp() {
     // Normalize to 91 prefix
     if (mobileToVerify.length === 10) mobileToVerify = '91' + mobileToVerify;
 
-    await fetch('https://login-otp-385594025448.asia-south1.run.app', {
+    await fetch('https://api.lucirajewelry.com/send-otp.php', {
         method: 'POST',
         headers: { 
             'Content-Type': 'application/json',
