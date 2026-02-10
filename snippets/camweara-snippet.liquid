@@ -1,8 +1,10 @@
 {% assign is_product_available = product.available %}
 {% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
+{% assign product_name = product.title %}
 
 <script>
     var productSKUTryOn = '{{ sku_tryon_pdp }}';
+    var productNameTryOn = '{{ product_name }}';
 
   function onTryOnBuynowclick(skuReceived){
     console.log("buynow clicked");
@@ -48,6 +50,26 @@
       // 5. Extract first product handle
       return meta?.products?.[0]?.handle || null;
 }
+
+  // DataLayer push function
+  function pushTryOnDataLayer(position) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: productSKUTryOn,
+        creative_name: "Virtual Try On",
+        promo_position: position,
+        promo_name: productNameTryOn,
+        location_id: "pdp"
+      }
+    });
+    console.log('📊 DataLayer pushed:', {
+      promo_id: productSKUTryOn,
+      promo_position: position,
+      promo_name: productNameTryOn
+    });
+  }
 
 </script>
 
@@ -127,7 +149,7 @@
         z-index: 9999 !important;
     }
 
-    /* Sliding panel - UPDATED FOR 40x40 ICON */
+    /* Sliding panel - UPDATED FOR 40x40 ICON with SLOWER COLLAPSE */
     .tryon-sliding-panel {
         position: absolute !important;
         left: 10px !important;
@@ -145,7 +167,8 @@
         border: 0.5px solid #1a1a1a !important;
         box-sizing: border-box !important;
         clip-path: circle(20px at 20px 20px) !important;
-        transition: clip-path 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+        /* Slower collapse transition */
+        transition: clip-path 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
         z-index: 9999 !important;
         cursor: pointer !important;
         visibility: visible !important;
@@ -155,6 +178,8 @@
 
     .tryon-sliding-panel.expanded {
         clip-path: circle(150% at 20px 20px) !important;
+        /* Faster expand transition */
+        transition: clip-path 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
     }
 
     /* Icon circle - UPDATED TO 40x40 */
@@ -188,10 +213,10 @@
         opacity: 1 !important;
     }
 
-    /* TEXT CONTENT - VERTICALLY CENTERED */
+    /* TEXT CONTENT - VERTICALLY CENTERED with SLOWER FADE OUT */
     .tryon-text-content {
         opacity: 0 !important;
-        transition: opacity 0.3s ease !important;
+        transition: opacity 0.8s ease !important;
         white-space: nowrap !important;
         pointer-events: none !important;
         display: flex !important;
@@ -203,7 +228,7 @@
 
     .tryon-sliding-panel.expanded .tryon-text-content {
         opacity: 1 !important;
-        transition-delay: 0.25s !important;
+        transition: opacity 0.3s ease 0.25s !important;
     }
 
     .tryon-text-content span {
@@ -554,11 +579,15 @@
       buttonElement.style.display = 'block';
       buttonElement.style.zIndex = '9999';
       
-      // Restore click functionality
+      // Restore click functionality WITH DATALAYER - Position 1 (Media Gallery)
       const clickHandler = function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('👆 Try On button clicked');
+        console.log('👆 Try On button clicked (Media Gallery)');
+        
+        // Push to dataLayer - Position 1
+        pushTryOnDataLayer("1");
+        
         if (originalOnClick) {
           originalOnClick.call(buttonElement, e);
         }
@@ -624,11 +653,15 @@
       buttonElement.style.cursor = 'pointer';
       buttonElement.style.position = 'static';
       
-      // Restore click functionality
+      // Restore click functionality WITH DATALAYER - Position 2 (Below Add to Cart)
       const clickHandler = function(e) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('👆 Second Try On button clicked');
+        console.log('👆 Second Try On button clicked (Below Add to Cart)');
+        
+        // Push to dataLayer - Position 2
+        pushTryOnDataLayer("2");
+        
         if (originalOnClick) {
           originalOnClick.call(buttonElement, e);
         }
@@ -643,7 +676,7 @@
       return true;
     }
 
-    // Animation function - plays once on load, then on hover
+    // Animation function - plays once on load, then on hover with SLOWER COLLAPSE
     function setupHoverAnimation(panel, wrapper) {
       if (!panel || !wrapper) return;
       
@@ -653,7 +686,7 @@
         panel.classList.add('expanded');
         setTimeout(() => {
           panel.classList.remove('expanded');
-        }, 2000);
+        }, 2500); // Increased from 2000 to allow more time for viewing
       }
       
       // Play once on initial load
@@ -804,4 +837,3 @@
     setTimeout(initTryOnButton, 2000);
   }
 </script>
-
