@@ -333,62 +333,74 @@ regBtn.addEventListener('click', async () => {
 }
 
 async function processRegistration(firstName, lastName, email, prizeData) {
-const mobile = document.getElementById('signupMobile').value.trim();
-const otp = [...document.querySelectorAll('.otp-inputs input')].map((i) => i.value).join('');
-const regBtn = document.getElementById('completeRegistration');
+    const mobile = document.getElementById('signupMobile').value.trim();
+    const otp = [...document.querySelectorAll('.otp-inputs input')].map((i) => i.value).join('');
+    const regBtn = document.getElementById('completeRegistration');
 
-regBtn.textContent = 'Creating Account...';
+    // Define the map here so we can use it for the API call
+    const couponMap = {
+        '750_off': 'GRAND750',
+        '1000_off': 'GRAND1000',
+        '1500_off': 'GRAND1500',
+    };
 
-try {
-    const res = await fetch('https://api.lucirajewelry.com/otp-verify-register.php', {
-    method: 'POST',
-    headers: { 
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-    },
-    body: JSON.stringify({
-        mobile: mobile,
-        otp: otp,
-        email: email,
-        first_name: firstName,
-        last_name: lastName,
-        won_prize: prizeData.value,
-        prize_label: prizeData.label,
-    }),
-    });
+    // Determine what to send: Coupon Code OR Label (if no coupon exists)
+    const prizeToSave = couponMap[prizeData.value] || prizeData.label;
 
-    const data = await res.json();
+    regBtn.textContent = 'Creating Account...';
 
-    if (data.type === 'success' && data.credentials) {
-    showSuccessCoupon(prizeData.value);
+    try {
+        const res = await fetch('https://api.lucirajewelry.com/otp-verify-register.php', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            },
+            body: JSON.stringify({
+                mobile: mobile,
+                otp: otp,
+                email: email,
+                first_name: firstName,
+                last_name: lastName,
+                // CHANGE: This now sends "GRAND750" instead of "750_off"
+                won_prize: prizeToSave, 
+                prize_label: prizeData.label,
+            }),
+        });
 
-    window.dataLayer = window.dataLayer || [];
-    dataLayer.push({
-        event: 'signup',
-        user: {
-        name: firstName + ' ' + lastName,
-        email: email,
-        mobile: mobile,
-        signupoffer: prizeData.label,
-        },
-    });
+        const data = await res.json();
 
-    setTimeout(() => {
-        closeloginPopup('login-popup');
-        shopifyAutoLogin(data.credentials.email, data.credentials.password);
-    }, 5000);
-    } else {
-    showError('emailError', data.msg || 'Registration failed.');
-    regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-    regBtn.disabled = false;
+        if (data.type === 'success' && data.credentials) {
+            // Keep existing UI success logic
+            showSuccessCoupon(prizeData.value);
+
+            window.dataLayer = window.dataLayer || [];
+            dataLayer.push({
+                event: 'signup',
+                user: {
+                    name: firstName + ' ' + lastName,
+                    email: email,
+                    mobile: mobile,
+                    signupoffer: prizeToSave, // Push the coupon to dataLayer too
+                },
+            });
+
+            setTimeout(() => {
+                closeloginPopup('login-popup');
+                shopifyAutoLogin(data.credentials.email, data.credentials.password);
+            }, 5000);
+        } else {
+            showError('emailError', data.msg || 'Registration failed.');
+            regBtn.textContent = 'SPIN & CREATE ACCOUNT';
+            regBtn.disabled = false;
+        }
+    } catch (error) {
+        console.error('Registration Error:', error);
+        showError('emailError', 'Connection error. Please try again.');
+        regBtn.textContent = 'SPIN & CREATE ACCOUNT';
+        regBtn.disabled = false;
     }
-} catch (error) {
-    console.error('Registration Error:', error);
-    showError('emailError', 'Connection error. Please try again.');
-    regBtn.textContent = 'SPIN & CREATE ACCOUNT';
-    regBtn.disabled = false;
-}
 }
 
 function shopifyAutoLogin(email, password) {
