@@ -332,3 +332,18 @@ $(document).ready(function () {
   setupBradAccordion();
   $(window).on("resize", setupBradAccordion);
 });
+
+document.addEventListener('DOMContentLoaded', function () {
+  const video = document.getElementById('delayedLoopVideo');
+
+  if (!video) return;
+
+  video.addEventListener('ended', function () {
+    video.pause();
+
+    setTimeout(function () {
+      video.currentTime = 0;
+      video.play();
+    }, 15000); // 15 seconds delay
+  });
+});

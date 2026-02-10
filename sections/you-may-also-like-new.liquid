@@ -1,4 +1,4 @@
-<div class="ymal-section page-width">
+{% comment %} <div class="ymal-section page-width">
   <h2 class="ymal-h2">You May Also Like</h2>
   <p class="ymal-p">Other picks based on your interest</p>
 
@@ -254,4 +254,105 @@
       .ymal-grid{display:grid;grid-template-columns: repeat(2,1fr);gap:10px;}
       h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
     }
-</style>
+</style> {% endcomment %}
+
+
+{% if product.metafields.custom.matching_product != blank %}
+  {% comment %} Count valid products (excluding current product) {% endcomment %}
+  {% assign valid_product_count = 0 %}
+  {% for ymal_product in product.metafields.custom.matching_product.value %}
+    {% if ymal_product.id != product.id %}
+      {% assign valid_product_count = valid_product_count | plus: 1 %}
+    {% endif %}
+  {% endfor %}
+
+  {% comment %} Calculate nearest lower multiple of 4, but show all if less than 4 {% endcomment %}
+  {% if valid_product_count < 4 %}
+    {% assign products_to_display = valid_product_count %}
+  {% else %}
+    {% assign products_to_display = valid_product_count | divided_by: 4 | times: 4 %}
+  {% endif %}
+
+  {% if products_to_display > 0 %}
+    <div class="ymal-section page-width">
+      <h2 class="ymal-h2">You May Also Like</h2>
+      <p class="ymal-p">Other picks based on your interest</p>
+
+      <div class="ymal-grid">
+        {% assign displayed_count = 0 %}
+        {% for ymal_product in product.metafields.custom.matching_product.value %}
+          {% if ymal_product.id != product.id and displayed_count < products_to_display %}
+            <div class="related-product-card"
+              data-handle="{{ ymal_product.handle }}"
+              data-name="{{ ymal_product.title | escape }}"
+              data-id="{{ ymal_product.id }}"
+              data-price="{{ ymal_product.price | divided_by: 100.0 }}"
+              data-category="{{ ymal_product.type | escape }}"
+              data-sku="{{ ymal_product.selected_or_first_available_variant.sku }}"
+              data-url="{{ ymal_product.url }}"
+            >
+              {% render 'card-product', card_product: ymal_product %}
+            </div>
+            {% assign displayed_count = displayed_count | plus: 1 %}
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener('click', function (e) {
+        const link = e.target.closest('.related-product-card a[href*="/products/"]');
+        if (!link) return;
+
+        const card = link.closest('.related-product-card');
+        if (!card) return;
+
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const d = card.dataset;
+        const productUrl = d.url || link.href;
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: d.id,
+            promo_name: d.name,
+            creative_name: "You May Also Like",
+            promo_position: "product_page_ymal"
+          },
+          event_callback: function () {
+            window.location.href = productUrl;
+          }
+        });
+
+        // Hard fallback
+        setTimeout(function () {
+          window.location.href = productUrl;
+        }, 600);
+      }, true);
+    </script>
+
+    <style>
+      .ymal-section.page-width {padding-top: 40px;}
+      .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:15px;}
+      h2.ymal-h2{text-align: center; font-size: 24px; margin-bottom: 0px; margin-top: 0px;}
+      p.ymal-p{text-align:center;color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
+      @media (max-width: 1080px) {
+        .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:10px;}
+        h2.ymal-h2{text-align: center; font-size: 22px; margin-bottom: 0px; margin-top: 0px;}
+      }
+      @media (max-width: 768px) {
+        .ymal-grid{display:grid;grid-template-columns: repeat(2,1fr);gap:10px;}
+        h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
+        p.ymal-p {font-size: 14px;}
+        .ymal-section.page-width { padding-top: 12px; }
+      }
+      @media (max-width: 428px) {
+        .ymal-grid{display:grid;grid-template-columns: repeat(2,1fr);gap:10px;}
+        h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
+      }
+    </style>
+  {% endif %}
+{% endif %}

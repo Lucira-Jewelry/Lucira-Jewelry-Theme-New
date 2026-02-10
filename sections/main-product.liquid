@@ -1,4 +1,13 @@
 {{ 'product-detail.css' | asset_url | stylesheet_tag: preload: true }}
+
+{% include 'gold-chains-styles' %}
+
+{% if product.tags contains 'Gold Jewelry' %}
+  <style>
+    section.pdp-price-breakup-tabs .contained-switcher::before {max-width: calc(100% - 8px);}
+  </style>
+{% endif %}
+
 <product-info
   id="MainProduct-{{ section.id }}"
   class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}"
@@ -76,6 +85,24 @@
   <div class="page-width">
     <div class="product product--{{ section.settings.media_size }} product--{{ section.settings.media_position }} product--{{ section.settings.gallery_layout }} product--mobile-{{ section.settings.mobile_thumbnails }} grid grid--1-col {% if product.media.size > 0 %}grid--2-col-tablet{% else %}product--no-media{% endif %}">
       <div class="grid__item product__media-wrapper">
+        <div class="breadcrumb-pdp-wrapper">
+         <nav class="breadcrumb" aria-label="Breadcrumb">
+            <a href="{{ routes.root_url }}">Home</a>
+
+            {% if collection %}
+              <span>/</span>
+              <a href="{{ collection.url }}">{{ collection.title }}</a>
+            {% elsif product.collections.size > 0 %}
+              <span>/</span>
+              <a href="{{ product.collections.first.url }}">
+                {{ product.collections.first.title }}
+              </a>
+            {% endif %}
+
+            <span>/</span>
+            <span class="breadcrumb-current">{{ product.title }}</span>
+          </nav>
+        </div>
         {% render 'product-media-gallery', variant_images: variant_images %}
       </div>
       <div class="product__info-wrapper grid__item{% if settings.page_width > 1400 and section.settings.media_size == "small" %} product__info-wrapper--extra-padding{% endif %}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
@@ -130,9 +157,24 @@
                     </p>
                   </a>
 
-                  <div class="trace-badge" id="trace-badge">
+                  {% comment %} <div class="trace-badge" id="trace-badge">
                     <div class="trace-icon new_modal">TRACE</div>
-                  </div>
+                  </div> {% endcomment %}
+                  {% assign hide_trace_badge = false %}
+
+                  {% for tag in product.tags %}
+                    {% if tag == 'Gold Jewelry' %}
+                      {% assign hide_trace_badge = true %}
+                    {% endif %}
+                  {% endfor %}
+
+                  {% unless hide_trace_badge %}
+                    <div class="trace-badge" id="trace-badge">
+                      <div class="trace-icon new_modal">TRACE</div>
+                    </div>
+                  {% endunless %}
+
+
 
                   {% render 'trace-datalayer' %}
                 </div>
@@ -269,6 +311,7 @@
                   or product.price <= 1000000
                   or product_collection_handles contains 'nose-pins'
                 %}
+                {% unless product.tags contains 'Gold Jewelry' %}
                   <div
                     class="product-promo-text"
                     id="promoTextBlock-{{ block.id }}"
@@ -283,20 +326,19 @@
                     data-msg-above-2="{{ block.settings.promo_message_above_2 | escape }}"
                     data-initial-price="{{ v.price }}"
                   >
-                    {% if desktop_url != '' or mobile_url != '' %}
-                      <div
-                        class="promo-image-wrapper"
-                        style="
-                          --promo-desktop: url('{{ desktop_url }}');
-                          --promo-mobile:  url('{{ mobile_url }}');
-                          background-image: var(--promo-desktop);
-                          background-repeat: no-repeat; background-position: center; display: block; width: 100% !important; background-size: cover;;
-                        "
-                      ></div>
-                    {% else %}
-                      <div class="svg-wrapper">{{ 'icon-promo.svg' | inline_asset_content }}</div>
-                    {% endif %}
-
+                      {% if desktop_url != '' or mobile_url != '' %}
+                        <div
+                          class="promo-image-wrapper"
+                          style="
+                            --promo-desktop: url('{{ desktop_url }}');
+                            --promo-mobile:  url('{{ mobile_url }}');
+                            background-image: var(--promo-desktop);
+                            background-repeat: no-repeat; background-position: center; display: block; width: 100% !important; background-size: cover;;
+                          "
+                        ></div>
+                      {% else %}
+                        <div class="svg-wrapper">{{ 'icon-promo.svg' | inline_asset_content }}</div>
+                      {% endif %}
                     <div class="promo-message-container">
                       <span class="promo-message active">{{ promo_copy }}</span>
                       {% if promo_copy_2 != blank %}
@@ -312,15 +354,15 @@
                     </style>
 
                     <script>
-                      (function() {
+                      (function () {
                         const promoBlock = document.getElementById('promoTextBlock-{{ block.id }}');
                         const messages = promoBlock.querySelectorAll('.promo-message');
                         if (messages.length > 1) {
                           let currentIndex = 0;
-                          setInterval(function() {
+                          setInterval(function () {
                             const nextIndex = (currentIndex + 1) % messages.length;
                             messages[currentIndex].classList.remove('active');
-                            setTimeout(function() {
+                            setTimeout(function () {
                               messages[nextIndex].classList.add('active');
                               currentIndex = nextIndex;
                             }, 500);
@@ -329,6 +371,7 @@
                       })();
                     </script>
                   </div>
+                    {% endunless %}
                 {% endunless %}
 
               {%- when 'custom_liquid' -%}
@@ -611,7 +654,27 @@
                 -%}
 
                 {% render 'pdp-delivery-details' %}
-                
+
+
+                {% assign allowed_tags = 'Chembur Store Available,Pune store available' | split: ',' %}
+                {% assign show_try_at_home = false %}
+
+                {% for tag in product.tags %}
+                  {% if allowed_tags contains tag %}
+                    {% assign show_try_at_home = true %}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+
+                {% comment %} If not found in tags, check variant metafields {% endcomment %}
+                {% unless show_try_at_home %}
+                  {% for variant in product.variants %}
+                    {% if variant.metafields.custom.in_store_available != blank %}
+                      {% assign show_try_at_home = true %}
+                      {% break %}
+                    {% endif %}
+                  {% endfor %}
+                {% endunless %}
 
               {% render 'pdp-try-at-home' %}
 
@@ -902,16 +965,18 @@
           >
         </div>
 
-        {% comment %} <div class="input-icon-wrapper">
-          {{- 'icon-location.svg' | inline_asset_content -}}
-          <input
-            type="number"
-            id="try_at_home_pincode"
-            placeholder="Pincode"
-            required
-            oninput="if(this.value.length > 6) this.value = this.value.slice(0, 6);"
-          >
-        </div> {% endcomment %}
+        {% comment %}
+          <div class="input-icon-wrapper">
+            {{- 'icon-location.svg' | inline_asset_content -}}
+            <input
+              type="number"
+              id="try_at_home_pincode"
+              placeholder="Pincode"
+              required
+              oninput="if(this.value.length > 6) this.value = this.value.slice(0, 6);"
+            >
+          </div>
+        {% endcomment %}
 
         <input type="hidden" id="try_at_home_product_title" value="{{ product.title }}">
 
@@ -922,8 +987,6 @@
         <button type="submit" id="tryAtHomeSubmitBtn" class="popup-submit-btn" disabled>Submit</button>
       </form>
     </div>
-
-    <!-- Success Message Section -->
     <div id="tryAtHomeSuccessMessage" class="popup-success-message" style="display: none;">
       <div class="success-icon">
         <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -968,7 +1031,6 @@
           Please enter a valid 10-digit phone number
         </p>
 
-        <!-- Store Location Dropdown -->
         {% assign variant_store = product.selected_or_first_available_variant.metafields.custom.in_store_available %}
         <div class="input-icon-wrapper">
           {{- 'scheme-location.svg' | inline_asset_content -}}
@@ -990,11 +1052,28 @@
             >
               Chembur - Mumbai
             </option>
-            <option value="JM Road - Pune" {% if variant_store == "JM Road - Pune" %}selected{% endif %}>JM Road - Pune</option>
+            <option
+              value="JM Road - Pune"
+              {% if variant_store == 'JM Road - Pune' %}
+                selected
+              {% endif %}
+            >
+              JM Road - Pune
+            </option>
+            <option
+              value="Sky City Mall - Borivali - Mumbai"
+              {% if variant_store == 'Sky City Mall - Borivali - Mumbai' %}
+                selected
+              {% endif %}
+            >
+              Sky City Mall - Borivali - Mumbai
+            </option>
           </select>
         </div>
 
-        <button type="submit" id="visitStoreSubmitBtn" class="popup-submit-btn btn-submit-try-at-store" disabled>Submit</button>
+        <button type="submit" id="visitStoreSubmitBtn" class="popup-submit-btn btn-submit-try-at-store" disabled>
+          Submit
+        </button>
       </form>
     </div>
 
@@ -1242,9 +1321,6 @@
   });
 </script>
 
-
-{% comment %} visit store form submit datalayer {% endcomment %}
-
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const btn = document.getElementById('visitStoreSubmitBtn');
@@ -1264,7 +1340,7 @@
             promoClick: {
               promo_id: '{{ product.id }}',
               creative_name: 'Visit Store Form-Submit',
-              promo_name:personName,
+              promo_name: personName,
               location_id: locationSelected,
             },
           };
@@ -1329,38 +1405,20 @@
 </script>
 
 <script>
-   (function () {
-
-    /* ----------------------------
-      GLOBAL SAFETY FLAGS
-    ----------------------------- */
+  (function () {
     if (window.atcListenerInitialized) return;
     window.atcListenerInitialized = true;
     window.lastAddToCartTime = window.lastAddToCartTime || 0;
-
-    /* ----------------------------
-      UTILITY: GET SELECTED VARIANT
-    ----------------------------- */
     function getSelectedVariant(atcForm) {
       if (!atcForm) return null;
-
       const variantInput = atcForm.querySelector('input[name="id"]');
       if (!variantInput) return null;
-
       const variantId = variantInput.value;
-
-      // Shopify exposes product JSON in most themes
       if (window.meta && window.meta.product && window.meta.product.variants) {
-        return window.meta.product.variants.find(v => v.id == variantId) || null;
+        return window.meta.product.variants.find((v) => v.id == variantId) || null;
       }
-
-      // Fallback if product JSON is unavailable
       return { id: variantId };
     }
-
-    /* ----------------------------
-      SETUP LISTENER
-    ----------------------------- */
     function setupEventListener() {
       const atcButton = document.querySelector('[type="submit"][name="add"]');
       const atcForm = atcButton ? atcButton.closest('form') : null;
@@ -1369,14 +1427,8 @@
         console.warn('⚠️ Add to Cart button or form not found.');
         return;
       }
-
-      /* ----------------------------
-        ADD TO CART HANDLER
-      ----------------------------- */
       function handleAddToCart(e) {
         const now = Date.now();
-
-        // Prevent duplicate firing within 2 seconds
         if (now - window.lastAddToCartTime < 2000) {
           console.log('⛔ Duplicate Add to Cart prevented');
           return;
@@ -1403,11 +1455,9 @@
           category: '{{ product.metafields.custom.category.value }}',
           subCategory: '{{ product.metafields.custom.sub_category_1.value }}',
           productPersona: '{{ product.metafields.custom.persona.value }}',
-
-          // Optional – helps analytics & CRM
           option1: variant?.option1 || null,
           option2: variant?.option2 || null,
-          option3: variant?.option3 || null
+          option3: variant?.option3 || null,
         };
 
         console.log('✅ dataLayer.push → addToCart', productData);
@@ -1416,25 +1466,16 @@
         window.dataLayer.push({
           event: 'addToCart',
           eventId: 'atc_' + now,
-          products: productData
+          products: productData,
         });
       }
-
-      /* ----------------------------
-        BIND EVENT (ONCE)
-      ----------------------------- */
       atcForm.addEventListener('submit', handleAddToCart, true);
     }
-
-    /* ----------------------------
-      INIT (DOM READY SAFE)
-    ----------------------------- */
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', setupEventListener);
     } else {
       setupEventListener();
     }
-
   })();
 
   function share() {
@@ -1466,7 +1507,6 @@
     }
   }
 </script>
-
 
 <script>
   function share() {
@@ -1609,7 +1649,7 @@
       "url": "{{ shop.url }}{{ product.url }}",
       "priceCurrency": "{{ shop.currency }}",
       "price": "{{ product.price | money_without_currency | remove: ',' }}",
-      "priceValidUntil": "2026-01-10",
+      "priceValidUntil": "2026-02-17",
       "availability": "{% if product.available %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
       "itemCondition": "https://schema.org/NewCondition",
       "eligibleRegion": {
@@ -1619,11 +1659,6 @@
       "seller": {
         "@type": "Organization",
         "name": "{{ shop.name | escape }}"
-      },
-      "discount": {
-        "@type": "DiscountOffer",
-        "description": "Flat 20% off on diamond prices + Upto 77% on making charges",
-        "validThrough": "2026-01-27"
       }
     },
     "aggregateRating": {
@@ -1635,6 +1670,58 @@
 </script>
 
 {% render 'product-collection-card' %}
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "{{ shop.url }}"
+    }
+    {% if collection %}
+    ,
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "{{ collection.title | escape }}",
+      "item": "{{ shop.url }}{{ collection.url }}"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "{{ product.title | escape }}",
+      "item": "{{ shop.url }}{{ product.url }}"
+    }
+    {% elsif product.collections.size > 0 %}
+    ,
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "{{ product.collections.first.title | escape }}",
+      "item": "{{ shop.url }}{{ product.collections.first.url }}"
+    },
+    {
+      "@type": "ListItem",
+      "position": 3,
+      "name": "{{ product.title | escape }}",
+      "item": "{{ shop.url }}{{ product.url }}"
+    }
+    {% else %}
+    ,
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "{{ product.title | escape }}",
+      "item": "{{ shop.url }}{{ product.url }}"
+    }
+    {% endif %}
+  ]
+}
+</script>
 
 {% schema %}
 {
