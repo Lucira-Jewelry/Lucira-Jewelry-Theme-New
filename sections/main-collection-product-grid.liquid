@@ -104,78 +104,91 @@
                 {% if section.settings.quick_add == 'bulk' %} collection-quick-add-bulk{% endif %}
               "
             >
-              {% assign skip_card_product_styles = false %}
-              {%- for product in collection.products -%}
-                {% assign lazy_load = false %}
-                {%- if forloop.index > 2 -%}
-                  {%- assign lazy_load = true -%}
-                {%- endif -%}
+              {%- liquid
+                assign skip_card_product_styles = false
                 
-                {% assign first_banner_position = 6 %}
-                {% assign subsequent_banner_position = 18 %}
+                # ✅ OPTIMIZATION: Cache collection check - calculate once instead of per product
+                assign is_9kt_collection_page = false
+                assign current_collection_handle = collection.handle | default: ''
+                if current_collection_handle == '9kt-collection'
+                  assign is_9kt_collection_page = true
+                endif
+                
+                # ✅ OPTIMIZATION: Calculate banner positions once before loop
+                assign first_banner_position = 6
+                assign subsequent_banner_position = 18
+                if paginate.current_page == 1
+                  assign banner_position = first_banner_position
+                else
+                  assign banner_position = subsequent_banner_position
+                endif
+              -%}
+              
+              {%- for product in collection.products -%}
+                {%- liquid
+                  assign lazy_load = false
+                  if forloop.index > 2
+                    assign lazy_load = true
+                  endif
+                -%}
 
-                {% if paginate.current_page == 1 %}
-                  {% assign banner_position = first_banner_position %}
-                {% else %}
-                  {% assign banner_position = subsequent_banner_position %}
-                {% endif %}
-                {% unless product.tags contains 'hidden' %}
-                {% if forloop.index0 == banner_position %}
+                {%- unless product.tags contains 'hidden' -%}
+                  {%- comment -%} Banner insertion at calculated position {%- endcomment -%}
+                  {%- if forloop.index0 == banner_position -%}
+                    <li
+                      class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
+                      {% if settings.animations_reveal_on_scroll %}
+                          data-cascade
+                          style="--animation-order: {{ forloop.index }};"
+                      {% endif %}
+                    >
+                        <div class="lucira-plp-pg-component">
+                            <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
+                            {%- if section.settings.plp_banner_id != blank -%}
+                                <picture class="lucira-plp-pg-component-image-wrapper-picture">
+                                    {%- if section.settings.plp_banner_mobile_id != blank -%}
+                                      <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
+                                    {%- endif -%}
+                                    <img class="lucira-plp-pg-component-image" 
+                                        src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
+                                        alt="PLP Banner" 
+                                        title="PLP Banner" 
+                                        href="https://www.lucirajewelry.com/collections/hexa"
+                                        width="374" height="420"
+                                        loading="lazy">
+                                  </picture>
+                            {%- endif -%}
+                        </div>
+                    </div>
+                    </li>
+                  {%- endif -%}
+
                   <li
-                    class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
+                    class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
                     {% if settings.animations_reveal_on_scroll %}
-                        data-cascade
-                        style="--animation-order: {{ forloop.index }};"
+                      data-cascade
+                      style="--animation-order: {{ forloop.index }};"
                     {% endif %}
                   >
-                      <div class="lucira-plp-pg-component">
-                          <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
-                          {% if section.settings.plp_banner_id != blank %}
-                          {% comment %} <img class="lucira-plp-pg-component-image" 
-                              src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
-                              alt="PLP Banner" 
-                              title="PLP Banner" 
-                              href="https://www.lucirajewelry.com/collections/hexa"
-                              width="374" height="420"> {% endcomment %}
-                              <picture class="lucira-plp-pg-component-image-wrapper-picture">
-                                  {% if section.settings.plp_banner_mobile_id != blank %}
-                                    <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
-                                  {% endif %}
-                                  <img class="lucira-plp-pg-component-image" 
-                                      src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
-                                      alt="PLP Banner" 
-                                      title="PLP Banner" 
-                                      href="https://www.lucirajewelry.com/collections/hexa"
-                                      width="374" height="420">
-                                </picture>
-                          {% endif %}
-                      </div>
-                  </div>
+                    {%- comment -%}
+                      ✅ OPTIMIZATION: Pass cached collection page flag to avoid recalculating
+                    {%- endcomment -%}
+                    {% render 'card-product',
+                      card_product: product,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      lazy_load: lazy_load,
+                      skip_styles: skip_card_product_styles,
+                      quick_add: section.settings.quick_add,
+                      section_id: section.id,
+                      is_9kt_collection_page: is_9kt_collection_page
+                    %}
                   </li>
-                {% endif %}
-                {% endunless %}
-                {% unless product.tags contains 'hidden' %}
-                <li
-                  class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
-                  {% if settings.animations_reveal_on_scroll %}
-                    data-cascade
-                    style="--animation-order: {{ forloop.index }};"
-                  {% endif %}
-                >
-                  {% render 'card-product',
-                    card_product: product,
-                    media_aspect_ratio: section.settings.image_ratio,
-                    image_shape: section.settings.image_shape,
-                    show_secondary_image: section.settings.show_secondary_image,
-                    show_vendor: section.settings.show_vendor,
-                    show_rating: section.settings.show_rating,
-                    lazy_load: lazy_load,
-                    skip_styles: skip_card_product_styles,
-                    quick_add: section.settings.quick_add,
-                    section_id: section.id
-                  %}
-                </li>
-                {% endunless %}
+                {%- endunless -%}
+                
                 {%- assign skip_card_product_styles = true -%}
               {%- endfor -%}
             </ul>
@@ -189,9 +202,6 @@
             {%- endif -%}
           </infinite-scroll>
 
-            {% comment %} {%- if paginate.pages > 1 -%}
-              {% render 'pagination', paginate: paginate, anchor: '' %}
-            {%- endif -%} {% endcomment %}
           </div>
         {%- endif -%}
       </div>
