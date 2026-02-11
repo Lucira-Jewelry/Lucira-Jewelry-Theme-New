@@ -809,6 +809,7 @@ const minWidth = isMobileLayout() ? 260 : 300;
 const maxWidth = isMobileLayout() ? 330 : 700;
 
 width = Math.max(minWidth, Math.min(width, maxWidth));
+
       // Desktop: Slightly decrease canvas layer height to 445px
       const height = isMobileLayout() ? 400 : (width * (445 / 440));
 
