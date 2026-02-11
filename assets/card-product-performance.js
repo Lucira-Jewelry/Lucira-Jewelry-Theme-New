@@ -1,107 +1,6 @@
 (function() {
   'use strict';
 
-  // Configuration
-  const CONFIG = {
-    INTERSECTION_ROOT_MARGIN: '100px',
-    DISCOUNT_COLORS: {
-      35: '#009147',
-      25: '#01A652',
-      20: '#27B169',
-      default: '#4CBC7F'
-    }
-  };
-
-  /**
-   * Get discount color based on percentage
-   */
-  function getDiscountColor(percent) {
-    if (percent >= 35) return CONFIG.DISCOUNT_COLORS[35];
-    if (percent >= 25) return CONFIG.DISCOUNT_COLORS[25];
-    if (percent >= 20) return CONFIG.DISCOUNT_COLORS[20];
-    return CONFIG.DISCOUNT_COLORS.default;
-  }
-
-  /**
-   * Render discount badges from pre-calculated values
-   */
-  function renderDiscounts(diamondPercent, mcPercent, container) {
-    // Clear any existing content
-    container.innerHTML = '';
-    
-    if (diamondPercent === 0 && mcPercent === 0) {
-      container.style.display = 'none';
-      return;
-    }
-
-    container.style.display = 'block';
-
-    const flipWrapper = document.createElement('div');
-    flipWrapper.className = 'flip-wrapper';
-    
-    if (diamondPercent > 0 && mcPercent > 0) {
-      flipWrapper.classList.add('animate-flip');
-    }
-
-    if (diamondPercent > 0) {
-      const diamondText = document.createElement('small');
-      diamondText.className = 'discount-text';
-      diamondText.style.color = getDiscountColor(diamondPercent);
-      diamondText.textContent = `${diamondPercent}% OFF on Diamond Price`;
-      flipWrapper.appendChild(diamondText);
-    }
-
-    if (mcPercent > 0) {
-      const mcText = document.createElement('small');
-      mcText.className = 'discount-text';
-      mcText.style.color = getDiscountColor(mcPercent);
-      mcText.textContent = `${mcPercent}% OFF on Making Charges`;
-      flipWrapper.appendChild(mcText);
-    }
-
-    container.appendChild(flipWrapper);
-  }
-
-  /**
-   * Load discount information from pre-calculated data attributes
-   */
-  function loadDiscountInfo(container) {
-    const diamondPercent = parseInt(container.dataset.diamondPercent || '0', 10);
-    const mcPercent = parseInt(container.dataset.mcPercent || '0', 10);
-    
-    renderDiscounts(diamondPercent, mcPercent, container);
-  }
-
-  /**
-   * Initialize lazy discount loading with Intersection Observer
-   */
-  function initLazyDiscounts() {
-    const discountContainers = document.querySelectorAll('.discount-container[data-diamond-percent]');
-    
-    if (!discountContainers.length) return;
-
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          const container = entry.target;
-          
-          // Load pre-calculated discounts
-          loadDiscountInfo(container);
-          
-          // Stop observing once loaded
-          observer.unobserve(container);
-        }
-      });
-    }, {
-      rootMargin: CONFIG.INTERSECTION_ROOT_MARGIN,
-      threshold: 0.01
-    });
-
-    discountContainers.forEach(container => {
-      observer.observe(container);
-    });
-  }
-
   /**
    * Initialize icon carousel
    */
@@ -149,7 +48,7 @@
   }
 
   /**
-   * Handle color variant switching - UPDATED to update discount container
+   * Handle color variant switching - UPDATED to preserve discount strip
    */
   function initColorVariants() {
     document.addEventListener('click', function(e) {
@@ -159,7 +58,6 @@
       const variantId = colorButton.dataset.variantId;
       const imageSrc = colorButton.dataset.imageSrc;
       const imageAlt = colorButton.dataset.imageAlt;
-      const discountData = colorButton.dataset.discountData;
 
       // Update active state
       const siblings = colorButton.parentElement.querySelectorAll('.color-option');
@@ -180,36 +78,8 @@
         }
       }
 
-      // Update discount container with variant-specific data
-      const cardWrapper = colorButton.closest('.card-wrapper');
-      if (cardWrapper && discountData) {
-        try {
-          const discount = JSON.parse(discountData.replace(/&quot;/g, '"'));
-          const discountContainer = cardWrapper.querySelector('.discount-container');
-          
-          if (discountContainer) {
-            discountContainer.dataset.diamondPercent = discount.diamondPercent || '0';
-            discountContainer.dataset.mcPercent = discount.mcPercent || '0';
-            discountContainer.dataset.variantId = variantId;
-            
-            // Clear existing content
-            discountContainer.innerHTML = '';
-            
-            // Reload if visible
-            const rect = discountContainer.getBoundingClientRect();
-            const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
-            if (isVisible) {
-              loadDiscountInfo(discountContainer);
-            } else {
-              discountContainer.style.display = 'none';
-            }
-          }
-        } catch (e) {
-          console.warn('Failed to parse discount data', e);
-        }
-      }
-
       // Update all product links with new variant
+      const cardWrapper = colorButton.closest('.card-wrapper');
       if (cardWrapper) {
         const links = cardWrapper.querySelectorAll('a[href*="/products/"]');
         links.forEach(link => {
@@ -222,6 +92,10 @@
           }
         });
       }
+      
+      // Note: Discount strip content is handled by Liquid on page load
+      // No need to update via JavaScript - each variant button should link to 
+      // the correct variant URL which will have its own pre-calculated discounts
     });
   }
 
@@ -231,13 +105,11 @@
   function init() {
     if ('requestIdleCallback' in window) {
       requestIdleCallback(() => {
-        initLazyDiscounts();
         initIconCarousels();
         initColorVariants();
       }, { timeout: 2000 });
     } else {
       setTimeout(() => {
-        initLazyDiscounts();
         initIconCarousels();
         initColorVariants();
       }, 100);
