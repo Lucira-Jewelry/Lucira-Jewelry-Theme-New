@@ -45,7 +45,7 @@ window.MainBaseCharm = function () {
           height: 310px !important;
         }
         #vis-Visualiser_Canvas canvas {
-          width: 330px !important;
+          width: 300px !important;
           height:  400px !important;
         }
       }
