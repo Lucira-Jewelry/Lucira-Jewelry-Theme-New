@@ -23,6 +23,47 @@
     {%- endif -%}
   {%- endfor -%}
 
+  {%- comment -%} 
+    First in-stock variant logic:
+    - If viewing 9kt-collection page AND product is in 9kt-collection: Don't set first_instock_variant
+    - For all other cases: Set first_instock_variant to first available variant with inventory > 0
+  {%- endcomment -%}
+  {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
+    {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
+  {%- else -%}
+    {%- comment -%} For all other scenarios: Use original logic to find first in-stock variant {%- endcomment -%}
+    {%- for v in card_product.variants -%}
+      {%- if v.inventory_quantity > 0 -%}
+        {%- assign first_instock_variant = v -%}
+        {%- break -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+
+  {%- if card_product.url contains '?' -%}
+    {%- assign variant_delim = '&' -%}
+  {%- else -%}
+    {%- assign variant_delim = '?' -%}
+  {%- endif -%}
+
+  {% assign base_url = card_product.url | split: '?' | first %}
+  {% assign query_params = card_product.url | split: '?' | last %}
+
+  {% assign cleaned_params = '' %}
+  {% if query_params != base_url %}
+    {% assign params_array = query_params | split: '&' %}
+    {% for param in params_array %}
+      {% unless param contains 'variant=' %}
+        {% assign cleaned_params = cleaned_params | append: param | append: '&' %}
+      {% endunless %}
+    {% endfor %}
+  {% endif %}
+
+  {% assign trimmed_params = cleaned_params %}
+  {% if trimmed_params != '' %}
+    {% assign trimmed_params = trimmed_params | slice: 0, trimmed_params.size | minus: 1 %}
+  {% endif %}
+
   {% assign target_variant = card_product.selected_or_first_available_variant %}
   {% if forced_variant %}
     {% assign target_variant = forced_variant %} 
@@ -91,47 +132,6 @@
       | times: 100 
       | divided_by: diamond_original 
       | round %}
-  {% endif %}
-
-  {%- comment -%} 
-    First in-stock variant logic:
-    - If viewing 9kt-collection page AND product is in 9kt-collection: Don't set first_instock_variant
-    - For all other cases: Set first_instock_variant to first available variant with inventory > 0
-  {%- endcomment -%}
-  {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
-    {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
-  {%- else -%}
-    {%- comment -%} For all other scenarios: Use original logic to find first in-stock variant {%- endcomment -%}
-    {%- for v in card_product.variants -%}
-      {%- if v.inventory_quantity > 0 -%}
-        {%- assign first_instock_variant = v -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
-
-  {%- if card_product.url contains '?' -%}
-    {%- assign variant_delim = '&' -%}
-  {%- else -%}
-    {%- assign variant_delim = '?' -%}
-  {%- endif -%}
-
-  {% assign base_url = card_product.url | split: '?' | first %}
-  {% assign query_params = card_product.url | split: '?' | last %}
-
-  {% assign cleaned_params = '' %}
-  {% if query_params != base_url %}
-    {% assign params_array = query_params | split: '&' %}
-    {% for param in params_array %}
-      {% unless param contains 'variant=' %}
-        {% assign cleaned_params = cleaned_params | append: param | append: '&' %}
-      {% endunless %}
-    {% endfor %}
-  {% endif %}
-
-  {% assign trimmed_params = cleaned_params %}
-  {% if trimmed_params != '' %}
-    {% assign trimmed_params = trimmed_params | slice: 0, trimmed_params.size | minus: 1 %}
   {% endif %}
 
   <div
