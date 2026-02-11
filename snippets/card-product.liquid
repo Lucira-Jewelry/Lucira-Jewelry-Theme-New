@@ -16,17 +16,23 @@
   {%- assign current_collection_handle = collection.handle | default: '' -%}
   
   {%- comment -%} Check if product is in 9kt-collection {%- endcomment -%}
-  {%- for collection in card_product.collections limit: 10 -%}
+  {%- for collection in card_product.collections -%}
     {%- if collection.handle == '9kt-collection' -%}
       {%- assign is_9kt_collection = true -%}
       {%- break -%}
     {%- endif -%}
   {%- endfor -%}
 
+  {%- comment -%} 
+    First in-stock variant logic:
+    - If viewing 9kt-collection page AND product is in 9kt-collection: Don't set first_instock_variant
+    - For all other cases: Set first_instock_variant to first available variant with inventory > 0
+  {%- endcomment -%}
   {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
     {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
   {%- else -%}
-    {%- for v in card_product.variants limit: 50 -%}
+    {%- comment -%} For all other scenarios: Use original logic to find first in-stock variant {%- endcomment -%}
+    {%- for v in card_product.variants -%}
       {%- if v.inventory_quantity > 0 -%}
         {%- assign first_instock_variant = v -%}
         {%- break -%}
@@ -63,7 +69,6 @@
     {% assign target_variant = forced_variant %} 
   {% endif %}
 
-  {%- comment -%} --- DISCOUNT CALCULATIONS - EXACTLY AS IN ORIGINAL --- {%- endcomment -%}
   {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
   {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
 
@@ -100,7 +105,7 @@
       {% endif %}
     {% endfor %}
 
-    {% comment %} Making Charges Calculation {% endcomment %}
+    {% comment %} --- START MAKING CHARGES CALCULATION --- {% endcomment %}
     {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
     {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
     {% assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0 %}
@@ -117,6 +122,7 @@
         | divided_by: mc_cost_original 
         | round %}
     {% endif %}
+    {% comment %} --- END MAKING CHARGES CALCULATION --- {% endcomment %}
   {% endif %}
 
   {% assign diamond_percent = 0 %}
@@ -128,29 +134,21 @@
       | round %}
   {% endif %}
 
-  {% assign discount_color = '#4CBC7F' %}
-  {% if diamond_percent >= 35 %}
-    {% assign discount_color = '#009147' %}
-  {% elsif diamond_percent >= 25 %}
-    {% assign discount_color = '#01A652' %}
-  {% elsif diamond_percent >= 20 %}
-    {% assign discount_color = '#27B169' %}
-  {% endif %}
-  {%- comment -%} --- END DISCOUNT CALCULATIONS --- {%- endcomment -%}
-
   <div
     class="card-wrapper product-card-wrapper underline-links-hover card_{{ forloop.index0 }}"
     data-product-handle="{{ card_product.handle }}"
   >
     {% render 'wishlist-app-links', linkType: 'list-product', product: card_product %}
     <div
-      class="card card--{{ settings.card_style }}
+      class="
+        card card--{{ settings.card_style }}
         {% if card_product.featured_media %} card--media{% else %} card--text{% endif %}
         {% if settings.card_style == 'card' %} color-{{ settings.card_color_scheme }} gradient{% endif %}
         {% if image_shape and image_shape != 'default' %} card--shape{% endif %}
         {% if extend_height %} card--extend-height{% endif %}
         {% if card_product.featured_media == nil and settings.card_style == 'card' %} ratio{% endif %}
-        {% if horizontal_class %} card--horizontal{% endif %}"
+        {% if horizontal_class %} card--horizontal{% endif %}
+      "
       style="--ratio-percent: {{ 1 | divided_by: ratio | times: 100 }}%;"
       data-product-id="{{ card_product.id }}"
     >
@@ -160,7 +158,9 @@
         data-desktop-ratio="{{ section.settings.image_ratio }}"
       >
         {%- if card_product.featured_media -%}
-          {%- comment -%} Primary and Secondary Media Selection Logic {%- endcomment -%}
+          {%- comment -%}
+            Primary and Secondary Media Selection Logic
+          {%- endcomment -%}
           {%- assign primary_media = nil -%}
           {%- assign secondary_media = nil -%}
 
@@ -178,6 +178,7 @@
               {%- assign variant_labels = variant_labels | push: first_instock_variant.option3 -%}
             {%- endif -%}
 
+            {%- comment -%} Find primary media by scanning product media alt for variant labels {%- endcomment -%}
             {%- for media in card_product.media -%}
               {%- if media.media_type == 'image' -%}
                 {%- assign alt_text = media.alt | default: '' | downcase -%}
@@ -209,16 +210,20 @@
               {%- endif -%}
             {%- endfor -%}
 
+            {%- comment -%} If no primary media found via alt, try variant.featured_media {%- endcomment -%}
             {%- if primary_media == nil and first_instock_variant.featured_media -%}
               {%- assign primary_media = first_instock_variant.featured_media -%}
             {%- endif -%}
           {%- endif -%}
 
+          {%- comment -%} Fallback to product featured media if still no primary {%- endcomment -%}
           {%- if primary_media == nil and card_product.featured_media -%}
             {%- assign primary_media = card_product.featured_media -%}
           {%- endif -%}
 
-          {%- comment -%} SECONDARY IMAGE SELECTION {%- endcomment -%}
+          {%- comment -%} SECONDARY IMAGE SELECTION - Priority Order {%- endcomment -%}
+          
+          {%- comment -%} 1. Prioritize image with alt text 'MQ' (case-insensitive, exact match) {%- endcomment -%}
           {%- if secondary_media == nil -%}
             {%- for media in card_product.media -%}
               {%- assign alt_text = media.alt | default: '' | downcase | strip -%}
@@ -229,9 +234,11 @@
             {%- endfor -%}
           {%- endif -%}
 
+          {%- comment -%} 2. If no MQ image, try color matching from primary image alt text {%- endcomment -%}
           {%- if secondary_media == nil and primary_media -%}
             {%- assign primary_alt = primary_media.alt | default: '' | downcase -%}
             {%- assign color_label = primary_alt | split: '-' | last | strip -%}
+
             {%- if color_label != '' -%}
               {%- for media in card_product.media -%}
                 {%- if media.media_type == 'image' and media.id != primary_media.id -%}
@@ -245,6 +252,7 @@
             {%- endif -%}
           {%- endif -%}
 
+          {%- comment -%} 3. Try matching variant labels for secondary image {%- endcomment -%}
           {%- if secondary_media == nil and first_instock_variant -%}
             {%- for media in card_product.media -%}
               {%- if media.media_type == 'image' and media.id != primary_media.id -%}
@@ -278,8 +286,9 @@
             {%- endfor -%}
           {%- endif -%}
 
+          {%- comment -%} 4. Fallback: try other in-stock variant.featured_media {%- endcomment -%}
           {%- if secondary_media == nil -%}
-            {%- for v in card_product.variants limit: 20 -%}
+            {%- for v in card_product.variants -%}
               {%- if first_instock_variant and v.id == first_instock_variant.id -%}
                 {%- continue -%}
               {%- endif -%}
@@ -290,6 +299,7 @@
             {%- endfor -%}
           {%- endif -%}
 
+          {%- comment -%} 5. Final fallback: any other image {%- endcomment -%}
           {%- if secondary_media == nil -%}
             {%- for media in card_product.media -%}
               {%- if media.media_type == 'image' and media.id != primary_media.id -%}
@@ -303,9 +313,24 @@
             href="{{ base_url }}{% if cleaned_params != '' %}?{{ cleaned_params }}{% endif %}{% if first_instock_variant %}{% if cleaned_params != '' %}&{% else %}?{% endif %}variant={{ first_instock_variant.id }}{% endif %}"
             class="product-image-link custom-image-link open-in-new-tab"
             aria-label="{{ card_product.title | escape }}"
+            data-product-url="{{ card_product.url }}"
             data-product-id="{{ card_product.id }}"
             data-variant-id="{% if first_instock_variant %}{{ first_instock_variant.id }}{% else %}{{ card_product.variants.first.id }}{% endif %}"
-            data-product-handle="{{ card_product.handle }}"
+            data-sku="{{ card_product.variants.first.sku }}"
+            data-product-name="{{ card_product.title | escape }}"
+            data-product-type="{{ card_product.type | escape }}"
+            data-product-category="{{ card_product.collections.first.title | escape }}"
+            data-category="{{ card_product.vendor | escape }}"
+            data-sub-category="{{ card_product.tags | join: ',' | escape }}"
+            data-thumbnail-image="{% if primary_media %}{{ primary_media | image_url: '300x' }}{% else %}{{ card_product.featured_image | img_url: '300x' }}{% endif %}"
+            data-purity="{{ card_product.metafields.custom.purity }}"
+            data-price="{{ card_product.price | money_without_currency }}"
+            data-offer-price="{{ card_product.compare_at_price | money_without_currency }}"
+            data-expected-delivery-date="{{ card_product.metafields.custom.expected_delivery_date }}"
+            data-coupon-code="{{ card_product.metafields.custom.coupon_code }}"
+            data-making-charges="{{ card_product.metafields.custom.making_charges }}"
+            data-number-of-review="{{ card_product.metafields.reviews.rating_count }}"
+            data-rating="{{ card_product.metafields.reviews.rating.value }}"
           >
             <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
               <div class="media media--transparent media--hover-effect">
@@ -320,7 +345,8 @@
                       {%- if primary_media.width >= 720 -%}{{ primary_media | image_url: width: 720 }} 720w,{%- endif -%}
                       {%- if primary_media.width >= 940 -%}{{ primary_media | image_url: width: 940 }} 940w,{%- endif -%}
                       {%- if primary_media.width >= 1066 -%}{{ primary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
-                      {{ primary_media | image_url }} {{ primary_media.width }}w"
+                      {{ primary_media | image_url }} {{ primary_media.width }}w
+                    "
                     src="{{ primary_media | image_url: width: 533 }}"
                     sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
                     alt="{{ card_product.title }} - {{ primary_media.alt }}"
@@ -414,7 +440,7 @@
 
           {% for color in color_mapping %}
             {% assign variant_for_color = nil %}
-            {% for variant in card_product.variants limit: 30 %}
+            {% for variant in card_product.variants %}
               {% assign variant_title = variant.title | downcase %}
               {% assign color_down = color | downcase %}
               {% if variant_title contains color_down %}
@@ -514,29 +540,20 @@
         </div>
       </div>
 
+      {%- comment -%} 
+        Fast Shipping Logic:
+        - On 9kt-collection page: Show only if 9kt variants are in stock
+        - On all other pages: Show if any variant is in stock (default behavior)
+      {%- endcomment -%}
       {% assign show_fast_shipping = false %}
+      {% assign current_collection_handle = collection.handle | default: '' %}
       
-      {% if card_product.available %}
-        {% if current_collection_handle == '9kt-collection' %}
-          {% for v in card_product.variants limit: 30 %}
-            {% if v.available %}
-              {% assign variant_title_lower = v.title | downcase %}
-              {% if variant_title_lower contains '9kt' or variant_title_lower contains '9 kt' %}
-                {% if v.inventory_management %}
-                  {% if v.inventory_quantity > 0 %}
-                    {% assign show_fast_shipping = true %}
-                    {% break %}
-                  {% endif %}
-                {% else %}
-                  {% assign show_fast_shipping = true %}
-                  {% break %}
-                {% endif %}
-              {% endif %}
-            {% endif %}
-          {% endfor %}
-        {% else %}
-          {% for v in card_product.variants limit: 30 %}
-            {% if v.available %}
+      {% if current_collection_handle == '9kt-collection' %}
+        {%- comment -%} ONLY on 9kt-collection page, check if any 9kt variant is in stock {%- endcomment -%}
+        {% for v in card_product.variants %}
+          {% if v.available %}
+            {% assign variant_title_lower = v.title | downcase %}
+            {% if variant_title_lower contains '9kt' or variant_title_lower contains '9 kt' %}
               {% if v.inventory_management %}
                 {% if v.inventory_quantity > 0 %}
                   {% assign show_fast_shipping = true %}
@@ -547,8 +564,23 @@
                 {% break %}
               {% endif %}
             {% endif %}
-          {% endfor %}
-        {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {%- comment -%} For all other pages/collections, check if any variant is in stock (default behavior) {%- endcomment -%}
+        {% for v in card_product.variants %}
+          {% if v.available %}
+            {% if v.inventory_management %}
+              {% if v.inventory_quantity > 0 %}
+                {% assign show_fast_shipping = true %}
+                {% break %}
+              {% endif %}
+            {% else %}
+              {% assign show_fast_shipping = true %}
+              {% break %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
       {% endif %}
 
       <div class="card__content">
@@ -571,7 +603,6 @@
                       alt="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
                       title="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
                       data-tag-type="{{ tag_icon.icon_type | default: 'tag' }}"
-                      loading="lazy"
                     >
                     {% assign first_tag = false %}
                     {% assign icon_index = icon_index | plus: 1 %}
@@ -589,7 +620,6 @@
                     alt="Fast Shipping"
                     title="Fast Shipping"
                     data-tag-type="shipping"
-                    loading="lazy"
                   >
                   {% assign first_tag = false %}
                   {% assign icon_index = icon_index | plus: 1 %}
@@ -606,7 +636,6 @@
                     alt="Engraving"
                     title="Engraving"
                     data-tag-type="engraving"
-                    loading="lazy"
                   >
                   {% assign first_tag = false %}
                   {% assign icon_index = icon_index | plus: 1 %}
@@ -624,7 +653,7 @@
           </div>
         {% endif %}
 
-        {% for variant in card_product.variants limit: 5 %}
+        {% for variant in card_product.variants %}
           {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
             {% assign discount = variant.compare_at_price | minus: variant.price %}
             {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
@@ -670,6 +699,17 @@
             </a>
           </h3>
 
+          {% assign discount_color = '#4CBC7F' %}
+          {% if diamond_percent >= 35 %}
+            {% assign discount_color = '#009147' %}
+          {% elsif diamond_percent >= 25 %}
+            {% assign discount_color = '#01A652' %}
+          {% elsif diamond_percent >= 20 %}
+            {% assign discount_color = '#27B169' %}
+          {% endif %}
+
+          
+
           <div class="card-information price-details-wrapper">
             {%- if show_vendor -%}
               <span class="visually-hidden">{{ 'accessibility.vendor' | t }}</span>
@@ -691,10 +731,6 @@
             </a>
           </div>
 
-          {%- comment -%} 
-            DISCOUNT STRIP - EXACTLY AS IN YOUR ORIGINAL CODE
-            With proper styling and animation
-          {%- endcomment -%}
           <div class="discount-container">
             <div class="flip-wrapper {% if diamond_percent > 0 and mc_percent > 0 %}animate-flip{% endif %}">
               {% if diamond_percent > 0 %}
@@ -749,51 +785,3 @@
     </div>
   </div>
 {%- endif -%}
-
-<style>
-/* DISCOUNT STRIP STYLES - EXACTLY matching your original */
-.discount-container {
-  display: block;
-  margin-top: 8px;
-}
-
-.flip-wrapper {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.discount-text {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.4;
-}
-
-.animate-flip {
-  position: relative;
-  height: 40px;
-}
-
-.animate-flip .discount-text {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  opacity: 0;
-  animation: flipSequence 8s infinite;
-}
-
-.animate-flip .discount-text:first-child {
-  animation-delay: 0s;
-}
-
-.animate-flip .discount-text:last-child {
-  animation-delay: 4s;
-}
-
-@keyframes flipSequence {
-  0%, 40% { opacity: 1; }
-  50%, 90% { opacity: 0; }
-  100% { opacity: 1; }
-}
-</style>
