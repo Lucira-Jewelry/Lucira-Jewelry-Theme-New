@@ -618,8 +618,13 @@ const SHOW_DELAY = 12000;
 const popup = document.getElementById(POPUP_ID);
 if (!popup) return;
 
+const path = window.location.pathname.toLowerCase();
+
+if (/\/[a-z-]+-silver-rate-today\/?$/.test(path)) return;
+
 if (hasLuciraSessionPopup()) return;
 if (document.body.classList.contains('customer-logged-in')) return;
+
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
@@ -653,6 +658,8 @@ let ORIGINAL_POPUP_SUBTEXT = '';
 document.addEventListener('DOMContentLoaded', () => {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
+
+  
 
   const heading = popup.querySelector('.otp-number-wrapper p.heading');
   const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
