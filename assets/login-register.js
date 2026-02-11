@@ -11,35 +11,35 @@ const globalOffset = 0;
 
 const wheelSegments = [
 {
-    value: '10000_off',
-    label: '₹10,000 OFF',
-    centerAngle: 0,
-},
-{
-    value: '1000_off',
-    label: '₹1,000 OFF',
-    centerAngle: 60,
-},
-{
-    value: '5000_off',
-    label: '₹5,000 OFF',
-    centerAngle: 120,
-},
-{
-    value: '750_off',
-    label: '₹750 OFF',
-    centerAngle: 180,
-},
-{
     value: 'diamond_pendant',
     label: 'Diamond Pendant',
-    centerAngle: 240,
+    centerAngle: 0,
 },
 {
     value: '1500_off',
     label: '₹1,500 OFF',
-    centerAngle: 300,
+    centerAngle: 60,
 },
+{
+    value: '10000_off',
+    label: '₹10,000 OFF',
+    centerAngle: 120,
+},
+{
+    value: '1000_off',
+    label: '₹1,000 OFF',
+    centerAngle: 180,
+},
+{
+    value: '5000_off',
+    label: '₹5,000 OFF',
+    centerAngle: 240,
+},
+{
+    value: '750_off',
+    label: '₹750 OFF',
+    centerAngle: 300,
+}
 ];
 
 function openloginPopup(id) {
@@ -642,7 +642,7 @@ setTimeout(() => {
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
     if (heading) heading.innerText = 'Register to Win a Reward';
-    if (subtext) subtext.innerText = 'Get assured reward of ₹750';
+    if (subtext) subtext.innerText = 'Try Your Luck! Win a Diamond Pendant';
     setLuciraSessionPopup();
 }, SHOW_DELAY);
 });
