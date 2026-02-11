@@ -35,13 +35,13 @@ window.MainBaseCharm = function () {
     style.innerHTML = `
       @media (max-width: 768px) {
         .variant-img-wrap {
-          width: 300px !important;
+          width: 350px !important;
           height: 310px !important;
           margin: 0 auto !important;
           display: block !important;
         }
         #vis-Visualiser_Canvas {
-          width: 300px !important;
+          width: 250px !important;
           height: 310px !important;
           margin: 0 auto;
         }
