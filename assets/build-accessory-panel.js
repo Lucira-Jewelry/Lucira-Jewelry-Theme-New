@@ -36,17 +36,17 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 310px !important;
+          height: 280px !important;
           margin: 0 auto !important;
           display: block !important;
         }
         #vis-Visualiser_Canvas {
           width: 350px !important;
-          height: 310px !important;
+          height: 280px !important;
         }
         #vis-Visualiser_Canvas canvas {
           width: 350px !important;
-          height: 300px !important;
+          height: 280px !important;
         }
       }
     `;
