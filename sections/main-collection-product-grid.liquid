@@ -1,6 +1,8 @@
 {{ 'plp-product-card.css' | asset_url | stylesheet_tag: preload: true }}
 {{ 'product-card.css' | asset_url | stylesheet_tag: preload: true }}
 {{ 'template-collection.css' | asset_url | stylesheet_tag: preload: true }}
+<link rel="preload" href="{{ 'component-card.css' | asset_url }}" as="style" onload="this.onload=null;this.rel='stylesheet'">
+<noscript><link rel="stylesheet" href="{{ 'component-card.css' | asset_url }}"></noscript>
 {{ 'product-detail.css' | asset_url | stylesheet_tag: preload: true }}
 
 {% if section.settings.image_shape == 'blob' %}
@@ -10,6 +12,18 @@
 {%- unless section.settings.quick_add == 'none' -%}
   {{ 'quick-add.css' | asset_url | stylesheet_tag: preload: true }}
 {%- endunless -%}
+
+{%- if section.settings.quick_add == 'standard' -%}
+  <script src="{{ 'quick-add.js' | asset_url }}" defer="defer"></script>
+  <script src="{{ 'product-form.js' | asset_url }}" defer="defer"></script>
+{%- endif -%}
+
+{%- if section.settings.quick_add == 'bulk' -%}
+  <script src="{{ 'quick-add-bulk.js' | asset_url }}" defer="defer"></script>
+  <script src="{{ 'quantity-popover.js' | asset_url }}" defer="defer"></script>
+  <script src="{{ 'price-per-item.js' | asset_url }}" defer="defer"></script>
+  <script src="{{ 'quick-order-list.js' | asset_url }}" defer="defer"></script>
+{%- endif -%}
 
 {%- style -%}
   .section-{{ section.id }}-padding {
@@ -32,84 +46,122 @@
   }
 {%- endstyle -%}
 
-<div class="section-{{ section.id }}-padding">
+<div class="section-{{ section.id }}-padding gradient color-{{ section.settings.color_scheme }}">
   {%- paginate collection.products by section.settings.products_per_page -%}
-    {{ 'component-facets.css' | asset_url | stylesheet_tag: preload: true }}
-    
-    {%- if section.settings.enable_filtering or section.settings.enable_sorting -%}
-      <aside aria-labelledby="verticalTitle" class="facets-wrapper{% unless section.settings.enable_filtering %} facets-wrapper--no-filters{% endunless %}{% if section.settings.filter_type == 'vertical' %} page-width{% endif %}" id="main-collection-filters" data-id="{{ section.id }}">
-        {% render 'facets', 
-          results: collection, 
-          enable_filtering: section.settings.enable_filtering, 
-          enable_sorting: section.settings.enable_sorting, 
-          filter_type: section.settings.filter_type, 
-          paginate: paginate 
-        %}
-      </aside>
-    {%- endif -%}
+    <div class="{% if section.settings.filter_type == 'vertical' %} facets-vertical page-width{% endif %}">
+      {{ 'component-facets.css' | asset_url | stylesheet_tag: preload: true }}
+      <script src="{{ 'facets.js' | asset_url }}" defer="defer"></script>
+      {%- if section.settings.enable_filtering or section.settings.enable_sorting -%}
+        <aside
+          aria-labelledby="verticalTitle"
+          class="facets-wrapper{% unless section.settings.enable_filtering %} facets-wrapper--no-filters{% endunless %}{% if section.settings.filter_type != 'vertical' %} page-width{% endif %}"
+          id="main-collection-filters"
+          data-id="{{ section.id }}"
+        >
+          {% render 'facets',
+            results: collection,
+            enable_filtering: section.settings.enable_filtering,
+            enable_sorting: section.settings.enable_sorting,
+            filter_type: section.settings.filter_type,
+            paginate: paginate
+          %}
+        </aside>
+      {%- endif -%}
 
-    <div class="product-grid-container" id="ProductGridContainer">
-      {%- if collection.products.size == 0 -%}
-        <div class="collection collection--empty page-width" id="product-grid" data-id="{{ section.id }}">
-          <div class="loading-overlay gradient"></div>
-          <div class="title-wrapper center">
-            <h2 class="title title--primary">
-              {{ 'sections.collection_template.empty' | t }}
-            </h2>
+      <div
+        class="product-grid-container{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
+        id="ProductGridContainer"
+        {% if settings.animations_reveal_on_scroll %}
+          data-cascade
+        {% endif %}
+      >
+        {%- if collection.products.size == 0 -%}
+          <div class="collection collection--empty page-width" id="product-grid" data-id="{{ section.id }}">
+            <div class="loading-overlay gradient"></div>
+            <div class="title-wrapper center">
+              <h2 class="title title--primary">
+                {{ 'sections.collection_template.empty' | t -}}
+                <br>
+                {{
+                  'sections.collection_template.use_fewer_filters_html'
+                  | t: link: collection.url, class: 'underlined-link link'
+                }}
+              </h2>
+            </div>
           </div>
-        </div>
-      {%- else -%}
-        <div class="collection{% if section.settings.filter_type == 'vertical' %} page-width{% endif %}">
-          <div class="loading-overlay gradient"></div>
-
-          <ul id="product-grid" data-id="{{ section.id }}" class="
-            grid product-grid grid--{{ section.settings.columns_mobile }}-col-tablet-down
-            grid--{{ section.settings.columns_desktop }}-col-desktop">
-            
-            {%- liquid
-              assign skip_card_product_styles = false
-              
-              # Cache collection handle check
-              assign is_9kt_collection_page = false
-              assign current_collection_handle = collection.handle | default: ''
-              if current_collection_handle == '9kt-collection'
-                assign is_9kt_collection_page = true
-              endif
-              
-              # Calculate banner positions once
-              assign first_banner_position = 6
-              assign subsequent_banner_position = 18
-              if paginate.current_page == 1
-                assign banner_position = first_banner_position
-              else
-                assign banner_position = subsequent_banner_position
-              endif
-            -%}
-            
-            {%- for product in collection.products -%}
-              {%- liquid
-                assign lazy_load = false
-                if forloop.index > 2
-                  assign lazy_load = true
-                endif
-              -%}
-
-              {%- unless product.tags contains 'hidden' -%}
-                {%- comment -%} Banner insertion {%- endcomment -%}
-                {%- if forloop.index0 == banner_position -%}
-                  <li class="grid__item plp-custom-banner">
-                    {%- if section.settings.plp_banner_id != blank -%}
-                      <picture>
-                        {%- if section.settings.plp_banner_mobile_id != blank -%}
-                          <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | image_url }}">
-                        {%- endif -%}
-                        <img src="{{ section.settings.plp_banner_id | image_url }}" alt="Banner" loading="lazy">
-                      </picture>
-                    {%- endif -%}
-                  </li>
+        {%- else -%}
+          <div
+            class="collection{% if section.settings.filter_type != 'vertical' %} page-width{% endif %}"
+          >
+            <div class="loading-overlay gradient"></div>
+            <ul
+              id="product-grid"
+              data-product-grid
+              data-id="{{ section.id }}"
+              class="
+                grid product-grid grid--{{ section.settings.columns_mobile }}-col-tablet-down
+                grid--{{ section.settings.columns_desktop }}-col-desktop
+                {% if section.settings.quick_add == 'bulk' %} collection-quick-add-bulk{% endif %}
+              "
+            >
+              {% assign skip_card_product_styles = false %}
+              {%- for product in collection.products -%}
+                {% assign lazy_load = false %}
+                {%- if forloop.index > 2 -%}
+                  {%- assign lazy_load = true -%}
                 {%- endif -%}
+                
+                {% assign first_banner_position = 6 %}
+                {% assign subsequent_banner_position = 18 %}
 
-                <li class="grid__item" data-product-id="{{ product.id }}">
+                {% if paginate.current_page == 1 %}
+                  {% assign banner_position = first_banner_position %}
+                {% else %}
+                  {% assign banner_position = subsequent_banner_position %}
+                {% endif %}
+                {% unless product.tags contains 'hidden' %}
+                {% if forloop.index0 == banner_position %}
+                  <li
+                    class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
+                    {% if settings.animations_reveal_on_scroll %}
+                        data-cascade
+                        style="--animation-order: {{ forloop.index }};"
+                    {% endif %}
+                  >
+                      <div class="lucira-plp-pg-component">
+                          <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
+                          {% if section.settings.plp_banner_id != blank %}
+                          {% comment %} <img class="lucira-plp-pg-component-image" 
+                              src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
+                              alt="PLP Banner" 
+                              title="PLP Banner" 
+                              href="https://www.lucirajewelry.com/collections/hexa"
+                              width="374" height="420"> {% endcomment %}
+                              <picture class="lucira-plp-pg-component-image-wrapper-picture">
+                                  {% if section.settings.plp_banner_mobile_id != blank %}
+                                    <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
+                                  {% endif %}
+                                  <img class="lucira-plp-pg-component-image" 
+                                      src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
+                                      alt="PLP Banner" 
+                                      title="PLP Banner" 
+                                      href="https://www.lucirajewelry.com/collections/hexa"
+                                      width="374" height="420">
+                                </picture>
+                          {% endif %}
+                      </div>
+                  </div>
+                  </li>
+                {% endif %}
+                {% endunless %}
+                {% unless product.tags contains 'hidden' %}
+                <li
+                  class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
+                  {% if settings.animations_reveal_on_scroll %}
+                    data-cascade
+                    style="--animation-order: {{ forloop.index }};"
+                  {% endif %}
+                >
                   {% render 'card-product',
                     card_product: product,
                     media_aspect_ratio: section.settings.image_ratio,
@@ -120,48 +172,164 @@
                     lazy_load: lazy_load,
                     skip_styles: skip_card_product_styles,
                     quick_add: section.settings.quick_add,
-                    section_id: section.id,
-                    is_9kt_collection_page: is_9kt_collection_page
+                    section_id: section.id
                   %}
                 </li>
-              {%- endunless -%}
+                {% endunless %}
+                {%- assign skip_card_product_styles = true -%}
+              {%- endfor -%}
+            </ul>
 
-              {%- assign skip_card_product_styles = true -%}
-            {%- endfor -%}
-          </ul>
+           <infinite-scroll style="display: flex; justify-content: center;">
+            {%- if paginate.next -%}
+              <a 
+                style="color: currentColor; text-decoration: none; pointer-events: none;" 
+                href="{{ paginate.next.url }}&section_id={{ section.id }}">
+              </a>
+            {%- endif -%}
+          </infinite-scroll>
 
-          {%- if paginate.next -%}
-            <div class="pagination-wrapper">
-              <noscript>
-                {%- if paginate.pages > 1 -%}
-                  {% render 'pagination', paginate: paginate, anchor: '' %}
-                {%- endif -%}
-              </noscript>
-            </div>
-          {%- endif -%}
-        </div>
-      {%- endif -%}
+            {% comment %} {%- if paginate.pages > 1 -%}
+              {% render 'pagination', paginate: paginate, anchor: '' %}
+            {%- endif -%} {% endcomment %}
+          </div>
+        {%- endif -%}
+      </div>
     </div>
   {%- endpaginate -%}
+  {% if section.settings.image_shape == 'arch' %}
+    {{ 'mask-arch.svg' | inline_asset_content }}
+  {%- endif -%}
 </div>
 
-{% if section.settings.image_shape == 'arch' %}
-  {% render 'icon-arch' %}
-{%- endif -%}
-
 {% render 'product-collection-card' %}
+
+<script>
+  window.dataLayer = window.dataLayer || [];
+  (function() {
+    var products = [
+      {% for product in collection.products limit: section.settings.products_per_page %}
+        {
+          item_id: '{{ product.id }}',
+          item_name: '{{ product.title | escape }}',
+          item_sku: '{{ product.variants.first.sku | escape }}',
+          category: '{{ collection.title | escape }}',
+          item_url: '{{ shop.url }}{{ product.url }}',
+          price: {{ product.compare_at_price_max | default: product.price | money_without_currency | remove: ',' }},
+          offer_price: {{ product.price | money_without_currency | remove: ',' }},
+          index: {{ forloop.index }}
+        }{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    ];
+
+    // Filter out any products with missing essential details (optional safety)
+    products = products.filter(function(p) {
+      return p.item_id && p.item_name && p.price != null;
+    });
+
+    // Push to dataLayer asynchronously to avoid blocking rendering
+    setTimeout(function() {
+      window.dataLayer.push({
+        event: 'productImpression',
+        products: products
+      });
+    }, 0);
+  })();
+</script>
+
+<script>
+(function () {
+  if (window.__gtmProductClickBound) return;
+  window.__gtmProductClickBound = true;
+
+  document.addEventListener("click", function (event) {
+    const link = event.target.closest(".product-image-link.custom-image-link");
+    if (!link) return;
+
+    event.preventDefault();
+
+    const productData = {
+      event: "productClick",
+      products: {
+        productId: link.dataset.productId,
+        variantId: link.dataset.variantId,
+        sku: link.dataset.sku,
+        productName: link.dataset.productName,
+        productType: link.dataset.productType,
+        productCategory: link.dataset.productCategory,
+        category: link.dataset.category,
+        subCategory: link.dataset.subCategory,
+        productUrl: link.dataset.productUrl || link.href,
+        thumbnailImage: link.dataset.thumbnailImage,
+        purity: link.dataset.purity,
+        price: link.dataset.price,
+        offerPrice: link.dataset.offerPrice,
+        expectedDeliveryDate: link.dataset.expectedDeliveryDate,
+        couponCode: link.dataset.couponCode,
+        makingCharges: link.dataset.makingCharges,
+        numberOfReview: link.dataset.numberOfReview,
+        rating: link.dataset.rating,
+        indexPosition: link.dataset.indexPosition
+      }
+    };
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(productData);
+
+    // navigate after GTM registers
+    setTimeout(() => {
+      window.location.href = link.href;
+    }, 250);
+  });
+})();
+</script>
+
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "CollectionPage",
+  "name": "{{ collection.title | escape }}",
+  "description": "{{ collection.description | strip_html | escape }}",
+  "url": "{{ shop.url }}{{ collection.url }}",
+  "image": [
+    {% if collection.image %}
+      "{{ collection.image | img_url: 'master' }}"
+    {% endif %}
+  ]
+}
+</script>
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "itemListElement": [
+    {% for product in collection.products %}
+    {
+      "@type": "ListItem",
+      "position": {{ forloop.index }},
+      "name": "{{ product.title | escape }}",
+      "description": "{{ product.description | strip_html | strip_newlines | escape }}",
+      "url": "{{ shop.url }}{{ product.url }}"
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ]
+}
+</script>
+
 
 {% schema %}
 {
   "name": "t:sections.main-collection-product-grid.name",
   "class": "section",
   "settings": [
-    {
-      "type": "image_picker",
+    { 
+     "type": "image_picker",
       "id": "plp_banner_id",
       "label": "PLP Banner Image"
     },
-    {
+     {
       "type": "image_picker",
       "id": "plp_banner_mobile_id",
       "label": "PLP Banner Image (Mobile)",
@@ -206,7 +374,7 @@
           "label": "t:sections.main-collection-product-grid.settings.columns_mobile.options__2.label"
         }
       ]
-    },
+    },    
     {
       "type": "color_scheme",
       "id": "color_scheme",
