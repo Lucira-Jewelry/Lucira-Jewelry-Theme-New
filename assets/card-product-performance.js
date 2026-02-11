@@ -1,8 +1,3 @@
-/**
- * Card Product Performance Optimizations
- * Handles deferred diamond discount calculations for product cards
- */
-
 (function() {
   'use strict';
 
