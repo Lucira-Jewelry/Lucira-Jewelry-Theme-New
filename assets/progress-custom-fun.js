@@ -57,7 +57,7 @@ function renderUIForStep(stepNumber) {
     centerLabel.style.display = 'inline-block';
 
     if (step >= 3) {
-      centerLabel.innerText = "SELECT YOUR CHARM";
+      //centerLabel.innerText = "SELECT YOUR CHARM";
       if (step4) {
         step4.insertAdjacentElement('afterend', centerLabel);
         // This is the CSS to remove the space
