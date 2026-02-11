@@ -46,7 +46,7 @@ window.MainBaseCharm = function () {
         }
         #vis-Visualiser_Canvas canvas {
           width: 350px !important;
-          height: 420px !important;
+          height: 310px !important;
         }
       }
     `;
