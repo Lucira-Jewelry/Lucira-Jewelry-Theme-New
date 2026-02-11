@@ -654,6 +654,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
 
+  if (window.location.pathname.includes('silver-rate-today')) return;
+
   const heading = popup.querySelector('.otp-number-wrapper p.heading');
   const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
 
