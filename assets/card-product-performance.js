@@ -23,78 +23,18 @@
   }
 
   /**
-   * Calculate diamond discount from config
-   */
-  function calculateDiamondDiscount(config, stonePricingDb) {
-    let diamondFinal = 0.0;
-    let diamondOriginal = 0.0;
-
-    if (!config || !config.advanced_stone_config) return 0;
-
-    config.advanced_stone_config.forEach(stoneItem => {
-      if (stoneItem.stone_type === 'diamond') {
-        let slabRate = 0;
-        let slabDiscount = 0;
-
-        // Find pricing reference
-        const pricingRef = stonePricingDb?.find(p => p.id === stoneItem.pricing_id);
-
-        if (pricingRef && pricingRef.slabs) {
-          const avgWeight = (stoneItem.stone_weight * 1.0) / stoneItem.stone_quantity;
-          
-          // Find matching slab
-          for (const slab of pricingRef.slabs) {
-            if (avgWeight >= slab.from_weight && avgWeight <= slab.to_weight) {
-              slabRate = slab.price * 100;
-              slabDiscount = slab.discount || 0;
-              break;
-            }
-          }
-        }
-
-        const itemBaseCost = slabRate * stoneItem.stone_weight;
-        const appliedDiscount = config.diamond_discount || slabDiscount;
-        const discountAmount = (itemBaseCost * appliedDiscount) / 100.0;
-        const itemFinalCost = itemBaseCost - discountAmount;
-
-        diamondFinal += itemFinalCost;
-        diamondOriginal += itemBaseCost;
-      }
-    });
-
-    if (diamondOriginal > diamondFinal && diamondOriginal > 0) {
-      return Math.round(((diamondOriginal - diamondFinal) * 100) / diamondOriginal);
-    }
-
-    return 0;
-  }
-
-  /**
-   * Calculate making charges discount
-   */
-  function calculateMCDiscount(config) {
-    if (!config) return 0;
-
-    const mcRateOriginal = (config.making_charges || 0) * 100;
-    const mcDiscountPercent = config.making_charges_discount || 0;
-    const mcRateDiscAmt = (mcRateOriginal * mcDiscountPercent) / 100.0;
-    const mcRateFinal = mcRateOriginal - mcRateDiscAmt;
-
-    const mcCostOriginal = mcRateOriginal * config.metal_weight;
-    const mcCostFinal = mcRateFinal * config.metal_weight;
-
-    if (mcCostOriginal > mcCostFinal && mcCostOriginal > 0) {
-      return Math.round(((mcCostOriginal - mcCostFinal) * 100) / mcCostOriginal);
-    }
-
-    return 0;
-  }
-
-  /**
-   * Render discount badges
+   * Render discount badges from pre-calculated values
    */
   function renderDiscounts(diamondPercent, mcPercent, container) {
-    if (diamondPercent === 0 && mcPercent === 0) return;
+    // Clear any existing content
+    container.innerHTML = '';
+    
+    if (diamondPercent === 0 && mcPercent === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = 'block';
 
     const flipWrapper = document.createElement('div');
     flipWrapper.className = 'flip-wrapper';
@@ -123,54 +63,20 @@
   }
 
   /**
-   * Load discount information for a variant
+   * Load discount information from pre-calculated data attributes
    */
-  async function loadDiscountInfo(variantId, container) {
-    try {
-      // Fetch variant data
-      const variantResponse = await fetch(`/variants/${variantId}.js`);
-      if (!variantResponse.ok) throw new Error('Failed to fetch variant');
-      
-      const variant = await variantResponse.json();
-      
-      // Check if variant has pricing config
-      if (!variant.metafields?.['DI-GoldPrice']?.variant_config) {
-        return;
-      }
-
-      const config = variant.metafields['DI-GoldPrice'].variant_config;
-      
-      // Fetch shop metafields for stone pricing database (cached)
-      let stonePricingDb = window.__stonePricingDb;
-      if (!stonePricingDb) {
-        try {
-          // This would need to be fetched from your shop's metafields
-          // For now, we'll skip this if not available
-          stonePricingDb = [];
-        } catch (e) {
-          console.warn('Could not load stone pricing database', e);
-          stonePricingDb = [];
-        }
-        window.__stonePricingDb = stonePricingDb;
-      }
-
-      // Calculate discounts
-      const diamondPercent = calculateDiamondDiscount(config, stonePricingDb);
-      const mcPercent = calculateMCDiscount(config);
-
-      // Render discounts
-      renderDiscounts(diamondPercent, mcPercent, container);
-
-    } catch (error) {
-      console.warn('Error loading discount info:', error);
-    }
+  function loadDiscountInfo(container) {
+    const diamondPercent = parseInt(container.dataset.diamondPercent || '0', 10);
+    const mcPercent = parseInt(container.dataset.mcPercent || '0', 10);
+    
+    renderDiscounts(diamondPercent, mcPercent, container);
   }
 
   /**
    * Initialize lazy discount loading with Intersection Observer
    */
   function initLazyDiscounts() {
-    const discountContainers = document.querySelectorAll('.discount-container[data-has-config="true"]');
+    const discountContainers = document.querySelectorAll('.discount-container[data-diamond-percent]');
     
     if (!discountContainers.length) return;
 
@@ -178,11 +84,9 @@
       entries.forEach(entry => {
         if (entry.isIntersecting) {
           const container = entry.target;
-          const variantId = container.dataset.variantId;
           
-          if (variantId) {
-            loadDiscountInfo(variantId, container);
-          }
+          // Load pre-calculated discounts
+          loadDiscountInfo(container);
           
           // Stop observing once loaded
           observer.unobserve(container);
@@ -205,6 +109,11 @@
     const carousels = document.querySelectorAll('.carousel-container');
     
     carousels.forEach(carousel => {
+      // Clear any existing interval
+      if (carousel.dataset.intervalId) {
+        clearInterval(parseInt(carousel.dataset.intervalId));
+      }
+
       const icons = carousel.querySelectorAll('.icon');
       const textContent = carousel.querySelector('.text-content');
       
@@ -225,24 +134,32 @@
         currentIndex = (currentIndex + 1) % icons.length;
       }
 
-      // Start rotation after a slight delay
+      // Set initial state
+      icons.forEach((icon, idx) => {
+        icon.classList.toggle('active', idx === 0);
+      });
+      
+      if (textContent && labels[0]) {
+        textContent.textContent = labels[0];
+      }
+
       const intervalId = setInterval(rotateIcons, 3000);
       carousel.dataset.intervalId = intervalId;
     });
   }
 
   /**
-   * Handle color variant switching
+   * Handle color variant switching - UPDATED to update discount container
    */
   function initColorVariants() {
     document.addEventListener('click', function(e) {
       const colorButton = e.target.closest('.color-option');
       if (!colorButton) return;
 
-      const productId = colorButton.dataset.productId;
       const variantId = colorButton.dataset.variantId;
       const imageSrc = colorButton.dataset.imageSrc;
       const imageAlt = colorButton.dataset.imageAlt;
+      const discountData = colorButton.dataset.discountData;
 
       // Update active state
       const siblings = colorButton.parentElement.querySelectorAll('.color-option');
@@ -251,10 +168,6 @@
 
       // Update primary image
       if (imageSrc) {
-        const primaryImage = document.querySelector(
-          `.card-wrapper[data-product-handle] .primary-image`
-        );
-        
         const cardWrapper = colorButton.closest('.card-wrapper');
         if (cardWrapper) {
           const img = cardWrapper.querySelector('.primary-image');
@@ -267,14 +180,46 @@
         }
       }
 
-      // Update all product links with new variant
+      // Update discount container with variant-specific data
       const cardWrapper = colorButton.closest('.card-wrapper');
+      if (cardWrapper && discountData) {
+        try {
+          const discount = JSON.parse(discountData.replace(/&quot;/g, '"'));
+          const discountContainer = cardWrapper.querySelector('.discount-container');
+          
+          if (discountContainer) {
+            discountContainer.dataset.diamondPercent = discount.diamondPercent || '0';
+            discountContainer.dataset.mcPercent = discount.mcPercent || '0';
+            discountContainer.dataset.variantId = variantId;
+            
+            // Clear existing content
+            discountContainer.innerHTML = '';
+            
+            // Reload if visible
+            const rect = discountContainer.getBoundingClientRect();
+            const isVisible = rect.top < window.innerHeight && rect.bottom >= 0;
+            if (isVisible) {
+              loadDiscountInfo(discountContainer);
+            } else {
+              discountContainer.style.display = 'none';
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse discount data', e);
+        }
+      }
+
+      // Update all product links with new variant
       if (cardWrapper) {
         const links = cardWrapper.querySelectorAll('a[href*="/products/"]');
         links.forEach(link => {
-          const url = new URL(link.href, window.location.origin);
-          url.searchParams.set('variant', variantId);
-          link.href = url.toString();
+          try {
+            const url = new URL(link.href, window.location.origin);
+            url.searchParams.set('variant', variantId);
+            link.href = url.toString();
+          } catch (e) {
+            // Ignore invalid URLs
+          }
         });
       }
     });
@@ -308,5 +253,7 @@
 
   // Reinitialize on AJAX page updates
   document.addEventListener('shopify:section:load', init);
+  document.addEventListener('shopify:section:select', init);
+  document.addEventListener('shopify:block:select', init);
 
 })();
