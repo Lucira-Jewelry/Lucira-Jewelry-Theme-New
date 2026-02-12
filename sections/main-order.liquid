@@ -685,6 +685,68 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  document.querySelectorAll(".order-invoice-btn").forEach(function(btn) {
+
+    btn.addEventListener("click", function () {
+
+      const orderId = this.dataset.orderId;
+      const itemId  = this.dataset.itemId;
+
+      if (!orderId || !itemId) {
+        alert("Invoice not available.");
+        return;
+      }
+
+      // STEP 1: Get document_no from your Ornaverse order API
+      fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketplace_order_id: Number(orderId),
+          marketplace_item_id: Number(itemId)
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+
+        if (!data || !data.success || !data.data) {
+          alert("Invoice not available yet.");
+          return;
+        }
+
+        // extract document_no
+        const docNo =
+          data.data.Entities?.[0]?.line_items?.[0]?.document_no;
+
+        if (!docNo) {
+          alert("Invoice not generated yet.");
+          return;
+        }
+
+        // STEP 2: call PDF API
+        const pdfUrl =
+          "https://invoice-api-385594025448.asia-south1.run.app" +
+          "?document_no=" + encodeURIComponent(docNo);
+
+        window.open(pdfUrl, "_blank");
+
+      })
+      .catch(err => {
+        console.error("Invoice fetch error:", err);
+        alert("Unable to fetch invoice.");
+      });
+
+    });
+
+  });
+
+});
+</script>
+
+
 {% schema %}
 {
   "name": "t:sections.main-order.name",
