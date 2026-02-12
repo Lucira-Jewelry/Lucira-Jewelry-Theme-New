@@ -680,69 +680,89 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 </script>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-
+document.addEventListener('DOMContentLoaded', function () {
   const invoiceBtn = document.querySelector('.order-invoice-btn');
+  const meta = document.querySelector('.order-status-meta');
 
-  if (!invoiceBtn) return;
+  if (!invoiceBtn || !meta) return;
 
-  invoiceBtn.addEventListener('click', async function () {
+  const marketplaceOrderId = meta.dataset.marketplaceOrderId;
+  const marketplaceItemId  = meta.dataset.marketplaceItemId;
 
-    const documentNo = this.getAttribute('data-document-no');
+  invoiceBtn.addEventListener('click', function () {
 
-    if (!documentNo) {
-      alert("Invoice number not available");
+    if (!marketplaceOrderId || !marketplaceItemId) {
+      alert('Order data missing');
       return;
     }
 
-    // UI feedback
-    const originalText = this.innerHTML;
-    this.innerHTML = "Generating...";
-    this.disabled = true;
+    invoiceBtn.disabled = true;
+    invoiceBtn.innerText = 'Generating...';
 
-    try {
-      const response = await fetch("https://invoice-api-385594025448.asia-south1.run.app", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          document_no: documentNo
-        })
-      });
+    // STEP 1: GET DOCUMENT NUMBER FROM ORNAVERSE
+    fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        marketplace_order_id: Number(marketplaceOrderId),
+        marketplace_item_id: Number(marketplaceItemId)
+      })
+    })
+    .then(r => r.json())
+    .then(orderData => {
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch invoice PDF");
+      if (!orderData || !orderData.success || !orderData.data) {
+        throw new Error('Unable to fetch document number');
       }
 
-      const blob = await response.blob();
+      const documentNo = orderData.data.document_no;
 
-      // Create download
+      if (!documentNo) {
+        throw new Error('Document number not available');
+      }
+
+      // STEP 2: CALL YOUR PDF API
+      return fetch('https://invoice-api-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ document_no: documentNo })
+      });
+    })
+    .then(response => {
+      if (!response.ok) throw new Error('PDF generation failed');
+      return response.blob();
+    })
+    .then(blob => {
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
 
+      const a = document.createElement('a');
       a.href = url;
-      a.download = documentNo + ".pdf";
+      a.download = 'Invoice.pdf';
       document.body.appendChild(a);
       a.click();
 
       a.remove();
       window.URL.revokeObjectURL(url);
-
-    } catch (error) {
-      console.error("Invoice error:", error);
-      alert("Unable to download invoice. Please try again.");
-    }
-
-    // restore button
-    this.innerHTML = originalText;
-    this.disabled = false;
-
+    })
+    .catch(err => {
+      console.error('Invoice error:', err);
+      alert('Unable to generate invoice.');
+    })
+    .finally(() => {
+      invoiceBtn.disabled = false;
+      invoiceBtn.innerHTML = `
+        <span aria-hidden="true">
+          {{ 'order-invoice.svg' | inline_asset_content }}
+        </span>
+        Invoice
+      `;
+    });
   });
-
 });
 </script>
+
 
 {% schema %}
 {
