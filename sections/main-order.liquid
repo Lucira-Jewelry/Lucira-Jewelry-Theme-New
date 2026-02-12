@@ -697,7 +697,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const marketplaceOrderId = meta.dataset.marketplaceOrderId;
     const marketplaceItemId  = meta.dataset.marketplaceItemId;
-
     const documentNo = "{{ order.name | remove: '#' }}";
 
     invoiceBtn.disabled = true;
@@ -712,14 +711,25 @@ document.addEventListener('DOMContentLoaded', function () {
         document_no: documentNo
       })
     })
-    .then(res => res.blob())
+    .then(res => {
+      if (!res.ok) throw new Error('Network response was not ok');
+      return res.blob();
+    })
     .then(blob => {
-      const fileURL = URL.createObjectURL(blob);
-      window.open(fileURL, '_blank'); // opens PDF in new tab
+      const url = window.URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = documentNo + '.pdf';   // force download
+      document.body.appendChild(a);
+      a.click();
+
+      a.remove();
+      window.URL.revokeObjectURL(url);
     })
     .catch(err => {
-      console.error('Invoice fetch error:', err);
-      alert('Unable to open invoice. Please try again.');
+      console.error('Invoice error:', err);
+      alert('Unable to download invoice.');
     })
     .finally(() => {
       invoiceBtn.disabled = false;
