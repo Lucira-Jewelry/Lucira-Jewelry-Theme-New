@@ -60,61 +60,7 @@ if (!customElements.get('product-info')) {
         });
       }
 
-      handleOptionValueChange({ data: { event, target, selectedOptionValues } }) {
-        if (!this.contains(event.target)) return;
-
-        this.resetProductFormState();
-        handleOptionValueChange({ data: { event, target, selectedOptionValues } }) {
-        if (!this.contains(event.target)) return;
-
-        this.resetProductFormState();
-
-        // -------------------------------------------------------
-        // STEP 3 START: OPTIMIZATION LOGIC
-        // -------------------------------------------------------
-        // Try to update the button INSTANTLY using the data from Step 1
-        if (window.variantDetails && window.variantStock) {
-          // 1. Convert the selected values (Set) to an Array
-          const currentOptions = Array.from(selectedOptionValues);
-
-          // 2. Find the matching variant ID from our local JSON
-          // (Checks if the options match, e.g., ["Gold", "Small"])
-          const localMatch = window.variantDetails.find(v => {
-            return v.options.length === currentOptions.length &&
-                   v.options.every((val, index) => val === currentOptions[index]);
-          });
-
-          // 3. If we found a match locally, update the button immediately
-          if (localMatch && window.variantStock[localMatch.id]) {
-            const stockInfo = window.variantStock[localMatch.id];
-            
-            // Toggle the button: true = disabled (sold out), false = enabled (available)
-            this.productForm?.toggleSubmitButton(
-              !stockInfo.available,
-              window.variantStrings.soldOut
-            );
-            
-            // Optional: If you want to update price instantly too
-            // console.log("Instant Stock Check: ", stockInfo.available ? "In Stock" : "Out of Stock");
-          }
-        }
-        // -------------------------------------------------------
-        // STEP 3 END
-        // -------------------------------------------------------
-
-        const productUrl = target.dataset.productUrl || this.pendingRequestUrl || this.dataset.url;
-        this.pendingRequestUrl = productUrl;
-        const shouldSwapProduct = this.dataset.url !== productUrl;
-        const shouldFetchFullPage = this.dataset.updateUrl === 'true' && shouldSwapProduct;
-
-        this.renderProductInfo({
-          requestUrl: this.buildRequestUrlWithParams(productUrl, selectedOptionValues, shouldFetchFullPage),
-          targetId: target.id,
-          callback: shouldSwapProduct
-            ? this.handleSwapProduct(productUrl, shouldFetchFullPage)
-            : this.handleUpdateProductInfo(productUrl),
-        });
-      }
+      
         const productUrl = target.dataset.productUrl || this.pendingRequestUrl || this.dataset.url;
         this.pendingRequestUrl = productUrl;
         const shouldSwapProduct = this.dataset.url !== productUrl;
