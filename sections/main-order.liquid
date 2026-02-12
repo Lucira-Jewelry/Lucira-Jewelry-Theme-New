@@ -374,7 +374,8 @@
         </div>
         <button
           class="order-invoice-btn" 
-          type="button">
+          type="button"
+          data-document-no="{{ order.metafields.custom.document_no }}">
           <span aria-hidden="true">
             {{- 'order-invoice.svg' | inline_asset_content -}}
           </span>
@@ -597,87 +598,141 @@
 {% endunless %}
 
 <script>
-  function openTimelineDrawer() {
-    document.getElementById('timelineDrawer').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
+function openTimelineDrawer() {
+  document.getElementById('timelineDrawer').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTimelineDrawer() {
+  document.getElementById('timelineDrawer').classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const meta = document.querySelector('.order-status-meta');
+  if (!meta) return;
+
+  const shopifyStatus = (meta.dataset.status || '').toLowerCase();
+  const isCancelled = {{ order.cancelled | json }};
+
+  if (shopifyStatus === 'fulfilled' || isCancelled) {
+    return;
   }
 
-  function closeTimelineDrawer() {
-    document.getElementById('timelineDrawer').classList.remove('is-open');
-    document.body.style.overflow = '';
-  }
-  document.addEventListener('DOMContentLoaded', function () {
-    const meta = document.querySelector('.order-status-meta');
-    if (!meta) return;
+  const marketplaceOrderId = meta.dataset.marketplaceOrderId;
+  const marketplaceItemId  = meta.dataset.marketplaceItemId;
+  const labelSpan = meta.querySelector('.order-status-label-js');
+  const chip = meta.querySelector('.order-status-chip');
 
-    const shopifyStatus = (meta.dataset.status || '').toLowerCase();
-    const isCancelled = {{ order.cancelled | json }};
+  if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
 
-    if (shopifyStatus === 'fulfilled' || isCancelled) {
+  const STATUS_STYLES = {
+    1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
+    2: { label: 'Processing', className: 'status-chip--processing' },
+    3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
+    13:{ label: 'Quality Control',  className: 'status-chip--qc' },
+    4: { label: 'Certification',    className: 'status-chip--certification' },
+    5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
+    6: { label: 'In Transit',       className: 'status-chip--in-transit' }
+  };
+
+  labelSpan.textContent = 'Fetching live status…';
+
+  fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      marketplace_order_id: Number(marketplaceOrderId),
+      marketplace_item_id: Number(marketplaceItemId)
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    console.log('Ornaverse Live Status (order page):', data);
+
+    if (!data || !data.success || !data.data || data.data.Error) {
+      labelSpan.textContent = 'Status unavailable';
       return;
     }
 
-    const marketplaceOrderId = meta.dataset.marketplaceOrderId;
-    const marketplaceItemId  = meta.dataset.marketplaceItemId;
-    const labelSpan = meta.querySelector('.order-status-label-js');
-    const chip = meta.querySelector('.order-status-chip');
+    const statusId = Number(data.data.order_status_id);
+    const info = STATUS_STYLES[statusId];
 
-    if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
+    if (!info) {
+      labelSpan.textContent = 'Unknown Status';
+      return;
+    }
 
-    const STATUS_STYLES = {
-      1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
-      2: { label: 'Processing', className: 'status-chip--processing' },
-      3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
-      13:{ label: 'Quality Control',  className: 'status-chip--qc' },
-      4: { label: 'Certification',    className: 'status-chip--certification' },
-      5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
-      6: { label: 'In Transit',       className: 'status-chip--in-transit' }
-    };
+    chip.classList.remove(
+      'status-chip--confirmed',
+      'status-chip--processing',
+      'status-chip--manufacturing',
+      'status-chip--qc',
+      'status-chip--certification',
+      'status-chip--dispatch',
+      'status-chip--in-transit'
+    );
+    chip.classList.add(info.className);
+    labelSpan.textContent = info.label;
+  })
+  .catch(function(err) {
+    console.error('Ornaverse error (order page)', err);
+    labelSpan.textContent = 'Status unavailable';
+  });
+});
+</script>
 
-    labelSpan.textContent = 'Fetching live status…';
+<script>
+  async function downloadInvoice(btn) {
+  // 1. Grab the Order ID from the meta tag we defined earlier in the HTML
+  const meta = document.querySelector('.order-status-meta');
+  if (!meta || !meta.dataset.marketplaceOrderId) {
+    console.error("Order ID not found in DOM");
+    return;
+  }
 
-    fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Searching...';
+
+  try {
+    const response = await fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        marketplace_order_id: Number(marketplaceOrderId),
-        marketplace_item_id: Number(marketplaceItemId)
+        marketplace_order_id: meta.dataset.marketplaceOrderId,
+        generate_invoice: true // Trigger the internal search & PDF logic in PHP
       })
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      console.log('Ornaverse Live Status (order page):', data);
-
-      if (!data || !data.success || !data.data || data.data.Error) {
-        labelSpan.textContent = 'Status unavailable';
-        return;
-      }
-
-      const statusId = Number(data.data.order_status_id);
-      const info = STATUS_STYLES[statusId];
-
-      if (!info) {
-        labelSpan.textContent = 'Unknown Status';
-        return;
-      }
-
-      chip.classList.remove(
-        'status-chip--confirmed',
-        'status-chip--processing',
-        'status-chip--manufacturing',
-        'status-chip--qc',
-        'status-chip--certification',
-        'status-chip--dispatch',
-        'status-chip--in-transit'
-      );
-      chip.classList.add(info.className);
-      labelSpan.textContent = info.label;
-    })
-    .catch(function(err) {
-      console.error('Ornaverse error (order page)', err);
-      labelSpan.textContent = 'Status unavailable';
     });
-  });
+
+    // If the backend returns 404 or 500 (e.g., invoice not created yet in Ornaverse)
+    if (!response.ok) {
+      throw new Error('Invoice not ready');
+    }
+
+    // 2. Handle the PDF Blob
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    
+    // 3. Trigger Download
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Invoice-${meta.dataset.marketplaceOrderId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    
+    // Cleanup
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    
+  } catch (err) {
+    console.error('Invoice Error:', err);
+    alert('Invoice is not yet generated in our system. Please check back after dispatch.');
+  } finally {
+    btn.innerHTML = originalHtml;
+    btn.disabled = false;
+  }
+}
 </script>
 
 {% schema %}
