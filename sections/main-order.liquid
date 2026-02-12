@@ -610,21 +610,13 @@ function closeTimelineDrawer() {
 
 document.addEventListener('DOMContentLoaded', function () {
   const meta = document.querySelector('.order-status-meta');
+  const invoiceBtn = document.getElementById('dynamic-invoice-btn');
   if (!meta) return;
-
-  const shopifyStatus = (meta.dataset.status || '').toLowerCase();
-  const isCancelled = {{ order.cancelled | json }};
-
-  if (shopifyStatus === 'fulfilled' || isCancelled) {
-    return;
-  }
 
   const marketplaceOrderId = meta.dataset.marketplaceOrderId;
   const marketplaceItemId  = meta.dataset.marketplaceItemId;
   const labelSpan = meta.querySelector('.order-status-label-js');
   const chip = meta.querySelector('.order-status-chip');
-
-  if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
 
   const STATUS_STYLES = {
     1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
@@ -636,9 +628,7 @@ document.addEventListener('DOMContentLoaded', function () {
     6: { label: 'In Transit',       className: 'status-chip--in-transit' }
   };
 
-  labelSpan.textContent = 'Fetching live status…';
-
-  fetch('https://invoice-api-385594025448.asia-south1.run.app', {
+  fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -646,39 +636,59 @@ document.addEventListener('DOMContentLoaded', function () {
       marketplace_item_id: Number(marketplaceItemId)
     })
   })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
-    console.log('Ornaverse Live Status (order page):', data);
+  .then(r => r.json())
+  .then(data => {
+    if (!data || !data.success || !data.data) return;
 
-    if (!data || !data.success || !data.data || data.data.Error) {
-      labelSpan.textContent = 'Status unavailable';
-      return;
-    }
-
+    // --- 1. HANDLE STATUS UPDATE ---
     const statusId = Number(data.data.order_status_id);
     const info = STATUS_STYLES[statusId];
-
-    if (!info) {
-      labelSpan.textContent = 'Unknown Status';
-      return;
+    if (info && labelSpan && chip) {
+      chip.className = `order-status-chip ${info.className}`;
+      labelSpan.textContent = info.label;
     }
 
-    chip.classList.remove(
-      'status-chip--confirmed',
-      'status-chip--processing',
-      'status-chip--manufacturing',
-      'status-chip--qc',
-      'status-chip--certification',
-      'status-chip--dispatch',
-      'status-chip--in-transit'
-    );
-    chip.classList.add(info.className);
-    labelSpan.textContent = info.label;
+    // --- 2. HANDLE INVOICE (DOCUMENT NO) ---
+    // Ornaverse usually returns 'invoice_no' or 'document_no' in the data object
+    const docNo = data.data.invoice_no || data.data.document_no; 
+
+    if (docNo && invoiceBtn) {
+      invoiceBtn.setAttribute('data-document-no', docNo);
+      invoiceBtn.style.display = 'inline-flex'; // Show the button now that we have a number
+    }
   })
-  .catch(function(err) {
-    console.error('Ornaverse error (order page)', err);
-    labelSpan.textContent = 'Status unavailable';
-  });
+  .catch(err => console.error('Ornaverse Sync Error:', err));
+
+  // --- 3. HANDLE BUTTON CLICK ---
+  if (invoiceBtn) {
+    invoiceBtn.addEventListener('click', function() {
+      const docNo = this.getAttribute('data-document-no');
+      const backendUrl = 'https://invoice-api-385594025448.asia-south1.run.app'; // Your PHP path
+
+      this.innerHTML = 'Downloading...';
+      this.disabled = true;
+
+      fetch(backendUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ document_no: docNo })
+      })
+      .then(res => res.blob())
+      .then(blob => {
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `Invoice-${docNo}.pdf`;
+          a.click();
+          this.innerHTML = 'Invoice';
+          this.disabled = false;
+      })
+      .catch(() => {
+          alert("Error downloading invoice.");
+          this.disabled = false;
+      });
+    });
+  }
 });
 
 </script>
