@@ -372,9 +372,16 @@
           </div>
 
         </div>
-        <button class="order-invoice-btn" type="button" onclick="window.print()">
-          <span aria-hidden="true">{{- 'order-invoice.svg' | inline_asset_content -}}</span> Invoice
+        <button
+          class="order-invoice-btn" 
+          type="button"
+          data-document-no="{{ order.metafields.custom.document_no }}">
+          <span aria-hidden="true">
+            {{- 'order-invoice.svg' | inline_asset_content -}}
+          </span>
+          Invoice
         </button>
+
       </div>
 
       <div class="order-details-wrapper">
@@ -672,6 +679,84 @@ document.addEventListener('DOMContentLoaded', function () {
     console.error('Ornaverse error (order page)', err);
     labelSpan.textContent = 'Status unavailable';
   });
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const invoiceBtn = document.querySelector('.order-invoice-btn');
+  if (!invoiceBtn) return;
+
+  invoiceBtn.addEventListener('click', async function () {
+
+    const documentNo = invoiceBtn.dataset.documentNo;
+
+    if (!documentNo) {
+      alert('Invoice number not found.');
+      return;
+    }
+
+    invoiceBtn.disabled = true;
+    invoiceBtn.innerText = 'Generating...';
+
+    try {
+      const response = await fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          document_no: documentNo
+        })
+      });
+
+      // If direct PDF returned
+      if (response.headers.get("content-type")?.includes("application/pdf")) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        window.open(url, '_blank');
+        invoiceBtn.disabled = false;
+        invoiceBtn.innerText = 'Invoice';
+        return;
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error('Invoice generation failed');
+      }
+
+      // If API returns PDF URL
+      if (result.data?.pdf_url) {
+        window.open(result.data.pdf_url, '_blank');
+      }
+
+      // If API returns base64
+      else if (result.data?.file) {
+        const byteCharacters = atob(result.data.file);
+        const byteNumbers = new Array(byteCharacters.length);
+
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url);
+      }
+
+    } catch (error) {
+      console.error(error);
+      alert('Unable to download invoice.');
+    }
+
+    invoiceBtn.disabled = false;
+    invoiceBtn.innerText = 'Invoice';
+
+  });
+
 });
 </script>
 
