@@ -372,16 +372,15 @@
           </div>
 
         </div>
-       <button
-        class="order-invoice-btn"
-        type="button"
-      >
-        <span aria-hidden="true">
-          {{ 'order-invoice.svg' | inline_asset_content }}
-        </span>
-        Invoice
-      </button>
-
+        <button
+          class="order-invoice-btn" 
+          type="button"
+          data-document-no="{{ order.metafields.custom.document_no }}">
+          <span aria-hidden="true">
+            {{- 'order-invoice.svg' | inline_asset_content -}}
+          </span>
+          Invoice
+        </button>
 
       </div>
 
@@ -639,14 +638,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
   labelSpan.textContent = 'Fetching live status…';
 
-  // ONLY CHANGE: Updated URL and added document_no parameter
-  fetch('https://invoice-api-385594025448.asia-south1.run.app', {
+  fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       marketplace_order_id: Number(marketplaceOrderId),
-      marketplace_item_id: Number(marketplaceItemId),
-      document_no: "{{ order.name | remove: '#' }}"
+      marketplace_item_id: Number(marketplaceItemId)
     })
   })
   .then(function(r) { return r.json(); })
@@ -687,23 +684,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const btn = document.querySelector('.order-invoice-btn');
-  if (!btn) return;
 
-  btn.addEventListener('click', function () {
-    const documentNo = "{{ order.name | remove: '#' }}";
+  const invoiceBtn = document.querySelector('.order-invoice-btn');
+  if (!invoiceBtn) return;
 
-    // IMPORTANT: encode in case of spaces or special chars
-    const url = "https://invoice-api-385594025448.asia-south1.run.app/?document_no=" + encodeURIComponent(documentNo);
+  invoiceBtn.addEventListener('click', async function () {
 
-    // this will ALWAYS trigger download
-    window.location.href = url;
+    const documentNo = invoiceBtn.dataset.documentNo;
+
+    console.log("Document No:", documentNo);
+
+    if (!documentNo) {
+      alert('Invoice number not found.');
+      return;
+    }
+
+    const originalHTML = invoiceBtn.innerHTML;
+    invoiceBtn.innerHTML = 'Generating...';
+    invoiceBtn.disabled = true;
+
+    try {
+      const response = await fetch(
+        'https://lucira-orders-api-385594025448.asia-south1.run.app',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            document_no: documentNo
+          })
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Invoice request failed");
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+
+    } catch (error) {
+      console.error(error);
+      alert('Unable to download invoice.');
+    }
+
+    invoiceBtn.innerHTML = originalHTML;
+    invoiceBtn.disabled = false;
+
   });
+
 });
 </script>
-
-
-
 
 {% schema %}
 {
