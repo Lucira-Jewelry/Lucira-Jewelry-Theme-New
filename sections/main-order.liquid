@@ -712,32 +712,53 @@ document.addEventListener('DOMContentLoaded', function () {
 
     fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         marketplace_order_id: Number(marketplaceOrderId),
         marketplace_item_id: Number(marketplaceItemId),
         generate_invoice: true
       })
     })
-    .then(function(response) {
+    .then(response => {
       if (!response.ok) {
-        throw new Error('Failed to generate invoice');
+        return response.text().then(text => {
+          throw new Error(text || 'Failed to generate invoice');
+        });
       }
+
+      const contentType = response.headers.get('Content-Type');
+
+      if (!contentType || !contentType.includes('application/pdf')) {
+        return response.text().then(text => {
+          throw new Error('Invalid PDF response: ' + text);
+        });
+      }
+
       return response.blob();
     })
-    .then(function(blob) {
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Invoice.pdf';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+    .then(blob => {
+      const fileURL = window.URL.createObjectURL(blob);
+
+      // Open in new tab (more reliable than forced download)
+      const newTab = window.open(fileURL, '_blank');
+
+      // fallback download
+      if (!newTab) {
+        const a = document.createElement('a');
+        a.href = fileURL;
+        a.download = 'Invoice.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      }
+
+      setTimeout(() => window.URL.revokeObjectURL(fileURL), 10000);
     })
-    .catch(function(err) {
+    .catch(err => {
       console.error('Invoice error:', err);
-      alert('Unable to download invoice.');
+      alert('Unable to download invoice');
     })
     .finally(() => {
       invoiceBtn.innerHTML = originalHTML;
@@ -748,6 +769,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 });
 </script>
+
 
 
 {% schema %}
