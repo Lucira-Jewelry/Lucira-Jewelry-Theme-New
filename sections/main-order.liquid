@@ -373,8 +373,7 @@
         </div>
         <button
           class="order-invoice-btn" 
-          type="button"
-          data-document-no="{{ order.metafields.custom.document_no }}">
+          type="button">
           <span aria-hidden="true">
             {{- 'order-invoice.svg' | inline_asset_content -}}
           </span>
@@ -691,6 +690,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const marketplaceOrderId = meta.dataset.marketplaceOrderId;
   const marketplaceItemId  = meta.dataset.marketplaceItemId;
 
+  // ✅ Save original button HTML
+  const originalHTML = invoiceBtn.innerHTML;
+
   invoiceBtn.addEventListener('click', function () {
 
     if (!marketplaceOrderId || !marketplaceItemId) {
@@ -701,7 +703,7 @@ document.addEventListener('DOMContentLoaded', function () {
     invoiceBtn.disabled = true;
     invoiceBtn.innerText = 'Generating...';
 
-    // STEP 1: GET DOCUMENT NUMBER FROM ORNAVERSE
+    // STEP 1: Fetch document_no
     fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -720,10 +722,11 @@ document.addEventListener('DOMContentLoaded', function () {
       const documentNo = orderData.data.document_no;
 
       if (!documentNo) {
-        throw new Error('Document number not available');
+        alert('Invoice is not ready yet. Please try again later.');
+        throw new Error('Document number missing');
       }
 
-      // STEP 2: CALL YOUR PDF API
+      // STEP 2: Generate PDF
       return fetch('https://invoice-api-385594025448.asia-south1.run.app', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -736,15 +739,7 @@ document.addEventListener('DOMContentLoaded', function () {
     })
     .then(blob => {
       const url = window.URL.createObjectURL(blob);
-
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'Invoice.pdf';
-      document.body.appendChild(a);
-      a.click();
-
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      window.open(url, '_blank'); // open in new tab
     })
     .catch(err => {
       console.error('Invoice error:', err);
@@ -752,16 +747,14 @@ document.addEventListener('DOMContentLoaded', function () {
     })
     .finally(() => {
       invoiceBtn.disabled = false;
-      invoiceBtn.innerHTML = `
-        <span aria-hidden="true">
-          {{ 'order-invoice.svg' | inline_asset_content }}
-        </span>
-        Invoice
-      `;
+
+      // ✅ restore original button HTML correctly
+      invoiceBtn.innerHTML = originalHTML;
     });
   });
 });
 </script>
+
 
 
 {% schema %}
