@@ -588,7 +588,6 @@
 {% endunless %}
 
 <script>
-  // Helper API URL (Ensure this matches your PHP script location)
   const API_URL = 'https://lucira-orders-api-385594025448.asia-south1.run.app';
 
   function openTimelineDrawer() {
@@ -601,49 +600,60 @@
     document.body.style.overflow = '';
   }
 
-  // --- NEW: INVOICE DOWNLOAD LOGIC ---
   function initInvoiceButtons() {
     const invoiceBtns = document.querySelectorAll('.order-invoice-btn');
-    
+
     invoiceBtns.forEach(btn => {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
-        
-        const docNo = this.dataset.documentNo;
-        if (!docNo) {
-          alert('Invoice document number is missing.');
+
+        const meta = document.querySelector('.order-status-meta');
+        if (!meta) {
+          alert('Order data missing.');
+          return;
+        }
+
+        const marketplaceOrderId = meta.dataset.marketplaceOrderId;
+        const marketplaceItemId  = meta.dataset.marketplaceItemId;
+
+        if (!marketplaceOrderId || !marketplaceItemId) {
+          alert('Invoice not available yet.');
           return;
         }
 
         const originalContent = this.innerHTML;
-        this.innerHTML = '<span>Downloading...</span>'; // Simple loading state
+        this.innerHTML = '<span>Downloading...</span>';
         this.disabled = true;
 
         fetch(API_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ document_no: docNo })
+          body: JSON.stringify({
+            marketplace_order_id: Number(marketplaceOrderId),
+            marketplace_item_id: Number(marketplaceItemId)
+          })
         })
         .then(response => {
-          if (!response.ok) throw new Error('Network response was not ok');
-          return response.blob(); // Expecting a binary file (PDF)
+          if (!response.ok) {
+            throw new Error('Failed to generate invoice');
+          }
+          return response.blob(); // Expect PDF directly
         })
         .then(blob => {
-          // Create a hidden link to trigger the download
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.style.display = 'none';
           a.href = url;
-          a.download = `Invoice-${docNo}.pdf`;
+          a.download = `Invoice-${marketplaceOrderId}.pdf`;
           document.body.appendChild(a);
           a.click();
-          
+
           window.URL.revokeObjectURL(url);
           document.body.removeChild(a);
         })
         .catch(err => {
-          console.error('Invoice download failed:', err);
-          alert('Failed to download invoice. Please try again later.');
+          console.error('Invoice error:', err);
+          alert('Unable to download invoice. Please try again.');
         })
         .finally(() => {
           this.innerHTML = originalContent;
@@ -653,13 +663,14 @@
     });
   }
 
-  // --- EXISTING: LIVE STATUS LOGIC ---
   document.addEventListener('DOMContentLoaded', function () {
-    
-    // Initialize Invoice Buttons
+
+    // Initialize invoice download
     initInvoiceButtons();
 
-    // Existing Status Logic
+    // ------------------------------
+    // EXISTING LIVE STATUS LOGIC
+    // ------------------------------
     const meta = document.querySelector('.order-status-meta');
     if (!meta) return;
 
@@ -697,10 +708,8 @@
         marketplace_item_id: Number(marketplaceItemId)
       })
     })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      console.log('Ornaverse Live Status:', data);
-
+    .then(r => r.json())
+    .then(data => {
       if (!data || !data.success || !data.data || data.data.Error) {
         labelSpan.textContent = 'Status unavailable';
         return;
@@ -715,14 +724,20 @@
       }
 
       chip.classList.remove(
-        'status-chip--confirmed', 'status-chip--processing', 'status-chip--manufacturing',
-        'status-chip--qc', 'status-chip--certification', 'status-chip--dispatch', 'status-chip--in-transit'
+        'status-chip--confirmed',
+        'status-chip--processing',
+        'status-chip--manufacturing',
+        'status-chip--qc',
+        'status-chip--certification',
+        'status-chip--dispatch',
+        'status-chip--in-transit'
       );
+
       chip.classList.add(info.className);
       labelSpan.textContent = info.label;
     })
-    .catch(function(err) {
-      console.error('Ornaverse error', err);
+    .catch(err => {
+      console.error('Status error', err);
       labelSpan.textContent = 'Status unavailable';
     });
   });
