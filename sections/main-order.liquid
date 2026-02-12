@@ -353,25 +353,35 @@
           <span>Order No:</span>
           <strong>{{ order.name | remove: '#' }}</strong>
 
-          <div class="order-status-meta" ... >
-            </div>
-        </div>
-
-        {% if order.metafields.custom.document_no != blank %}
-          <button
-            class="order-invoice-btn" 
-            type="button"
-            data-document-no="{{ order.metafields.custom.document_no }}">
-            <span aria-hidden="true">
-              {{- 'order-invoice.svg' | inline_asset_content -}}
+          <div class="order-status-meta"
+            data-status="{{ order.fulfillment_status | default: 'unfulfilled' | downcase }}"
+            data-marketplace-order-id="{{ order.id }}"
+            data-marketplace-item-id="{{ order.line_items.first.id }}">
+            <span class="order-status-text-label">Status:</span>
+            <span class="order-status-chip {{ status_chip_class }}">
+              <span class="order-status-label-js">
+                {% if order.cancelled %}
+                  Cancelled
+                {% elsif order.fulfillment_status == 'fulfilled' %}
+                  Delivered
+                {% else %}
+                  {{ current_stage_label }}
+                {% endif %}
+              </span>
             </span>
-            Invoice
-          </button>
-        {% else %}
-          <span class="invoice-pending-msg" style="font-size: 12px; color: #666; padding: 8px;">
-            Invoice generating...
+          </div>
+
+        </div>
+        <button
+          class="order-invoice-btn" 
+          type="button"
+          data-document-no="{{ order.metafields.custom.document_no }}">
+          <span aria-hidden="true">
+            {{- 'order-invoice.svg' | inline_asset_content -}}
           </span>
-          {% endif %}
+          Invoice
+        </button>
+
       </div>
 
       <div class="order-details-wrapper">
@@ -588,160 +598,181 @@
 {% endunless %}
 
 <script>
+function openTimelineDrawer() {
+  document.getElementById('timelineDrawer').classList.add('is-open');
+  document.body.style.overflow = 'hidden';
+}
+
+function closeTimelineDrawer() {
+  document.getElementById('timelineDrawer').classList.remove('is-open');
+  document.body.style.overflow = '';
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+  const meta = document.querySelector('.order-status-meta');
+  if (!meta) return;
+
+  const shopifyStatus = (meta.dataset.status || '').toLowerCase();
+  const isCancelled = {{ order.cancelled | json }};
+
+  if (shopifyStatus === 'fulfilled' || isCancelled) {
+    return;
+  }
+
+  const marketplaceOrderId = meta.dataset.marketplaceOrderId;
+  const marketplaceItemId  = meta.dataset.marketplaceItemId;
+  const labelSpan = meta.querySelector('.order-status-label-js');
+  const chip = meta.querySelector('.order-status-chip');
+
+  if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
+
+  const STATUS_STYLES = {
+    1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
+    2: { label: 'Processing', className: 'status-chip--processing' },
+    3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
+    13:{ label: 'Quality Control',  className: 'status-chip--qc' },
+    4: { label: 'Certification',    className: 'status-chip--certification' },
+    5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
+    6: { label: 'In Transit',       className: 'status-chip--in-transit' }
+  };
+
+  labelSpan.textContent = 'Fetching live status…';
+
+  fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      marketplace_order_id: Number(marketplaceOrderId),
+      marketplace_item_id: Number(marketplaceItemId)
+    })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    console.log('Ornaverse Live Status (order page):', data);
+
+    if (!data || !data.success || !data.data || data.data.Error) {
+      labelSpan.textContent = 'Status unavailable';
+      return;
+    }
+
+    const statusId = Number(data.data.order_status_id);
+    const info = STATUS_STYLES[statusId];
+
+    if (!info) {
+      labelSpan.textContent = 'Unknown Status';
+      return;
+    }
+
+    chip.classList.remove(
+      'status-chip--confirmed',
+      'status-chip--processing',
+      'status-chip--manufacturing',
+      'status-chip--qc',
+      'status-chip--certification',
+      'status-chip--dispatch',
+      'status-chip--in-transit'
+    );
+    chip.classList.add(info.className);
+    labelSpan.textContent = info.label;
+  })
+  .catch(function(err) {
+    console.error('Ornaverse error (order page)', err);
+    labelSpan.textContent = 'Status unavailable';
+  });
+});
+</script>
+
+<script>
+fetch(API_URL, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    marketplace_order_id: Number(marketplaceOrderId),
+    marketplace_item_id: Number(marketplaceItemId),
+    generate_invoice: true
+  })
+})
+.then(response => response.blob())
+.then(blob => {
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Invoice.pdf';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
   const API_URL = 'https://lucira-orders-api-385594025448.asia-south1.run.app';
 
-  function openTimelineDrawer() {
-    document.getElementById('timelineDrawer').classList.add('is-open');
-    document.body.style.overflow = 'hidden';
-  }
+  const invoiceBtn = document.querySelector('.order-invoice-btn');
+  if (!invoiceBtn) return;
 
-  function closeTimelineDrawer() {
-    document.getElementById('timelineDrawer').classList.remove('is-open');
-    document.body.style.overflow = '';
-  }
+  invoiceBtn.addEventListener('click', function(e) {
+    e.preventDefault();
 
-  function initInvoiceButtons() {
-    const invoiceBtns = document.querySelectorAll('.order-invoice-btn');
-
-    invoiceBtns.forEach(btn => {
-      btn.addEventListener('click', function(e) {
-        e.preventDefault();
-
-        const meta = document.querySelector('.order-status-meta');
-        if (!meta) {
-          alert('Order data missing.');
-          return;
-        }
-
-        const marketplaceOrderId = meta.dataset.marketplaceOrderId;
-        const marketplaceItemId  = meta.dataset.marketplaceItemId;
-
-        if (!marketplaceOrderId || !marketplaceItemId) {
-          alert('Invoice not available yet.');
-          return;
-        }
-
-        const originalContent = this.innerHTML;
-        this.innerHTML = '<span>Downloading...</span>';
-        this.disabled = true;
-
-        fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            marketplace_order_id: Number(marketplaceOrderId),
-            marketplace_item_id: Number(marketplaceItemId)
-          })
-        })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Failed to generate invoice');
-          }
-          return response.blob(); // Expect PDF directly
-        })
-        .then(blob => {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.style.display = 'none';
-          a.href = url;
-          a.download = `Invoice-${marketplaceOrderId}.pdf`;
-          document.body.appendChild(a);
-          a.click();
-
-          window.URL.revokeObjectURL(url);
-          document.body.removeChild(a);
-        })
-        .catch(err => {
-          console.error('Invoice error:', err);
-          alert('Unable to download invoice. Please try again.');
-        })
-        .finally(() => {
-          this.innerHTML = originalContent;
-          this.disabled = false;
-        });
-      });
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', function () {
-
-    // Initialize invoice download
-    initInvoiceButtons();
-
-    // ------------------------------
-    // EXISTING LIVE STATUS LOGIC
-    // ------------------------------
     const meta = document.querySelector('.order-status-meta');
-    if (!meta) return;
-
-    const shopifyStatus = (meta.dataset.status || '').toLowerCase();
-    const isCancelled = {{ order.cancelled | json }};
-
-    if (shopifyStatus === 'fulfilled' || isCancelled) {
+    if (!meta) {
+      alert('Order information missing.');
       return;
     }
 
     const marketplaceOrderId = meta.dataset.marketplaceOrderId;
     const marketplaceItemId  = meta.dataset.marketplaceItemId;
-    const labelSpan = meta.querySelector('.order-status-label-js');
-    const chip = meta.querySelector('.order-status-chip');
 
-    if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
+    if (!marketplaceOrderId || !marketplaceItemId) {
+      alert('Invoice not available yet.');
+      return;
+    }
 
-    const STATUS_STYLES = {
-      1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
-      2: { label: 'Processing', className: 'status-chip--processing' },
-      3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
-      13:{ label: 'Quality Control',  className: 'status-chip--qc' },
-      4: { label: 'Certification',    className: 'status-chip--certification' },
-      5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
-      6: { label: 'In Transit',       className: 'status-chip--in-transit' }
-    };
-
-    labelSpan.textContent = 'Fetching live status…';
+    const originalHTML = this.innerHTML;
+    this.innerHTML = 'Downloading...';
+    this.disabled = true;
 
     fetch(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         marketplace_order_id: Number(marketplaceOrderId),
-        marketplace_item_id: Number(marketplaceItemId)
+        marketplace_item_id: Number(marketplaceItemId),
+        generate_invoice: true
       })
     })
-    .then(r => r.json())
-    .then(data => {
-      if (!data || !data.success || !data.data || data.data.Error) {
-        labelSpan.textContent = 'Status unavailable';
-        return;
+    .then(function(response) {
+      if (!response.ok) {
+        throw new Error('Failed to generate invoice');
       }
-
-      const statusId = Number(data.data.order_status_id);
-      const info = STATUS_STYLES[statusId];
-
-      if (!info) {
-        labelSpan.textContent = 'Unknown Status';
-        return;
-      }
-
-      chip.classList.remove(
-        'status-chip--confirmed',
-        'status-chip--processing',
-        'status-chip--manufacturing',
-        'status-chip--qc',
-        'status-chip--certification',
-        'status-chip--dispatch',
-        'status-chip--in-transit'
-      );
-
-      chip.classList.add(info.className);
-      labelSpan.textContent = info.label;
+      return response.blob();
     })
-    .catch(err => {
-      console.error('Status error', err);
-      labelSpan.textContent = 'Status unavailable';
+    .then(function(blob) {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'Invoice.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    })
+    .catch(function(err) {
+      console.error('Invoice error:', err);
+      alert('Unable to download invoice.');
+    })
+    .finally(() => {
+      invoiceBtn.innerHTML = originalHTML;
+      invoiceBtn.disabled = false;
     });
+
   });
+
+});
 </script>
+
 
 {% schema %}
 {
