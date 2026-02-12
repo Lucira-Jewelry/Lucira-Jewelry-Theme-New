@@ -375,14 +375,14 @@
        <button
         class="order-invoice-btn"
         type="button"
-        data-document-no="{{ order.metafields.custom.document_no }}"
+        data-order-id="{{ order.id }}"
+        data-item-id="{{ order.line_items.first.id }}"
       >
         <span aria-hidden="true">
           {{ 'order-invoice.svg' | inline_asset_content }}
         </span>
         Invoice
       </button>
-
 
 
       </div>
@@ -692,18 +692,64 @@ document.addEventListener("DOMContentLoaded", function () {
 
     btn.addEventListener("click", function () {
 
-      const documentNo = this.dataset.documentNo;
+      const orderId = this.dataset.orderId;
+      const itemId  = this.dataset.itemId;
 
-      if (!documentNo) {
-        alert("Invoice not available yet.");
+      if (!orderId || !itemId) {
+        alert("Invoice not available.");
         return;
       }
 
-      const pdfUrl =
-        "https://invoice-api-385594025448.asia-south1.run.app" +
-        "?document_no=" + encodeURIComponent(documentNo);
+      // STEP 1: fetch order details from Ornaverse
+      fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          marketplace_order_id: Number(orderId),
+          marketplace_item_id: Number(itemId)
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
 
-      window.open(pdfUrl, "_blank");
+        console.log("ORDER API RESPONSE:", data);
+
+        if (!data || !data.success) {
+          alert("Unable to fetch invoice details.");
+          return;
+        }
+
+        // 🔥 IMPORTANT: correct extraction
+        let documentNo = null;
+
+        // Try all possible locations safely
+        if (data.document_no) {
+          documentNo = data.document_no;
+        } else if (data.data?.document_no) {
+          documentNo = data.data.document_no;
+        } else if (data.data?.Entities?.length) {
+          documentNo = data.data.Entities[0]?.line_items?.[0]?.document_no;
+        }
+
+        if (!documentNo) {
+          alert("Invoice not generated yet.");
+          return;
+        }
+
+        console.log("DOCUMENT NO:", documentNo);
+
+        // STEP 2: call invoice API
+        const pdfUrl =
+          "https://invoice-api-385594025448.asia-south1.run.app" +
+          "?document_no=" + encodeURIComponent(documentNo);
+
+        window.open(pdfUrl, "_blank");
+
+      })
+      .catch(err => {
+        console.error("Invoice fetch error:", err);
+        alert("Unable to fetch invoice.");
+      });
 
     });
 
@@ -711,6 +757,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
+
 
 
 
