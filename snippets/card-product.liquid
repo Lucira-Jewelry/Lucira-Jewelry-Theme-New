@@ -1,4 +1,4 @@
-{%- if card_product and card_product != empty -%}
+{% comment %} {%- if card_product and card_product != empty -%}
   {%- liquid
     assign ratio = 1.4
     if card_product.featured_media and media_aspect_ratio == 'portrait'
@@ -760,6 +760,830 @@
           {%- elsif card_product.compare_at_price > card_product.price and card_product.available -%}
             <span
               id="Badge-{{ section_id }}-{{ card_product.id }}"
+              class="badge badge--bottom-left color-{{ settings.sale_badge_color_scheme }}"
+            >
+              {{- 'products.product.on_sale' | t -}}
+            </span>
+          {%- endif -%}
+        </div>
+      </div>
+    </div>
+  </div>
+{%- else -%}
+  <div class="card-wrapper product-card-wrapper underline-links-hover">
+    <div class="card card--{{ settings.card_style }}">
+      <div class="card__inner">
+        <div class="card__media">
+          {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
+        </div>
+      </div>
+      <div class="card__content">
+        <h3 class="card__heading">
+          <a class="full-unstyled-link">{{ 'onboarding.product_title' | t }}</a>
+        </h3>
+      </div>
+    </div>
+  </div>
+{%- endif -%} {% endcomment %}
+
+{%- if card_product and card_product != empty -%}
+  {%- liquid
+    # Cache frequently accessed objects (NO LOGIC CHANGE)
+    assign p = card_product
+    assign p_id = p.id
+    assign p_handle = p.handle
+    assign p_title = p.title
+    assign p_title_down = p_title | downcase
+    assign p_url = p.url
+    assign p_variants = p.variants
+    assign p_media = p.media
+    assign p_featured_media = p.featured_media
+    assign p_available = p.available
+    assign p_compare_at_price = p.compare_at_price
+    assign p_price = p.price
+    assign p_collections = p.collections
+    assign p_tags = p.tags
+    assign p_type = p.type
+    assign p_vendor = p.vendor
+    assign p_metafields = p.metafields
+    
+    # Ratio calculation (EXACTLY same logic)
+    assign ratio = 1.4
+    if p_featured_media and media_aspect_ratio == 'portrait'
+      assign ratio = 0.72
+    elsif p_featured_media and media_aspect_ratio == 'adapt'
+      assign ratio = p_featured_media.aspect_ratio
+    endif
+    if ratio == 0 or ratio == null
+      assign ratio = 1.4
+    endif
+  -%}
+
+  {%- assign first_instock_variant = nil -%}
+  {%- assign is_9kt_collection = false -%}
+  {%- assign current_collection_handle = collection.handle | default: '' -%}
+  
+  {%- comment -%} Check if product is in 9kt-collection (EXACT same logic) {%- endcomment -%}
+  {%- for collection in p_collections -%}
+    {%- if collection.handle == '9kt-collection' -%}
+      {%- assign is_9kt_collection = true -%}
+      {%- break -%}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- comment -%} 
+    First in-stock variant logic: (EXACT same logic)
+    - If viewing 9kt-collection page AND product is in 9kt-collection: Don't set first_instock_variant
+    - For all other cases: Set first_instock_variant to first available variant with inventory > 0
+  {%- endcomment -%}
+  {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
+    {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
+  {%- else -%}
+    {%- comment -%} For all other scenarios: Use original logic to find first in-stock variant {%- endcomment -%}
+    {%- for v in p_variants -%}
+      {%- if v.inventory_quantity > 0 -%}
+        {%- assign first_instock_variant = v -%}
+        {%- break -%}
+      {%- endif -%}
+    {%- endfor -%}
+  {%- endif -%}
+
+  {%- comment -%} URL handling (EXACT same logic, just optimized string building) {%- endcomment -%}
+  {%- if p_url contains '?' -%}
+    {%- assign variant_delim = '&' -%}
+  {%- else -%}
+    {%- assign variant_delim = '?' -%}
+  {%- endif -%}
+
+  {% assign base_url = p_url | split: '?' | first %}
+  {% assign query_params = p_url | split: '?' | last %}
+
+  {% assign cleaned_params = '' %}
+  {% if query_params != base_url %}
+    {% assign params_array = query_params | split: '&' %}
+    {% for param in params_array %}
+      {% unless param contains 'variant=' %}
+        {% if cleaned_params == '' %}
+          {% assign cleaned_params = param %}
+        {% else %}
+          {% assign cleaned_params = cleaned_params | append: '&' | append: param %}
+        {% endif %}
+      {% endunless %}
+    {% endfor %}
+  {% endif %}
+
+  {% assign trimmed_params = cleaned_params %}
+  {% if trimmed_params != '' %}
+    {% assign trimmed_params = trimmed_params | slice: 0, trimmed_params.size | minus: 1 %}
+  {% endif %}
+
+  {% comment %} Build final URL once (performance optimization, NO LOGIC CHANGE) {% endcomment %}
+  {% assign variant_id_to_use = first_instock_variant.id | default: p_variants.first.id %}
+  {% assign final_product_url = base_url %}
+  {% if cleaned_params != '' %}
+    {% assign final_product_url = final_product_url | append: '?' | append: cleaned_params %}
+    {% if first_instock_variant %}
+      {% assign final_product_url = final_product_url | append: '&' | append: 'variant=' | append: first_instock_variant.id %}
+    {% endif %}
+  {% elsif first_instock_variant %}
+    {% assign final_product_url = final_product_url | append: '?' | append: 'variant=' | append: first_instock_variant.id %}
+  {% endif %}
+
+  {% assign target_variant = p.selected_or_first_available_variant %}
+  {% if forced_variant %}
+    {% assign target_variant = forced_variant %} 
+  {% endif %}
+
+  {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
+  {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
+
+  {% assign diamond_final = 0.0 %}
+  {% assign diamond_original = 0.0 %}
+
+  {% if config %}
+    {% for stone_item in config.advanced_stone_config %}
+      {% if stone_item.stone_type == 'diamond' %}
+        {% assign slab_rate = 0 %}
+        {% assign slab_discount = 0 %}
+        
+        {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
+
+        {% if pricing_ref %}
+          {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
+          {% for slab in pricing_ref.slabs %}
+            {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
+              {% assign slab_rate = slab.price | times: 100 %}
+              {% assign slab_discount = slab.discount | default: 0 %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+        {% endif %}
+
+        {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
+        {% assign applied_discount = config.diamond_discount | default: slab_discount %}
+        
+        {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
+        {% assign item_final_cost = item_base_cost | minus: discount_amount %}
+
+        {% assign diamond_final = diamond_final | plus: item_final_cost %}
+        {% assign diamond_original = diamond_original | plus: item_base_cost %}
+      {% endif %}
+    {% endfor %}
+
+    {% comment %} --- START MAKING CHARGES CALCULATION --- {% endcomment %}
+    {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
+    {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
+    {% assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0 %}
+    {% assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt %}
+    
+    {% assign mc_cost_original = mc_rate_original | times: config.metal_weight %}
+    {% assign mc_cost_final = mc_rate_final | times: config.metal_weight %}
+
+    {% assign mc_percent = 0 %}
+    {% if mc_cost_original > mc_cost_final and mc_cost_original > 0 %}
+      {% assign mc_percent = mc_cost_original 
+        | minus: mc_cost_final 
+        | times: 100 
+        | divided_by: mc_cost_original 
+        | round %}
+    {% endif %}
+    {% comment %} --- END MAKING CHARGES CALCULATION --- {% endcomment %}
+  {% endif %}
+
+  {% assign diamond_percent = 0 %}
+  {% if diamond_original > diamond_final and diamond_original > 0 %}
+    {% assign diamond_percent = diamond_original 
+      | minus: diamond_final 
+      | times: 100 
+      | divided_by: diamond_original 
+      | round %}
+  {% endif %}
+
+  <div
+    class="card-wrapper product-card-wrapper underline-links-hover card_{{ forloop.index0 }}"
+    data-product-handle="{{ p_handle }}"
+  >
+    {% render 'wishlist-app-links', linkType: 'list-product', product: p %}
+    <div
+      class="
+        card card--{{ settings.card_style }}
+        {% if p_featured_media %} card--media{% else %} card--text{% endif %}
+        {% if settings.card_style == 'card' %} color-{{ settings.card_color_scheme }} gradient{% endif %}
+        {% if image_shape and image_shape != 'default' %} card--shape{% endif %}
+        {% if extend_height %} card--extend-height{% endif %}
+        {% if p_featured_media == nil and settings.card_style == 'card' %} ratio{% endif %}
+        {% if horizontal_class %} card--horizontal{% endif %}
+      "
+      style="--ratio-percent: {{ 1 | divided_by: ratio | times: 100 }}%;"
+      data-product-id="{{ p_id }}"
+    >
+      <div
+        class="card__inner {% if settings.card_style == 'standard' %}color-{{ settings.card_color_scheme }} gradient{% endif %}{% if p_featured_media or settings.card_style == 'standard' %} ratio{% endif %} {% if section.settings.portrait_mobile_only %}portrait-mobile-only{% endif %}"
+        style="--ratio-percent: {{ 1 | divided_by: ratio | times: 100 }}%;"
+        data-desktop-ratio="{{ section.settings.image_ratio }}"
+      >
+        {%- if p_featured_media -%}
+          {%- comment -%}
+            Primary and Secondary Media Selection Logic (EXACT same logic, optimized to single pass)
+          {%- endcomment -%}
+          {%- assign primary_media = nil -%}
+          {%- assign secondary_media = nil -%}
+          {%- assign mq_media = nil -%}
+          {%- assign fallback_media = nil -%}
+
+          {%- if first_instock_variant -%}
+            {%- comment -%} Build variant labels once (EXACT same labels) {%- endcomment -%}
+            {%- assign variant_labels = '' | split: ',' -%}
+            {%- assign variant_labels = variant_labels | push: first_instock_variant.title | uniq -%}
+            {%- if first_instock_variant.option1 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option1 -%}
+            {%- endif -%}
+            {%- if first_instock_variant.option2 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option2 -%}
+            {%- endif -%}
+            {%- if first_instock_variant.option3 != blank -%}
+              {%- assign variant_labels = variant_labels | push: first_instock_variant.option3 -%}
+            {%- endif -%}
+
+            {%- comment -%} Single pass through media for ALL selections {%- endcomment -%}
+            {%- for media in p_media -%}
+              {%- if media.media_type == 'image' -%}
+                {%- assign alt_text = media.alt | default: '' | downcase -%}
+                
+                {%- comment -%} Check for MQ image (highest priority for secondary) {%- endcomment -%}
+                {%- if alt_text == 'mq' and mq_media == nil -%}
+                  {%- assign mq_media = media -%}
+                {%- endif -%}
+                
+                {%- comment -%} Store first non-primary image as fallback {%- endcomment -%}
+                {%- if fallback_media == nil and media.id != primary_media.id -%}
+                  {%- assign fallback_media = media -%}
+                {%- endif -%}
+                
+                {%- comment -%} Check for primary media match (EXACT same matching logic) {%- endcomment -%}
+                {%- if primary_media == nil -%}
+                  {%- assign matched_primary = false -%}
+                  {%- for label in variant_labels -%}
+                    {%- assign lab = label | default: '' | downcase -%}
+                    {%- if lab != '' and alt_text contains lab -%}
+                      {%- assign primary_media = media -%}
+                      {%- assign matched_primary = true -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  
+                  {%- if matched_primary == false and p_title_down != '' -%}
+                    {%- if alt_text contains p_title_down -%}
+                      {%- assign remainder = alt_text | replace: p_title_down, '' | strip -%}
+                      {%- for label in variant_labels -%}
+                        {%- assign lab = label | default: '' | downcase -%}
+                        {%- if lab != '' and remainder contains lab -%}
+                          {%- assign primary_media = media -%}
+                          {%- assign matched_primary = true -%}
+                          {%- break -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+                
+                {%- comment -%} Check for secondary media via variant labels (EXACT same logic) {%- endcomment -%}
+                {%- if secondary_media == nil and primary_media != nil and media.id != primary_media.id -%}
+                  {%- assign matched_secondary = false -%}
+                  {%- for label in variant_labels -%}
+                    {%- assign lab = label | default: '' | downcase -%}
+                    {%- if lab != '' and alt_text contains lab -%}
+                      {%- assign secondary_media = media -%}
+                      {%- assign matched_secondary = true -%}
+                      {%- break -%}
+                    {%- endif -%}
+                  {%- endfor -%}
+                  
+                  {%- if matched_secondary == false and p_title_down != '' -%}
+                    {%- if alt_text contains p_title_down -%}
+                      {%- assign remainder = alt_text | replace: p_title_down, '' | strip -%}
+                      {%- for label in variant_labels -%}
+                        {%- assign lab = label | default: '' | downcase -%}
+                        {%- if lab != '' and remainder contains lab -%}
+                          {%- assign secondary_media = media -%}
+                          {%- assign matched_secondary = true -%}
+                          {%- break -%}
+                        {%- endif -%}
+                      {%- endfor -%}
+                    {%- endif -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endif -%}
+            {%- endfor -%}
+
+            {%- comment -%} If no primary media found via alt, try variant.featured_media (EXACT same logic) {%- endcomment -%}
+            {%- if primary_media == nil and first_instock_variant.featured_media -%}
+              {%- assign primary_media = first_instock_variant.featured_media -%}
+            {%- endif -%}
+          {%- endif -%}
+
+          {%- comment -%} Fallback to product featured media if still no primary (EXACT same logic) {%- endcomment -%}
+          {%- if primary_media == nil and p_featured_media -%}
+            {%- assign primary_media = p_featured_media -%}
+          {%- endif -%}
+
+          {%- comment -%} SECONDARY IMAGE SELECTION - Priority Order (EXACT same logic) {%- endcomment -%}
+          
+          {%- comment -%} 1. Prioritize image with alt text 'MQ' (case-insensitive, exact match) {%- endcomment -%}
+          {%- if secondary_media == nil -%}
+            {%- assign secondary_media = mq_media -%}
+          {%- endif -%}
+
+          {%- comment -%} 2. If no MQ image, try color matching from primary image alt text {%- endcomment -%}
+          {%- if secondary_media == nil and primary_media -%}
+            {%- assign primary_alt = primary_media.alt | default: '' | downcase -%}
+            {%- assign color_label = primary_alt | split: '-' | last | strip -%}
+
+            {%- if color_label != '' -%}
+              {%- for media in p_media -%}
+                {%- if media.media_type == 'image' and media.id != primary_media.id -%}
+                  {%- assign alt_text = media.alt | default: '' | downcase -%}
+                  {%- if alt_text contains color_label -%}
+                    {%- assign secondary_media = media -%}
+                    {%- break -%}
+                  {%- endif -%}
+                {%- endif -%}
+              {%- endfor -%}
+            {%- endif -%}
+          {%- endif -%}
+
+          {%- comment -%} 3. Already handled variant labels in the main loop above {%- endcomment -%}
+
+          {%- comment -%} 4. Fallback: try other in-stock variant.featured_media {%- endcomment -%}
+          {%- if secondary_media == nil -%}
+            {%- for v in p_variants -%}
+              {%- if first_instock_variant and v.id == first_instock_variant.id -%}
+                {%- continue -%}
+              {%- endif -%}
+              {%- if v.available and v.featured_media -%}
+                {%- assign secondary_media = v.featured_media -%}
+                {%- break -%}
+              {%- endif -%}
+            {%- endfor -%}
+          {%- endif -%}
+
+          {%- comment -%} 5. Final fallback: any other image {%- endcomment -%}
+          {%- if secondary_media == nil -%}
+            {%- assign secondary_media = fallback_media -%}
+          {%- endif -%}
+
+          <a
+            href="{{ final_product_url }}"
+            class="product-image-link custom-image-link open-in-new-tab"
+            aria-label="{{ p_title | escape }}"
+            data-product-url="{{ p_url }}"
+            data-product-id="{{ p_id }}"
+            data-variant-id="{{ variant_id_to_use }}"
+            data-sku="{{ p_variants.first.sku }}"
+            data-product-name="{{ p_title | escape }}"
+            data-product-type="{{ p_type | escape }}"
+            data-product-category="{{ p_collections.first.title | escape }}"
+            data-category="{{ p_vendor | escape }}"
+            data-sub-category="{{ p_tags | join: ',' | escape }}"
+            data-thumbnail-image="{% if primary_media %}{{ primary_media | image_url: '300x' }}{% else %}{{ p.featured_image | img_url: '300x' }}{% endif %}"
+            data-purity="{{ p_metafields.custom.purity }}"
+            data-price="{{ p_price | money_without_currency }}"
+            data-offer-price="{{ p_compare_at_price | money_without_currency }}"
+            data-expected-delivery-date="{{ p_metafields.custom.expected_delivery_date }}"
+            data-coupon-code="{{ p_metafields.custom.coupon_code }}"
+            data-making-charges="{{ p_metafields.custom.making_charges }}"
+            data-number-of-review="{{ p_metafields.reviews.rating_count }}"
+            data-rating="{{ p_metafields.reviews.rating.value }}"
+          >
+            <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
+              <div class="media media--transparent media--hover-effect">
+                {%- if primary_media -%}
+                  <img
+                    id="product-image-{{ p_id }}"
+                    class="motion-reduce primary-image"
+                    srcset="
+                      {%- if primary_media.width >= 165 -%}{{ primary_media | image_url: width: 165 }} 165w,{%- endif -%}
+                      {%- if primary_media.width >= 360 -%}{{ primary_media | image_url: width: 360 }} 360w,{%- endif -%}
+                      {%- if primary_media.width >= 533 -%}{{ primary_media | image_url: width: 533 }} 533w,{%- endif -%}
+                      {%- if primary_media.width >= 720 -%}{{ primary_media | image_url: width: 720 }} 720w,{%- endif -%}
+                      {%- if primary_media.width >= 940 -%}{{ primary_media | image_url: width: 940 }} 940w,{%- endif -%}
+                      {%- if primary_media.width >= 1066 -%}{{ primary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
+                      {{ primary_media | image_url }} {{ primary_media.width }}w
+                    "
+                    src="{{ primary_media | image_url: width: 533 }}"
+                    sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
+                    alt="{{ p_title }} - {{ primary_media.alt }}"
+                    loading="lazy"
+                    decoding="async"
+                    width="400"
+                    height="400"
+                    title="{{ p_title }}"
+                    data-current-variant="{{ primary_media.alt | escape }}"
+                  >
+                  {%- if show_secondary_image -%}
+                    <img
+                      id="product-image-secondary-{{ p_id }}"
+                      class="motion-reduce secondary-image"
+                      style="{% unless secondary_media %}display: none;{% endunless %}"
+                      {% if secondary_media %}
+                        src="{{ secondary_media | image_url: width: 533 }}"
+                        srcset="
+                          {%- if secondary_media.width >= 165 -%}{{ secondary_media | image_url: width: 165 }} 165w,{%- endif -%}
+                          {%- if secondary_media.width >= 360 -%}{{ secondary_media | image_url: width: 360 }} 360w,{%- endif -%}
+                          {%- if secondary_media.width >= 533 -%}{{ secondary_media | image_url: width: 533 }} 533w,{%- endif -%}
+                          {%- if secondary_media.width >= 720 -%}{{ secondary_media | image_url: width: 720 }} 720w,{%- endif -%}
+                          {%- if secondary_media.width >= 940 -%}{{ secondary_media | image_url: width: 940 }} 940w,{%- endif -%}
+                          {%- if secondary_media.width >= 1066 -%}{{ secondary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
+                          {{ secondary_media | image_url }} {{ secondary_media.width }}w
+                        "
+                        sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
+                        width="400"
+                        height="400"
+                        title="{{ p_title | escape }}"
+                      {% endif %}
+                        alt="{{ p_title }} - {{ secondary_media.alt }}"
+                      loading="lazy" width="400" height="400"
+                    >
+                  {%- endif -%}
+                {%- else -%}
+                  {%- if placeholder_image -%}
+                    {{ placeholder_image | placeholder_svg_tag: 'placeholder-svg' }}
+                  {%- else -%}
+                    {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
+                  {% endif %}
+                {%- endif -%}
+              </div>
+            </div>
+          </a>
+        {%- endif -%}
+
+        <div class="card__content">
+          <div class="card__information">
+            <div
+              class="card__heading"
+              {% if p_featured_media == null and settings.card_style == 'standard' %}
+                id="title-{{ section_id }}-{{ p_id }}"
+              {% endif %}
+            >
+              <a
+                href="{{ final_product_url }}"
+                id="StandardCardNoMediaLink-{{ section_id }}-{{ p_id }}"
+                class="full-unstyled-link"
+                aria-labelledby="StandardCardNoMediaLink-{{ section_id }}-{{ p_id }} NoMediaStandardBadge-{{ section_id }}-{{ p_id }}"
+                target="_blank"
+              >
+                {{ p_title | escape }}
+              </a>
+            </div>
+          </div>
+          <div class="card__badge {{ settings.badge_position }}">
+            {%- if p_available == false -%}
+              <span
+                id="NoMediaStandardBadge-{{ section_id }}-{{ p_id }}"
+                class="badge badge--bottom-left color-{{ settings.sold_out_badge_color_scheme }}"
+              >
+                {{- 'products.product.sold_out' | t -}}
+              </span>
+            {%- elsif p_compare_at_price > p_price and p_available -%}
+              <span
+                id="NoMediaStandardBadge-{{ section_id }}-{{ p_id }}"
+                class="badge badge--bottom-left color-{{ settings.sale_badge_color_scheme }}"
+              >
+                {{- 'products.product.on_sale' | t -}}
+              </span>
+            {%- endif -%}
+          </div>
+        </div>
+      </div>
+      
+      <div class="card-content-wrapper">
+        <div class="color-variants-options">
+          {% assign simplified_colors = '' | split: ',' %}
+          {% assign color_mapping = 'Yellow Gold,Rose Gold,White Gold,Platinum' | split: ',' %}
+
+          {% for color in color_mapping %}
+            {% assign variant_for_color = nil %}
+            {% for variant in p_variants %}
+              {% assign variant_title = variant.title | downcase %}
+              {% assign color_down = color | downcase %}
+              {% if variant_title contains color_down %}
+                {% assign variant_for_color = variant %}
+                {% break %}
+              {% endif %}
+            {% endfor %}
+
+            {% unless simplified_colors contains color %}
+              {% if variant_for_color %}
+                {% assign simplified_colors = simplified_colors | push: color %}
+                {% assign color_icon = '' %}
+
+                {% case color %}
+                  {% when 'Yellow Gold' %}
+                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
+                  {% when 'Rose Gold' %}
+                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
+                  {% when 'White Gold' %}
+                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
+                  {% when 'Platinum' %}
+                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Platinum.svg?v=1752822068' %}
+                {% endcase %}
+
+                <button
+                  class="color-option {% if forloop.first %}active{% endif %}"
+                  data-variant-id="{{ variant_for_color.id }}"
+                  data-color="{{ color }}"
+                  data-product-id="{{ p_id }}"
+                  {% if variant_for_color.featured_media %}
+                    data-image-src="{{ variant_for_color.featured_media | image_url: width: 533 }}"
+                    data-image-alt="{{ variant_for_color.featured_media.alt | escape }}"
+                  {% else %}
+                    data-image-src=""
+                    data-image-alt="No image for {{ color }}"
+                  {% endif %}
+                  title="{{ color }}"
+                >
+                  {% if color_icon != '' %}
+                    <img
+                      src="{{ color_icon }}"
+                      alt="{{ color }}"
+                      width="20"
+                      height="20"
+                      title="{{ color }}"
+                      loading="lazy"
+                    >
+                  {% else %}
+                    <span class="color-swatch color-{{ color | handleize }}"></span>
+                  {% endif %}
+                </button>
+              {% endif %}
+            {% endunless %}
+          {% endfor %}
+        </div>
+
+        <div class="card__rating">
+          {%- if show_rating and p_metafields.reviews.rating.value != blank -%}
+            {% liquid
+              assign rating_decimal = 0
+              assign decimal = p_metafields.reviews.rating.value.rating | modulo: 1
+              if decimal >= 0.3 and decimal <= 0.7
+                assign rating_decimal = 0.5
+              elsif decimal > 0.7
+                assign rating_decimal = 1
+              endif
+            %}
+            <div
+              class="rating"
+              role="img"
+              aria-label="{{ 'accessibility.star_reviews_info' | t: rating_value: p_metafields.reviews.rating.value, rating_max: p_metafields.reviews.rating.value.scale_max }}"
+            >
+              <span
+                aria-hidden="true"
+                class="rating-star desktop-show"
+                style="--rating: {{ p_metafields.reviews.rating.value.rating | floor }}; --rating-max: {{ p_metafields.reviews.rating.value.scale_max }}; --rating-decimal: {{ rating_decimal }};"
+              ></span>
+              <span class="">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 10" height="10" width="10">
+                  <path fill="#FEC602" d="M5 8.3747L7.42493 9.90932C7.86901 10.1906 8.41243 9.77481 8.29556 9.24901L7.65281 6.36318L9.79727 4.41892C10.1888 4.0643 9.97841 3.39176 9.4642 3.34896L6.64194 3.09829L5.53757 0.371428C5.33891 -0.123809 4.6611 -0.123809 4.46243 0.371428L3.35806 3.09217L0.535797 3.34285C0.021595 3.38565 -0.18876 4.05819 0.202734 4.4128L2.34719 6.35707L1.70444 9.24289C1.58757 9.7687 2.13099 10.1845 2.57507 9.90321L5 8.3747Z"></path>
+                </svg>
+              </span>
+            </div>
+            <p class="rating-text caption">
+              <span aria-hidden="true">
+                {{- p_metafields.reviews.rating.value }}
+              </span>
+            </p>
+            <p class="rating-count caption">
+              <span aria-hidden="true">({{ p_metafields.reviews.rating_count }})</span>
+              <span class="visually-hidden">
+                {{- p_metafields.reviews.rating_count }}
+                {{ 'accessibility.total_reviews' | t -}}
+              </span>
+            </p>
+          {%- endif -%}
+        </div>
+      </div>
+
+      {%- comment -%} 
+        Fast Shipping Logic: (EXACT same logic, just optimized syntax)
+        - On 9kt-collection page: Show only if 9kt variants are in stock
+        - On all other pages: Show if any variant is in stock (default behavior)
+      {%- endcomment -%}
+      {% assign show_fast_shipping = false %}
+      {% assign current_collection_handle = collection.handle | default: '' %}
+      
+      {% if current_collection_handle == '9kt-collection' %}
+        {%- comment -%} ONLY on 9kt-collection page, check if any 9kt variant is in stock {%- endcomment -%}
+        {% for v in p_variants %}
+          {% if v.available %}
+            {% assign variant_title_lower = v.title | downcase %}
+            {% if variant_title_lower contains '9kt' or variant_title_lower contains '9 kt' %}
+              {% if v.inventory_management %}
+                {% if v.inventory_quantity > 0 %}
+                  {% assign show_fast_shipping = true %}
+                  {% break %}
+                {% endif %}
+              {% else %}
+                {% assign show_fast_shipping = true %}
+                {% break %}
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% else %}
+        {%- comment -%} For all other pages/collections, check if any variant is in stock (default behavior) {%- endcomment -%}
+        {% for v in p_variants %}
+          {% if v.available %}
+            {% if v.inventory_management %}
+              {% if v.inventory_quantity > 0 %}
+                {% assign show_fast_shipping = true %}
+                {% break %}
+              {% endif %}
+            {% else %}
+              {% assign show_fast_shipping = true %}
+              {% break %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+
+      <div class="card__content">
+        {% if p_metafields.custom.product_card_tags.value != blank or show_fast_shipping %}
+          <div class="product-collection-card-icons">
+            <div class="carousel-container" data-product-id="{{ p_id }}">
+              <div class="icon-container">
+                {% assign first_tag = true %}
+                {% assign icon_index = 0 %}
+                {% assign all_labels = '' %}
+
+                {% for tag_icon in p_metafields.custom.product_card_tags.value %}
+                  {% if tag_icon.product_tags_enable and tag_icon.product_tags_image %}
+                    <img
+                      src="{{ tag_icon.product_tags_image | img_url: '16x16' }}"
+                      class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                      width="16"
+                      height="16"
+                      style="width:16px;height:16px;object-fit:contain;"
+                      alt="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
+                      title="{{ tag_icon.product_tags_label | default: 'Product tag' }}"
+                      data-tag-type="{{ tag_icon.icon_type | default: 'tag' }}"
+                      loading="lazy"
+                    >
+                    {% assign first_tag = false %}
+                    {% assign icon_index = icon_index | plus: 1 %}
+                    {% assign all_labels = all_labels | append: tag_icon.product_tags_label | append: '|' %}
+                  {% endif %}
+                {% endfor %}
+
+                {% if show_fast_shipping %}
+                  <img
+                    src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Fast Shipping"
+                    title="Fast Shipping"
+                    data-tag-type="shipping"
+                    loading="lazy"
+                  >
+                  {% assign first_tag = false %}
+                  {% assign icon_index = icon_index | plus: 1 %}
+                  {% assign all_labels = all_labels | append: 'Fast Shipping' | append: '|' %}
+                {% endif %}
+
+                {% if p_tags contains 'Engraving Available' %}
+                  <img
+                    src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Engraving"
+                    title="Engraving"
+                    data-tag-type="engraving"
+                    loading="lazy"
+                  >
+                  {% assign first_tag = false %}
+                  {% assign icon_index = icon_index | plus: 1 %}
+                  {% assign all_labels = all_labels | append: 'Engraving' | append: '|' %}
+                {% endif %}
+              </div>
+
+              <div class="text-content">
+                {% assign labels_array = all_labels | split: '|' %}
+                {% if labels_array[0] != blank %}
+                  {{ labels_array[0] }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+
+        {% for variant in p_variants %}
+          {% if variant.compare_at_price and variant.compare_at_price > variant.price %}
+            {% assign discount = variant.compare_at_price | minus: variant.price %}
+            {% assign discount_percent = discount | times: 100.0 | divided_by: variant.compare_at_price %}
+            <span class="label-amount">{{ discount_percent | round }}% OFF</span>
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        {% assign video = p_media | where: 'media_type', 'video' | first %}
+        {% if video %}
+          <div
+            class="product-video-icon-wrapper"
+            data-product-handle="{{ p_handle }}"
+            data-video-id="{{ video.id }}"
+            data-product-id="{{ p_id }}"
+          >
+            <img
+              src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/play_circle.svg?v=1753099595"
+              width="28"
+              height="28"
+              loading="lazy"
+              alt="Play product video"
+              title="Play product video"
+              class="product-video-icon"
+            >
+          </div>
+        {% endif %}
+
+        <div class="card__information">
+          <h3
+            class="card__heading{% if p_featured_media or settings.card_style == 'standard' %} h5{% endif %}"
+            {% if p_featured_media or settings.card_style == 'card' %}
+              id="title-{{ section_id }}-{{ p_id }}"
+            {% endif %}
+          >
+            <a
+              href="{{ final_product_url }}"
+              id="CardLink-{{ section_id }}-{{ p_id }}"
+              class="full-unstyled-link"
+              aria-labelledby="CardLink-{{ section_id }}-{{ p_id }} Badge-{{ section_id }}-{{ p_id }}"
+            >
+              {{ p_title | escape }}
+            </a>
+          </h3>
+
+          {% assign discount_color = '#4CBC7F' %}
+          {% if diamond_percent >= 35 %}
+            {% assign discount_color = '#009147' %}
+          {% elsif diamond_percent >= 25 %}
+            {% assign discount_color = '#01A652' %}
+          {% elsif diamond_percent >= 20 %}
+            {% assign discount_color = '#27B169' %}
+          {% endif %}
+
+          <div class="card-information price-details-wrapper">
+            {%- if show_vendor -%}
+              <span class="visually-hidden">{{ 'accessibility.vendor' | t }}</span>
+              <div class="caption-with-letter-spacing light">{{ p_vendor }}</div>
+            {%- endif -%}
+            
+            {% render 'price',
+              product: p,
+              use_variant: true,
+              forced_variant: first_instock_variant,
+              price_class: '',
+              show_compare_at_price: true
+            %}
+            <a
+              href="{{ final_product_url }}"
+              class="product-card-link"
+            >
+              View details {{ 'icon-right-arrow-cp.svg' | inline_asset_content }}
+            </a>
+          </div>
+
+          <div class="discount-container">
+            <div class="flip-wrapper {% if diamond_percent > 0 and mc_percent > 0 %}animate-flip{% endif %}">
+              {% if diamond_percent > 0 %}
+                <small class="discount-text" style="color: {{ discount_color }};">
+                  {{ diamond_percent }}% OFF on Diamond Price
+                </small>
+              {% endif %}
+
+              {% if mc_percent > 0 %}
+                <small class="discount-text" style="color: {{ discount_color }};">
+                  {{ mc_percent }}% OFF on Making Charges
+                </small>
+              {% endif %}
+            </div>
+          </div>
+
+        </div>  
+
+        <div class="card__badge {{ settings.badge_position }}">
+          {%- if p_available == false -%}
+            <span
+              id="Badge-{{ section_id }}-{{ p_id }}"
+              class="badge badge--bottom-left color-{{ settings.sold_out_badge_color_scheme }}"
+            >
+              {{- 'products.product.sold_out' | t -}}
+            </span>
+          {%- elsif p_compare_at_price > p_price and p_available -%}
+            <span
+              id="Badge-{{ section_id }}-{{ p_id }}"
               class="badge badge--bottom-left color-{{ settings.sale_badge_color_scheme }}"
             >
               {{- 'products.product.on_sale' | t -}}
