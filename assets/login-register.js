@@ -48,6 +48,17 @@ document.getElementById(id).style.display = 'flex';
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+    
+  // 🔹 Push GTM DataLayer Event
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+        event: "promoClick",
+        promoClick : { promotion_name: id,
+        creative_name: 'login-popup',
+        location_id: window.location.pathname
+        }
+    });
+
   document.getElementById(id).style.display = 'none';
   resetToLoginView();
   const popup = document.getElementById('login-popup');
