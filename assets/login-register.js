@@ -623,7 +623,7 @@ if (document.body.classList.contains('customer-logged-in')) return;
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
-    loadRecentWinners();
+    loadLatestWinner();
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
@@ -663,65 +663,32 @@ document.addEventListener('DOMContentLoaded', () => {
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
 
-/* ================= WINNER TICKER ================= */
-
-let recentWinners = [];
-let winnerInterval = null;
-
-async function loadRecentWinners() {
+async function loadLatestWinner() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
-
-    if (!res.ok) {
-      console.warn('Winners API error:', res.status);
-      return;
-    }
+    if (!res.ok) return;
 
     const data = await res.json();
-    console.log('Winners API response:', data);
+    if (!Array.isArray(data) || data.length === 0) return;
 
-    if (Array.isArray(data) && data.length > 0) {
-      recentWinners = data;
-      startWinnerTicker();
-    } else {
-      console.warn('No winners returned');
-    }
+    const latest = data[0]; // ✅ first = latest
 
-  } catch (err) {
-    console.error('Failed to load winners:', err);
-  }
-}
+    const ticker = document.getElementById('winnerTicker');
+    const textEl = document.getElementById('winnerText');
 
-function startWinnerTicker() {
-  const ticker = document.getElementById('winnerTicker');
-  const textEl = document.getElementById('winnerText');
-
-  if (!ticker || !textEl) {
-    console.warn('Ticker elements missing');
-    return;
-  }
-
-  if (recentWinners.length === 0) return;
-
-  ticker.style.display = 'flex';
-
-  let index = 0; // latest first
-
-  if (winnerInterval) clearInterval(winnerInterval);
-
-  function updateTicker() {
-    const w = recentWinners[index];
+    if (!ticker || !textEl) return;
 
     textEl.innerText =
-      w.city && w.city !== "India"
-        ? `${w.name} from ${w.city} just won ${w.prize}!`
-        : `${w.name} just won ${w.prize}!`;
+      latest.city && latest.city !== "India"
+        ? `${latest.name} from ${latest.city} just won ${latest.prize}!`
+        : `${latest.name} just won ${latest.prize}!`;
 
-    index = (index + 1) % recentWinners.length;
+    ticker.style.display = 'flex'; // ✅ show once
+
+  } catch (err) {
+    console.error('Winner fetch error:', err);
   }
-
-  updateTicker();
-  winnerInterval = setInterval(updateTicker, 5000);
 }
+
 
 
