@@ -661,3 +661,38 @@ document.addEventListener('DOMContentLoaded', () => {
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
 
+let recentWinners = [];
+
+async function loadRecentWinners() {
+  try {
+    const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
+    const data = await res.json();
+
+    if (Array.isArray(data) && data.length) {
+      recentWinners = data;
+      startWinnerTicker();
+    }
+  } catch (e) {
+    console.error('Failed to load winners:', e);
+  }
+}
+
+function startWinnerTicker() {
+  const ticker = document.getElementById('winnerTicker');
+  const textEl = document.getElementById('winnerText');
+  if (!ticker || !textEl || recentWinners.length === 0) return;
+
+  ticker.style.display = 'flex';
+
+  let index = 0;
+
+  function updateTicker() {
+    const w = recentWinners[index];
+    textEl.innerText = `${w.name} from ${w.city} just won ${w.prize}!`;
+    index = (index + 1) % recentWinners.length;
+  }
+
+  updateTicker();
+  setInterval(updateTicker, 5000);
+}
+
