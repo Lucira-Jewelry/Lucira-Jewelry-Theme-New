@@ -125,6 +125,17 @@ if (firstOtp) firstOtp.focus();
 
 const sendBtn = document.getElementById('sendOtp');
 if (sendBtn) {
+
+      window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+                event: "promoClick",
+                promoClick : { promotion_name: 'send-otp',
+                creative_name: 'send-otp-button-login-form',
+                location_id: window.location.pathname
+                }
+    });
+
+
 sendBtn.addEventListener('click', async () => {
     const rawInput = document.getElementById('loginMobile').value;
     let cleanMobile = rawInput.replace(/\D/g, ''); 
