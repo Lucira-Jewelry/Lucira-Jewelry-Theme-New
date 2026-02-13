@@ -48,6 +48,17 @@ document.getElementById(id).style.display = 'flex';
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+    
+  // 🔹 Push GTM DataLayer Event
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+        event: "promoClick",
+        promoClick : { promotion_name: id,
+        creative_name: 'login-popup-close-x-button',
+        location_id: window.location.pathname
+        }
+    });
+
   document.getElementById(id).style.display = 'none';
   resetToLoginView();
   const popup = document.getElementById('login-popup');
@@ -114,6 +125,17 @@ if (firstOtp) firstOtp.focus();
 
 const sendBtn = document.getElementById('sendOtp');
 if (sendBtn) {
+
+      window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+                event: "promoClick",
+                promoClick : { promotion_name: 'send-otp',
+                creative_name: 'send-otp-button-login-form',
+                location_id: window.location.pathname
+                }
+    });
+
+
 sendBtn.addEventListener('click', async () => {
     const rawInput = document.getElementById('loginMobile').value;
     let cleanMobile = rawInput.replace(/\D/g, ''); 
