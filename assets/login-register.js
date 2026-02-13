@@ -623,7 +623,6 @@ if (document.body.classList.contains('customer-logged-in')) return;
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
-    loadLatestWinner();
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
