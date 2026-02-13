@@ -623,6 +623,7 @@ if (document.body.classList.contains('customer-logged-in')) return;
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
+    loadRecentWinners();
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
@@ -644,6 +645,7 @@ setTimeout(() => {
     if (heading) heading.innerText = 'Register to Win a Reward';
     if (subtext) subtext.innerText = 'Get assured reward of ₹750';
     setLuciraSessionPopup();
+    
 }, SHOW_DELAY);
 });
 
@@ -660,12 +662,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
+
 /* ================= WINNER TICKER ================= */
 
 let recentWinners = [];
 let winnerInterval = null;
 
-/* 🔹 Load winners from API */
 async function loadRecentWinners() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
@@ -690,7 +692,6 @@ async function loadRecentWinners() {
   }
 }
 
-/* 🔹 Start ticker */
 function startWinnerTicker() {
   const ticker = document.getElementById('winnerTicker');
   const textEl = document.getElementById('winnerText');
@@ -704,7 +705,7 @@ function startWinnerTicker() {
 
   ticker.style.display = 'flex';
 
-  let index = 0; // ✅ start from latest
+  let index = 0; // latest first
 
   if (winnerInterval) clearInterval(winnerInterval);
 
@@ -719,10 +720,8 @@ function startWinnerTicker() {
     index = (index + 1) % recentWinners.length;
   }
 
-  updateTicker(); // ✅ show immediately
+  updateTicker();
   winnerInterval = setInterval(updateTicker, 5000);
 }
 
-/* 🔥 IMPORTANT: auto start */
-document.addEventListener("DOMContentLoaded", loadRecentWinners);
 
