@@ -54,7 +54,7 @@ function closeloginPopup(e, id) {
   window.dataLayer.push({
         event: "promoClick",
         promoClick : { promotion_name: id,
-        creative_name: 'login-popup',
+        creative_name: 'login-popup-close-x-button',
         location_id: window.location.pathname
         }
     });
