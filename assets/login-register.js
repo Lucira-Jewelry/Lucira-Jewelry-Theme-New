@@ -660,10 +660,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
+/* ================= WINNER TICKER ================= */
 
 let recentWinners = [];
 let winnerInterval = null;
 
+/* 🔹 Load winners from API */
 async function loadRecentWinners() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
@@ -679,22 +681,30 @@ async function loadRecentWinners() {
     if (Array.isArray(data) && data.length > 0) {
       recentWinners = data;
       startWinnerTicker();
+    } else {
+      console.warn('No winners returned');
     }
+
   } catch (err) {
     console.error('Failed to load winners:', err);
   }
 }
 
+/* 🔹 Start ticker */
 function startWinnerTicker() {
   const ticker = document.getElementById('winnerTicker');
   const textEl = document.getElementById('winnerText');
 
-  if (!ticker || !textEl) return;
+  if (!ticker || !textEl) {
+    console.warn('Ticker elements missing');
+    return;
+  }
+
   if (recentWinners.length === 0) return;
 
   ticker.style.display = 'flex';
 
-  let index = Math.floor(Math.random() * recentWinners.length);
+  let index = 0; // ✅ start from latest
 
   if (winnerInterval) clearInterval(winnerInterval);
 
@@ -709,8 +719,10 @@ function startWinnerTicker() {
     index = (index + 1) % recentWinners.length;
   }
 
-  updateTicker();
+  updateTicker(); // ✅ show immediately
   winnerInterval = setInterval(updateTicker, 5000);
 }
 
+/* 🔥 IMPORTANT: auto start */
 document.addEventListener("DOMContentLoaded", loadRecentWinners);
+
