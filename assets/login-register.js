@@ -612,6 +612,7 @@ function setLuciraSessionPopup() {
 sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
 document.addEventListener('DOMContentLoaded', function () {
+loadLatestWinner();
 const POPUP_ID = 'login-popup';
 const SHOW_DELAY = 12000;
 
