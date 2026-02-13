@@ -661,38 +661,60 @@ document.addEventListener('DOMContentLoaded', () => {
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
 
-let recentWinners = [];
+/* ================= WINNER TICKER ================= */
 
+let recentWinners = [];
+let winnerInterval = null;
+
+// 🔹 Fetch winners from your PHP API
 async function loadRecentWinners() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
+
+    if (!res.ok) {
+      console.warn('Winners API error:', res.status);
+      return;
+    }
+
     const data = await res.json();
 
-    if (Array.isArray(data) && data.length) {
+    if (Array.isArray(data) && data.length > 0) {
       recentWinners = data;
       startWinnerTicker();
+    } else {
+      console.log('No winners returned');
     }
-  } catch (e) {
-    console.error('Failed to load winners:', e);
+  } catch (err) {
+    console.error('Failed to load winners:', err);
   }
 }
 
+// 🔹 Start rotating winner messages
 function startWinnerTicker() {
   const ticker = document.getElementById('winnerTicker');
   const textEl = document.getElementById('winnerText');
+
   if (!ticker || !textEl || recentWinners.length === 0) return;
 
   ticker.style.display = 'flex';
 
   let index = 0;
 
+  if (winnerInterval) clearInterval(winnerInterval);
+
   function updateTicker() {
     const w = recentWinners[index];
-    textEl.innerText = `${w.name} from ${w.city} just won ${w.prize}!`;
+
+    const name = w.name || 'Someone';
+    const city = w.city || 'India';
+    const prize = w.prize || 'a reward';
+
+    textEl.innerText = `${name} from ${city} just won ${prize}!`;
+
     index = (index + 1) % recentWinners.length;
   }
 
   updateTicker();
-  setInterval(updateTicker, 5000);
+  winnerInterval = setInterval(updateTicker, 5000);
 }
 
