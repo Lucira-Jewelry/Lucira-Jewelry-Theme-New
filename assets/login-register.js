@@ -660,7 +660,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
-/* ================= WINNER TICKER ================= */
 
 let recentWinners = [];
 let winnerInterval = null;
@@ -675,13 +674,11 @@ async function loadRecentWinners() {
     }
 
     const data = await res.json();
-    console.log('Winners API response:', data); // 🔍 DEBUG
+    console.log('Winners API response:', data);
 
     if (Array.isArray(data) && data.length > 0) {
       recentWinners = data;
       startWinnerTicker();
-    } else {
-      console.log('No winners returned');
     }
   } catch (err) {
     console.error('Failed to load winners:', err);
@@ -692,23 +689,22 @@ function startWinnerTicker() {
   const ticker = document.getElementById('winnerTicker');
   const textEl = document.getElementById('winnerText');
 
-  if (!ticker || !textEl) {
-    console.warn('Ticker elements not found');
-    return;
-  }
-
+  if (!ticker || !textEl) return;
   if (recentWinners.length === 0) return;
 
   ticker.style.display = 'flex';
 
-  let index = 0;
+  let index = Math.floor(Math.random() * recentWinners.length);
 
   if (winnerInterval) clearInterval(winnerInterval);
 
   function updateTicker() {
     const w = recentWinners[index];
 
-    textEl.innerText = `${w.name} from ${w.city} just won ${w.prize}!`;
+    textEl.innerText =
+      w.city && w.city !== "India"
+        ? `${w.name} from ${w.city} just won ${w.prize}!`
+        : `${w.name} just won ${w.prize}!`;
 
     index = (index + 1) % recentWinners.length;
   }
@@ -717,3 +713,4 @@ function startWinnerTicker() {
   winnerInterval = setInterval(updateTicker, 5000);
 }
 
+document.addEventListener("DOMContentLoaded", loadRecentWinners);
