@@ -660,13 +660,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
-
 /* ================= WINNER TICKER ================= */
 
 let recentWinners = [];
 let winnerInterval = null;
 
-// 🔹 Fetch winners from your PHP API
 async function loadRecentWinners() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/app/recent-winners.php');
@@ -677,6 +675,7 @@ async function loadRecentWinners() {
     }
 
     const data = await res.json();
+    console.log('Winners API response:', data); // 🔍 DEBUG
 
     if (Array.isArray(data) && data.length > 0) {
       recentWinners = data;
@@ -689,12 +688,16 @@ async function loadRecentWinners() {
   }
 }
 
-// 🔹 Start rotating winner messages
 function startWinnerTicker() {
   const ticker = document.getElementById('winnerTicker');
   const textEl = document.getElementById('winnerText');
 
-  if (!ticker || !textEl || recentWinners.length === 0) return;
+  if (!ticker || !textEl) {
+    console.warn('Ticker elements not found');
+    return;
+  }
+
+  if (recentWinners.length === 0) return;
 
   ticker.style.display = 'flex';
 
@@ -705,11 +708,7 @@ function startWinnerTicker() {
   function updateTicker() {
     const w = recentWinners[index];
 
-    const name = w.name || 'Someone';
-    const city = w.city || 'India';
-    const prize = w.prize || 'a reward';
-
-    textEl.innerText = `${name} from ${city} just won ${prize}!`;
+    textEl.innerText = `${w.name} from ${w.city} just won ${w.prize}!`;
 
     index = (index + 1) % recentWinners.length;
   }
