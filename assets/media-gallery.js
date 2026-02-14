@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq", "mh", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -161,7 +161,8 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      codes: { mv: [], mq: [], ci: [], mh: [], v360: [] },
+      cert: [],   // ✅ ADD
       extras: []
     };
 
@@ -171,11 +172,17 @@ if (!customElements.get('media-gallery')) {
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
+      // ✅ CERT detection (only classification, no reordering logic)
+      if (alt.includes("cert")) {
+        buckets.cert.push(item);
+        return;
+      }
+
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
-        if (alt.includes("mq")) buckets.codes.mq.push(item);
+        if (alt.includes("mv")) buckets.codes.mv.push(item);
+        else if (alt.includes("mq")) buckets.codes.mq.push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
-        else if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
@@ -215,17 +222,27 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+    Object.values(buckets.codes).forEach(arr =>
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      })
+    );
+
+    buckets.color.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+
+    buckets.extras.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
+    // ✅ CERT — always last
+    buckets.cert.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
 
     return ordered;
