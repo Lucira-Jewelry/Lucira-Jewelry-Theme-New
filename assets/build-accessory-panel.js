@@ -419,37 +419,38 @@ window.MainBaseCharm = function () {
 
     currentCollectionId = targetId;
 
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.addEventListener('click', function () {
-        const isAlreadyActive = this.classList.contains('active');
+    document.addEventListener('click', function (e) {
+      const tile = e.target.closest('.collection-tile');
+      if (!tile) return;
 
-        // Remove active from all tiles
-        document.querySelectorAll('.collection-tile').forEach((tile) => {
-          tile.classList.remove('active');
-          tile.setAttribute('aria-selected', 'false');
-        });
+      const isAlreadyActive = tile.classList.contains('active');
 
-        // Remove active from all grid containers
-        document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-          grid.classList.remove('active');
-        });
+      // Remove active from all tiles
+      document.querySelectorAll('.collection-tile').forEach((t) => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
 
-        // If it was NOT already active, activate it
-        if (!isAlreadyActive) {
-          this.classList.add('active');
-          this.setAttribute('aria-selected', 'true');
+      // Remove active from all grid containers
+      document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+        grid.classList.remove('active');
+      });
 
-          // Optional: activate matching grid using data attribute
-          const targetId = this.dataset.target;
-          if (targetId) {
-            const targetGrid = document.getElementById(targetId);
-            if (targetGrid) {
-              targetGrid.classList.add('active');
-            }
+      // If it was NOT already active, activate it
+      if (!isAlreadyActive) {
+        tile.classList.add('active');
+        tile.setAttribute('aria-selected', 'true');
+
+        const targetId = tile.dataset.target;
+        if (targetId) {
+          const targetGrid = document.getElementById(targetId);
+          if (targetGrid) {
+            targetGrid.classList.add('active');
           }
         }
-      });
+      }
     });
+
 
 
 
