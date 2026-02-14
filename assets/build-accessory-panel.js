@@ -91,13 +91,26 @@ window.MainBaseCharm = function () {
 
   const __VariantIndex = { built: false, idToVariant: new Map(), idToProduct: new Map() };
 
-  // Attach only once
-document.addEventListener('click', function (e) {
+  document.addEventListener('click', function (e) {
   const tile = e.target.closest('.collection-tile');
   if (!tile) return;
 
-  const isAlreadyActive = tile.classList.contains('active');
   const targetId = tile.dataset.target;
+  if (!targetId) return;
+
+  const wrapper = document.getElementById('lf-charms-grids-wrapper');
+  if (!wrapper) return;
+
+  const targetGrid = document.getElementById(targetId);
+  if (!targetGrid) return;
+
+  const isOpen = targetGrid.classList.contains('active');
+
+  // Close all grids
+  wrapper.querySelectorAll('.charms-grid-container').forEach((grid) => {
+    grid.classList.remove('active');
+    grid.style.display = 'none';
+  });
 
   // Remove active from all tiles
   document.querySelectorAll('.collection-tile').forEach((t) => {
@@ -105,20 +118,12 @@ document.addEventListener('click', function (e) {
     t.setAttribute('aria-selected', 'false');
   });
 
-  // Remove active from all grids
-  document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-    grid.classList.remove('active');
-  });
-
-  // Toggle logic
-  if (!isAlreadyActive && targetId) {
+  // If it was closed → open it
+  if (!isOpen) {
+    targetGrid.classList.add('active');
+    targetGrid.style.display = '';
     tile.classList.add('active');
     tile.setAttribute('aria-selected', 'true');
-
-    const targetGrid = document.getElementById(targetId);
-    if (targetGrid) {
-      targetGrid.classList.add('active');
-    }
   }
 });
 
