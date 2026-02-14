@@ -373,120 +373,110 @@ window.MainBaseCharm = function () {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
-  function moveGridsColumnBelowTile(targetId, forceClose = false) {
+  function moveGridsColumnBelowTile(targetId) {
     const gridsColumn = document.querySelector('.grids-column');
     const tilesColumn = document.getElementById('lf-collection-tiles');
     const rightInner = document.querySelector('.right-split-inner');
     if (!gridsColumn || !tilesColumn || !rightInner) return;
 
-    // Desktop: Always ensure grid is in the main right column
+    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+      btn.classList.remove('open-with-grid')
+    );
+
     if (!isMobileLayout()) {
       if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
-      gridsColumn.style.display = '';
       return;
     }
 
-    // Mobile: Handle Accordion Logic
     const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
     if (!activeTile) return;
 
     const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
 
-    if (forceClose) {
-      // Close logic: Remove class and hide/move grid
+    if (activeTile.classList.contains('open-with-grid')) {
       activeTile.classList.remove('open-with-grid');
-      gridsColumn.style.display = 'none';
-      
-      // Move grid back to a safe container (rightInner) so it doesn't get lost
-      if (gridsColumn.parentNode !== rightInner) {
-        rightInner.appendChild(gridsColumn);
-      }
+      tileWrapper.removeChild(gridsColumn);
     } else {
-      // Open logic: Add class and insert grid below tile
       activeTile.classList.add('open-with-grid');
-      gridsColumn.style.display = '';
-      
-      // Move the grid column DOM element after the tile wrapper
-      if (tileWrapper.nextSibling !== gridsColumn) {
-        tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
-      }
+      if (tileWrapper.nextSibling === gridsColumn) return;
+      tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
     }
   }
 
   function setActiveCollectionById(targetId) {
-    const wrapper = document.getElementById('lf-charms-grids-wrapper');
+    const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
 
-    const activeTile = document.querySelector(`.collection-tile[data-target="${targetId}"]`);
-    const isMobile = isMobileLayout();
-    
-    // 1. Determine Toggle State (Are we closing?)
-    // We are closing if: It's mobile AND the clicked ID matches the current ID AND it is currently visually open
-    let isClosing = false;
-    if (isMobile && currentCollectionId === targetId) {
-      if (activeTile && activeTile.classList.contains('open-with-grid')) {
-        isClosing = true;
-      }
-    }
-
-    // 2. Reset UI (Turn off everything first)
-    // Remove active classes from all tiles
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.classList.remove('active');
-      t.classList.remove('open-with-grid');
-      t.setAttribute('aria-selected', 'false');
-    });
-
-    // Hide all grid containers
     wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      c.style.display = 'none';
-      c.classList.remove('active');
+      if (c.id === targetId) {
+        c.style.display = '';
+        c.classList.add('active');
+      } else {
+        c.style.display = 'none';
+        c.classList.remove('active');
+      }
     });
 
-    // 3. Handle Closing
-    if (isClosing) {
-      currentCollectionId = null; // No collection active
-      moveGridsColumnBelowTile(targetId, true); // Force close visual
-      return; // Stop here
-    }
-
-    // 4. Handle Opening (If not closing)
     currentCollectionId = targetId;
 
-    // Set Tile Active
-    if (activeTile) {
-      activeTile.classList.add('active');
-      activeTile.setAttribute('aria-selected', 'true');
-    }
+    document.addEventListener('click', function (e) {
+      const tile = e.target.closest('.collection-tile');
+      if (!tile) return;
 
-    // Show Target Grid
-    const targetGrid = document.getElementById(targetId);
-    if (targetGrid) {
-      targetGrid.style.display = '';
-      targetGrid.classList.add('active');
-    }
+      const isAlreadyActive = tile.classList.contains('active');
 
-    // Move Grid Element (Accordion Effect)
-    moveGridsColumnBelowTile(targetId, false);
+      // Remove active from all tiles
+      document.querySelectorAll('.collection-tile').forEach((t) => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
 
-    // 5. Post-Open UI Updates (Filters, Colors, etc.)
+      // Remove active from all grid containers
+      document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+        grid.classList.remove('active');
+      });
+
+      // If it was NOT already active, activate it
+      if (!isAlreadyActive) {
+        tile.classList.add('active');
+        tile.setAttribute('aria-selected', 'true');
+
+        const targetId = tile.dataset.target;
+        if (targetId) {
+          const targetGrid = document.getElementById(targetId);
+          if (targetGrid) {
+            targetGrid.classList.add('active');
+          }
+        }
+      }
+    });
+
+
+
+
     setTimeout(() => {
-      document.querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+      document
+        .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
         .forEach((each) => {
           const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
-          const colorName = document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
-          each.style.display = title.includes(colorName) || colorName.includes(title) ? '' : 'none';
+          const colorName =
+            document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+
+          each.style.display =
+            title.includes(colorName) || colorName.includes(title)
+              ? ''
+              : 'none';
         });
 
-      if (typeof filterCharmsBySelectedVariantCarat === 'function') {
-        filterCharmsBySelectedVariantCarat();
-      }
-    }, 100);
+      filterCharmsBySelectedVariantCarat();
+    }, 500);
 
-    if (typeof buildColorMapForActiveGrid === 'function') buildColorMapForActiveGrid();
-    if (typeof buildSwatchDots === 'function') buildSwatchDots();
-    if (typeof refreshSelectedBorders === 'function') refreshSelectedBorders();
-    if (typeof refreshCapState === 'function') refreshCapState();
+    moveGridsColumnBelowTile(targetId);
+
+    buildColorMapForActiveGrid();
+    buildSwatchDots();
+    refreshSelectedBorders();
+    refreshCapState();
   }
 
   (function () {
