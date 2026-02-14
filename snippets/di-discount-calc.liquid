@@ -1,10 +1,3 @@
-{%- comment -%}
-  DI Discount Calculator
-  Outputs:
-    diamond_percent
-    mc_percent
-{%- endcomment -%}
-
 {%- assign diamond_percent = 0 -%}
 {%- assign mc_percent = 0 -%}
 {%- assign diamond_final = 0 -%}
@@ -12,30 +5,18 @@
 
 {%- assign target_variant = product.selected_or_first_available_variant -%}
 {%- assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value -%}
-{%- assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value -%}
+{%- assign stone_pricing_db = stone_pricing_db | default: shop.metafields['DI-GoldPrice'].stone_pricing.value -%}
 
 {%- if config -%}
-
-  {# ---------------- Diamond Calculation ---------------- #}
   {%- for stone_item in config.advanced_stone_config -%}
     {%- if stone_item.stone_type == 'diamond' -%}
 
       {%- assign slab_rate = 0 -%}
       {%- assign slab_discount = 0 -%}
-      {%- assign pricing_ref = nil -%}
-
-      {%- for ref in stone_pricing_db -%}
-        {%- if ref.id == stone_item.pricing_id -%}
-          {%- assign pricing_ref = ref -%}
-          {%- break -%}
-        {%- endif -%}
-      {%- endfor -%}
+      {%- assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first -%}
 
       {%- if pricing_ref -%}
-        {%- assign avg_weight = stone_item.stone_weight
-          | times: 1.0
-          | divided_by: stone_item.stone_quantity -%}
-
+        {%- assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity -%}
         {%- for slab in pricing_ref.slabs -%}
           {%- if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight -%}
             {%- assign slab_rate = slab.price | times: 100 -%}
@@ -56,7 +37,6 @@
     {%- endif -%}
   {%- endfor -%}
 
-  {# ---------------- Making Charges ---------------- #}
   {%- assign mc_rate_original = config.making_charges | default: 0 | times: 100 -%}
   {%- assign mc_discount_percent = config.making_charges_discount | default: 0 -%}
   {%- assign mc_discount_amount = mc_rate_original | times: mc_discount_percent | divided_by: 100 -%}
@@ -72,7 +52,6 @@
       | divided_by: mc_cost_original
       | round -%}
   {%- endif -%}
-
 {%- endif -%}
 
 {%- if diamond_original > diamond_final and diamond_original > 0 -%}
@@ -82,3 +61,5 @@
     | divided_by: diamond_original
     | round -%}
 {%- endif -%}
+
+{{ diamond_percent }}|{{ mc_percent }}
