@@ -105,144 +105,95 @@
               "
             >
               {% assign skip_card_product_styles = false %}
+              {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
+
               {%- for product in collection.products -%}
 
-                {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
-                {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
+                {% unless product.tags contains 'hidden' %}
 
-                {% assign diamond_final = 0.0 %}
-                {% assign diamond_original = 0.0 %}
+                  {%- comment -%} ================= DI GOLD PRICE CALCULATION ================= {%- endcomment -%}
+                  {% assign target_variant = product.selected_or_first_available_variant %}
+                  {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
 
-                {% if config %}
-                  {% for stone_item in config.advanced_stone_config %}
-                    {% if stone_item.stone_type == 'diamond' %}
-                      {% assign slab_rate = 0 %}
-                      {% assign slab_discount = 0 %}
-                      
-                      {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
-
-                      {% if pricing_ref %}
-                        {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
-                        {% for slab in pricing_ref.slabs %}
-                          {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
-                            {% assign slab_rate = slab.price | times: 100 %}
-                            {% assign slab_discount = slab.discount | default: 0 %}
-                            {% break %}
-                          {% endif %}
-                        {% endfor %}
-                      {% endif %}
-
-                      {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
-                      {% assign applied_discount = config.diamond_discount | default: slab_discount %}
-                      
-                      {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
-                      {% assign item_final_cost = item_base_cost | minus: discount_amount %}
-
-                      {% assign diamond_final = diamond_final | plus: item_final_cost %}
-                      {% assign diamond_original = diamond_original | plus: item_base_cost %}
-                    {% endif %}
-                  {% endfor %}
-
-                  {% comment %} --- START MAKING CHARGES CALCULATION --- {% endcomment %}
-                  {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
-                  {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
-                  {% assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0 %}
-                  {% assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt %}
-                  
-                  {% assign mc_cost_original = mc_rate_original | times: config.metal_weight %}
-                  {% assign mc_cost_final = mc_rate_final | times: config.metal_weight %}
-
+                  {% assign diamond_final = 0 %}
+                  {% assign diamond_original = 0 %}
+                  {% assign diamond_percent = 0 %}
                   {% assign mc_percent = 0 %}
-                  {% if mc_cost_original > mc_cost_final and mc_cost_original > 0 %}
-                    {% assign mc_percent = mc_cost_original 
-                      | minus: mc_cost_final 
-                      | times: 100 
-                      | divided_by: mc_cost_original 
+
+                  {% if config %}
+                    {% for stone_item in config.advanced_stone_config %}
+                      {% if stone_item.stone_type == 'diamond' %}
+                        {% assign slab_rate = 0 %}
+                        {% assign slab_discount = 0 %}
+                        
+                        {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
+
+                        {% if pricing_ref %}
+                          {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
+                          {% for slab in pricing_ref.slabs %}
+                            {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
+                              {% assign slab_rate = slab.price | times: 100 %}
+                              {% assign slab_discount = slab.discount | default: 0 %}
+                              {% break %}
+                            {% endif %}
+                          {% endfor %}
+                        {% endif %}
+
+                        {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
+                        {% assign applied_discount = config.diamond_discount | default: slab_discount %}
+                        {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100 %}
+                        {% assign item_final_cost = item_base_cost | minus: discount_amount %}
+
+                        {% assign diamond_final = diamond_final | plus: item_final_cost %}
+                        {% assign diamond_original = diamond_original | plus: item_base_cost %}
+                      {% endif %}
+                    {% endfor %}
+
+                    {%- comment -%} ===== MAKING CHARGES ===== {%- endcomment -%}
+                    {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
+                    {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
+                    {% assign mc_rate_final = mc_rate_original | minus: mc_rate_original | times: mc_discount_percent | divided_by: 100 %}
+
+                    {% assign mc_cost_original = mc_rate_original | times: config.metal_weight %}
+                    {% assign mc_cost_final = mc_rate_final | times: config.metal_weight %}
+
+                    {% if mc_cost_original > mc_cost_final and mc_cost_original > 0 %}
+                      {% assign mc_percent = mc_cost_original
+                        | minus: mc_cost_final
+                        | times: 100
+                        | divided_by: mc_cost_original
+                        | round %}
+                    {% endif %}
+                  {% endif %}
+
+                  {% if diamond_original > diamond_final and diamond_original > 0 %}
+                    {% assign diamond_percent = diamond_original
+                      | minus: diamond_final
+                      | times: 100
+                      | divided_by: diamond_original
                       | round %}
                   {% endif %}
-                  {% comment %} --- END MAKING CHARGES CALCULATION --- {% endcomment %}
-                {% endif %}
+                  {%- comment -%} ================= END CALCULATION ================= {%- endcomment -%}
 
-                {% assign diamond_percent = 0 %}
-                {% if diamond_original > diamond_final and diamond_original > 0 %}
-                  {% assign diamond_percent = diamond_original 
-                    | minus: diamond_final 
-                    | times: 100 
-                    | divided_by: diamond_original 
-                    | round %}
-                {% endif %}
-                {% assign lazy_load = false %}
-                {%- if forloop.index > 2 -%}
-                  {%- assign lazy_load = true -%}
-                {%- endif -%}
-                
-                {% assign first_banner_position = 6 %}
-                {% assign subsequent_banner_position = 18 %}
 
-                {% if paginate.current_page == 1 %}
-                  {% assign banner_position = first_banner_position %}
-                {% else %}
-                  {% assign banner_position = subsequent_banner_position %}
-                {% endif %}
-                {% unless product.tags contains 'hidden' %}
-                {% if forloop.index0 == banner_position %}
-                  <li
-                    class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
-                    {% if settings.animations_reveal_on_scroll %}
-                        data-cascade
-                        style="--animation-order: {{ forloop.index }};"
-                    {% endif %}
-                  >
-                      <div class="lucira-plp-pg-component">
-                          <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
-                          {% if section.settings.plp_banner_id != blank %}
-                          {% comment %} <img class="lucira-plp-pg-component-image" 
-                              src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
-                              alt="PLP Banner" 
-                              title="PLP Banner" 
-                              href="https://www.lucirajewelry.com/collections/hexa"
-                              width="374" height="420"> {% endcomment %}
-                              <picture class="lucira-plp-pg-component-image-wrapper-picture">
-                                  {% if section.settings.plp_banner_mobile_id != blank %}
-                                    <source media="(max-width: 749px)" srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}">
-                                  {% endif %}
-                                  <img class="lucira-plp-pg-component-image" 
-                                      src="{{ section.settings.plp_banner_id | img_url: 'master' }}" 
-                                      alt="PLP Banner" 
-                                      title="PLP Banner" 
-                                      href="https://www.lucirajewelry.com/collections/hexa"
-                                      width="374" height="420">
-                                </picture>
-                          {% endif %}
-                      </div>
-                  </div>
+                  <li class="grid__item">
+                    {% render 'card-product',
+                      card_product: product,
+                      diamond_percent: diamond_percent,
+                      mc_percent: mc_percent,
+                      media_aspect_ratio: section.settings.image_ratio,
+                      image_shape: section.settings.image_shape,
+                      show_secondary_image: section.settings.show_secondary_image,
+                      show_vendor: section.settings.show_vendor,
+                      show_rating: section.settings.show_rating,
+                      section_id: section.id
+                    %}
                   </li>
-                {% endif %}
+
                 {% endunless %}
-                {% unless product.tags contains 'hidden' %}
-                <li
-                  class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
-                  {% if settings.animations_reveal_on_scroll %}
-                    data-cascade
-                    style="--animation-order: {{ forloop.index }};"
-                  {% endif %}
-                >
-                  {% render 'card-product',
-                    card_product: product,
-                    media_aspect_ratio: section.settings.image_ratio,
-                    image_shape: section.settings.image_shape,
-                    show_secondary_image: section.settings.show_secondary_image,
-                    show_vendor: section.settings.show_vendor,
-                    show_rating: section.settings.show_rating,
-                    lazy_load: lazy_load,
-                    skip_styles: skip_card_product_styles,
-                    quick_add: section.settings.quick_add,
-                    section_id: section.id
-                  %}
-                </li>
-                {% endunless %}
-                {%- assign skip_card_product_styles = true -%}
+
               {%- endfor -%}
+
             </ul>
 
            <infinite-scroll style="display: flex; justify-content: center;">
