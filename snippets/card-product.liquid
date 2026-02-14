@@ -11,28 +11,77 @@
     endif
   -%}
 
-  {%- assign first_instock_variant = nil -%}
-  {%- assign is_9kt_collection = false -%}
-  {%- assign current_collection_handle = collection.handle | default: '' -%}
+  {%- liquid
+  assign first_instock_variant = nil
+  assign show_fast_shipping = false
+  assign calculated_discount_percent = 0
   
-  {%- comment -%} Check if product is in 9kt-collection {%- endcomment -%}
-  {%- for collection in card_product.collections -%}
-    {%- if collection.handle == '9kt-collection' -%}
-      {%- assign is_9kt_collection = true -%}
-      {%- break -%}
-    {%- endif -%}
-  {%- endfor -%}
+  assign variant_yellow = nil
+  assign variant_rose = nil
+  assign variant_white = nil
+  assign variant_platinum = nil
+  
+  assign current_collection_handle = collection.handle | default: ''
+  assign is_9kt_collection = false
+  for c in card_product.collections
+    if c.handle == '9kt-collection'
+      assign is_9kt_collection = true
+      break
+    endif
+  endfor
 
-  {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
-    {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
-  {%- else -%}
-    {%- for v in card_product.variants -%}
-      {%- if v.inventory_quantity > 0 -%}
-        {%- assign first_instock_variant = v -%}
-        {%- break -%}
-      {%- endif -%}
-    {%- endfor -%}
-  {%- endif -%}
+  assign skip_first_instock = false
+  if current_collection_handle == '9kt-collection' and is_9kt_collection
+    assign skip_first_instock = true
+  endif
+
+  # --- THE SINGLE MASTER LOOP ---
+  for v in card_product.variants
+    assign v_title_down = v.title | downcase
+
+    # 1. First In-Stock Variant Logic (Preserves your 9kt exception)
+    if skip_first_instock == false and first_instock_variant == nil
+      if v.inventory_quantity > 0
+        assign first_instock_variant = v
+      endif
+    endif
+
+    # 2. Fast Shipping Logic (Preserves your exact availability rules)
+    if show_fast_shipping == false and v.available
+      if current_collection_handle == '9kt-collection'
+        if v_title_down contains '9kt' or v_title_down contains '9 kt'
+          if v.inventory_management == false or v.inventory_quantity > 0
+            assign show_fast_shipping = true
+          endif
+        endif
+      else
+        if v.inventory_management == false or v.inventory_quantity > 0
+          assign show_fast_shipping = true
+        endif
+      endif
+    endif
+
+    # 3. Discount Logic (Captures the first available discount)
+    if calculated_discount_percent == 0 and v.compare_at_price > v.price
+      assign calc_discount = v.compare_at_price | minus: v.price
+      assign calculated_discount_percent = calc_discount | times: 100.0 | divided_by: v.compare_at_price | round
+    endif
+
+    # 4. Pre-fetch Color Variants (Eliminates the downstream nested loop)
+    if variant_yellow == nil and v_title_down contains 'yellow gold'
+      assign variant_yellow = v
+    endif
+    if variant_rose == nil and v_title_down contains 'rose gold'
+      assign variant_rose = v
+    endif
+    if variant_white == nil and v_title_down contains 'white gold'
+      assign variant_white = v
+    endif
+    if variant_platinum == nil and v_title_down contains 'platinum'
+      assign variant_platinum = v
+    endif
+  endfor
+-%}
 
   {%- if card_product.url contains '?' -%}
     {%- assign variant_delim = '&' -%}
@@ -217,65 +266,49 @@
       
       <div class="card-content-wrapper">
         <div class="color-variants-options">
-          {% assign simplified_colors = '' | split: ',' %}
           {% assign color_mapping = 'Yellow Gold,Rose Gold,White Gold,Platinum' | split: ',' %}
+          {% assign active_assigned = false %}
 
           {% for color in color_mapping %}
             {% assign variant_for_color = nil %}
-            {% for variant in card_product.variants %}
-              {% assign variant_title = variant.title | downcase %}
-              {% assign color_down = color | downcase %}
-              {% if variant_title contains color_down %}
-                {% assign variant_for_color = variant %}
-                {% break %}
-              {% endif %}
-            {% endfor %}
+            
+            {% case color %}
+              {% when 'Yellow Gold' %}{% assign variant_for_color = variant_yellow %}
+              {% when 'Rose Gold' %}{% assign variant_for_color = variant_rose %}
+              {% when 'White Gold' %}{% assign variant_for_color = variant_white %}
+              {% when 'Platinum' %}{% assign variant_for_color = variant_platinum %}
+            {% endcase %}
 
-            {% unless simplified_colors contains color %}
-              {% if variant_for_color %}
-                {% assign simplified_colors = simplified_colors | push: color %}
-                {% assign color_icon = '' %}
+            {% if variant_for_color %}
+              {% assign color_icon = '' %}
+              {% case color %}
+                {% when 'Yellow Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
+                {% when 'Rose Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
+                {% when 'White Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
+                {% when 'Platinum' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Platinum.svg?v=1752822068' %}
+              {% endcase %}
 
-                {% case color %}
-                  {% when 'Yellow Gold' %}
-                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
-                  {% when 'Rose Gold' %}
-                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
-                  {% when 'White Gold' %}
-                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
-                  {% when 'Platinum' %}
-                    {% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Platinum.svg?v=1752822068' %}
-                {% endcase %}
-
-                <button
-                  class="color-option {% if forloop.first %}active{% endif %}"
-                  data-variant-id="{{ variant_for_color.id }}"
-                  data-color="{{ color }}"
-                  data-product-id="{{ card_product.id }}"
-                  {% if variant_for_color.featured_media %}
-                    data-image-src="{{ variant_for_color.featured_media | image_url: width: 533 }}"
-                    data-image-alt="{{ variant_for_color.featured_media.alt | escape }}"
-                  {% else %}
-                    data-image-src=""
-                    data-image-alt="No image for {{ color }}"
-                  {% endif %}
-                  title="{{ color }}"
-                >
-                  {% if color_icon != '' %}
-                    <img
-                      src="{{ color_icon }}"
-                      alt="{{ color }}"
-                      width="20"
-                      height="20"
-                      title="{{ color }}"
-                      loading="lazy"
-                    >
-                  {% else %}
-                    <span class="color-swatch color-{{ color | handleize }}"></span>
-                  {% endif %}
-                </button>
-              {% endif %}
-            {% endunless %}
+              <button
+                class="color-option {% if active_assigned == false %}active{% assign active_assigned = true %}{% endif %}"
+                data-variant-id="{{ variant_for_color.id }}"
+                data-color="{{ color }}"
+                data-product-id="{{ card_product.id }}"
+                {% if variant_for_color.featured_media %}
+                  data-image-src="{{ variant_for_color.featured_media | image_url: width: 533 }}"
+                  data-image-alt="{{ variant_for_color.featured_media.alt | escape }}"
+                {% else %}
+                  data-image-src=""
+                  data-image-alt="No image for {{ color }}"
+                {% endif %}
+                title="{{ color }}"
+              >
+                {% if color_icon != '' %}
+                  <img src="{{ color_icon }}" alt="{{ color }}" width="20" height="20" title="{{ color }}" loading="lazy">
+                {% else %}
+                  <span class="color-swatch color-{{ color | handleize }}"></span>
+                {% endif %}
+              </button>
+            {% endif %}
           {% endfor %}
         </div>
 
