@@ -405,19 +405,67 @@ window.MainBaseCharm = function () {
 
   // 1. Define the function to handle the UI state logic
   function setActiveCollectionById(targetId) {
-    const wrapper = $('lf-charms-grids-wrapper');
-    if (!wrapper) return;
+  // 1. Sync the Tiles (The clickable buttons)
+  document.querySelectorAll('.collection-tile').forEach((tile) => {
+    if (tile.dataset.target === targetId) {
+      tile.classList.add('active');
+      tile.setAttribute('aria-selected', 'true');
+    } else {
+      tile.classList.remove('active');
+      tile.setAttribute('aria-selected', 'false');
+    }
+  });
 
-    // Toggle grid visibility
-    wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      if (c.id === targetId) {
-        c.style.display = '';
-        c.classList.add('active');
+  // 2. Sync the Grids (The charm containers)
+  const wrapper = $('lf-charms-grids-wrapper');
+  if (wrapper) {
+    wrapper.querySelectorAll('.charms-grid-container').forEach((grid) => {
+      if (grid.id === targetId) {
+        grid.style.display = '';
+        grid.classList.add('active');
       } else {
-        c.style.display = 'none';
-        c.classList.remove('active');
+        grid.style.display = 'none';
+        grid.classList.remove('active');
       }
     });
+  }
+
+  // 3. Run secondary UI updates
+  currentCollectionId = targetId;
+  
+  // Update positioning and filtering
+  moveGridsColumnBelowTile(targetId);
+  
+  setTimeout(() => {
+    // Filter charms by color
+    document.querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+      .forEach((grid) => {
+        const title = grid.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
+        const colorName = document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+        grid.style.display = (title.includes(colorName) || colorName.includes(title)) ? '' : 'none';
+      });
+
+    if (typeof filterCharmsBySelectedVariantCarat === 'function') {
+      filterCharmsBySelectedVariantCarat();
+    }
+    
+    buildColorMapForActiveGrid();
+    buildSwatchDots();
+    refreshSelectedBorders();
+    refreshCapState();
+  }, 50); 
+}
+
+// 4. The Global Click Listener (Move this OUTSIDE any other functions)
+document.addEventListener('click', function (e) {
+  const tile = e.target.closest('.collection-tile');
+  if (!tile) return;
+
+  const targetId = tile.dataset.target;
+  if (targetId) {
+    setActiveCollectionById(targetId);
+  }
+});
 
     currentCollectionId = targetId;
 
