@@ -87,155 +87,47 @@
         data-desktop-ratio="{{ section.settings.image_ratio }}"
       >
         {%- if card_product.featured_media -%}
-          {%- comment -%}
-            Primary and Secondary Media Selection Logic
-          {%- endcomment -%}
-          {%- assign primary_media = nil -%}
+
+          {%- assign primary_media = card_product.featured_media -%}
+          {%- if first_instock_variant and first_instock_variant.featured_media -%}
+            {%- assign primary_media = first_instock_variant.featured_media -%}
+          {%- endif -%}
+
           {%- assign secondary_media = nil -%}
+          {%- assign fallback_media = nil -%}
 
-          {%- if first_instock_variant -%}
-            {%- assign product_title_down = card_product.title | default: '' | downcase -%}
-            {%- assign variant_labels = '' | split: ',' -%}
-            {%- assign variant_labels = variant_labels | push: first_instock_variant.title | uniq -%}
-            {%- if first_instock_variant.option1 != blank -%}
-              {%- assign variant_labels = variant_labels | push: first_instock_variant.option1 -%}
-            {%- endif -%}
-            {%- if first_instock_variant.option2 != blank -%}
-              {%- assign variant_labels = variant_labels | push: first_instock_variant.option2 -%}
-            {%- endif -%}
-            {%- if first_instock_variant.option3 != blank -%}
-              {%- assign variant_labels = variant_labels | push: first_instock_variant.option3 -%}
+          {%- assign primary_alt_down = primary_media.alt | default: '' | downcase -%}
+          {%- assign color_label = primary_alt_down | split: '-' | last | strip -%}
+
+          {%- comment -%}
+            Single loop to determine secondary image
+          {%- endcomment -%}
+          {%- for media in card_product.media limit: 8 -%}
+            {%- if media.media_type != 'image' or media.id == primary_media.id -%}
+              {%- continue -%}
             {%- endif -%}
 
-            {%- comment -%} Find primary media by scanning product media alt for variant labels {%- endcomment -%}
-            {%- for media in card_product.media -%}
-              {%- if media.media_type == 'image' -%}
-                {%- assign alt_text = media.alt | default: '' | downcase -%}
-                {%- assign matched_primary = false -%}
-                {%- for label in variant_labels -%}
-                  {%- assign lab = label | default: '' | downcase -%}
-                  {%- if lab != '' and alt_text contains lab -%}
-                    {%- assign primary_media = media -%}
-                    {%- assign matched_primary = true -%}
-                    {%- break -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                {%- if matched_primary == false and product_title_down != '' -%}
-                  {%- if alt_text contains product_title_down -%}
-                    {%- assign remainder = alt_text | replace: product_title_down, '' | strip -%}
-                    {%- for label in variant_labels -%}
-                      {%- assign lab = label | default: '' | downcase -%}
-                      {%- if lab != '' and remainder contains lab -%}
-                        {%- assign primary_media = media -%}
-                        {%- assign matched_primary = true -%}
-                        {%- break -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                  {%- endif -%}
-                {%- endif -%}
-                {%- if primary_media -%}
-                  {%- break -%}
-                {%- endif -%}
-              {%- endif -%}
-            {%- endfor -%}
+            {%- assign current_alt = media.alt | default: '' | downcase | strip -%}
 
-            {%- comment -%} If no primary media found via alt, try variant.featured_media {%- endcomment -%}
-            {%- if primary_media == nil and first_instock_variant.featured_media -%}
-              {%- assign primary_media = first_instock_variant.featured_media -%}
+            {%- comment -%} Priority 1: MQ image {%- endcomment -%}
+            {%- if current_alt == 'mq' -%}
+              {%- assign secondary_media = media -%}
+              {%- break -%}
             {%- endif -%}
-          {%- endif -%}
 
-          {%- comment -%} Fallback to product featured media if still no primary {%- endcomment -%}
-          {%- if primary_media == nil and card_product.featured_media -%}
-            {%- assign primary_media = card_product.featured_media -%}
-          {%- endif -%}
+            {%- comment -%} Priority 2: Color match from primary image {%- endcomment -%}
+            {%- if secondary_media == nil and color_label != blank and current_alt contains color_label -%}
+              {%- assign secondary_media = media -%}
+            {%- endif -%}
 
-          {%- comment -%} SECONDARY IMAGE SELECTION - Priority Order {%- endcomment -%}
-          
-          {%- comment -%} 1. Prioritize image with alt text 'MQ' (case-insensitive, exact match) {%- endcomment -%}
+            {%- comment -%} Priority 3: Save first valid fallback {%- endcomment -%}
+            {%- if fallback_media == nil -%}
+              {%- assign fallback_media = media -%}
+            {%- endif -%}
+          {%- endfor -%}
+
           {%- if secondary_media == nil -%}
-            {%- for media in card_product.media -%}
-              {%- assign alt_text = media.alt | default: '' | downcase | strip -%}
-              {%- if media.media_type == 'image' and media.id != primary_media.id and alt_text == 'mq' -%}
-                {%- assign secondary_media = media -%}
-                {%- break -%}
-              {%- endif -%}
-            {%- endfor -%}
-          {%- endif -%}
-
-          {%- comment -%} 2. If no MQ image, try color matching from primary image alt text {%- endcomment -%}
-          {%- if secondary_media == nil and primary_media -%}
-            {%- assign primary_alt = primary_media.alt | default: '' | downcase -%}
-            {%- assign color_label = primary_alt | split: '-' | last | strip -%}
-
-            {%- if color_label != '' -%}
-              {%- for media in card_product.media -%}
-                {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-                  {%- assign alt_text = media.alt | default: '' | downcase -%}
-                  {%- if alt_text contains color_label -%}
-                    {%- assign secondary_media = media -%}
-                    {%- break -%}
-                  {%- endif -%}
-                {%- endif -%}
-              {%- endfor -%}
-            {%- endif -%}
-          {%- endif -%}
-
-          {%- comment -%} 3. Try matching variant labels for secondary image {%- endcomment -%}
-          {%- if secondary_media == nil and first_instock_variant -%}
-            {%- for media in card_product.media -%}
-              {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-                {%- assign alt_text = media.alt | default: '' | downcase -%}
-                {%- assign matched_secondary = false -%}
-                {%- for label in variant_labels -%}
-                  {%- assign lab = label | default: '' | downcase -%}
-                  {%- if lab != '' and alt_text contains lab -%}
-                    {%- assign secondary_media = media -%}
-                    {%- assign matched_secondary = true -%}
-                    {%- break -%}
-                  {%- endif -%}
-                {%- endfor -%}
-                {%- if matched_secondary == false and product_title_down != '' -%}
-                  {%- if alt_text contains product_title_down -%}
-                    {%- assign remainder = alt_text | replace: product_title_down, '' | strip -%}
-                    {%- for label in variant_labels -%}
-                      {%- assign lab = label | default: '' | downcase -%}
-                      {%- if lab != '' and remainder contains lab -%}
-                        {%- assign secondary_media = media -%}
-                        {%- assign matched_secondary = true -%}
-                        {%- break -%}
-                      {%- endif -%}
-                    {%- endfor -%}
-                  {%- endif -%}
-                {%- endif -%}
-                {%- if secondary_media -%}
-                  {%- break -%}
-                {%- endif -%}
-              {%- endif -%}
-            {%- endfor -%}
-          {%- endif -%}
-
-          {%- comment -%} 4. Fallback: try other in-stock variant.featured_media {%- endcomment -%}
-          {%- if secondary_media == nil -%}
-            {%- for v in card_product.variants -%}
-              {%- if first_instock_variant and v.id == first_instock_variant.id -%}
-                {%- continue -%}
-              {%- endif -%}
-              {%- if v.available and v.featured_media -%}
-                {%- assign secondary_media = v.featured_media -%}
-                {%- break -%}
-              {%- endif -%}
-            {%- endfor -%}
-          {%- endif -%}
-
-          {%- comment -%} 5. Final fallback: any other image {%- endcomment -%}
-          {%- if secondary_media == nil -%}
-            {%- for media in card_product.media -%}
-              {%- if media.media_type == 'image' and media.id != primary_media.id -%}
-                {%- assign secondary_media = media -%}
-                {%- break -%}
-              {%- endif -%}
-            {%- endfor -%}
+            {%- assign secondary_media = fallback_media -%}
           {%- endif -%}
 
           <a
@@ -245,83 +137,44 @@
             data-product-url="{{ card_product.url }}"
             data-product-id="{{ card_product.id }}"
             data-variant-id="{% if first_instock_variant %}{{ first_instock_variant.id }}{% else %}{{ card_product.variants.first.id }}{% endif %}"
-            data-sku="{{ card_product.variants.first.sku }}"
-            data-product-name="{{ card_product.title | escape }}"
-            data-product-type="{{ card_product.type | escape }}"
-            data-product-category="{{ card_product.collections.first.title | escape }}"
-            data-category="{{ card_product.vendor | escape }}"
-            data-sub-category="{{ card_product.tags | join: ',' | escape }}"
             data-thumbnail-image="{% if primary_media %}{{ primary_media | image_url: '300x' }}{% else %}{{ card_product.featured_image | img_url: '300x' }}{% endif %}"
-            data-purity="{{ card_product.metafields.custom.purity }}"
-            data-price="{{ card_product.price | money_without_currency }}"
-            data-offer-price="{{ card_product.compare_at_price | money_without_currency }}"
-            data-expected-delivery-date="{{ card_product.metafields.custom.expected_delivery_date }}"
-            data-coupon-code="{{ card_product.metafields.custom.coupon_code }}"
-            data-making-charges="{{ card_product.metafields.custom.making_charges }}"
-            data-number-of-review="{{ card_product.metafields.reviews.rating_count }}"
-            data-rating="{{ card_product.metafields.reviews.rating.value }}"
           >
             <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
               <div class="media media--transparent media--hover-effect">
+
                 {%- if primary_media -%}
                   <img
                     id="product-image-{{ card_product.id }}"
                     class="motion-reduce primary-image"
-                    srcset="
-                      {%- if primary_media.width >= 165 -%}{{ primary_media | image_url: width: 165 }} 165w,{%- endif -%}
-                      {%- if primary_media.width >= 360 -%}{{ primary_media | image_url: width: 360 }} 360w,{%- endif -%}
-                      {%- if primary_media.width >= 533 -%}{{ primary_media | image_url: width: 533 }} 533w,{%- endif -%}
-                      {%- if primary_media.width >= 720 -%}{{ primary_media | image_url: width: 720 }} 720w,{%- endif -%}
-                      {%- if primary_media.width >= 940 -%}{{ primary_media | image_url: width: 940 }} 940w,{%- endif -%}
-                      {%- if primary_media.width >= 1066 -%}{{ primary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
-                      {{ primary_media | image_url }} {{ primary_media.width }}w
-                    "
                     src="{{ primary_media | image_url: width: 533 }}"
-                    sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
                     alt="{{ card_product.title }} - {{ primary_media.alt }}"
                     loading="lazy"
-                    decoding="async"
                     width="400"
                     height="400"
-                    title="{{ card_product.title }}"
-                    data-current-variant="{{ primary_media.alt | escape }}"
                   >
-                  {%- if show_secondary_image -%}
+
+                  {%- if show_secondary_image and secondary_media -%}
                     <img
                       id="product-image-secondary-{{ card_product.id }}"
                       class="motion-reduce secondary-image"
-                      style="{% unless secondary_media %}display: none;{% endunless %}"
-                      {% if secondary_media %}
-                        src="{{ secondary_media | image_url: width: 533 }}"
-                        srcset="
-                          {%- if secondary_media.width >= 165 -%}{{ secondary_media | image_url: width: 165 }} 165w,{%- endif -%}
-                          {%- if secondary_media.width >= 360 -%}{{ secondary_media | image_url: width: 360 }} 360w,{%- endif -%}
-                          {%- if secondary_media.width >= 533 -%}{{ secondary_media | image_url: width: 533 }} 533w,{%- endif -%}
-                          {%- if secondary_media.width >= 720 -%}{{ secondary_media | image_url: width: 720 }} 720w,{%- endif -%}
-                          {%- if secondary_media.width >= 940 -%}{{ secondary_media | image_url: width: 940 }} 940w,{%- endif -%}
-                          {%- if secondary_media.width >= 1066 -%}{{ secondary_media | image_url: width: 1066 }} 1066w,{%- endif -%}
-                          {{ secondary_media | image_url }} {{ secondary_media.width }}w
-                        "
-                        sizes="(min-width: {{ settings.page_width }}px) {{ settings.page_width | minus: 130 | divided_by: 4 }}px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)"
-                        width="400"
-                        height="400"
-                        title="{{ card_product.title | escape }}"
-                      {% endif %}
-                        alt="{{ card_product.title }} - {{ secondary_media.alt }}"
-                      loading="lazy" width="400" height="400"
+                      src="{{ secondary_media | image_url: width: 533 }}"
+                      alt="{{ card_product.title }} - {{ secondary_media.alt }}"
+                      loading="lazy"
+                      width="400"
+                      height="400"
                     >
                   {%- endif -%}
+
                 {%- else -%}
-                  {%- if placeholder_image -%}
-                    {{ placeholder_image | placeholder_svg_tag: 'placeholder-svg' }}
-                  {%- else -%}
-                    {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
-                  {% endif %}
+                  {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
                 {%- endif -%}
+
               </div>
             </div>
           </a>
         {%- endif -%}
+
+
 
         <div class="card__content">
           <div class="card__information">
