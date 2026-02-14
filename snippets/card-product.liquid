@@ -23,15 +23,9 @@
     {%- endif -%}
   {%- endfor -%}
 
-  {%- comment -%} 
-    First in-stock variant logic:
-    - If viewing 9kt-collection page AND product is in 9kt-collection: Don't set first_instock_variant
-    - For all other cases: Set first_instock_variant to first available variant with inventory > 0
-  {%- endcomment -%}
   {%- if current_collection_handle == '9kt-collection' and is_9kt_collection -%}
     {%- comment -%} On 9kt-collection page viewing 9kt products: Skip first_instock_variant logic {%- endcomment -%}
   {%- else -%}
-    {%- comment -%} For all other scenarios: Use original logic to find first in-stock variant {%- endcomment -%}
     {%- for v in card_product.variants -%}
       {%- if v.inventory_quantity > 0 -%}
         {%- assign first_instock_variant = v -%}
@@ -67,71 +61,6 @@
   {% assign target_variant = card_product.selected_or_first_available_variant %}
   {% if forced_variant %}
     {% assign target_variant = forced_variant %} 
-  {% endif %}
-
-  {% assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value %}
-  {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
-
-  {% assign diamond_final = 0.0 %}
-  {% assign diamond_original = 0.0 %}
-
-  {% if config %}
-    {% for stone_item in config.advanced_stone_config %}
-      {% if stone_item.stone_type == 'diamond' %}
-        {% assign slab_rate = 0 %}
-        {% assign slab_discount = 0 %}
-        
-        {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
-
-        {% if pricing_ref %}
-          {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
-          {% for slab in pricing_ref.slabs %}
-            {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
-              {% assign slab_rate = slab.price | times: 100 %}
-              {% assign slab_discount = slab.discount | default: 0 %}
-              {% break %}
-            {% endif %}
-          {% endfor %}
-        {% endif %}
-
-        {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
-        {% assign applied_discount = config.diamond_discount | default: slab_discount %}
-        
-        {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
-        {% assign item_final_cost = item_base_cost | minus: discount_amount %}
-
-        {% assign diamond_final = diamond_final | plus: item_final_cost %}
-        {% assign diamond_original = diamond_original | plus: item_base_cost %}
-      {% endif %}
-    {% endfor %}
-
-    {% comment %} --- START MAKING CHARGES CALCULATION --- {% endcomment %}
-    {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
-    {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
-    {% assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0 %}
-    {% assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt %}
-    
-    {% assign mc_cost_original = mc_rate_original | times: config.metal_weight %}
-    {% assign mc_cost_final = mc_rate_final | times: config.metal_weight %}
-
-    {% assign mc_percent = 0 %}
-    {% if mc_cost_original > mc_cost_final and mc_cost_original > 0 %}
-      {% assign mc_percent = mc_cost_original 
-        | minus: mc_cost_final 
-        | times: 100 
-        | divided_by: mc_cost_original 
-        | round %}
-    {% endif %}
-    {% comment %} --- END MAKING CHARGES CALCULATION --- {% endcomment %}
-  {% endif %}
-
-  {% assign diamond_percent = 0 %}
-  {% if diamond_original > diamond_final and diamond_original > 0 %}
-    {% assign diamond_percent = diamond_original 
-      | minus: diamond_final 
-      | times: 100 
-      | divided_by: diamond_original 
-      | round %}
   {% endif %}
 
   <div
