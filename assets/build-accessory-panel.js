@@ -429,13 +429,28 @@ window.MainBaseCharm = function () {
           tile.setAttribute('aria-selected', 'false');
         });
 
+        // Remove active from all grid containers
+        document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+          grid.classList.remove('active');
+        });
+
         // If it was NOT already active, activate it
         if (!isAlreadyActive) {
           this.classList.add('active');
           this.setAttribute('aria-selected', 'true');
+
+          // Optional: activate matching grid using data attribute
+          const targetId = this.dataset.target;
+          if (targetId) {
+            const targetGrid = document.getElementById(targetId);
+            if (targetGrid) {
+              targetGrid.classList.add('active');
+            }
+          }
         }
       });
     });
+
 
 
     setTimeout(() => {
