@@ -420,11 +420,23 @@ window.MainBaseCharm = function () {
     currentCollectionId = targetId;
 
     document.querySelectorAll('.collection-tile').forEach((t) => {
-      const active = t.dataset.target === targetId;
+      t.addEventListener('click', function () {
+        const isAlreadyActive = this.classList.contains('active');
 
-      t.classList.toggle('active', active);
-      t.setAttribute('aria-selected', active ? 'true' : 'false');
+        // Remove active from all tiles
+        document.querySelectorAll('.collection-tile').forEach((tile) => {
+          tile.classList.remove('active');
+          tile.setAttribute('aria-selected', 'false');
+        });
+
+        // If it was NOT already active, activate it
+        if (!isAlreadyActive) {
+          this.classList.add('active');
+          this.setAttribute('aria-selected', 'true');
+        }
+      });
     });
+
 
     setTimeout(() => {
       document
