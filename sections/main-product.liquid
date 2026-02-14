@@ -19,7 +19,6 @@
     data-zoom-on-hover
   {% endif %}
 >
-  {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
   {{ 'section-main-product.css' | asset_url | stylesheet_tag: preload: true }}
   {{ 'component-accordion.css' | asset_url | stylesheet_tag: preload: true }}
   {{ 'component-slider.css' | asset_url | stylesheet_tag: preload: true }}
@@ -180,88 +179,6 @@
                   {% render 'trace-datalayer' %}
                 </div>
               {%- when 'price' -%}
-              {%- assign target_variant = product.selected_or_first_available_variant -%}
-              {%- assign config = target_variant.metafields['DI-GoldPrice'].variant_config.value -%}
-
-              {%- assign diamond_final = 0 -%}
-              {%- assign diamond_original = 0 -%}
-              {%- assign diamond_percent = 0 -%}
-              {%- assign mc_percent = 0 -%}
-
-              {%- if config -%}
-                {%- for stone_item in config.advanced_stone_config -%}
-                  {%- if stone_item.stone_type == 'diamond' -%}
-                    {%- assign slab_rate = 0 -%}
-                    {%- assign slab_discount = 0 -%}
-
-                    {%- assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first -%}
-
-                    {%- if pricing_ref -%}
-                      {%- assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity -%}
-                      {%- for slab in pricing_ref.slabs -%}
-                        {%- if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight -%}
-                          {%- assign slab_rate = slab.price | times: 100 -%}
-                          {%- assign slab_discount = slab.discount | default: 0 -%}
-                          {%- break -%}
-                        {%- endif -%}
-                      {%- endfor -%}
-                    {%- endif -%}
-
-                    {%- assign item_base_cost = slab_rate | times: stone_item.stone_weight -%}
-                    {%- assign applied_discount = config.diamond_discount | default: slab_discount -%}
-                    {%- assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100 -%}
-                    {%- assign item_final_cost = item_base_cost | minus: discount_amount -%}
-
-                    {%- assign diamond_final = diamond_final | plus: item_final_cost -%}
-                    {%- assign diamond_original = diamond_original | plus: item_base_cost -%}
-                  {%- endif -%}
-                {%- endfor -%}
-
-                {%- assign mc_rate_original = config.making_charges | default: 0 | times: 100 -%}
-                {%- assign mc_discount_percent = config.making_charges_discount | default: 0 -%}
-                {%- assign mc_discount_amount = mc_rate_original | times: mc_discount_percent | divided_by: 100 -%}
-                {%- assign mc_rate_final = mc_rate_original | minus: mc_discount_amount -%}
-
-                {%- assign mc_cost_original = mc_rate_original | times: config.metal_weight -%}
-                {%- assign mc_cost_final = mc_rate_final | times: config.metal_weight -%}
-
-                {%- if mc_cost_original > mc_cost_final and mc_cost_original > 0 -%}
-                  {%- assign mc_percent = mc_cost_original
-                    | minus: mc_cost_final
-                    | times: 100
-                    | divided_by: mc_cost_original
-                    | round -%}
-                {%- endif -%}
-              {%- endif -%}
-
-              {%- if diamond_original > diamond_final and diamond_original > 0 -%}
-                {%- assign diamond_percent = diamond_original
-                  | minus: diamond_final
-                  | times: 100
-                  | divided_by: diamond_original
-                  | round -%}
-              {%- endif -%}
-
-              <div id="price-{{ section.id }}" role="status" {{ block.shopify_attributes }}>
-                {%- render 'price',
-                  product: product,
-                  use_variant: true,
-                  show_badges: true,
-                  price_class: 'price--large'
-                -%}
-              </div>
-
-              {% if diamond_percent > 0 or mc_percent > 0 %}
-                <div class="pdp-discount-wrapper" style="margin-top:8px;">
-                  {% if diamond_percent > 0 %}
-                    <p class="discount-line">{{ diamond_percent }}% OFF on Diamond Price</p>
-                  {% endif %}
-                  {% if mc_percent > 0 %}
-                    <p class="discount-line">{{ mc_percent }}% OFF on Making Charges</p>
-                  {% endif %}
-                </div>
-              {% endif %}
-
                 <div id="price-{{ section.id }}" role="status" {{ block.shopify_attributes }}>
                   {%- render 'price',
                     product: product,
@@ -738,7 +655,6 @@
 
                 {% render 'pdp-delivery-details' %}
 
-
                 {% assign allowed_tags = 'Chembur Store Available,Pune store available' | split: ',' %}
                 {% assign show_try_at_home = false %}
 
@@ -759,7 +675,9 @@
                   {% endfor %}
                 {% endunless %}
 
-              {% render 'pdp-try-at-home' %}
+                {% if show_try_at_home %}
+                  {% render 'pdp-try-at-home' %}
+                {% endif %}
 
                 {% if product.tags contains 'Engraving Available' %}
                   <div class="engraving-button-wrapper">
@@ -1732,7 +1650,7 @@
       "url": "{{ shop.url }}{{ product.url }}",
       "priceCurrency": "{{ shop.currency }}",
       "price": "{{ product.price | money_without_currency | remove: ',' }}",
-      "priceValidUntil": "2026-02-17",
+      "priceValidUntil": "2026-01-10",
       "availability": "{% if product.available %}https://schema.org/InStock{% else %}https://schema.org/OutOfStock{% endif %}",
       "itemCondition": "https://schema.org/NewCondition",
       "eligibleRegion": {
@@ -1742,6 +1660,11 @@
       "seller": {
         "@type": "Organization",
         "name": "{{ shop.name | escape }}"
+      },
+      "discount": {
+        "@type": "DiscountOffer",
+        "description": "Flat 20% off on diamond prices + Upto 77% on making charges",
+        "validThrough": "2026-01-27"
       }
     },
     "aggregateRating": {
@@ -3384,8 +3307,3 @@
   ]
 }
 {% endschema %}
-
-
-<!-- camweara code starts -->
- {% render 'camweara-snippet' %}                                 
-<!-- camweara code ends -->
