@@ -379,9 +379,7 @@ window.MainBaseCharm = function () {
     const rightInner = document.querySelector('.right-split-inner');
     if (!gridsColumn || !tilesColumn || !rightInner) return;
 
-    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
-      btn.classList.remove('open-with-grid')
-    );
+    
 
     if (!isMobileLayout()) {
       if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
@@ -393,14 +391,7 @@ window.MainBaseCharm = function () {
 
     const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
 
-    if (activeTile.classList.contains('open-with-grid')) {
-      activeTile.classList.remove('open-with-grid');
-      tileWrapper.removeChild(gridsColumn);
-    } else {
-      activeTile.classList.add('open-with-grid');
-      if (tileWrapper.nextSibling === gridsColumn) return;
-      tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
-    }
+    
   }
 
   function setActiveCollectionById(targetId) {
