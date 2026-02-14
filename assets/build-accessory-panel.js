@@ -403,10 +403,12 @@ window.MainBaseCharm = function () {
     }
   }
 
+  // 1. Define the function to handle the UI state logic
   function setActiveCollectionById(targetId) {
     const wrapper = $('lf-charms-grids-wrapper');
     if (!wrapper) return;
 
+    // Toggle grid visibility
     wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
       if (c.id === targetId) {
         c.style.display = '';
@@ -419,41 +421,7 @@ window.MainBaseCharm = function () {
 
     currentCollectionId = targetId;
 
-    document.addEventListener('click', function (e) {
-      const tile = e.target.closest('.collection-tile');
-      if (!tile) return;
-
-      const isAlreadyActive = tile.classList.contains('active');
-
-      // Remove active from all tiles
-      document.querySelectorAll('.collection-tile').forEach((t) => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-
-      // Remove active from all grid containers
-      document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-        grid.classList.remove('active');
-      });
-
-      // If it was NOT already active, activate it
-      if (!isAlreadyActive) {
-        tile.classList.add('active');
-        tile.setAttribute('aria-selected', 'true');
-
-        const targetId = tile.dataset.target;
-        if (targetId) {
-          const targetGrid = document.getElementById(targetId);
-          if (targetGrid) {
-            targetGrid.classList.add('active');
-          }
-        }
-      }
-    });
-
-
-
-
+    // Run filtering and UI refreshes
     setTimeout(() => {
       document
         .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
@@ -463,21 +431,43 @@ window.MainBaseCharm = function () {
             document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
 
           each.style.display =
-            title.includes(colorName) || colorName.includes(title)
-              ? ''
-              : 'none';
+            title.includes(colorName) || colorName.includes(title) ? '' : 'none';
         });
 
       filterCharmsBySelectedVariantCarat();
-    }, 500);
+    }, 100); // Reduced delay for better responsiveness
 
     moveGridsColumnBelowTile(targetId);
-
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
     refreshCapState();
+    toggleZoomBar(); // Added to ensure zoom bar refreshes on collection change
   }
+
+// 2. Add the Click Listener ONCE (Place this outside any function scope)
+document.addEventListener('click', function (e) {
+  const tile = e.target.closest('.collection-tile');
+  if (!tile) return;
+
+  const targetId = tile.dataset.target;
+  const isAlreadyActive = tile.classList.contains('active');
+
+  // Clear previous states
+  document.querySelectorAll('.collection-tile').forEach((t) => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+
+  // Activate current
+  tile.classList.add('active');
+  tile.setAttribute('aria-selected', 'true');
+
+  // Trigger the visual update
+  if (targetId) {
+    setActiveCollectionById(targetId);
+  }
+});
 
   (function () {
     if (window._charmCartInit) return;
