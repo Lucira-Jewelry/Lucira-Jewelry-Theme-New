@@ -1,4 +1,3 @@
-
 <style>
   .dual-banner-section {
     width: 100%;
@@ -11,7 +10,7 @@
     width: 100%;
     height: auto;
     text-decoration: none;
-    cursor: {{ section.settings.banner_url | default: '' | blank | if: 'default', 'pointer' }};
+    cursor: {% if section.settings.banner_url == blank %}default{% else %}pointer{% endif %};
   }
 
   .dual-banner-wrapper.no-link {
@@ -24,38 +23,6 @@
     display: block;
     object-fit: cover;
   }
-
-  .desktop-banner {
-    display: block;
-    {% comment %} height: 200px; {% endcomment %}
-  }
-
-  .mobile-banner {
-    display: none;
-    {% comment %} height: 160px; %} {% endcomment %}
-  }
-
-  @media screen and (max-width: 768px) {
-    .desktop-banner {
-      display: none;
-    }
-    
-    .mobile-banner {
-      display: block;
-    }
-  }
-
-  /* Optional: Add loading animation */
-  .dual-banner-image {
-    opacity: 0;
-    animation: fadeIn 0.5s ease-in forwards;
-  }
-
-  @keyframes fadeIn {
-    to {
-      opacity: 1;
-    }
-  }
 </style>
 
 <div class="dual-banner-section">
@@ -67,33 +34,42 @@
     <div class="dual-banner-wrapper no-link">
   {% endif %}
 
-    {% if section.settings.desktop_banner != blank %}
-      <img 
-        src="{{ section.settings.desktop_banner | img_url: '1920x200', crop: 'center' }}"
-        alt="{{ section.settings.banner_alt_text | default: 'Banner' }}"
-        class="dual-banner-image desktop-banner"
-        loading="lazy"
-        width="1920"
-        height="200">
-    {% else %}
-      <div class="desktop-banner" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #999;">
-        Desktop Banner (1920x200)
-      </div>
-    {% endif %}
-
-    {% if section.settings.mobile_banner != blank %}
-      <img 
-        src="{{ section.settings.mobile_banner | img_url: '428x160', crop: 'center' }}"
-        alt="{{ section.settings.banner_alt_text | default: 'Banner' }}"
-        class="dual-banner-image mobile-banner"
-        loading="lazy"
-        width="428"
-        height="160">
-    {% else %}
-      <div class="mobile-banner" style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #999;">
-        Mobile Banner (428x160)
-      </div>
-    {% endif %}
+    <picture>
+      {%- comment -%} 1. Mobile Source: Loads only on screens 768px and smaller {%- endcomment -%}
+      {% if section.settings.mobile_banner != blank %}
+        <source media="(max-width: 768px)" srcset="{{ section.settings.mobile_banner | image_url: width: 800 }}">
+      {% endif %}
+      
+      {%- comment -%} 2. Desktop Source: Loads only on screens 769px and larger {%- endcomment -%}
+      {% if section.settings.desktop_banner != blank %}
+        <source media="(min-width: 769px)" srcset="{{ section.settings.desktop_banner | image_url: width: 1920 }}">
+        
+        {%- comment -%} 3. Fallback Image Tag (Required for <picture> to work) {%- endcomment -%}
+        <img 
+          src="{{ section.settings.desktop_banner | image_url: width: 1920 }}"
+          alt="{{ section.settings.banner_alt_text | default: 'Banner' | escape }}"
+          class="dual-banner-image"
+          fetchpriority="high"
+          width="1920"
+          height="200"
+        >
+      {% elsif section.settings.mobile_banner != blank %}
+        {%- comment -%} If they forgot a desktop banner, fallback to mobile {%- endcomment -%}
+        <img 
+          src="{{ section.settings.mobile_banner | image_url: width: 800 }}"
+          alt="{{ section.settings.banner_alt_text | default: 'Banner' | escape }}"
+          class="dual-banner-image"
+          fetchpriority="high"
+          width="428"
+          height="160"
+        >
+      {% else %}
+        {%- comment -%} Placeholder if no images are selected {%- endcomment -%}
+        <div style="background: #f0f0f0; display: flex; align-items: center; justify-content: center; color: #999; height: 200px; width: 100%;">
+          Please select a banner image in the theme editor.
+        </div>
+      {% endif %}
+    </picture>
 
   {% if section.settings.banner_url != blank %}
     </a>
