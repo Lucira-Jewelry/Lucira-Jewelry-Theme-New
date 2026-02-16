@@ -125,17 +125,6 @@ if (firstOtp) firstOtp.focus();
 
 const sendBtn = document.getElementById('sendOtp');
 if (sendBtn) {
-
-      window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-                event: "promoClick",
-                promoClick : { promotion_name: 'send-otp',
-                creative_name: 'send-otp-button-login-form',
-                location_id: window.location.pathname
-                }
-    });
-
-
 sendBtn.addEventListener('click', async () => {
     const rawInput = document.getElementById('loginMobile').value;
     let cleanMobile = rawInput.replace(/\D/g, ''); 
@@ -173,7 +162,16 @@ sendBtn.addEventListener('click', async () => {
         });
         
         const data = await response.json();
-        
+        if (data.type == 'success'){
+            window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+                event: "promoClick",
+                promoClick : { promotion_name: 'send-otp',
+                creative_name: 'send-otp-button-login-form',
+                location_id: window.location.pathname
+                }
+    });
+        }
         if (data.type !== 'success') {
             showError('mobileError', data.message || 'Failed to send OTP');
             sendBtn.disabled = false;
