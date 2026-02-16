@@ -585,22 +585,22 @@ document.addEventListener('click', function (e) {
 
 
 
-    setTimeout(() => {
-      document
-        .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
-        .forEach((each) => {
-          const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
-          const colorName =
-            document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
+    // setTimeout(() => {
+    //   document
+    //     .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+    //     .forEach((each) => {
+    //       const title = each.getAttribute('data-title')?.toLowerCase().replace(/\s+/g, '') || '';
+    //       const colorName =
+    //         document.querySelector('#lf-color-name')?.textContent.toLowerCase().replace(/\s+/g, '') || '';
 
-          each.style.display =
-            title.includes(colorName) || colorName.includes(title)
-              ? ''
-              : 'none';
-        });
+    //       each.style.display =
+    //         title.includes(colorName) || colorName.includes(title)
+    //           ? ''
+    //           : 'none';
+    //     });
 
-      filterCharmsBySelectedVariantCarat();
-    }, 500);
+    //   filterCharmsBySelectedVariantCarat();
+    // }, 500);
 
     moveGridsColumnBelowTile(targetId);
 
