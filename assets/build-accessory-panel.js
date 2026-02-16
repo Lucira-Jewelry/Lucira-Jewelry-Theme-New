@@ -426,15 +426,15 @@ window.MainBaseCharm = function () {
     const isAlreadyActive = tile.classList.contains('active');
 
     // Remove active from all tiles
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.classList.remove('active');
-      t.setAttribute('aria-selected', 'false');
-    });
+    // document.querySelectorAll('.collection-tile').forEach((t) => {
+    //   t.classList.remove('active');
+    //   t.setAttribute('aria-selected', 'false');
+    // });
 
     // Remove active from all grid containers
-    document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-      grid.classList.remove('active');
-    });
+    // document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+    //   grid.classList.remove('active');
+    // });
 
     // If it was NOT already active, activate it
     if (!isAlreadyActive) {
