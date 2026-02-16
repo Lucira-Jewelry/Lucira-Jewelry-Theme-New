@@ -450,6 +450,14 @@ window.MainBaseCharm = function () {
       }
     }
   });
+document.addEventListener("DOMContentLoaded", function () {
+  const container = document.querySelector('.steps-container.custom_class_steps');
+  const step3 = container?.querySelector('.step-3');
+
+  if (container && step3 && step3.classList.contains('is-complete')) {
+    container.style.display = 'none';
+  }
+});
 
 
   // function moveGridsColumnBelowTile(targetId) {
