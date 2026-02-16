@@ -369,88 +369,219 @@ window.MainBaseCharm = function () {
   let currentCollectionId = null;
   let currentColorLabel = 'All';
 
-  function isMobileLayout() {
-    return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  // function isMobileLayout() {
+  //   return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  // }
+
+  // function moveGridsColumnBelowTile(targetId) {
+  //   const gridsColumn = document.querySelector('.grids-column');
+  //   const tilesColumn = document.getElementById('lf-collection-tiles');
+  //   const rightInner = document.querySelector('.right-split-inner');
+  //   if (!gridsColumn || !tilesColumn || !rightInner) return;
+
+  //   tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+  //     btn.classList.remove('open-with-grid')
+  //   );
+
+  //   if (!isMobileLayout()) {
+  //     if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
+  //     return;
+  //   }
+
+  //   const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
+  //   if (!activeTile) return;
+
+  //   const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
+
+  //   if (activeTile.classList.contains('open-with-grid')) {
+  //     activeTile.classList.remove('open-with-grid');
+  //     tileWrapper.removeChild(gridsColumn);
+  //   } else {
+  //     activeTile.classList.add('open-with-grid');
+  //     if (tileWrapper.nextSibling === gridsColumn) return;
+  //     tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
+  //   }
+  // }
+
+  // function setActiveCollectionById(targetId) {
+  //   const wrapper = $('lf-charms-grids-wrapper');
+  //   if (!wrapper) return;
+
+  //   wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
+  //     if (c.id === targetId) {
+  //       c.style.display = '';
+  //       c.classList.add('active');
+  //     } else {
+  //       c.style.display = 'none';
+  //       c.classList.remove('active');
+  //     }
+  //   });
+
+  //   currentCollectionId = targetId;
+
+  //   document.addEventListener('click', function (e) {
+  //   const tile = e.target.closest('.collection-tile');
+  //   if (!tile) return;
+
+  //   const isAlreadyActive = tile.classList.contains('active');
+
+  //   // Remove active from all tiles
+  //   document.querySelectorAll('.collection-tile').forEach((t) => {
+  //     t.classList.remove('active');
+  //     t.setAttribute('aria-selected', 'false');
+  //   });
+
+  //   // Remove active from all grid containers
+  //   document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+  //     grid.classList.remove('active');
+  //   });
+
+  //   // If it was NOT already active, activate it
+  //   if (!isAlreadyActive) {
+  //     tile.classList.add('active');
+  //     tile.setAttribute('aria-selected', 'true');
+
+  //     const targetId = tile.dataset.target;
+  //     if (targetId) {
+  //       const targetGrid = document.getElementById(targetId);
+  //       if (targetGrid) {
+  //         targetGrid.classList.add('active');
+  //       }
+  //     }
+  //   }
+  // });
+
+function isMobileLayout() {
+  return window.matchMedia &&
+    window.matchMedia('(max-width: 768px)').matches;
+}
+
+
+/* =========================================
+   MOVE GRID (Layout Only)
+========================================= */
+function moveGridsColumnBelowTile(targetId) {
+  const gridsColumn = document.querySelector('.grids-column');
+  const tilesColumn = document.getElementById('lf-collection-tiles');
+  const rightInner = document.querySelector('.right-split-inner');
+
+  if (!gridsColumn || !tilesColumn || !rightInner) return;
+
+  const activeTile = tilesColumn.querySelector(
+    `.collection-tile[data-target="${targetId}"]`
+  );
+  if (!activeTile) return;
+
+  const tileWrapper =
+    activeTile.closest('.main-collection-tile-div') || activeTile;
+
+  // Desktop → fixed position
+  if (!isMobileLayout()) {
+    if (!rightInner.contains(gridsColumn)) {
+      rightInner.insertBefore(gridsColumn, tilesColumn);
+    }
+    return;
   }
 
-  function moveGridsColumnBelowTile(targetId) {
-    const gridsColumn = document.querySelector('.grids-column');
-    const tilesColumn = document.getElementById('lf-collection-tiles');
-    const rightInner = document.querySelector('.right-split-inner');
-    if (!gridsColumn || !tilesColumn || !rightInner) return;
-
-    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
-      btn.classList.remove('open-with-grid')
+  // Mobile → move below tile
+  if (tileWrapper.nextSibling !== gridsColumn) {
+    tileWrapper.parentNode.insertBefore(
+      gridsColumn,
+      tileWrapper.nextSibling
     );
-
-    if (!isMobileLayout()) {
-      if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
-      return;
-    }
-
-    const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
-    if (!activeTile) return;
-
-    const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
-
-    if (activeTile.classList.contains('open-with-grid')) {
-      activeTile.classList.remove('open-with-grid');
-      tileWrapper.removeChild(gridsColumn);
-    } else {
-      activeTile.classList.add('open-with-grid');
-      if (tileWrapper.nextSibling === gridsColumn) return;
-      tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
-    }
   }
+}
 
-  function setActiveCollectionById(targetId) {
-    const wrapper = $('lf-charms-grids-wrapper');
-    if (!wrapper) return;
 
-    wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      if (c.id === targetId) {
-        c.style.display = '';
-        c.classList.add('active');
-      } else {
-        c.style.display = 'none';
-        c.classList.remove('active');
-      }
-    });
+/* =========================================
+   ACTIVATE COLLECTION
+========================================= */
+function setActiveCollectionById(targetId) {
 
-    currentCollectionId = targetId;
+  const wrapper = document.getElementById('lf-charms-grids-wrapper');
+  if (!wrapper) return;
 
-    document.addEventListener('click', function (e) {
-    const tile = e.target.closest('.collection-tile');
-    if (!tile) return;
+  const clickedTile = document.querySelector(
+    `.collection-tile[data-target="${targetId}"]`
+  );
+  if (!clickedTile) return;
 
-    const isAlreadyActive = tile.classList.contains('active');
+  const isAlreadyOpen = clickedTile.classList.contains('open-with-grid');
 
-    // Remove active from all tiles
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.classList.remove('active');
-      t.setAttribute('aria-selected', 'false');
-    });
-
-    // Remove active from all grid containers
-    document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-      grid.classList.remove('active');
-    });
-
-    // If it was NOT already active, activate it
-    if (!isAlreadyActive) {
-      tile.classList.add('active');
-      tile.setAttribute('aria-selected', 'true');
-
-      const targetId = tile.dataset.target;
-      if (targetId) {
-        const targetGrid = document.getElementById(targetId);
-        if (targetGrid) {
-          targetGrid.classList.add('active');
-        }
-      }
-    }
+  /* -------- RESET ALL TILES -------- */
+  document.querySelectorAll('.collection-tile').forEach((tile) => {
+    tile.classList.remove('open-with-grid', 'active');
+    tile.setAttribute('aria-selected', 'false');
   });
 
+  /* -------- RESET ALL GRIDS -------- */
+  wrapper.querySelectorAll('.charms-grid-container').forEach((grid) => {
+    grid.classList.remove('active');
+    grid.style.display = 'none';
+  });
+
+  /* -------- CLOSE IF ALREADY OPEN -------- */
+  if (isAlreadyOpen) return;
+
+  /* -------- OPEN STATE (ONLY STATE ALLOWED) -------- */
+  clickedTile.classList.add('open-with-grid', 'active');
+  clickedTile.setAttribute('aria-selected', 'true');
+
+  const targetGrid = document.getElementById(targetId);
+  if (targetGrid) {
+    targetGrid.classList.add('active');
+    targetGrid.style.display = '';
+  }
+
+  currentCollectionId = targetId;
+
+  /* -------- MOVE GRID -------- */
+  moveGridsColumnBelowTile(targetId);
+
+  /* -------- YOUR EXISTING LOGIC -------- */
+  setTimeout(() => {
+    document
+      .querySelectorAll('.charms-grid-container.active .custom-charm-grid')
+      .forEach((each) => {
+        const title =
+          each.getAttribute('data-title')
+            ?.toLowerCase()
+            .replace(/\s+/g, '') || '';
+
+        const colorName =
+          document
+            .querySelector('#lf-color-name')
+            ?.textContent.toLowerCase()
+            .replace(/\s+/g, '') || '';
+
+        each.style.display =
+          title.includes(colorName) || colorName.includes(title)
+            ? ''
+            : 'none';
+      });
+
+    filterCharmsBySelectedVariantCarat();
+  }, 500);
+
+  buildColorMapForActiveGrid();
+  buildSwatchDots();
+  refreshSelectedBorders();
+  refreshCapState();
+}
+
+
+/* =========================================
+   SINGLE CLICK HANDLER (ONLY ONCE)
+========================================= */
+document.addEventListener('click', function (e) {
+  const tile = e.target.closest('.collection-tile');
+  if (!tile) return;
+
+  const targetId = tile.dataset.target;
+  if (!targetId) return;
+
+  setActiveCollectionById(targetId);
+});
 
 
 
