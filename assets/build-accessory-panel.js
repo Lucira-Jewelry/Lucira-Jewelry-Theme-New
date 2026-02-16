@@ -373,35 +373,35 @@ window.MainBaseCharm = function () {
     return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
   }
 
-  function moveGridsColumnBelowTile(targetId) {
-    const gridsColumn = document.querySelector('.grids-column');
-    const tilesColumn = document.getElementById('lf-collection-tiles');
-    const rightInner = document.querySelector('.right-split-inner');
-    if (!gridsColumn || !tilesColumn || !rightInner) return;
+  // function moveGridsColumnBelowTile(targetId) {
+  //   const gridsColumn = document.querySelector('.grids-column');
+  //   const tilesColumn = document.getElementById('lf-collection-tiles');
+  //   const rightInner = document.querySelector('.right-split-inner');
+  //   if (!gridsColumn || !tilesColumn || !rightInner) return;
 
-    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
-      btn.classList.remove('open-with-grid')
-    );
+  //   tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+  //     btn.classList.remove('open-with-grid')
+  //   );
 
-    if (!isMobileLayout()) {
-      if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
-      return;
-    }
+  //   if (!isMobileLayout()) {
+  //     if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
+  //     return;
+  //   }
 
-    const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
-    if (!activeTile) return;
+  //   const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
+  //   if (!activeTile) return;
 
-    const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
+  //   const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
 
-    if (activeTile.classList.contains('open-with-grid')) {
-      activeTile.classList.remove('open-with-grid');
-      tileWrapper.removeChild(gridsColumn);
-    } else {
-      activeTile.classList.add('open-with-grid');
-      if (tileWrapper.nextSibling === gridsColumn) return;
-      tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
-    }
-  }
+  //   if (activeTile.classList.contains('open-with-grid')) {
+  //     activeTile.classList.remove('open-with-grid');
+  //     tileWrapper.removeChild(gridsColumn);
+  //   } else {
+  //     activeTile.classList.add('open-with-grid');
+  //     if (tileWrapper.nextSibling === gridsColumn) return;
+  //     tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
+  //   }
+  // }
 
   function setActiveCollectionById(targetId) {
     const wrapper = $('lf-charms-grids-wrapper');
