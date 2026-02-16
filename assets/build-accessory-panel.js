@@ -403,53 +403,53 @@ window.MainBaseCharm = function () {
     }
   }
 
-  function setActiveCollectionById(targetId) {
-    const wrapper = $('lf-charms-grids-wrapper');
-    if (!wrapper) return;
+  // function setActiveCollectionById(targetId) {
+  //   const wrapper = $('lf-charms-grids-wrapper');
+  //   if (!wrapper) return;
 
-    wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
-      if (c.id === targetId) {
-        c.style.display = '';
-        c.classList.add('active');
-      } else {
-        c.style.display = 'none';
-        c.classList.remove('active');
-      }
-    });
+  //   wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
+  //     if (c.id === targetId) {
+  //       c.style.display = '';
+  //       c.classList.add('active');
+  //     } else {
+  //       c.style.display = 'none';
+  //       c.classList.remove('active');
+  //     }
+  //   });
 
-    currentCollectionId = targetId;
+  //   currentCollectionId = targetId;
 
-    document.addEventListener('click', function (e) {
-    const tile = e.target.closest('.collection-tile');
-    if (!tile) return;
+  //   document.addEventListener('click', function (e) {
+  //   const tile = e.target.closest('.collection-tile');
+  //   if (!tile) return;
 
-    const isAlreadyActive = tile.classList.contains('active');
+  //   const isAlreadyActive = tile.classList.contains('active');
 
-    // Remove active from all tiles
-    document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.classList.remove('active');
-      t.setAttribute('aria-selected', 'false');
-    });
+  //   // Remove active from all tiles
+  //   document.querySelectorAll('.collection-tile').forEach((t) => {
+  //     t.classList.remove('active');
+  //     t.setAttribute('aria-selected', 'false');
+  //   });
 
-    // Remove active from all grid containers
-    document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-      grid.classList.remove('active');
-    });
+  //   // Remove active from all grid containers
+  //   document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+  //     grid.classList.remove('active');
+  //   });
 
-    // If it was NOT already active, activate it
-    if (!isAlreadyActive) {
-      tile.classList.add('active');
-      tile.setAttribute('aria-selected', 'true');
+  //   // If it was NOT already active, activate it
+  //   if (!isAlreadyActive) {
+  //     tile.classList.add('active');
+  //     tile.setAttribute('aria-selected', 'true');
 
-      const targetId = tile.dataset.target;
-      if (targetId) {
-        const targetGrid = document.getElementById(targetId);
-        if (targetGrid) {
-          targetGrid.classList.add('active');
-        }
-      }
-    }
-  });
+  //     const targetId = tile.dataset.target;
+  //     if (targetId) {
+  //       const targetGrid = document.getElementById(targetId);
+  //       if (targetGrid) {
+  //         targetGrid.classList.add('active');
+  //       }
+  //     }
+  //   }
+  // });
 
 
 
