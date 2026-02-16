@@ -394,7 +394,7 @@ window.MainBaseCharm = function () {
     const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
 
     if (activeTile.classList.contains('open-with-grid')) {
-      //activeTile.classList.remove('open-with-grid');
+      activeTile.classList.remove('open-with-grid');
       tileWrapper.removeChild(gridsColumn);
     } else {
       activeTile.classList.add('open-with-grid');
