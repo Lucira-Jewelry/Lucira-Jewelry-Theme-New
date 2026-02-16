@@ -379,9 +379,9 @@ window.MainBaseCharm = function () {
     const rightInner = document.querySelector('.right-split-inner');
     if (!gridsColumn || !tilesColumn || !rightInner) return;
 
-    // tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
-    //   btn.classList.remove('open-with-grid')
-    // );
+    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+      btn.classList.remove('open-with-grid')
+    );
 
     if (!isMobileLayout()) {
       if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
