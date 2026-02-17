@@ -133,72 +133,54 @@
           </picture> {% endcomment %}
 
           <picture>
-            {% if block.settings.category_image_mobile %}
+            {%- comment -%} Define images for cleaner logic {%- endcomment -%}
+            {%- assign desktop_img = block.settings.category_image_desktop | default: block.settings.category_image_mobile -%}
+            {%- assign mobile_img = block.settings.category_image_mobile | default: block.settings.category_image_desktop -%}
+
+            {%- comment -%} Mobile Sources (50vw width) {%- endcomment -%}
+            {%- if mobile_img -%}
               <source
                 media="(max-width: 767px)"
                 srcset="
-                  {{ block.settings.category_image_mobile | img_url: '210x360', format: 'webp' }} 210w,
-                  {{ block.settings.category_image_mobile | img_url: '420x720', format: 'webp' }} 420w
+                  {{ mobile_img | image_url: width: 210, height: 360, crop: 'center' }} 210w,
+                  {{ mobile_img | image_url: width: 420, height: 720, crop: 'center' }} 420w
                 "
-                sizes="(max-width: 767px) 210px"
-                type="image/webp"
+                sizes="50vw"
               >
-              <source
-                media="(max-width: 767px)"
-                srcset="
-                  {{ block.settings.category_image_mobile | img_url: '210x360' }} 210w,
-                  {{ block.settings.category_image_mobile | img_url: '420x720' }} 420w
-                "
-                sizes="(max-width: 767px) 210px"
-              >
-            {% endif %}
+            {%- endif -%}
 
-            {% if block.settings.category_image_desktop %}
+            {%- comment -%} Desktop Sources (Approx 16.5% width) {%- endcomment -%}
+            {%- if desktop_img -%}
               <source
                 media="(min-width: 768px)"
                 srcset="
-                  {{ block.settings.category_image_desktop | img_url: '200x346', crop: 'center', format: 'webp' }} 200w,
-                  {{ block.settings.category_image_desktop | img_url: '270x468', crop: 'center', format: 'webp' }} 270w,
-                  {{ block.settings.category_image_desktop | img_url: '400x692', crop: 'center', format: 'webp' }} 400w
+                  {{ desktop_img | image_url: width: 200, height: 346, crop: 'center' }} 200w,
+                  {{ desktop_img | image_url: width: 270, height: 468, crop: 'center' }} 270w,
+                  {{ desktop_img | image_url: width: 400, height: 692, crop: 'center' }} 400w
                 "
-                sizes="(min-width: 768px) 270px"
-                type="image/webp"
+                sizes="(min-width: 1400px) 16vw, 20vw"
               >
-              <source
-                media="(min-width: 768px)"
-                srcset="
-                  {{ block.settings.category_image_desktop | img_url: '200x346', crop: 'center' }} 200w,
-                  {{ block.settings.category_image_desktop | img_url: '270x468', crop: 'center' }} 270w,
-                  {{ block.settings.category_image_desktop | img_url: '400x692', crop: 'center' }} 400w
-                "
-                sizes="(min-width: 768px) 270px"
-              >
-            {% endif %}
+            {%- endif -%}
 
+            {%- comment -%} Main Image Tag {%- endcomment -%}
             <img
-              src="{% if block.settings.category_image_desktop %}
-                    {{ block.settings.category_image_desktop | img_url: '270x468', crop: 'center' }}
-                  {% elsif block.settings.category_image_mobile %}
-                    {{ block.settings.category_image_mobile | img_url: '420x720' }}
-                  {% else %}
-                    {{ 'placeholder-image.png' | asset_url }}
-                  {% endif %}"
-              srcset="{% if block.settings.category_image_desktop %}
-                        {{ block.settings.category_image_desktop | img_url: '200x346', crop: 'center' }} 200w,
-                        {{ block.settings.category_image_desktop | img_url: '270x468', crop: 'center' }} 270w,
-                        {{ block.settings.category_image_desktop | img_url: '400x692', crop: 'center' }} 400w
-                      {% elsif block.settings.category_image_mobile %}
-                        {{ block.settings.category_image_mobile | img_url: '210x360' }} 210w,
-                        {{ block.settings.category_image_mobile | img_url: '420x720' }} 420w
-                      {% endif %}"
-              sizes="(max-width: 767px) 210px, 270px"
-              width="400"
-              height="692"
-              alt="Explore our {{ block.settings.title }} Collection"
-              title="{{ block.settings.title }}"
-              loading="lazy"
-              decoding="async"
+              src="{{ desktop_img | image_url: width: 270, height: 468, crop: 'center' }}"
+              alt="Explore our {{ block.settings.title | escape }} Collection"
+              width="270"
+              height="468"
               class="category-card-img"
+              {%- comment -%} 
+                PERFORMANCE FIX: Load the first 6 images (1st row) eagerly. 
+                Load the rest lazily to save data.
+              {%- endcomment -%}
+              {% if forloop.index <= 6 %}
+                loading="eager"
+                fetchpriority="high"
+              {% else %}
+                loading="lazy"
+              {% endif %}
+              decoding="async"
+              style="object-fit: cover; width: 100%; height: auto; aspect-ratio: 270/468;"
             >
           </picture>
 
