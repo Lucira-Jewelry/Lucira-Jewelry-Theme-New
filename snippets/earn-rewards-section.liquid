@@ -704,36 +704,39 @@
       }
     }
 
-    // ── API Integration ──
     async function fetchLeadAndSync() {
       try {
-        // 1. Get Lead ID
         const res = await fetch(`${CONFIG.apiBase}/get-lead.php?customer_id=${window.customerData.id}`);
         const data = await res.json();
         
         if (data.data && data.data[0]) {
-          state.leadId = data.data[0]._id;
+          const serverLeadId = data.data[0]._id;
+
+          // ── THE FIX: DETECT DELETED/REPLACED CUSTOMER ──
+          // If we have a local leadId and it doesn't match the server, reset the progress.
+          if (state.leadId && state.leadId !== serverLeadId) {
+            console.warn("Lead ID mismatch detected (Customer likely recreated). Resetting local progress.");
+            state.maxStepReached = 0;
+            state.rewardedSteps = new Set();
+            // You might also want to clear state.formData = {} if you want a fresh start
+          }
+
+          state.leadId = serverLeadId;
           
-          // 2. Get Progress
+          // Now continue with syncing server progress...
           const progRes = await fetch(`${CONFIG.apiBase}/get-progress.php?lead_id=${state.leadId}`);
           const progData = await progRes.json();
           
-          // 3. Sync Server Data to Local State
-          if (progData.completed_steps && Array.isArray(progData.completed_steps)) {
-             progData.completed_steps.forEach(s => state.rewardedSteps.add(Number(s)));
+          if (progData.completed_steps) {
+            progData.completed_steps.forEach(s => state.rewardedSteps.add(Number(s)));
+            // Update maxStepReached based on what the server actually has
+            state.maxStepReached = Math.max(...Array.from(state.rewardedSteps), 0);
           }
           
-          // Ensure maxStep matches server reality
-          if (progData.last_step && progData.last_step > state.currentStep) {
-             state.currentStep = progData.last_step;
-             state.maxStepReached = Math.max(state.maxStepReached, state.currentStep);
-          }
-          
-          // Re-render to show updated progress
           renderUI();
         }
       } catch (e) {
-        console.warn('API Sync failed, using local state', e);
+        console.error('Sync failed', e);
       }
     }
 
