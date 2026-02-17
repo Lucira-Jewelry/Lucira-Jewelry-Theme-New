@@ -655,6 +655,8 @@ document.addEventListener('DOMContentLoaded', function () {
       wheelWrapper.style.display = 'flex';
       wheelWrapper.style.visibility = 'visible';
     }
+
+    loadLatestWinner();
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
     if (heading) heading.innerText = 'Register & Win a Reward';
