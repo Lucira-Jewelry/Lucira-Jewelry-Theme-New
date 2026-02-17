@@ -771,7 +771,6 @@
       }).catch(err => console.error('Reward save failed', err));
     }
 
-    // ── UI Rendering ──
     function renderUI() {
       // ── Show completion screen if profile is done ──
       if (state.profileComplete) {
@@ -779,7 +778,6 @@
         const completePanel = document.getElementById('step-complete');
         if (completePanel) completePanel.classList.add('active');
 
-        // Keep sidebar/coins up to date
         const coins = state.maxStepReached * CONFIG.pointsPerStep;
         ui.coinsDisplay.innerText = coins;
         const percent = (state.maxStepReached / CONFIG.totalSteps) * 100;
@@ -787,7 +785,6 @@
         ui.ringPct.innerText = Math.round(percent);
         ui.trackProgress.style.width = '100%';
 
-        // Mark all sidebar steps done
         ui.stepList.querySelectorAll('li').forEach(li => {
           li.classList.add('done');
           li.querySelector('.check-circle').classList.add('done');
@@ -798,12 +795,44 @@
           if (dot) { dot.classList.remove('current'); dot.classList.add('done'); }
           if (lbl) { lbl.classList.remove('current'); lbl.classList.add('done'); }
         }
-        return; // ← stop here, skip rest of renderUI
+        return;
       }
 
-      // Sidebar List
-      const listItems = ui.stepList.querySelectorAll('li');
-      listItems.forEach((li, idx) => {
+      // ── Toggle Panels ──
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+      const currentPanel = document.getElementById('step-' + state.currentStep);
+      if (currentPanel) currentPanel.classList.add('active');
+
+      // ── Coins & Ring Progress ──
+      const coins = state.maxStepReached * CONFIG.pointsPerStep;
+      ui.coinsDisplay.innerText = coins;
+      const percent = (state.maxStepReached / CONFIG.totalSteps) * 100;
+      ui.ringFill.style.strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
+      ui.ringPct.innerText = Math.round(percent);
+
+      // ── Top Progress Bar ──
+      const barPercent = ((state.currentStep - 1) / (CONFIG.totalSteps - 1)) * 100;
+      ui.trackProgress.style.width = barPercent + '%';
+
+      // ── Milestone Dots ──
+      for (let i = 0; i <= CONFIG.totalSteps; i++) {
+        const dot = document.getElementById('dot' + i);
+        const lbl = document.getElementById('lbl' + i);
+        if (!dot) continue;
+        dot.classList.remove('current', 'done');
+        if (lbl) lbl.classList.remove('current', 'done');
+
+        if (i < state.currentStep) {
+          dot.classList.add('done');
+          if (lbl) lbl.classList.add('done');
+        } else if (i === state.currentStep) {
+          dot.classList.add('current');
+          if (lbl) lbl.classList.add('current');
+        }
+      }
+
+      // ── Sidebar Step List ──
+      ui.stepList.querySelectorAll('li').forEach((li, idx) => {
         const stepIndex = idx + 1;
         const circle = li.querySelector('.check-circle');
         li.classList.remove('done');
