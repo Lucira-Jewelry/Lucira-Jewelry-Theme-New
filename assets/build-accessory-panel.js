@@ -36,7 +36,6 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 353px !important;
           margin: 0 auto !important;
           display: block !important;
         }
