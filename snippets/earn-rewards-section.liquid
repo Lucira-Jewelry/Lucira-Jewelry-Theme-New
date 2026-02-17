@@ -664,58 +664,140 @@ document.addEventListener('DOMContentLoaded', function () {
     requestAnimationFrame(step);
   }
 
-  goToStep(1);
 });
 </script>
 
 <script>
+/* ===============================
+   GLOBAL STATE
+=============================== */
 let leadId = null;
+let completedSteps = [];
 
-// 🔹 Fetch lead_id using customer id
+/* ===============================
+   FETCH LEAD ID
+=============================== */
 async function fetchLeadId() {
-  const res = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
-  const data = await res.json();
+  if (!window.customerData) {
+    console.warn("No customer logged in");
+    goToStep(1);
+    return;
+  }
 
-  // adjust based on response structure
-  leadId = data.data[0]._id;
-  console.log("Lead ID:", leadId);
+  try {
+    const res = await fetch(
+      "https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" +
+      customerData.id
+    );
 
-  loadProgress(); // restore saved progress
+    const data = await res.json();
+
+    if (!data?.data?.length) {
+      console.warn("Lead not found");
+      goToStep(1);
+      return;
+    }
+
+    leadId = data.data[0]._id;
+    console.log("Lead ID:", leadId);
+
+    await loadProgress();
+
+  } catch (err) {
+    console.error("Lead fetch failed:", err);
+    goToStep(1);
+  }
 }
 
-// 🔹 Save step
+/* ===============================
+   LOAD SAVED PROGRESS
+=============================== */
+async function loadProgress() {
+  if (!leadId) return;
+
+  try {
+    const res = await fetch(
+      "https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" +
+      leadId
+    );
+
+    const data = await res.json();
+
+    completedSteps = data.completed_steps || [];
+    const lastStep = data.last_step || 1;
+
+    console.log("Completed steps:", completedSteps);
+    console.log("Restoring step:", lastStep);
+
+    // Restore coins
+    const earnedCoins = completedSteps.length * 100;
+    document.getElementById("coinsEarned").textContent = earnedCoins;
+
+    goToStep(lastStep);
+
+  } catch (err) {
+    console.error("Progress load failed:", err);
+    goToStep(1);
+  }
+}
+
+/* ===============================
+   SAVE STEP (NO DUPLICATES)
+=============================== */
 async function saveStep(step) {
   if (!leadId) return;
 
-  await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      lead_id: leadId,
-      step: step
-    })
-  });
+  if (completedSteps.includes(step)) {
+    console.log("Step already rewarded:", step);
+    return;
+  }
+
+  try {
+    await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lead_id: leadId,
+        step: step
+      })
+    });
+
+    completedSteps.push(step);
+
+    // update coins
+    animateCoins(completedSteps.length * 100);
+
+  } catch (err) {
+    console.error("Save step failed:", err);
+  }
 }
 
-// 🔹 Load saved progress
-async function loadProgress() {
-  const res = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
-  const data = await res.json();
-
-  const lastStep = data.last_step || 1;
-  goToStep(lastStep);
-}
-
-// 🔹 Hook into your existing step function
+/* ===============================
+   HOOK goToStep
+=============================== */
 const originalGoToStep = window.goToStep;
 
-window.goToStep = async function(step) {
+window.goToStep = async function (step) {
   if (step > 1) {
-    await saveStep(step - 1); // reward previous step
+    await saveStep(step - 1);
   }
   originalGoToStep(step);
 };
 
+/* ===============================
+   HOOK completeProfile
+=============================== */
+const originalCompleteProfile = window.completeProfile;
+
+window.completeProfile = async function () {
+  await saveStep(4);
+  originalCompleteProfile();
+};
+
+/* ===============================
+   INIT
+=============================== */
 document.addEventListener("DOMContentLoaded", fetchLeadId);
 </script>
+
 
