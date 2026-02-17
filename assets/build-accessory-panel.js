@@ -41,12 +41,12 @@ window.MainBaseCharm = function () {
           display: block !important;
         }
         #vis-Visualiser_Canvas {
-          width: 300px !important;
-          height: 300px !important;
+          width: 250px !important;
+          height: 250px !important;
         }
         #vis-Visualiser_Canvas canvas {
-          width: 300px !important;
-          height: 300px !important;
+          width: 250px !important;
+          height: 250px !important;
         }
       }
     `;
