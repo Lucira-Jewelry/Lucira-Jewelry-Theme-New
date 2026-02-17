@@ -678,22 +678,33 @@ async function loadLatestWinner() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/recent-winners.php');
     if (!res.ok) return;
+
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) return;
+
     const latest = data[0];
+
     const ticker = document.getElementById('winnerTicker');
     const textEl = document.getElementById('winnerText');
+
     if (!ticker || !textEl) return;
-    textEl.innerText =
-      latest.city && latest.city !== "India"
-        ? `${latest.name} from ${latest.city} just won ${latest.prize}!`
-        : `${latest.name} just won ${latest.prize}!`;
+
+    // ✅ GUARD: hide ticker if data incomplete
+    if (!latest || !latest.name || !latest.prize) {
+      ticker.style.display = 'none';
+      return;
+    }
+
+    const cityText = latest.city ? ` from ${latest.city}` : '';
+    textEl.innerText = `${latest.name}${cityText} just won ${latest.prize}!`;
 
     ticker.style.display = 'flex';
+
   } catch (err) {
     console.error('Winner fetch error:', err);
   }
 }
+
 
 
 
