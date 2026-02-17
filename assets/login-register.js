@@ -701,7 +701,7 @@ async function loadLatestWinner() {
     }
 
     const cityText = latest.city ? ` from ${latest.city}` : '';
-    textEl.innerText = `${latest.name}${cityText} just won ${latest.prize}!`;
+    textEl.innerText = `${latest.name} just won ${latest.prize}!`;
 
     ticker.style.display = 'flex';
 
