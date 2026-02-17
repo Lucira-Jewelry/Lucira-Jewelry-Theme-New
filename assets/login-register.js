@@ -377,7 +377,7 @@ try {
     window.dataLayer = window.dataLayer || [];
     dataLayer.push({
         event: 'signup',
-        user: {
+        User: {
         name: firstName + ' ' + lastName,
         email: email,
         mobile: mobile,
