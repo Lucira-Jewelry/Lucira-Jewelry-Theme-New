@@ -679,8 +679,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const popup = document.getElementById('login-popup');
   if (!popup) return;
 
-  
-
   const heading = popup.querySelector('.otp-number-wrapper p.heading');
   const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
 
@@ -688,3 +686,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
 
+async function loadLatestWinner() {
+  try {
+    const res = await fetch('https://api.lucirajewelry.com/recent-winners.php');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) return;
+    const latest = data[0];
+    const ticker = document.getElementById('winnerTicker');
+    const textEl = document.getElementById('winnerText');
+    if (!ticker || !textEl) return;
+    textEl.innerText =
+      latest.city && latest.city !== "India"
+        ? `${latest.name} from ${latest.city} just won ${latest.prize}!`
+        : `${latest.name} just won ${latest.prize}!`;
+
+    ticker.style.display = 'flex';
+  } catch (err) {
+    console.error('Winner fetch error:', err);
+  }
+}
