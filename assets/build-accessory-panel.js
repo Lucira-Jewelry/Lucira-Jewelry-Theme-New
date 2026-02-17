@@ -467,15 +467,39 @@ window.MainBaseCharm = function () {
         });
 
       filterCharmsBySelectedVariantCarat();
-    }, 500);
+    }, 100); // Reduced delay for better responsiveness
 
     moveGridsColumnBelowTile(targetId);
-
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
     refreshCapState();
+    toggleZoomBar(); // Added to ensure zoom bar refreshes on collection change
   }
+
+// 2. Add the Click Listener ONCE (Place this outside any function scope)
+document.addEventListener('click', function (e) {
+  const tile = e.target.closest('.collection-tile');
+  if (!tile) return;
+
+  const targetId = tile.dataset.target;
+  const isAlreadyActive = tile.classList.contains('active');
+
+  // Clear previous states
+  document.querySelectorAll('.collection-tile').forEach((t) => {
+    t.classList.remove('active');
+    t.setAttribute('aria-selected', 'false');
+  });
+
+  // Activate current
+  tile.classList.add('active');
+  tile.setAttribute('aria-selected', 'true');
+
+  // Trigger the visual update
+  if (targetId) {
+    setActiveCollectionById(targetId);
+  }
+});
 
   (function () {
     if (window._charmCartInit) return;
