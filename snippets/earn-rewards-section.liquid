@@ -544,304 +544,307 @@
 </script>
 {% endif %}
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const TOTAL = 4;
-  const CIRCUMFERENCE = 2 * Math.PI * 42;
-  document.getElementById('ringFill').style.strokeDasharray = CIRCUMFERENCE;
-
-  document.querySelectorAll('.chip-group').forEach(g => {
-    g.querySelectorAll('.chip').forEach(c => {
-      c.addEventListener('click', () => c.classList.toggle('selected'));
-    });
-  });
-
-  document.getElementById('marriedToggle').addEventListener('change', function () {
-    document.getElementById('spouseFields').style.display = this.checked ? '' : 'none';
-  });
-
-  const hintTexts = [
-    'You are just <strong>3 more steps</strong> away for Bonus Lucira Coins',
-    'You are just <strong>2 more steps</strong> away for Bonus Lucira Coins',
-    'You are just <strong>1 more step</strong> away for Bonus Lucira Coins',
-    'One final step — complete your profile for <strong>400 Lucira Coins!</strong>',
-    '🎉 You\'ve unlocked all <strong>400 Lucira Coins!</strong>'
-  ];
-
-  const coinsPerStep = [0, 100, 200, 300, 400];
-
-  window.goToStep = function (step) {
-    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('step-' + step).classList.add('active');
-
-    document.querySelectorAll('.step-tab').forEach((t, i) => {
-      t.classList.remove('active', 'done');
-      if (i + 1 < step) t.classList.add('done');
-      if (i + 1 === step) t.classList.add('active');
-    });
-
-    for (let i = 0; i <= 4; i++) {
-      const dot = document.getElementById('dot' + i);
-      const lbl = document.getElementById('lbl' + i);
-      if (!dot) continue;
-      dot.classList.remove('done', 'current');
-      lbl.classList.remove('done', 'current');
-      if (i < step) {
-        dot.classList.add('done');
-        lbl.classList.add('done');
-      } else if (i === step) {
-        dot.classList.add('current');
-        lbl.classList.add('current');
-      }
-    }
-
-    const SEGMENTS = 4;
-
-    const progressIndex = step - 1;
-    const trackPct = (progressIndex / SEGMENTS) * 100;
-    document.getElementById('trackProgress').style.width = trackPct + '%';
-
-    const pct = Math.round(trackPct);
-    const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
-    document.getElementById('ringFill').style.strokeDashoffset = offset;
-    document.getElementById('ringPct').textContent = pct;
-
-    for (let i = 1; i <= 4; i++) {
-      const li = document.getElementById('sli-' + i);
-      const cc = document.getElementById('cc' + i);
-      if (!li || !cc) continue;
-      li.classList.remove('done');
-      cc.classList.remove('done', 'current');
-      if (i < step) {
-        li.classList.add('done');
-        cc.classList.add('done');
-      } else if (i === step) {
-        cc.classList.add('current');
-      }
-    }
-
-    animateCoins(coinsPerStep[step - 1]);
-
-    document.getElementById('ptsHint').innerHTML = hintTexts[step - 1] || hintTexts[0];
-  };
-
-  window.completeProfile = function () {
-    for (let i = 0; i <= 4; i++) {
-      const dot = document.getElementById('dot' + i);
-      const lbl = document.getElementById('lbl' + i);
-      if (dot) { dot.classList.add('done'); dot.classList.remove('current'); }
-      if (lbl) { lbl.classList.add('done'); lbl.classList.remove('current'); }
-    }
-    document.getElementById('trackProgress').style.width = '100%';
-
-    const offset = 0;
-    document.getElementById('ringFill').style.strokeDashoffset = offset;
-    document.getElementById('ringPct').textContent = '100';
-
-    for (let i = 1; i <= 4; i++) {
-      const li = document.getElementById('sli-' + i);
-      const cc = document.getElementById('cc' + i);
-      if (li) li.classList.add('done');
-      if (cc) { cc.classList.add('done'); cc.classList.remove('current'); }
-    }
-    document.querySelectorAll('.step-tab').forEach(t => t.classList.add('done'));
-    animateCoins(400);
-    document.getElementById('ptsHint').innerHTML = hintTexts[4];
-    setTimeout(() => alert('🎉 Profile Complete! Your 400 Lucira Coins are unlocked.'), 600);
-  };
-
-  function animateCoins(target) {
-    const el = document.getElementById('coinsEarned');
-    const start = parseInt(el.textContent) || 0;
-    const diff = target - start;
-    const dur = 600;
-    const startTime = performance.now();
-    function step(now) {
-      const t = Math.min((now - startTime) / dur, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      el.textContent = Math.round(start + diff * ease);
-      if (t < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
-  }
-
-  goToStep(1);
-});
-</script>
-
-<script>
   document.addEventListener('DOMContentLoaded', function () {
+    // ── Configuration ──
+    const CONFIG = {
+      storageKey: 'lucira_profile_data',
+      apiBase: 'https://api.lucirajewelry.com/earn-rewards',
+      totalSteps: 4,
+      pointsPerStep: 100
+    };
 
-    // ✅ Captured HERE (after first script's DOMContentLoaded has already run and set these)
-    const originalGoToStep      = window.goToStep;
-    const originalCompleteProfile = window.completeProfile;
+    // ── State Management ──
+    let state = {
+      currentStep: 1,
+      maxStepReached: 0,
+      formData: {},
+      leadId: null,
+      rewardedSteps: new Set() // Prevent double-dipping points
+    };
 
-    let leadId        = null;
-    let rewardedSteps = new Set(); // prevents double-rewarding on refresh
+    // ── UI References ──
+    const ui = {
+      trackProgress: document.getElementById('trackProgress'),
+      ringFill: document.getElementById('ringFill'),
+      ringPct: document.getElementById('ringPct'),
+      coinsDisplay: document.getElementById('coinsEarned'),
+      marriedToggle: document.getElementById('marriedToggle'),
+      spouseFields: document.getElementById('spouseFields'),
+      stepList: document.getElementById('stepsList')
+    };
 
-    // ── Form Save / Restore ────────────────────────────────────────────────────
+    // Circle Math
+    const CIRCUMFERENCE = 2 * Math.PI * 42;
+    ui.ringFill.style.strokeDasharray = CIRCUMFERENCE;
 
-    function saveFormState() {
-      try {
-        const state = {};
+    // ── Initialization ──
+    async function init() {
+      // 1. Load LocalStorage first (Instant UI feedback)
+      loadLocalState();
+      
+      // 2. Bind Interactions
+      bindEvents();
 
-        const g = document.querySelector('input[name="gender"]:checked');
-        if (g) state.gender = g.value;
-
-        const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
-        if (dob) state.dob = dob.value;
-
-        state.married = document.getElementById('marriedToggle').checked;
-
-        const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
-        if (spouseDates[0]) state.anniversary = spouseDates[0].value;
-        if (spouseDates[1]) state.spouseDob   = spouseDates[1].value;
-
-        document.querySelectorAll('.step-panel').forEach(panel => {
-          panel.querySelectorAll('.chip-group').forEach((group, gi) => {
-            const sel = [];
-            group.querySelectorAll('.chip').forEach((chip, ci) => {
-              if (chip.classList.contains('selected')) sel.push(ci);
-            });
-            state[panel.id + '_chips_' + gi] = sel;
-          });
-          panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
-            state[panel.id + '_cb_' + ci] = cb.checked;
-          });
-        });
-
-        localStorage.setItem('lucira_form_state', JSON.stringify(state));
-      } catch (e) { console.warn('saveFormState', e); }
-    }
-
-    function restoreFormState() {
-      try {
-        const raw = localStorage.getItem('lucira_form_state');
-        if (!raw) return;
-        const state = JSON.parse(raw);
-
-        if (state.gender) {
-          const r = document.querySelector('input[name="gender"][value="' + state.gender + '"]');
-          if (r) r.checked = true;
-        }
-
-        const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
-        if (dob && state.dob) dob.value = state.dob;
-
-        if (state.married !== undefined) {
-          document.getElementById('marriedToggle').checked = state.married;
-          document.getElementById('spouseFields').style.display = state.married ? '' : 'none';
-        }
-
-        const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
-        if (spouseDates[0] && state.anniversary) spouseDates[0].value = state.anniversary;
-        if (spouseDates[1] && state.spouseDob)   spouseDates[1].value = state.spouseDob;
-
-        document.querySelectorAll('.step-panel').forEach(panel => {
-          panel.querySelectorAll('.chip-group').forEach((group, gi) => {
-            const key = panel.id + '_chips_' + gi;
-            if (state[key]) {
-              group.querySelectorAll('.chip').forEach((chip, ci) => {
-                chip.classList.toggle('selected', state[key].includes(ci));
-              });
-            }
-          });
-          panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
-            const key = panel.id + '_cb_' + ci;
-            if (state[key] !== undefined) cb.checked = state[key];
-          });
-        });
-      } catch (e) { console.warn('restoreFormState', e); }
-    }
-
-    // Save on any field change or chip click
-    document.addEventListener('change', function (e) {
-      if (e.target.closest && e.target.closest('.page-wrap')) saveFormState();
-    });
-    document.addEventListener('click', function (e) {
-      if (e.target.classList && e.target.classList.contains('chip')) {
-        setTimeout(saveFormState, 50);
+      // 3. If Customer exists, sync with Server
+      if (typeof window.customerData !== 'undefined' && window.customerData.id) {
+        await fetchLeadAndSync();
       }
-    });
 
-    // ── API ──────────────────────────────────────────────────────────────────────
-
-    async function saveStep(step) {
-      if (!leadId)                 return;
-      if (rewardedSteps.has(step)) { console.log('Step ' + step + ' already rewarded, skip'); return; }
-      try {
-        await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ lead_id: leadId, step: step })
-        });
-        rewardedSteps.add(step);
-        console.log('Rewarded step', step);
-      } catch (e) { console.error('saveStep', e); }
+      // 4. Render final state
+      renderUI();
     }
 
-    async function loadProgress() {
-      try {
-        const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
-        const data = await res.json();
-
-        // Mark server-completed steps so they're never re-sent
-        if (Array.isArray(data.completed_steps)) {
-          data.completed_steps.forEach(s => rewardedSteps.add(Number(s)));
+    // ── Core Logic: Navigation ──
+    window.goToStep = function(step) {
+      const direction = step > state.currentStep ? 'forward' : 'backward';
+      
+      // 1. Save Data
+      scrapeFormData();
+      
+      // 2. Handle Rewards (Only moving forward)
+      if (direction === 'forward') {
+        // Update Max Reach
+        if (state.currentStep > state.maxStepReached) {
+          state.maxStepReached = state.currentStep;
         }
+        // Save current step completion to API (Fire & Forget)
+        saveStepToApi(state.currentStep); 
+      }
 
-        restoreFormState();
+      // 3. Move Step
+      state.currentStep = step;
+      
+      // 4. Persist & Render
+      saveLocalState();
+      renderUI();
+      
+      // Scroll to top
+      document.querySelector('.page-wrap').scrollIntoView({ behavior: 'smooth' });
+    };
 
-        // ✅ Use originalGoToStep — NOT window.goToStep — to avoid re-triggering rewards on load
-        originalGoToStep(data.last_step || 1);
+    window.completeProfile = function() {
+      scrapeFormData();
+      state.maxStepReached = 4;
+      saveLocalState();
+      
+      // Save Step 4 to API
+      saveStepToApi(4);
+      
+      renderUI();
+      alert("Profile Completed! 400 Coins Earned.");
+    };
+
+    // ── Data Handling (Unified) ──
+    function scrapeFormData() {
+      // Scrape standard inputs
+      document.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.type === 'radio') {
+          if (el.checked) state.formData[el.name] = el.value;
+        } else if (el.type === 'checkbox') {
+          state.formData[el.id] = el.checked;
+        } else {
+          // Use ID, or name, or generate a key based on parent text for dates
+          let key = el.id || el.name;
+          if(el.type === 'date' && !key) key = 'date_' + el.closest('.form-row')?.innerText.trim();
+          state.formData[key] = el.value;
+        }
+      });
+
+      // Scrape Chips
+      document.querySelectorAll('.chip-group').forEach((group, index) => {
+        const selectedChips = [];
+        group.querySelectorAll('.chip.selected').forEach(c => selectedChips.push(c.innerText));
+        state.formData['chip_group_' + index] = selectedChips;
+      });
+    }
+
+    function restoreFormInputs() {
+      if (!state.formData) return;
+
+      // Restore Inputs
+      for (const [key, value] of Object.entries(state.formData)) {
+        const elById = document.getElementById(key);
+        if (elById) {
+          if (elById.type === 'checkbox') elById.checked = value;
+          else elById.value = value;
+        }
+        
+        const radios = document.getElementsByName(key);
+        if (radios.length > 0) {
+          radios.forEach(r => { if (r.value === value) r.checked = true; });
+        }
+      }
+
+      // Restore Chips
+      document.querySelectorAll('.chip-group').forEach((group, index) => {
+        const savedChips = state.formData['chip_group_' + index] || [];
+        group.querySelectorAll('.chip').forEach(c => {
+          c.classList.toggle('selected', savedChips.includes(c.innerText));
+        });
+      });
+      
+      // Retrigger toggles
+      toggleSpouseFields();
+    }
+
+    function saveLocalState() {
+      // Convert Set to Array for JSON storage
+      const storageState = { ...state, rewardedSteps: Array.from(state.rewardedSteps) };
+      localStorage.setItem(CONFIG.storageKey, JSON.stringify(storageState));
+    }
+
+    function loadLocalState() {
+      const saved = localStorage.getItem(CONFIG.storageKey);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        state = { ...state, ...parsed };
+        // Convert Array back to Set
+        state.rewardedSteps = new Set(parsed.rewardedSteps || []);
+        restoreFormInputs();
+      }
+    }
+
+    // ── API Integration ──
+    async function fetchLeadAndSync() {
+      try {
+        // 1. Get Lead ID
+        const res = await fetch(`${CONFIG.apiBase}/get-lead.php?customer_id=${window.customerData.id}`);
+        const data = await res.json();
+        
+        if (data.data && data.data[0]) {
+          state.leadId = data.data[0]._id;
+          
+          // 2. Get Progress
+          const progRes = await fetch(`${CONFIG.apiBase}/get-progress.php?lead_id=${state.leadId}`);
+          const progData = await progRes.json();
+          
+          // 3. Sync Server Data to Local State
+          if (progData.completed_steps && Array.isArray(progData.completed_steps)) {
+             progData.completed_steps.forEach(s => state.rewardedSteps.add(Number(s)));
+          }
+          
+          // Ensure maxStep matches server reality
+          if (progData.last_step && progData.last_step > state.currentStep) {
+             state.currentStep = progData.last_step;
+             state.maxStepReached = Math.max(state.maxStepReached, state.currentStep);
+          }
+          
+          // Re-render to show updated progress
+          renderUI();
+        }
       } catch (e) {
-        console.error('loadProgress', e);
-        restoreFormState();
-        originalGoToStep(1);
+        console.warn('API Sync failed, using local state', e);
       }
     }
 
-    async function fetchLeadId() {
-      try {
-        const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
-        const data = await res.json();
-        leadId = data.data[0]._id;
-        console.log('Lead ID:', leadId);
-        await loadProgress();
-      } catch (e) { console.error('fetchLeadId', e); }
+    function saveStepToApi(step) {
+      if (!state.leadId) return;
+      if (state.rewardedSteps.has(step)) return;
+
+      // Use keepalive:true so the request survives if the page closes
+      fetch(`${CONFIG.apiBase}/save-step.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: state.leadId, step: step }),
+        keepalive: true 
+      }).then(() => {
+        state.rewardedSteps.add(step);
+        saveLocalState();
+      }).catch(err => console.error('Reward save failed', err));
     }
 
-    // ── Override goToStep ────────────────────────────────────────────────────────
+    // ── UI Rendering ──
+    function renderUI() {
+      // Toggle Panels
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+      const currentPanel = document.getElementById('step-' + state.currentStep);
+      if(currentPanel) currentPanel.classList.add('active');
 
-    window.goToStep = async function (targetStep) {
-      const activePanel = document.querySelector('.step-panel.active');
-      const currentStep = activePanel ? parseInt(activePanel.id.replace('step-', '')) : 1;
+      // Coins & Progress
+      const coins = state.maxStepReached * CONFIG.pointsPerStep;
+      ui.coinsDisplay.innerText = coins;
 
-      saveFormState();
+      const percent = (state.maxStepReached / CONFIG.totalSteps) * 100;
+      ui.ringFill.style.strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
+      ui.ringPct.innerText = Math.round(percent);
 
-      // Only reward when moving forward, for the step being LEFT
-      if (targetStep > currentStep) {
-        await saveStep(currentStep);
+      // Top Bar
+      const barPercent = ((state.currentStep - 1) / (CONFIG.totalSteps - 1)) * 100;
+      ui.trackProgress.style.width = barPercent + '%';
+
+      // Dots
+      for (let i = 0; i <= CONFIG.totalSteps; i++) {
+        const dot = document.getElementById('dot' + i);
+        const lbl = document.getElementById('lbl' + i);
+        if (!dot) continue;
+        dot.classList.remove('current', 'done');
+        if (lbl) lbl.classList.remove('current', 'done');
+
+        if (i < state.currentStep) {
+          dot.classList.add('done');
+          if (lbl) lbl.classList.add('done');
+        } else if (i === state.currentStep) {
+          dot.classList.add('current');
+          if (lbl) lbl.classList.add('current');
+        }
       }
 
-      originalGoToStep(targetStep);
-    };
+      // Sidebar List
+      const listItems = ui.stepList.querySelectorAll('li');
+      listItems.forEach((li, idx) => {
+        const stepIndex = idx + 1;
+        const circle = li.querySelector('.check-circle');
+        li.classList.remove('done');
+        circle.classList.remove('done', 'current');
 
-    // ✅ Override completeProfile — step 4 was NEVER being saved before
-    window.completeProfile = async function () {
-      saveFormState();
-      await saveStep(4);
-      originalCompleteProfile();
-    };
-
-    // ── Init ─────────────────────────────────────────────────────────────────────
-
-    if (typeof customerData !== 'undefined' && customerData.id) {
-      fetchLeadId();
-    } else {
-      restoreFormState();
-      // goToStep(1) already called by first script — no need to call again
+        if (stepIndex <= state.maxStepReached) {
+          li.classList.add('done');
+          circle.classList.add('done');
+        } else if (stepIndex === state.currentStep) {
+          circle.classList.add('current');
+        }
+      });
     }
 
+    // ── Event Bindings ──
+    function bindEvents() {
+      // Chips
+      document.querySelectorAll('.chip-group').forEach(g => {
+        g.querySelectorAll('.chip').forEach(c => {
+          c.addEventListener('click', () => {
+            c.classList.toggle('selected');
+            scrapeFormData();
+            saveLocalState();
+          });
+        });
+      });
+
+      // Toggles
+      if(ui.marriedToggle) {
+        ui.marriedToggle.addEventListener('change', () => {
+          toggleSpouseFields();
+          scrapeFormData();
+          saveLocalState();
+        });
+      }
+
+      // Inputs
+      document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', () => {
+          scrapeFormData();
+          saveLocalState();
+        });
+      });
+    }
+
+    function toggleSpouseFields() {
+      if (ui.marriedToggle && ui.spouseFields) {
+        ui.spouseFields.style.display = ui.marriedToggle.checked ? 'block' : 'none';
+      }
+    }
+
+    // ── Run ──
+    init();
   });
 </script>
 
