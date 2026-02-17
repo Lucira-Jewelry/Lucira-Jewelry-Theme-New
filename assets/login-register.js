@@ -48,6 +48,17 @@ document.getElementById(id).style.display = 'flex';
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+    
+  // 🔹 Push GTM DataLayer Event
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+        event: "promoClick",
+        promoClick : { promotion_name: id,
+        creative_name: 'login-popup-close',
+        location_id: window.location.pathname
+        }
+    });
+
   document.getElementById(id).style.display = 'none';
   resetToLoginView();
   const popup = document.getElementById('login-popup');
@@ -151,7 +162,16 @@ sendBtn.addEventListener('click', async () => {
         });
         
         const data = await response.json();
-        
+        if (data.type == 'success'){
+            window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+                event: "promoClick",
+                promoClick : { promotion_name: 'send-otp',
+                creative_name: 'send-otp-button-login-form',
+                location_id: window.location.pathname
+                }
+    });
+        }
         if (data.type !== 'success') {
             showError('mobileError', data.message || 'Failed to send OTP');
             sendBtn.disabled = false;
