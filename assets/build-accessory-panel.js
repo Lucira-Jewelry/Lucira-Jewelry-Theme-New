@@ -41,13 +41,13 @@ window.MainBaseCharm = function () {
           display: block !important;
         }
         #vis-Visualiser_Canvas {
-          width: 250px !important;
-          height: 250px !important;
+          width: 200px !important;
+          height: 200px !important;
           margin: 0 auto;
         }
         #vis-Visualiser_Canvas canvas {
-          width: 250px !important;
-          height: 250px !important;
+          width: 200px !important;
+          height: 200px !important;
         }
       }
     `;
