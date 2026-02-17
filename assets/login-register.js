@@ -48,6 +48,17 @@ document.getElementById(id).style.display = 'flex';
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+    
+  // 🔹 Push GTM DataLayer Event
+  window.dataLayer = window.dataLayer || [];
+  window.dataLayer.push({
+        event: "promoClick",
+        promoClick : { promotion_name: id,
+        creative_name: 'login-popup-close',
+        location_id: window.location.pathname
+        }
+    });
+
   document.getElementById(id).style.display = 'none';
   resetToLoginView();
   const popup = document.getElementById('login-popup');
@@ -151,7 +162,16 @@ sendBtn.addEventListener('click', async () => {
         });
         
         const data = await response.json();
-        
+        if (data.type == 'success'){
+            window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+                event: "promoClick",
+                promoClick : { promotion_name: 'send-otp',
+                creative_name: 'send-otp-button-login-form',
+                location_id: window.location.pathname
+                }
+    });
+        }
         if (data.type !== 'success') {
             showError('mobileError', data.message || 'Failed to send OTP');
             sendBtn.disabled = false;
@@ -366,7 +386,7 @@ try {
     window.dataLayer = window.dataLayer || [];
     dataLayer.push({
         event: 'signup',
-        user: {
+        User: {
         name: firstName + ' ' + lastName,
         email: email,
         mobile: mobile,
@@ -612,15 +632,19 @@ function setLuciraSessionPopup() {
 sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
 document.addEventListener('DOMContentLoaded', function () {
-loadLatestWinner();
 const POPUP_ID = 'login-popup';
-const SHOW_DELAY = 12000;
+const SHOW_DELAY = 8000;
 
 const popup = document.getElementById(POPUP_ID);
 if (!popup) return;
 
+const path = window.location.pathname.toLowerCase();
+
+if (/\/[a-z-]+-silver-rate-today\/?$/.test(path)) return;
+
 if (hasLuciraSessionPopup()) return;
 if (document.body.classList.contains('customer-logged-in')) return;
+
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
@@ -642,10 +666,9 @@ setTimeout(() => {
     }
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
-    if (heading) heading.innerText = 'Register & Win a Reward';
-    if (subtext) subtext.innerText = 'Get assured reward of ₹750';
+    if (heading) heading.innerText = 'Register to Win a Reward';
+    if (subtext) subtext.innerText = 'Try Your Luck! Win a Diamond Pendant';
     setLuciraSessionPopup();
-    
 }, SHOW_DELAY);
 });
 
@@ -683,6 +706,3 @@ async function loadLatestWinner() {
     console.error('Winner fetch error:', err);
   }
 }
-
-
-
