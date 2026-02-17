@@ -535,7 +535,14 @@
   </div><!-- /sidebar -->
 
 </div>
-
+{% if customer %}
+<script>
+  window.customerData = {
+    id: "{{ customer.id }}",
+    email: "{{ customer.email }}"
+  };
+</script>
+{% endif %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const TOTAL = 4;
@@ -660,3 +667,55 @@ document.addEventListener('DOMContentLoaded', function () {
   goToStep(1);
 });
 </script>
+
+<script>
+let leadId = null;
+
+// 🔹 Fetch lead_id using customer id
+async function fetchLeadId() {
+  const res = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
+  const data = await res.json();
+
+  // adjust based on response structure
+  leadId = data.data[0]._id;
+  console.log("Lead ID:", leadId);
+
+  loadProgress(); // restore saved progress
+}
+
+// 🔹 Save step
+async function saveStep(step) {
+  if (!leadId) return;
+
+  await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      lead_id: leadId,
+      step: step
+    })
+  });
+}
+
+// 🔹 Load saved progress
+async function loadProgress() {
+  const res = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
+  const data = await res.json();
+
+  const lastStep = data.last_step || 1;
+  goToStep(lastStep);
+}
+
+// 🔹 Hook into your existing step function
+const originalGoToStep = window.goToStep;
+
+window.goToStep = async function(step) {
+  if (step > 1) {
+    await saveStep(step - 1); // reward previous step
+  }
+  originalGoToStep(step);
+};
+
+document.addEventListener("DOMContentLoaded", fetchLeadId);
+</script>
+
