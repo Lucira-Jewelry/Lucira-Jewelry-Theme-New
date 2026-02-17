@@ -535,218 +535,328 @@
   </div><!-- /sidebar -->
 
 </div>
+{% if customer %}
 <script>
-/* ======================================================
-   GLOBAL STATE
-====================================================== */
-let leadId = null;
-let completedSteps = [];
-
-/* ======================================================
-   UI INITIALIZATION
-====================================================== */
+  window.customerData = {
+    id: "{{ customer.id }}",
+    email: "{{ customer.email }}"
+  };
+</script>
+{% endif %}
+<script>
 document.addEventListener('DOMContentLoaded', function () {
-
   const TOTAL = 4;
   const CIRCUMFERENCE = 2 * Math.PI * 42;
   document.getElementById('ringFill').style.strokeDasharray = CIRCUMFERENCE;
 
-  // Chip toggle
   document.querySelectorAll('.chip-group').forEach(g => {
     g.querySelectorAll('.chip').forEach(c => {
       c.addEventListener('click', () => c.classList.toggle('selected'));
     });
   });
 
-  // Married toggle
   document.getElementById('marriedToggle').addEventListener('change', function () {
     document.getElementById('spouseFields').style.display = this.checked ? '' : 'none';
   });
 
-  fetchLeadId(); // 🔥 start app
-});
+  const hintTexts = [
+    'You are just <strong>3 more steps</strong> away for Bonus Lucira Coins',
+    'You are just <strong>2 more steps</strong> away for Bonus Lucira Coins',
+    'You are just <strong>1 more step</strong> away for Bonus Lucira Coins',
+    'One final step — complete your profile for <strong>400 Lucira Coins!</strong>',
+    '🎉 You\'ve unlocked all <strong>400 Lucira Coins!</strong>'
+  ];
 
-/* ======================================================
-   STEP UI CONTROLLER
-====================================================== */
-const hintTexts = [
-  'You are just <strong>3 more steps</strong> away for Bonus Lucira Coins',
-  'You are just <strong>2 more steps</strong> away for Bonus Lucira Coins',
-  'You are just <strong>1 more step</strong> away for Bonus Lucira Coins',
-  'One final step — complete your profile for <strong>400 Lucira Coins!</strong>',
-  '🎉 You\'ve unlocked all <strong>400 Lucira Coins!</strong>'
-];
+  const coinsPerStep = [0, 100, 200, 300, 400];
 
-window.goToStep = async function (step) {
+  window.goToStep = function (step) {
+    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('step-' + step).classList.add('active');
 
-  // save previous step
-  if (step > 1) await saveStep(step - 1);
-
-  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById('step-' + step).classList.add('active');
-
-  for (let i = 0; i <= 4; i++) {
-    const dot = document.getElementById('dot' + i);
-    const lbl = document.getElementById('lbl' + i);
-    if (!dot) continue;
-
-    dot.classList.remove('done', 'current');
-    lbl.classList.remove('done', 'current');
-
-    if (i < step) {
-      dot.classList.add('done');
-      lbl.classList.add('done');
-    } else if (i === step) {
-      dot.classList.add('current');
-      lbl.classList.add('current');
-    }
-  }
-
-  // progress bar
-  const trackPct = ((step - 1) / 4) * 100;
-  document.getElementById('trackProgress').style.width = trackPct + '%';
-
-  // ring
-  const CIRCUMFERENCE = 2 * Math.PI * 42;
-  const pct = Math.round(trackPct);
-  const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
-  document.getElementById('ringFill').style.strokeDashoffset = offset;
-  document.getElementById('ringPct').textContent = pct;
-
-  // checklist
-  for (let i = 1; i <= 4; i++) {
-    const li = document.getElementById('sli-' + i);
-    const cc = document.getElementById('cc' + i);
-    if (!li || !cc) continue;
-
-    li.classList.remove('done');
-    cc.classList.remove('done', 'current');
-
-    if (i < step) {
-      li.classList.add('done');
-      cc.classList.add('done');
-    } else if (i === step) {
-      cc.classList.add('current');
-    }
-  }
-
-  document.getElementById('ptsHint').innerHTML = hintTexts[step - 1];
-};
-
-/* ======================================================
-   COMPLETE PROFILE
-====================================================== */
-window.completeProfile = async function () {
-  await saveStep(4);
-
-  for (let i = 0; i <= 4; i++) {
-    const dot = document.getElementById('dot' + i);
-    const lbl = document.getElementById('lbl' + i);
-    if (dot) dot.classList.add('done');
-    if (lbl) lbl.classList.add('done');
-  }
-
-  document.getElementById('trackProgress').style.width = '100%';
-  document.getElementById('ringFill').style.strokeDashoffset = 0;
-  document.getElementById('ringPct').textContent = '100';
-
-  animateCoins(400);
-  document.getElementById('ptsHint').innerHTML = hintTexts[4];
-
-  setTimeout(() => alert('🎉 Profile Complete! Your 400 Lucira Coins are unlocked.'), 600);
-};
-
-/* ======================================================
-   COIN ANIMATION
-====================================================== */
-function animateCoins(target) {
-  const el = document.getElementById('coinsEarned');
-  const start = parseInt(el.textContent) || 0;
-  const diff = target - start;
-  const dur = 600;
-  const startTime = performance.now();
-
-  function step(now) {
-    const t = Math.min((now - startTime) / dur, 1);
-    const ease = 1 - Math.pow(1 - t, 3);
-    el.textContent = Math.round(start + diff * ease);
-    if (t < 1) requestAnimationFrame(step);
-  }
-  requestAnimationFrame(step);
-}
-
-/* ======================================================
-   BACKEND INTEGRATION
-====================================================== */
-async function fetchLeadId() {
-  if (!window.customerData) {
-    goToStep(1);
-    return;
-  }
-
-  try {
-    const res = await fetch(
-      "https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" +
-      customerData.id
-    );
-    const data = await res.json();
-
-    leadId = data.data?.[0]?._id;
-
-    if (!leadId) {
-      goToStep(1);
-      return;
-    }
-
-    await loadProgress();
-
-  } catch (e) {
-    console.error("Lead fetch failed", e);
-    goToStep(1);
-  }
-}
-
-async function loadProgress() {
-  try {
-    const res = await fetch(
-      "https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" +
-      leadId
-    );
-    const data = await res.json();
-
-    completedSteps = data.completed_steps || [];
-    const lastStep = data.last_step || 1;
-
-    // restore coins
-    document.getElementById("coinsEarned").textContent =
-      completedSteps.length * 100;
-
-    goToStep(lastStep);
-
-  } catch (e) {
-    console.error("Progress load failed", e);
-    goToStep(1);
-  }
-}
-
-async function saveStep(step) {
-  if (!leadId || completedSteps.includes(step)) return;
-
-  try {
-    await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lead_id: leadId, step })
+    document.querySelectorAll('.step-tab').forEach((t, i) => {
+      t.classList.remove('active', 'done');
+      if (i + 1 < step) t.classList.add('done');
+      if (i + 1 === step) t.classList.add('active');
     });
 
-    completedSteps.push(step);
-    animateCoins(completedSteps.length * 100);
+    for (let i = 0; i <= 4; i++) {
+      const dot = document.getElementById('dot' + i);
+      const lbl = document.getElementById('lbl' + i);
+      if (!dot) continue;
+      dot.classList.remove('done', 'current');
+      lbl.classList.remove('done', 'current');
+      if (i < step) {
+        dot.classList.add('done');
+        lbl.classList.add('done');
+      } else if (i === step) {
+        dot.classList.add('current');
+        lbl.classList.add('current');
+      }
+    }
 
-  } catch (e) {
-    console.error("Save step failed", e);
+    const SEGMENTS = 4;
+
+    const progressIndex = step - 1;
+    const trackPct = (progressIndex / SEGMENTS) * 100;
+    document.getElementById('trackProgress').style.width = trackPct + '%';
+
+    const pct = Math.round(trackPct);
+    const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
+    document.getElementById('ringFill').style.strokeDashoffset = offset;
+    document.getElementById('ringPct').textContent = pct;
+
+    for (let i = 1; i <= 4; i++) {
+      const li = document.getElementById('sli-' + i);
+      const cc = document.getElementById('cc' + i);
+      if (!li || !cc) continue;
+      li.classList.remove('done');
+      cc.classList.remove('done', 'current');
+      if (i < step) {
+        li.classList.add('done');
+        cc.classList.add('done');
+      } else if (i === step) {
+        cc.classList.add('current');
+      }
+    }
+
+    animateCoins(coinsPerStep[step - 1]);
+
+    document.getElementById('ptsHint').innerHTML = hintTexts[step - 1] || hintTexts[0];
+  };
+
+  window.completeProfile = function () {
+    for (let i = 0; i <= 4; i++) {
+      const dot = document.getElementById('dot' + i);
+      const lbl = document.getElementById('lbl' + i);
+      if (dot) { dot.classList.add('done'); dot.classList.remove('current'); }
+      if (lbl) { lbl.classList.add('done'); lbl.classList.remove('current'); }
+    }
+    document.getElementById('trackProgress').style.width = '100%';
+
+    const offset = 0;
+    document.getElementById('ringFill').style.strokeDashoffset = offset;
+    document.getElementById('ringPct').textContent = '100';
+
+    for (let i = 1; i <= 4; i++) {
+      const li = document.getElementById('sli-' + i);
+      const cc = document.getElementById('cc' + i);
+      if (li) li.classList.add('done');
+      if (cc) { cc.classList.add('done'); cc.classList.remove('current'); }
+    }
+    document.querySelectorAll('.step-tab').forEach(t => t.classList.add('done'));
+    animateCoins(400);
+    document.getElementById('ptsHint').innerHTML = hintTexts[4];
+    setTimeout(() => alert('🎉 Profile Complete! Your 400 Lucira Coins are unlocked.'), 600);
+  };
+
+  function animateCoins(target) {
+    const el = document.getElementById('coinsEarned');
+    const start = parseInt(el.textContent) || 0;
+    const diff = target - start;
+    const dur = 600;
+    const startTime = performance.now();
+    function step(now) {
+      const t = Math.min((now - startTime) / dur, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      el.textContent = Math.round(start + diff * ease);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
   }
-}
+
+  goToStep(1);
+});
 </script>
 
+<script>
+  let leadId = null;
+  let rewardedSteps = new Set(); // prevents double-rewarding
 
+  // ── Form Save / Restore via localStorage ─────────────────────────────────────
+
+  function saveFormState() {
+    try {
+      const state = {};
+
+      // Gender
+      const g = document.querySelector('input[name="gender"]:checked');
+      if (g) state.gender = g.value;
+
+      // DOB
+      const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
+      if (dob) state.dob = dob.value;
+
+      // Married toggle
+      state.married = document.getElementById('marriedToggle').checked;
+
+      // Spouse dates
+      const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
+      if (spouseDates[0]) state.anniversary = spouseDates[0].value;
+      if (spouseDates[1]) state.spouseDob   = spouseDates[1].value;
+
+      // Chips (per panel, per chip-group index)
+      document.querySelectorAll('.step-panel').forEach(panel => {
+        panel.querySelectorAll('.chip-group').forEach((group, gi) => {
+          const sel = [];
+          group.querySelectorAll('.chip').forEach((chip, ci) => {
+            if (chip.classList.contains('selected')) sel.push(ci);
+          });
+          state[panel.id + '_chips_' + gi] = sel;
+        });
+
+        // Checkboxes
+        panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
+          state[panel.id + '_cb_' + ci] = cb.checked;
+        });
+      });
+
+      localStorage.setItem('lucira_form_state', JSON.stringify(state));
+    } catch(e) { console.warn('saveFormState', e); }
+  }
+
+  function restoreFormState() {
+    try {
+      const raw = localStorage.getItem('lucira_form_state');
+      if (!raw) return;
+      const state = JSON.parse(raw);
+
+      // Gender
+      if (state.gender) {
+        const r = document.querySelector('input[name="gender"][value="' + state.gender + '"]');
+        if (r) r.checked = true;
+      }
+
+      // DOB
+      const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
+      if (dob && state.dob) dob.value = state.dob;
+
+      // Married
+      if (state.married !== undefined) {
+        document.getElementById('marriedToggle').checked = state.married;
+        document.getElementById('spouseFields').style.display = state.married ? '' : 'none';
+      }
+
+      // Spouse dates
+      const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
+      if (spouseDates[0] && state.anniversary) spouseDates[0].value = state.anniversary;
+      if (spouseDates[1] && state.spouseDob)   spouseDates[1].value = state.spouseDob;
+
+      // Chips
+      document.querySelectorAll('.step-panel').forEach(panel => {
+        panel.querySelectorAll('.chip-group').forEach((group, gi) => {
+          const key = panel.id + '_chips_' + gi;
+          if (state[key]) {
+            group.querySelectorAll('.chip').forEach((chip, ci) => {
+              chip.classList.toggle('selected', state[key].includes(ci));
+            });
+          }
+        });
+
+        // Checkboxes
+        panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
+          const key = panel.id + '_cb_' + ci;
+          if (state[key] !== undefined) cb.checked = state[key];
+        });
+      });
+    } catch(e) { console.warn('restoreFormState', e); }
+  }
+
+  // Save whenever user changes any field
+  document.addEventListener('change', function(e) {
+    if (e.target.closest && e.target.closest('.page-wrap')) saveFormState();
+  });
+  document.addEventListener('click', function(e) {
+    if (e.target.classList && e.target.classList.contains('chip')) {
+      setTimeout(saveFormState, 50); // after toggle fires
+    }
+  });
+
+  // ── API ───────────────────────────────────────────────────────────────────────
+
+  async function fetchLeadId() {
+    try {
+      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
+      const data = await res.json();
+      leadId = data.data[0]._id;
+      console.log("Lead ID:", leadId);
+      await loadProgress();
+    } catch(e) { console.error("fetchLeadId:", e); }
+  }
+
+  // Reward a step ONCE — skips if already rewarded this session or server says so
+  async function saveStep(step) {
+    if (!leadId)                  return;
+    if (rewardedSteps.has(step))  { console.log("Step", step, "already rewarded – skip"); return; }
+
+    try {
+      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ lead_id: leadId, step })
+      });
+      const data = await res.json();
+      console.log("saveStep", step, data);
+      rewardedSteps.add(step);
+    } catch(e) { console.error("saveStep:", e); }
+  }
+
+  async function loadProgress() {
+    try {
+      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
+      const data = await res.json();
+
+      // Pre-populate rewarded steps so refresh never re-awards them
+      if (Array.isArray(data.completed_steps)) {
+        data.completed_steps.forEach(s => rewardedSteps.add(Number(s)));
+      }
+
+      restoreFormState();
+
+      // Use originalGoToStep so we don't trigger reward logic on restore
+      const lastStep = data.last_step || 1;
+      originalGoToStep(lastStep);
+    } catch(e) {
+      console.error("loadProgress:", e);
+      restoreFormState();
+      originalGoToStep(1);
+    }
+  }
+
+  // ── Override goToStep & completeProfile ──────────────────────────────────────
+
+  const originalGoToStep = window.goToStep;
+
+  window.goToStep = async function(targetStep) {
+    // Detect which step is currently visible
+    const activePanel = document.querySelector('.step-panel.active');
+    const currentStep = activePanel ? parseInt(activePanel.id.replace('step-', '')) : 1;
+
+    saveFormState();
+
+    // Only reward when moving FORWARD, and only for the step just completed
+    if (targetStep > currentStep) {
+      await saveStep(currentStep);
+    }
+
+    originalGoToStep(targetStep);
+  };
+
+  const originalCompleteProfile = window.completeProfile;
+  window.completeProfile = async function() {
+    saveFormState();
+    await saveStep(4); // ← this was missing; step 4 was never rewarded
+    originalCompleteProfile();
+  };
+
+  // ── Init ──────────────────────────────────────────────────────────────────────
+
+  document.addEventListener("DOMContentLoaded", function() {
+    if (typeof customerData !== 'undefined' && customerData.id) {
+      fetchLeadId(); // will call restoreFormState + originalGoToStep internally
+    } else {
+      restoreFormState();
+      originalGoToStep(1);
+    }
+  });
+</script>
 
