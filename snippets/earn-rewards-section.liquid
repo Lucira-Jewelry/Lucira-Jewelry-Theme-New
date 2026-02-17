@@ -535,151 +535,151 @@
   </div><!-- /sidebar -->
 
 </div>
-{% if customer %}
 <script>
-  window.customerData = {
-    id: "{{ customer.id }}",
-    email: "{{ customer.email }}"
-  };
-</script>
-{% endif %}
-<script>
+/* ======================================================
+   GLOBAL STATE
+====================================================== */
+let leadId = null;
+let completedSteps = [];
+
+/* ======================================================
+   UI INITIALIZATION
+====================================================== */
 document.addEventListener('DOMContentLoaded', function () {
+
   const TOTAL = 4;
   const CIRCUMFERENCE = 2 * Math.PI * 42;
   document.getElementById('ringFill').style.strokeDasharray = CIRCUMFERENCE;
 
+  // Chip toggle
   document.querySelectorAll('.chip-group').forEach(g => {
     g.querySelectorAll('.chip').forEach(c => {
       c.addEventListener('click', () => c.classList.toggle('selected'));
     });
   });
 
+  // Married toggle
   document.getElementById('marriedToggle').addEventListener('change', function () {
     document.getElementById('spouseFields').style.display = this.checked ? '' : 'none';
   });
 
-  const hintTexts = [
-    'You are just <strong>3 more steps</strong> away for Bonus Lucira Coins',
-    'You are just <strong>2 more steps</strong> away for Bonus Lucira Coins',
-    'You are just <strong>1 more step</strong> away for Bonus Lucira Coins',
-    'One final step — complete your profile for <strong>400 Lucira Coins!</strong>',
-    '🎉 You\'ve unlocked all <strong>400 Lucira Coins!</strong>'
-  ];
+  fetchLeadId(); // 🔥 start app
+});
 
-  const coinsPerStep = [0, 100, 200, 300, 400];
+/* ======================================================
+   STEP UI CONTROLLER
+====================================================== */
+const hintTexts = [
+  'You are just <strong>3 more steps</strong> away for Bonus Lucira Coins',
+  'You are just <strong>2 more steps</strong> away for Bonus Lucira Coins',
+  'You are just <strong>1 more step</strong> away for Bonus Lucira Coins',
+  'One final step — complete your profile for <strong>400 Lucira Coins!</strong>',
+  '🎉 You\'ve unlocked all <strong>400 Lucira Coins!</strong>'
+];
 
-  window.goToStep = function (step) {
-    document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
-    document.getElementById('step-' + step).classList.add('active');
+window.goToStep = async function (step) {
 
-    document.querySelectorAll('.step-tab').forEach((t, i) => {
-      t.classList.remove('active', 'done');
-      if (i + 1 < step) t.classList.add('done');
-      if (i + 1 === step) t.classList.add('active');
-    });
+  // save previous step
+  if (step > 1) await saveStep(step - 1);
 
-    for (let i = 0; i <= 4; i++) {
-      const dot = document.getElementById('dot' + i);
-      const lbl = document.getElementById('lbl' + i);
-      if (!dot) continue;
-      dot.classList.remove('done', 'current');
-      lbl.classList.remove('done', 'current');
-      if (i < step) {
-        dot.classList.add('done');
-        lbl.classList.add('done');
-      } else if (i === step) {
-        dot.classList.add('current');
-        lbl.classList.add('current');
-      }
+  document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('step-' + step).classList.add('active');
+
+  for (let i = 0; i <= 4; i++) {
+    const dot = document.getElementById('dot' + i);
+    const lbl = document.getElementById('lbl' + i);
+    if (!dot) continue;
+
+    dot.classList.remove('done', 'current');
+    lbl.classList.remove('done', 'current');
+
+    if (i < step) {
+      dot.classList.add('done');
+      lbl.classList.add('done');
+    } else if (i === step) {
+      dot.classList.add('current');
+      lbl.classList.add('current');
     }
-
-    const SEGMENTS = 4;
-
-    const progressIndex = step - 1;
-    const trackPct = (progressIndex / SEGMENTS) * 100;
-    document.getElementById('trackProgress').style.width = trackPct + '%';
-
-    const pct = Math.round(trackPct);
-    const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
-    document.getElementById('ringFill').style.strokeDashoffset = offset;
-    document.getElementById('ringPct').textContent = pct;
-
-    for (let i = 1; i <= 4; i++) {
-      const li = document.getElementById('sli-' + i);
-      const cc = document.getElementById('cc' + i);
-      if (!li || !cc) continue;
-      li.classList.remove('done');
-      cc.classList.remove('done', 'current');
-      if (i < step) {
-        li.classList.add('done');
-        cc.classList.add('done');
-      } else if (i === step) {
-        cc.classList.add('current');
-      }
-    }
-
-    animateCoins(coinsPerStep[step - 1]);
-
-    document.getElementById('ptsHint').innerHTML = hintTexts[step - 1] || hintTexts[0];
-  };
-
-  window.completeProfile = function () {
-    for (let i = 0; i <= 4; i++) {
-      const dot = document.getElementById('dot' + i);
-      const lbl = document.getElementById('lbl' + i);
-      if (dot) { dot.classList.add('done'); dot.classList.remove('current'); }
-      if (lbl) { lbl.classList.add('done'); lbl.classList.remove('current'); }
-    }
-    document.getElementById('trackProgress').style.width = '100%';
-
-    const offset = 0;
-    document.getElementById('ringFill').style.strokeDashoffset = offset;
-    document.getElementById('ringPct').textContent = '100';
-
-    for (let i = 1; i <= 4; i++) {
-      const li = document.getElementById('sli-' + i);
-      const cc = document.getElementById('cc' + i);
-      if (li) li.classList.add('done');
-      if (cc) { cc.classList.add('done'); cc.classList.remove('current'); }
-    }
-    document.querySelectorAll('.step-tab').forEach(t => t.classList.add('done'));
-    animateCoins(400);
-    document.getElementById('ptsHint').innerHTML = hintTexts[4];
-    setTimeout(() => alert('🎉 Profile Complete! Your 400 Lucira Coins are unlocked.'), 600);
-  };
-
-  function animateCoins(target) {
-    const el = document.getElementById('coinsEarned');
-    const start = parseInt(el.textContent) || 0;
-    const diff = target - start;
-    const dur = 600;
-    const startTime = performance.now();
-    function step(now) {
-      const t = Math.min((now - startTime) / dur, 1);
-      const ease = 1 - Math.pow(1 - t, 3);
-      el.textContent = Math.round(start + diff * ease);
-      if (t < 1) requestAnimationFrame(step);
-    }
-    requestAnimationFrame(step);
   }
 
-});
-</script>
+  // progress bar
+  const trackPct = ((step - 1) / 4) * 100;
+  document.getElementById('trackProgress').style.width = trackPct + '%';
 
-<script>
-/* ===============================
-   GLOBAL STATE
-=============================== */
-let leadId = null;
-let completedSteps = [];
+  // ring
+  const CIRCUMFERENCE = 2 * Math.PI * 42;
+  const pct = Math.round(trackPct);
+  const offset = CIRCUMFERENCE - (pct / 100) * CIRCUMFERENCE;
+  document.getElementById('ringFill').style.strokeDashoffset = offset;
+  document.getElementById('ringPct').textContent = pct;
 
-/* ===============================
-   FETCH LEAD ID
-=============================== */
+  // checklist
+  for (let i = 1; i <= 4; i++) {
+    const li = document.getElementById('sli-' + i);
+    const cc = document.getElementById('cc' + i);
+    if (!li || !cc) continue;
+
+    li.classList.remove('done');
+    cc.classList.remove('done', 'current');
+
+    if (i < step) {
+      li.classList.add('done');
+      cc.classList.add('done');
+    } else if (i === step) {
+      cc.classList.add('current');
+    }
+  }
+
+  document.getElementById('ptsHint').innerHTML = hintTexts[step - 1];
+};
+
+/* ======================================================
+   COMPLETE PROFILE
+====================================================== */
+window.completeProfile = async function () {
+  await saveStep(4);
+
+  for (let i = 0; i <= 4; i++) {
+    const dot = document.getElementById('dot' + i);
+    const lbl = document.getElementById('lbl' + i);
+    if (dot) dot.classList.add('done');
+    if (lbl) lbl.classList.add('done');
+  }
+
+  document.getElementById('trackProgress').style.width = '100%';
+  document.getElementById('ringFill').style.strokeDashoffset = 0;
+  document.getElementById('ringPct').textContent = '100';
+
+  animateCoins(400);
+  document.getElementById('ptsHint').innerHTML = hintTexts[4];
+
+  setTimeout(() => alert('🎉 Profile Complete! Your 400 Lucira Coins are unlocked.'), 600);
+};
+
+/* ======================================================
+   COIN ANIMATION
+====================================================== */
+function animateCoins(target) {
+  const el = document.getElementById('coinsEarned');
+  const start = parseInt(el.textContent) || 0;
+  const diff = target - start;
+  const dur = 600;
+  const startTime = performance.now();
+
+  function step(now) {
+    const t = Math.min((now - startTime) / dur, 1);
+    const ease = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.round(start + diff * ease);
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* ======================================================
+   BACKEND INTEGRATION
+====================================================== */
 async function fetchLeadId() {
   if (!window.customerData) {
-    console.warn("No customer logged in");
     goToStep(1);
     return;
   }
@@ -689,115 +689,64 @@ async function fetchLeadId() {
       "https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" +
       customerData.id
     );
-
     const data = await res.json();
 
-    if (!data?.data?.length) {
-      console.warn("Lead not found");
+    leadId = data.data?.[0]?._id;
+
+    if (!leadId) {
       goToStep(1);
       return;
     }
 
-    leadId = data.data[0]._id;
-    console.log("Lead ID:", leadId);
-
     await loadProgress();
 
-  } catch (err) {
-    console.error("Lead fetch failed:", err);
+  } catch (e) {
+    console.error("Lead fetch failed", e);
     goToStep(1);
   }
 }
 
-/* ===============================
-   LOAD SAVED PROGRESS
-=============================== */
 async function loadProgress() {
-  if (!leadId) return;
-
   try {
     const res = await fetch(
       "https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" +
       leadId
     );
-
     const data = await res.json();
 
     completedSteps = data.completed_steps || [];
     const lastStep = data.last_step || 1;
 
-    console.log("Completed steps:", completedSteps);
-    console.log("Restoring step:", lastStep);
-
-    // Restore coins
-    const earnedCoins = completedSteps.length * 100;
-    document.getElementById("coinsEarned").textContent = earnedCoins;
+    // restore coins
+    document.getElementById("coinsEarned").textContent =
+      completedSteps.length * 100;
 
     goToStep(lastStep);
 
-  } catch (err) {
-    console.error("Progress load failed:", err);
+  } catch (e) {
+    console.error("Progress load failed", e);
     goToStep(1);
   }
 }
 
-/* ===============================
-   SAVE STEP (NO DUPLICATES)
-=============================== */
 async function saveStep(step) {
-  if (!leadId) return;
-
-  if (completedSteps.includes(step)) {
-    console.log("Step already rewarded:", step);
-    return;
-  }
+  if (!leadId || completedSteps.includes(step)) return;
 
   try {
     await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        lead_id: leadId,
-        step: step
-      })
+      body: JSON.stringify({ lead_id: leadId, step })
     });
 
     completedSteps.push(step);
-
-    // update coins
     animateCoins(completedSteps.length * 100);
 
-  } catch (err) {
-    console.error("Save step failed:", err);
+  } catch (e) {
+    console.error("Save step failed", e);
   }
 }
-
-/* ===============================
-   HOOK goToStep
-=============================== */
-const originalGoToStep = window.goToStep;
-
-window.goToStep = async function (step) {
-  if (step > 1) {
-    await saveStep(step - 1);
-  }
-  originalGoToStep(step);
-};
-
-/* ===============================
-   HOOK completeProfile
-=============================== */
-const originalCompleteProfile = window.completeProfile;
-
-window.completeProfile = async function () {
-  await saveStep(4);
-  originalCompleteProfile();
-};
-
-/* ===============================
-   INIT
-=============================== */
-document.addEventListener("DOMContentLoaded", fetchLeadId);
 </script>
+
 
 
