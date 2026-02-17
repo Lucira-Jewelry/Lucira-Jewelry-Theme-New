@@ -419,16 +419,16 @@ window.MainBaseCharm = function () {
 
     currentCollectionId = targetId;
 
-    // document.addEventListener('click', function (e) {
-    // const tile = e.target.closest('.collection-tile');
-    // if (!tile) return;
+    document.addEventListener('click', function (e) {
+    const tile = e.target.closest('.collection-tile');
+    if (!tile) return;
 
-    // const isAlreadyActive = tile.classList.contains('active');
+    const isAlreadyActive = tile.classList.contains('active');
 
-    // document.querySelectorAll('.collection-tile').forEach((t) => {
-    //   t.classList.remove('active');
-    //   t.setAttribute('aria-selected', 'false');
-    // });
+    document.querySelectorAll('.collection-tile').forEach((t) => {
+      t.classList.remove('active');
+      t.setAttribute('aria-selected', 'false');
+    });
 
     document.querySelectorAll('.charms-grid-container').forEach((grid) => {
       grid.classList.remove('active');
