@@ -419,6 +419,13 @@ window.MainBaseCharm = function () {
 
     currentCollectionId = targetId;
 
+    document.addEventListener('click', function (e) {
+    const tile = e.target.closest('.collection-tile');
+    if (!tile) return;
+
+    const isAlreadyActive = tile.classList.contains('active');
+
+    // Remove active from all tiles
     document.querySelectorAll('.collection-tile').forEach((t) => {
       t.classList.remove('active');
       t.setAttribute('aria-selected', 'false');
