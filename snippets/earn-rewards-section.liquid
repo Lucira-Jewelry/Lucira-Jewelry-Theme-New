@@ -669,194 +669,180 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script>
-  let leadId = null;
-  let rewardedSteps = new Set(); // prevents double-rewarding
+  document.addEventListener('DOMContentLoaded', function () {
 
-  // ── Form Save / Restore via localStorage ─────────────────────────────────────
+    // ✅ Captured HERE (after first script's DOMContentLoaded has already run and set these)
+    const originalGoToStep      = window.goToStep;
+    const originalCompleteProfile = window.completeProfile;
 
-  function saveFormState() {
-    try {
-      const state = {};
+    let leadId        = null;
+    let rewardedSteps = new Set(); // prevents double-rewarding on refresh
 
-      // Gender
-      const g = document.querySelector('input[name="gender"]:checked');
-      if (g) state.gender = g.value;
+    // ── Form Save / Restore ────────────────────────────────────────────────────
 
-      // DOB
-      const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
-      if (dob) state.dob = dob.value;
+    function saveFormState() {
+      try {
+        const state = {};
 
-      // Married toggle
-      state.married = document.getElementById('marriedToggle').checked;
+        const g = document.querySelector('input[name="gender"]:checked');
+        if (g) state.gender = g.value;
 
-      // Spouse dates
-      const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
-      if (spouseDates[0]) state.anniversary = spouseDates[0].value;
-      if (spouseDates[1]) state.spouseDob   = spouseDates[1].value;
+        const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
+        if (dob) state.dob = dob.value;
 
-      // Chips (per panel, per chip-group index)
-      document.querySelectorAll('.step-panel').forEach(panel => {
-        panel.querySelectorAll('.chip-group').forEach((group, gi) => {
-          const sel = [];
-          group.querySelectorAll('.chip').forEach((chip, ci) => {
-            if (chip.classList.contains('selected')) sel.push(ci);
-          });
-          state[panel.id + '_chips_' + gi] = sel;
-        });
+        state.married = document.getElementById('marriedToggle').checked;
 
-        // Checkboxes
-        panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
-          state[panel.id + '_cb_' + ci] = cb.checked;
-        });
-      });
+        const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
+        if (spouseDates[0]) state.anniversary = spouseDates[0].value;
+        if (spouseDates[1]) state.spouseDob   = spouseDates[1].value;
 
-      localStorage.setItem('lucira_form_state', JSON.stringify(state));
-    } catch(e) { console.warn('saveFormState', e); }
-  }
-
-  function restoreFormState() {
-    try {
-      const raw = localStorage.getItem('lucira_form_state');
-      if (!raw) return;
-      const state = JSON.parse(raw);
-
-      // Gender
-      if (state.gender) {
-        const r = document.querySelector('input[name="gender"][value="' + state.gender + '"]');
-        if (r) r.checked = true;
-      }
-
-      // DOB
-      const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
-      if (dob && state.dob) dob.value = state.dob;
-
-      // Married
-      if (state.married !== undefined) {
-        document.getElementById('marriedToggle').checked = state.married;
-        document.getElementById('spouseFields').style.display = state.married ? '' : 'none';
-      }
-
-      // Spouse dates
-      const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
-      if (spouseDates[0] && state.anniversary) spouseDates[0].value = state.anniversary;
-      if (spouseDates[1] && state.spouseDob)   spouseDates[1].value = state.spouseDob;
-
-      // Chips
-      document.querySelectorAll('.step-panel').forEach(panel => {
-        panel.querySelectorAll('.chip-group').forEach((group, gi) => {
-          const key = panel.id + '_chips_' + gi;
-          if (state[key]) {
+        document.querySelectorAll('.step-panel').forEach(panel => {
+          panel.querySelectorAll('.chip-group').forEach((group, gi) => {
+            const sel = [];
             group.querySelectorAll('.chip').forEach((chip, ci) => {
-              chip.classList.toggle('selected', state[key].includes(ci));
+              if (chip.classList.contains('selected')) sel.push(ci);
             });
-          }
+            state[panel.id + '_chips_' + gi] = sel;
+          });
+          panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
+            state[panel.id + '_cb_' + ci] = cb.checked;
+          });
         });
 
-        // Checkboxes
-        panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
-          const key = panel.id + '_cb_' + ci;
-          if (state[key] !== undefined) cb.checked = state[key];
-        });
-      });
-    } catch(e) { console.warn('restoreFormState', e); }
-  }
-
-  // Save whenever user changes any field
-  document.addEventListener('change', function(e) {
-    if (e.target.closest && e.target.closest('.page-wrap')) saveFormState();
-  });
-  document.addEventListener('click', function(e) {
-    if (e.target.classList && e.target.classList.contains('chip')) {
-      setTimeout(saveFormState, 50); // after toggle fires
+        localStorage.setItem('lucira_form_state', JSON.stringify(state));
+      } catch (e) { console.warn('saveFormState', e); }
     }
-  });
 
-  // ── API ───────────────────────────────────────────────────────────────────────
+    function restoreFormState() {
+      try {
+        const raw = localStorage.getItem('lucira_form_state');
+        if (!raw) return;
+        const state = JSON.parse(raw);
 
-  async function fetchLeadId() {
-    try {
-      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
-      const data = await res.json();
-      leadId = data.data[0]._id;
-      console.log("Lead ID:", leadId);
-      await loadProgress();
-    } catch(e) { console.error("fetchLeadId:", e); }
-  }
+        if (state.gender) {
+          const r = document.querySelector('input[name="gender"][value="' + state.gender + '"]');
+          if (r) r.checked = true;
+        }
 
-  // Reward a step ONCE — skips if already rewarded this session or server says so
-  async function saveStep(step) {
-    if (!leadId)                  return;
-    if (rewardedSteps.has(step))  { console.log("Step", step, "already rewarded – skip"); return; }
+        const dob = document.querySelector('#step-1 .form-row.single input[type="date"]');
+        if (dob && state.dob) dob.value = state.dob;
 
-    try {
-      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        body:    JSON.stringify({ lead_id: leadId, step })
-      });
-      const data = await res.json();
-      console.log("saveStep", step, data);
-      rewardedSteps.add(step);
-    } catch(e) { console.error("saveStep:", e); }
-  }
+        if (state.married !== undefined) {
+          document.getElementById('marriedToggle').checked = state.married;
+          document.getElementById('spouseFields').style.display = state.married ? '' : 'none';
+        }
 
-  async function loadProgress() {
-    try {
-      const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
-      const data = await res.json();
+        const spouseDates = document.querySelectorAll('#spouseFields input[type="date"]');
+        if (spouseDates[0] && state.anniversary) spouseDates[0].value = state.anniversary;
+        if (spouseDates[1] && state.spouseDob)   spouseDates[1].value = state.spouseDob;
 
-      // Pre-populate rewarded steps so refresh never re-awards them
-      if (Array.isArray(data.completed_steps)) {
-        data.completed_steps.forEach(s => rewardedSteps.add(Number(s)));
+        document.querySelectorAll('.step-panel').forEach(panel => {
+          panel.querySelectorAll('.chip-group').forEach((group, gi) => {
+            const key = panel.id + '_chips_' + gi;
+            if (state[key]) {
+              group.querySelectorAll('.chip').forEach((chip, ci) => {
+                chip.classList.toggle('selected', state[key].includes(ci));
+              });
+            }
+          });
+          panel.querySelectorAll('.checkbox-list input[type="checkbox"]').forEach((cb, ci) => {
+            const key = panel.id + '_cb_' + ci;
+            if (state[key] !== undefined) cb.checked = state[key];
+          });
+        });
+      } catch (e) { console.warn('restoreFormState', e); }
+    }
+
+    // Save on any field change or chip click
+    document.addEventListener('change', function (e) {
+      if (e.target.closest && e.target.closest('.page-wrap')) saveFormState();
+    });
+    document.addEventListener('click', function (e) {
+      if (e.target.classList && e.target.classList.contains('chip')) {
+        setTimeout(saveFormState, 50);
+      }
+    });
+
+    // ── API ──────────────────────────────────────────────────────────────────────
+
+    async function saveStep(step) {
+      if (!leadId)                 return;
+      if (rewardedSteps.has(step)) { console.log('Step ' + step + ' already rewarded, skip'); return; }
+      try {
+        await fetch("https://api.lucirajewelry.com/earn-rewards/save-step.php", {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ lead_id: leadId, step: step })
+        });
+        rewardedSteps.add(step);
+        console.log('Rewarded step', step);
+      } catch (e) { console.error('saveStep', e); }
+    }
+
+    async function loadProgress() {
+      try {
+        const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-progress.php?lead_id=" + leadId);
+        const data = await res.json();
+
+        // Mark server-completed steps so they're never re-sent
+        if (Array.isArray(data.completed_steps)) {
+          data.completed_steps.forEach(s => rewardedSteps.add(Number(s)));
+        }
+
+        restoreFormState();
+
+        // ✅ Use originalGoToStep — NOT window.goToStep — to avoid re-triggering rewards on load
+        originalGoToStep(data.last_step || 1);
+      } catch (e) {
+        console.error('loadProgress', e);
+        restoreFormState();
+        originalGoToStep(1);
+      }
+    }
+
+    async function fetchLeadId() {
+      try {
+        const res  = await fetch("https://api.lucirajewelry.com/earn-rewards/get-lead.php?customer_id=" + customerData.id);
+        const data = await res.json();
+        leadId = data.data[0]._id;
+        console.log('Lead ID:', leadId);
+        await loadProgress();
+      } catch (e) { console.error('fetchLeadId', e); }
+    }
+
+    // ── Override goToStep ────────────────────────────────────────────────────────
+
+    window.goToStep = async function (targetStep) {
+      const activePanel = document.querySelector('.step-panel.active');
+      const currentStep = activePanel ? parseInt(activePanel.id.replace('step-', '')) : 1;
+
+      saveFormState();
+
+      // Only reward when moving forward, for the step being LEFT
+      if (targetStep > currentStep) {
+        await saveStep(currentStep);
       }
 
-      restoreFormState();
+      originalGoToStep(targetStep);
+    };
 
-      // Use originalGoToStep so we don't trigger reward logic on restore
-      const lastStep = data.last_step || 1;
-      originalGoToStep(lastStep);
-    } catch(e) {
-      console.error("loadProgress:", e);
-      restoreFormState();
-      originalGoToStep(1);
-    }
-  }
+    // ✅ Override completeProfile — step 4 was NEVER being saved before
+    window.completeProfile = async function () {
+      saveFormState();
+      await saveStep(4);
+      originalCompleteProfile();
+    };
 
-  // ── Override goToStep & completeProfile ──────────────────────────────────────
+    // ── Init ─────────────────────────────────────────────────────────────────────
 
-  const originalGoToStep = window.goToStep;
-
-  window.goToStep = async function(targetStep) {
-    // Detect which step is currently visible
-    const activePanel = document.querySelector('.step-panel.active');
-    const currentStep = activePanel ? parseInt(activePanel.id.replace('step-', '')) : 1;
-
-    saveFormState();
-
-    // Only reward when moving FORWARD, and only for the step just completed
-    if (targetStep > currentStep) {
-      await saveStep(currentStep);
-    }
-
-    originalGoToStep(targetStep);
-  };
-
-  const originalCompleteProfile = window.completeProfile;
-  window.completeProfile = async function() {
-    saveFormState();
-    await saveStep(4); // ← this was missing; step 4 was never rewarded
-    originalCompleteProfile();
-  };
-
-  // ── Init ──────────────────────────────────────────────────────────────────────
-
-  document.addEventListener("DOMContentLoaded", function() {
     if (typeof customerData !== 'undefined' && customerData.id) {
-      fetchLeadId(); // will call restoreFormState + originalGoToStep internally
+      fetchLeadId();
     } else {
       restoreFormState();
-      originalGoToStep(1);
+      // goToStep(1) already called by first script — no need to call again
     }
+
   });
 </script>
+
 
