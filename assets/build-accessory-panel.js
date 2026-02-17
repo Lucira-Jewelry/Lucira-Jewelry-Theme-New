@@ -430,10 +430,12 @@ window.MainBaseCharm = function () {
       t.setAttribute('aria-selected', 'false');
     });
 
+    // Remove active from all grid containers
     document.querySelectorAll('.charms-grid-container').forEach((grid) => {
       grid.classList.remove('active');
     });
 
+    // If it was NOT already active, activate it
     if (!isAlreadyActive) {
       tile.classList.add('active');
       tile.setAttribute('aria-selected', 'true');
@@ -449,6 +451,83 @@ window.MainBaseCharm = function () {
   });
 
 
+  // function moveGridsColumnBelowTile(targetId) {
+  //   const gridsColumn = document.querySelector('.grids-column');
+  //   const tilesColumn = document.getElementById('lf-collection-tiles');
+  //   const rightInner = document.querySelector('.right-split-inner');
+  //   if (!gridsColumn || !tilesColumn || !rightInner) return;
+
+  //   tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+  //     btn.classList.remove('open-with-grid', 'active')
+  //   );
+
+  //   if (!isMobileLayout()) {
+  //     if (rightInner.contains(gridsColumn) === false) rightInner.insertBefore(gridsColumn, tilesColumn);
+  //     return;
+  //   }
+
+  //   const activeTile = tilesColumn.querySelector(`.collection-tile[data-target="${targetId}"]`);
+  //   if (!activeTile) return;
+
+  //   const tileWrapper = activeTile.closest('.main-collection-tile-div') || activeTile;
+
+  //   if (activeTile.classList.contains('open-with-grid')) {
+  //     activeTile.classList.remove('open-with-grid', 'active');
+  //     tileWrapper.removeChild(gridsColumn);
+  //   } else {
+  //     activeTile.classList.add('open-with-grid', 'active');
+  //     if (tileWrapper.nextSibling === gridsColumn) return;
+  //     tileWrapper.parentNode.insertBefore(gridsColumn, tileWrapper.nextSibling);
+  //   }
+  // }
+
+  // function setActiveCollectionById(targetId) {
+  //   const wrapper = $('lf-charms-grids-wrapper');
+  //   if (!wrapper) return;
+
+  //   wrapper.querySelectorAll('.charms-grid-container').forEach((c) => {
+  //     if (c.id === targetId) {
+  //       c.style.display = '';
+  //       c.classList.add('active');
+  //     } else {
+  //       c.style.display = 'none';
+  //       c.classList.remove('active');
+  //     }
+  //   });
+
+  //   currentCollectionId = targetId;
+
+  //   document.addEventListener('click', function (e) {
+  //   const tile = e.target.closest('.collection-tile');
+  //   if (!tile) return;
+
+  //   const isAlreadyActive = tile.classList.contains('open-with-grid');
+
+  //   // Remove active from all tiles
+  //   document.querySelectorAll('.collection-tile').forEach((t) => {
+  //     t.classList.remove('active', 'open-with-grid');
+  //     t.setAttribute('aria-selected', 'false');
+  //   });
+
+  //   // Remove active from all grid containers
+  //   document.querySelectorAll('.charms-grid-container').forEach((grid) => {
+  //     grid.classList.remove('active');
+  //   });
+
+  //   // If it was NOT already active, activate it
+  //   if (!isAlreadyActive) {
+  //     tile.classList.add('active', 'open-with-grid');
+  //     tile.setAttribute('aria-selected', 'true');
+
+  //     const targetId = tile.dataset.target;
+  //     if (targetId) {
+  //       const targetGrid = document.getElementById(targetId);
+  //       if (targetGrid) {
+  //         targetGrid.classList.add('active');
+  //       }
+  //     }
+  //   }
+  // });
 
 
     setTimeout(() => {
