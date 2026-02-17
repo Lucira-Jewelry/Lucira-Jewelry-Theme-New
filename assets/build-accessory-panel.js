@@ -36,7 +36,7 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 250px !important;
+          height: 353px !important;
           margin: 0 auto !important;
           display: block !important;
         }
@@ -794,7 +794,7 @@ window.MainBaseCharm = function () {
       if (isMobileLayout()) {
         if (wrapper) {
           wrapper.style.setProperty('width', '350px', 'important');
-          wrapper.style.setProperty('height', '353px', 'important');
+          wrapper.style.setProperty('height', '250px', 'important');
         }
       } else {
         // Desktop: Increase main container height to prevent cropping
