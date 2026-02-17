@@ -192,7 +192,6 @@ if (sendBtn) {
     }
   });
 }
-// ---------------------------------------------------------
 
 const verifyBtn = document.getElementById('verifyOtp');
 if (verifyBtn) {
