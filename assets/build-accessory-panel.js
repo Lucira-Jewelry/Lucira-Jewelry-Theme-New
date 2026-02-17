@@ -36,17 +36,17 @@ window.MainBaseCharm = function () {
       @media (max-width: 768px) {
         .variant-img-wrap {
           width: 350px !important;
-          height: 310px !important;
+          height: 353px !important;
           margin: 0 auto !important;
-          
+          display: block !important;
         }
         #vis-Visualiser_Canvas {
-          width: 270px !important;
-          height: 310px !important;
+          width: 350px !important;
+          height: 353px !important;
         }
         #vis-Visualiser_Canvas canvas {
-          width: 270px !important;
-          height:  400px !important;
+          width: 350px !important;
+          height: 353px !important;
         }
       }
     `;
@@ -379,7 +379,7 @@ window.MainBaseCharm = function () {
     const rightInner = document.querySelector('.right-split-inner');
     if (!gridsColumn || !tilesColumn || !rightInner) return;
 
-    tilesColumn.querySelectorAll('.collection-tile .open-with-grid').forEach((btn) =>
+    tilesColumn.querySelectorAll('.collection-tile.open-with-grid').forEach((btn) =>
       btn.classList.remove('open-with-grid')
     );
 
@@ -419,38 +419,12 @@ window.MainBaseCharm = function () {
 
     currentCollectionId = targetId;
 
-    document.addEventListener('click', function (e) {
-    const tile = e.target.closest('.collection-tile');
-    if (!tile) return;
-
-    const isAlreadyActive = tile.classList.contains('active');
-
-    // Remove active from all tiles
     document.querySelectorAll('.collection-tile').forEach((t) => {
-      t.classList.remove('active');
-      t.setAttribute('aria-selected', 'false');
+      const active = t.dataset.target === targetId;
+
+      t.classList.toggle('active', active);
+      t.setAttribute('aria-selected', active ? 'true' : 'false');
     });
-
-    // Remove active from all grid containers
-    document.querySelectorAll('.charms-grid-container').forEach((grid) => {
-      grid.classList.remove('active');
-    });
-
-    // If it was NOT already active, activate it
-    if (!isAlreadyActive) {
-      tile.classList.add('active');
-      tile.setAttribute('aria-selected', 'true');
-
-      const targetId = tile.dataset.target;
-      if (targetId) {
-        const targetGrid = document.getElementById(targetId);
-        if (targetGrid) {
-          targetGrid.classList.add('active');
-        }
-      }
-    }
-  });
-
 
     setTimeout(() => {
       document
@@ -467,39 +441,15 @@ window.MainBaseCharm = function () {
         });
 
       filterCharmsBySelectedVariantCarat();
-    }, 100); // Reduced delay for better responsiveness
+    }, 500);
 
     moveGridsColumnBelowTile(targetId);
+
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
     refreshCapState();
-    toggleZoomBar(); // Added to ensure zoom bar refreshes on collection change
   }
-
-// 2. Add the Click Listener ONCE (Place this outside any function scope)
-document.addEventListener('click', function (e) {
-  const tile = e.target.closest('.collection-tile');
-  if (!tile) return;
-
-  const targetId = tile.dataset.target;
-  const isAlreadyActive = tile.classList.contains('active');
-
-  // Clear previous states
-  document.querySelectorAll('.collection-tile').forEach((t) => {
-    t.classList.remove('active');
-    t.setAttribute('aria-selected', 'false');
-  });
-
-  // Activate current
-  tile.classList.add('active');
-  tile.setAttribute('aria-selected', 'true');
-
-  // Trigger the visual update
-  if (targetId) {
-    setActiveCollectionById(targetId);
-  }
-});
 
   (function () {
     if (window._charmCartInit) return;
@@ -843,25 +793,20 @@ document.addEventListener('click', function (e) {
       if (isMobileLayout()) {
         if (wrapper) {
           wrapper.style.setProperty('width', '350px', 'important');
-          wrapper.style.setProperty('height', '310px', 'important');
+          wrapper.style.setProperty('height', '353px', 'important');
         }
       } else {
         // Desktop: Increase main container height to prevent cropping
         if (wrapper) {
-          //wrapper.style.setProperty('height', '470px', 'important');
+          wrapper.style.setProperty('height', '470px', 'important');
         }
       }
 
       const rect = container.getBoundingClientRect();
-let width = isMobileLayout() ? 280 : (rect.width || 440);
-
-const minWidth = isMobileLayout() ? 260 : 300;
-const maxWidth = isMobileLayout() ? 330 : 700;
-
-width = Math.max(minWidth, Math.min(width, maxWidth));
-
+      let width = isMobileLayout() ? 350 : (rect.width || 440);
+      width = Math.max(300, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
-      const height = isMobileLayout() ? 400 : (width * (445 / 440));
+      const height = isMobileLayout() ? 353 : (width * (445 / 440));
 
       this.stageWidth = width;
       this.stageHeight = height;
@@ -1476,63 +1421,7 @@ width = Math.max(minWidth, Math.min(width, maxWidth));
       }
     }
 
-    toDataURL() {
-      try {
-        if (!this.stage) return null;
-
-        // Save current state
-        const oldScale = this.stage.scaleX();
-        const oldPos = this.stage.position();
-
-        // Reset view for capture
-        this.stage.scale({ x: 1, y: 1 });
-        this.stage.position({ x: 0, y: 0 });
-        this.stage.draw(); // Use draw() for synchronous capture
-
-        let dataURL = null;
-        try {
-          dataURL = this.stage.toDataURL({
-            pixelRatio: 2
-          });
-        } catch (err) {
-          console.error('Visualizer: Capture failed. This is likely a CORS issue (tainted canvas).', err);
-          // If it's a security error, high-level fallback won't help, but we'll try standard ratio
-          try {
-            dataURL = this.stage.toDataURL({ pixelRatio: 1 });
-          } catch (inner) {
-            console.error('Visualizer: Standard capture also failed.', inner);
-          }
-        }
-
-        // Restore view
-        this.stage.scale({ x: oldScale, y: oldScale });
-        this.stage.position(oldPos);
-        this.stage.draw(); // Synchronous draw to restore view
-
-        return dataURL;
-      } catch (e) {
-        console.warn('Visualizer: Error in toDataURL method', e);
-        return null;
-      }
-    }
-
   }
-
-  window.getVisualizerImage = function () {
-    try {
-      if (window.bv && typeof window.bv.toDataURL === 'function') {
-        return window.bv.toDataURL();
-      }
-      if (typeof ensureBV === 'function') {
-        const instance = ensureBV();
-        return (instance && typeof instance.toDataURL === 'function') ? instance.toDataURL() : null;
-      }
-    } catch (e) {
-      console.error('Visualizer: getVisualizerImage failed', e);
-    }
-    return null;
-  };
-
   let bv = null;
   function ensureBV() {
     if (!bv) {
@@ -2632,8 +2521,8 @@ document.addEventListener('DOMContentLoaded', function () {
   const dotsWrap = document.getElementById('lf-dots');
   const activeDot = document.getElementById('lf-active-dot');
   const caratValue = localStorage.getItem('Carat-value');
-  if (label && caratValue) {
-    label.insertAdjacentHTML('afterbegin', `<span class="carat-value">${caratValue}</span> `);
+  if (caratValue) {
+    label.insertAdjacentText('afterbegin', `<span class="carat-value">${caratValue}</span> `);
   }
 
   if (dotsWrap && dotsWrap.children.length === 0) {
