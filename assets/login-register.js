@@ -629,7 +629,7 @@ function setLuciraSessionPopup() {
 document.addEventListener('DOMContentLoaded', function () {
   loadLatestWinner(); // <--- This function powers the ticker
   const POPUP_ID = 'login-popup';
-  const SHOW_DELAY = 12000;
+  const SHOW_DELAY = 8000;
 
   const popup = document.getElementById(POPUP_ID);
   if (!popup) return;
@@ -656,7 +656,6 @@ document.addEventListener('DOMContentLoaded', function () {
       wheelWrapper.style.visibility = 'visible';
     }
 
-    loadLatestWinner();
     const heading = popup.querySelector('.otp-number-wrapper p.heading');
     const subtext = popup.querySelector('.otp-number-wrapper p:not(.heading)');
     if (heading) heading.innerText = 'Register & Win a Reward';
@@ -684,18 +683,28 @@ async function loadLatestWinner() {
   try {
     const res = await fetch('https://api.lucirajewelry.com/recent-winners.php');
     if (!res.ok) return;
+
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) return;
+
     const latest = data[0];
+
     const ticker = document.getElementById('winnerTicker');
     const textEl = document.getElementById('winnerText');
+
     if (!ticker || !textEl) return;
-    textEl.innerText =
-      latest.city && latest.city !== "India"
-        ? `${latest.name} from ${latest.city} just won ${latest.prize}!`
-        : `${latest.name} just won ${latest.prize}!`;
+
+    // ✅ GUARD: hide ticker if data incomplete
+    if (!latest || !latest.name || !latest.prize) {
+      ticker.style.display = 'none';
+      return;
+    }
+
+    const cityText = latest.city ? ` from ${latest.city}` : '';
+    textEl.innerText = `${latest.name}${cityText} just won ${latest.prize}!`;
 
     ticker.style.display = 'flex';
+
   } catch (err) {
     console.error('Winner fetch error:', err);
   }
