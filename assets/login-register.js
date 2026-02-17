@@ -162,16 +162,7 @@ sendBtn.addEventListener('click', async () => {
         });
         
         const data = await response.json();
-        if (data.type == 'success'){
-            window.dataLayer = window.dataLayer || [];
-                window.dataLayer.push({
-                        event: "promoClick",
-                        promoClick : { promotion_name: 'send-otp',
-                        creative_name: 'send-otp-button-login-form',
-                        location_id: window.location.pathname
-                        }
-            });
-        }
+        
         if (data.type !== 'success') {
             showError('mobileError', data.message || 'Failed to send OTP');
             sendBtn.disabled = false;
