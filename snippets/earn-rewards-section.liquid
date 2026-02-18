@@ -575,8 +575,8 @@
       currentStep: 1,
       maxStepReached: 0,
       formData: {},
-      leadId: null,
-      rewardedSteps: new Set() // Prevent double-dipping points
+      rewardedSteps: new Set(),
+      profileComplete: false
     };
 
     // ── UI References ──
@@ -590,128 +590,130 @@
       stepList: document.getElementById('stepsList')
     };
 
-    // Circle Math
     const CIRCUMFERENCE = 2 * Math.PI * 42;
     ui.ringFill.style.strokeDasharray = CIRCUMFERENCE;
 
     // ── Initialization ──
     async function init() {
-      // 1. Load LocalStorage first (Instant UI feedback)
       loadLocalState();
-      
-      // 2. Bind Interactions
       bindEvents();
 
-      // 3. If Customer exists, sync with Server
-      if (typeof window.customerData !== 'undefined' && window.customerData.id) {
-        await fetchLeadAndSync();
+      // If Customer exists, fetch progress from server using Shopify ID
+      if (window.customerData && window.customerData.id) {
+        await fetchProgressFromServer();
       }
 
-      // 4. Render final state
       renderUI();
     }
 
-    // ── Core Logic: Navigation ──
+    // ── Navigation ──
     window.goToStep = function(step) {
       const direction = step > state.currentStep ? 'forward' : 'backward';
-      
-      // 1. Save Data
       scrapeFormData();
       
       if (direction === 'forward') {
-
-        // Only reward if not already rewarded
         if (!state.rewardedSteps.has(state.currentStep)) {
-
-          // 🔥 Update progress immediately
           state.rewardedSteps.add(state.currentStep);
           state.maxStepReached = Math.max(state.maxStepReached, state.currentStep);
-
+          
           saveLocalState();
-          renderUI(); // ← instant coins update
-
-          // 🔥 Save to server (async)
+          renderUI();
+          
+          // Save to server using Shopify ID
           saveStepToApi(state.currentStep);
         }
       }
 
-
-      // 3. Move Step
       state.currentStep = step;
-      
-      // 4. Persist & Render
       saveLocalState();
       renderUI();
-      
-      // Scroll to top
       document.querySelector('.page-wrap').scrollIntoView({ behavior: 'smooth' });
     };
 
     window.completeProfile = function() {
       scrapeFormData();
       state.maxStepReached = 4;
-      state.profileComplete = true;   // ← add this flag
+      state.profileComplete = true;
+      state.rewardedSteps.add(4);
+      
       saveLocalState();
       saveStepToApi(4);
       renderUI();
-      alert("Profile Completed! 400 Coins Earned.");
     };
 
-    // ── Data Handling (Unified) ──
+    // ── API Communication ──
+
+    async function fetchProgressFromServer() {
+      try {
+        // Fetching progress directly using the Shopify Customer ID
+        const customerId = `shopify-${window.customerData.id}`;
+        const res = await fetch(`${CONFIG.apiBase}/get-progress.php?customer_id=${customerId}`);
+        const data = await res.json();
+        
+        if (data.completed_steps) {
+          state.rewardedSteps = new Set(data.completed_steps.map(Number));
+          state.maxStepReached = Math.max(...Array.from(state.rewardedSteps), 0);
+          if (state.maxStepReached === 4) state.profileComplete = true;
+          
+          saveLocalState();
+          renderUI();
+        }
+      } catch (e) {
+        console.error('Sync with server failed', e);
+      }
+    }
+
+    function saveStepToApi(step) {
+      if (!window.customerData || !window.customerData.id) return;
+
+      const payload = {
+        customer_id: `shopify-${window.customerData.id}`,
+        step: step
+      };
+
+      fetch(`${CONFIG.apiBase}/save-step.php`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        keepalive: true 
+      })
+      .then(res => res.json())
+      .catch(err => console.error('API Save Error:', err));
+    }
+
+    // ── Helper Functions (Scraping, LocalStorage, UI) ──
+
     function scrapeFormData() {
-      // Scrape standard inputs
       document.querySelectorAll('input, select, textarea').forEach(el => {
         if (el.type === 'radio') {
           if (el.checked) state.formData[el.name] = el.value;
         } else if (el.type === 'checkbox') {
           state.formData[el.id] = el.checked;
         } else {
-          // Use ID, or name, or generate a key based on parent text for dates
-          let key = el.id || el.name;
-          if(el.type === 'date' && !key) key = 'date_' + el.closest('.form-row')?.innerText.trim();
+          let key = el.id || el.name || 'field_' + Math.random();
           state.formData[key] = el.value;
         }
       });
 
-      // Scrape Chips
       document.querySelectorAll('.chip-group').forEach((group, index) => {
-        const selectedChips = [];
-        group.querySelectorAll('.chip.selected').forEach(c => selectedChips.push(c.innerText));
-        state.formData['chip_group_' + index] = selectedChips;
+        const selected = Array.from(group.querySelectorAll('.chip.selected')).map(c => c.innerText);
+        state.formData['chip_group_' + index] = selected;
       });
     }
 
     function restoreFormInputs() {
       if (!state.formData) return;
-
-      // Restore Inputs
-      for (const [key, value] of Object.entries(state.formData)) {
-        const elById = document.getElementById(key);
-        if (elById) {
-          if (elById.type === 'checkbox') elById.checked = value;
-          else elById.value = value;
+      Object.entries(state.formData).forEach(([key, value]) => {
+        const el = document.getElementById(key);
+        if (el) {
+          if (el.type === 'checkbox') el.checked = value;
+          else el.value = value;
         }
-        
-        const radios = document.getElementsByName(key);
-        if (radios.length > 0) {
-          radios.forEach(r => { if (r.value === value) r.checked = true; });
-        }
-      }
-
-      // Restore Chips
-      document.querySelectorAll('.chip-group').forEach((group, index) => {
-        const savedChips = state.formData['chip_group_' + index] || [];
-        group.querySelectorAll('.chip').forEach(c => {
-          c.classList.toggle('selected', savedChips.includes(c.innerText));
-        });
       });
-      
-      // Retrigger toggles
       toggleSpouseFields();
     }
 
     function saveLocalState() {
-      // Convert Set to Array for JSON storage
       const storageState = { ...state, rewardedSteps: Array.from(state.rewardedSteps) };
       localStorage.setItem(CONFIG.storageKey, JSON.stringify(storageState));
     }
@@ -721,154 +723,58 @@
       if (saved) {
         const parsed = JSON.parse(saved);
         state = { ...state, ...parsed };
-        // Convert Array back to Set
         state.rewardedSteps = new Set(parsed.rewardedSteps || []);
         restoreFormInputs();
       }
     }
 
-    async function fetchLeadAndSync() {
-      try {
-        const res = await fetch(`${CONFIG.apiBase}/get-lead.php?customer_id=${window.customerData.id}`);
-        const data = await res.json();
-        
-        if (data.data && data.data[0]) {
-          const serverLeadId = data.data[0]._id;
-
-          // ── THE FIX: DETECT DELETED/REPLACED CUSTOMER ──
-          // If we have a local leadId and it doesn't match the server, reset the progress.
-          if (state.leadId && state.leadId !== serverLeadId) {
-            console.warn("Lead ID mismatch detected (Customer likely recreated). Resetting local progress.");
-            state.maxStepReached = 0;
-            state.rewardedSteps = new Set();
-            // You might also want to clear state.formData = {} if you want a fresh start
-          }
-
-          state.leadId = serverLeadId;
-          
-          // Now continue with syncing server progress...
-          const progRes = await fetch(`${CONFIG.apiBase}/get-progress.php?lead_id=${state.leadId}`);
-          const progData = await progRes.json();
-          
-          if (progData.completed_steps) {
-            progData.completed_steps.forEach(s => state.rewardedSteps.add(Number(s)));
-            // Update maxStepReached based on what the server actually has
-            state.maxStepReached = Math.max(...Array.from(state.rewardedSteps), 0);
-          }
-          
-          renderUI();
-        }
-      } catch (e) {
-        console.error('Sync failed', e);
-      }
-    }
-
-    function saveStepToApi(step) {
-      if (!state.leadId) return;
-      if (state.rewardedSteps.has(step)) return;
-
-      // Use keepalive:true so the request survives if the page closes
-      fetch(`${CONFIG.apiBase}/save-step.php`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: state.leadId, step: step }),
-        keepalive: true 
-      }).then(() => {
-        state.rewardedSteps.add(step);
-        saveLocalState();
-      }).catch(err => console.error('Reward save failed', err));
-    }
-
     function renderUI() {
-      // ── Show completion screen if profile is done ──
+      // Logic for Completion Screen
       if (state.profileComplete) {
         document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
-        const completePanel = document.getElementById('step-complete');
-        if (completePanel) completePanel.classList.add('active');
-
-        const coins = state.rewardedSteps.size * CONFIG.pointsPerStep;
-        ui.coinsDisplay.innerText = coins;
-        const percent = (state.maxStepReached / CONFIG.totalSteps) * 100;
-        ui.ringFill.style.strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
-        ui.ringPct.innerText = Math.round(percent);
+        document.getElementById('step-complete').classList.add('active');
         ui.trackProgress.style.width = '100%';
-
-        ui.stepList.querySelectorAll('li').forEach(li => {
-          li.classList.add('done');
-          li.querySelector('.check-circle').classList.add('done');
-        });
-        for (let i = 0; i <= CONFIG.totalSteps; i++) {
-          const dot = document.getElementById('dot' + i);
-          const lbl = document.getElementById('lbl' + i);
-          if (dot) { dot.classList.remove('current'); dot.classList.add('done'); }
-          if (lbl) { lbl.classList.remove('current'); lbl.classList.add('done'); }
-        }
+        updateProgressRing(100);
         return;
       }
 
-      // ── Toggle Panels ──
+      // Toggle Panels
       document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
-      const currentPanel = document.getElementById('step-' + state.currentStep);
-      if (currentPanel) currentPanel.classList.add('active');
+      document.getElementById('step-' + state.currentStep).classList.add('active');
 
-      // ── Coins & Ring Progress ──
-      const coins = state.maxStepReached * CONFIG.pointsPerStep;
-      ui.coinsDisplay.innerText = coins;
-      const percent = (state.maxStepReached / CONFIG.totalSteps) * 100;
-      ui.ringFill.style.strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
-      ui.ringPct.innerText = Math.round(percent);
-
-      // ── Top Progress Bar ──
+      // Update Top Progress Bar
       const barPercent = ((state.currentStep - 1) / (CONFIG.totalSteps - 1)) * 100;
       ui.trackProgress.style.width = barPercent + '%';
 
-      // ── Milestone Dots ──
+      // Update Sidebar & Coins
+      const coins = state.maxStepReached * CONFIG.pointsPerStep;
+      ui.coinsDisplay.innerText = coins;
+      updateProgressRing((state.maxStepReached / CONFIG.totalSteps) * 100);
+      
+      // Update Milestones (Dots)
       for (let i = 0; i <= CONFIG.totalSteps; i++) {
         const dot = document.getElementById('dot' + i);
-        const lbl = document.getElementById('lbl' + i);
-        if (!dot) continue;
-        dot.classList.remove('current', 'done');
-        if (lbl) lbl.classList.remove('current', 'done');
-
-        if (i < state.currentStep) {
-          dot.classList.add('done');
-          if (lbl) lbl.classList.add('done');
-        } else if (i === state.currentStep) {
-          dot.classList.add('current');
-          if (lbl) lbl.classList.add('current');
+        if (dot) {
+            dot.classList.toggle('done', i < state.currentStep);
+            dot.classList.toggle('current', i === state.currentStep);
         }
       }
-
-      // ── Sidebar Step List ──
-      ui.stepList.querySelectorAll('li').forEach((li, idx) => {
-        const stepIndex = idx + 1;
-        const circle = li.querySelector('.check-circle');
-        li.classList.remove('done');
-        circle.classList.remove('done', 'current');
-
-        if (stepIndex <= state.maxStepReached) {
-          li.classList.add('done');
-          circle.classList.add('done');
-        } else if (stepIndex === state.currentStep) {
-          circle.classList.add('current');
-        }
-      });
     }
 
-    // ── Event Bindings ──
+    function updateProgressRing(percent) {
+      ui.ringFill.style.strokeDashoffset = CIRCUMFERENCE - (percent / 100) * CIRCUMFERENCE;
+      ui.ringPct.innerText = Math.round(percent);
+    }
+
     function bindEvents() {
-      // Chips
-      document.querySelectorAll('.chip-group').forEach(g => {
-        g.querySelectorAll('.chip').forEach(c => {
-          c.addEventListener('click', () => {
-            c.classList.toggle('selected');
-            scrapeFormData();
-            saveLocalState();
-          });
+      document.querySelectorAll('.chip').forEach(c => {
+        c.addEventListener('click', () => {
+          c.classList.toggle('selected');
+          scrapeFormData();
+          saveLocalState();
         });
       });
 
-      // Toggles
       if(ui.marriedToggle) {
         ui.marriedToggle.addEventListener('change', () => {
           toggleSpouseFields();
@@ -876,25 +782,16 @@
           saveLocalState();
         });
       }
-
-      // Inputs
-      document.querySelectorAll('input').forEach(input => {
-        input.addEventListener('change', () => {
-          scrapeFormData();
-          saveLocalState();
-        });
-      });
     }
 
     function toggleSpouseFields() {
-      if (ui.marriedToggle && ui.spouseFields) {
+      if (ui.spouseFields && ui.marriedToggle) {
         ui.spouseFields.style.display = ui.marriedToggle.checked ? 'block' : 'none';
       }
     }
 
-    // ── Run ──
     init();
-  });
+});
 </script>
 
 
