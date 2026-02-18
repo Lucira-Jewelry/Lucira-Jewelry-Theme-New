@@ -833,50 +833,101 @@ document.addEventListener('DOMContentLoaded', function () {
   function getStepFormData(step) {
     const panel = document.getElementById('step-' + step);
     if (!panel) return {};
-    const data = {};
 
-    // ── Text / date inputs ──
-    panel.querySelectorAll('input[type="text"], input[type="date"]').forEach(el => {
-      const key = el.id || el.name || el.placeholder || 'input_' + Math.random().toString(36).slice(2,6);
-      data[key] = el.value;
-    });
+    switch (step) {
 
-    // ── Radio buttons — collect name → value ──
-    const radioNames = new Set(
-      Array.from(panel.querySelectorAll('input[type="radio"]')).map(r => r.name)
-    );
-    radioNames.forEach(name => {
-      const checked = panel.querySelector(`input[name="${name}"]:checked`);
-      data[name] = checked ? checked.value : '';
-    });
+      case 1: {
+        // Gender radio
+        const genderEl = panel.querySelector('input[name="gender"]:checked');
+        // DOB — first date input (single row)
+        const dobEl = panel.querySelector('.form-row.single input[type="date"]');
+        // Married toggle
+        const married = ui.marriedToggle ? ui.marriedToggle.checked : false;
+        // Spouse fields (anniversary + spouse DOB)
+        const spouseDates = panel.querySelectorAll('#spouseFields input[type="date"]');
 
-    // ── Checkboxes — collect id → boolean ──
-    panel.querySelectorAll('input[type="checkbox"]').forEach(el => {
-      const key = el.id || el.name || 'checkbox_' + Math.random().toString(36).slice(2,6);
-      data[key] = el.checked;
-    });
-
-    // ── Toggle (married) — explicit capture ──
-    if (step === 1 && ui.marriedToggle) {
-      data['married'] = ui.marriedToggle.checked;
-    }
-
-    // ── Chip groups — labelled by their preceding .field-label text ──
-    panel.querySelectorAll('.chip-group').forEach((g, i) => {
-      // Try to find the .field-label that precedes this chip-group
-      let label = 'chip_group_' + (i + 1);
-      let prev = g.previousElementSibling;
-      while (prev) {
-        if (prev.classList.contains('field-label')) {
-          label = prev.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_');
-          break;
-        }
-        prev = prev.previousElementSibling;
+        return {
+          gender           : genderEl ? genderEl.value : '',
+          date_of_birth    : dobEl ? dobEl.value : '',
+          is_married       : married,
+          anniversary_date : married && spouseDates[0] ? spouseDates[0].value : '',
+          spouse_dob       : married && spouseDates[1] ? spouseDates[1].value : '',
+        };
       }
-      data[label] = Array.from(g.querySelectorAll('.chip.selected')).map(c => c.innerText.trim());
-    });
 
-    return data;
+      case 2: {
+        const chipGroups   = panel.querySelectorAll('.chip-group');
+        const checkboxes   = panel.querySelectorAll('.checkbox-list input[type="checkbox"]');
+
+        // Gifting frequency chips (1st chip group)
+        const giftFrequency = chipGroups[0]
+          ? Array.from(chipGroups[0].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+
+        // Gifting style checkboxes
+        const giftingStyle = Array.from(checkboxes)
+          .filter(cb => cb.checked)
+          .map(cb => {
+            const lbl = panel.querySelector(`label[for="${cb.id}"]`);
+            return lbl ? lbl.innerText.trim() : cb.id;
+          });
+
+        // Gift recipients chips (2nd chip group)
+        const giftRecipients = chipGroups[1]
+          ? Array.from(chipGroups[1].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+
+        return {
+          gifting_frequency : giftFrequency,
+          gifting_style     : giftingStyle,
+          gift_recipients   : giftRecipients,
+        };
+      }
+
+      case 3: {
+        const chipGroups = panel.querySelectorAll('.chip-group');
+
+        const jewelry_types = chipGroups[0]
+          ? Array.from(chipGroups[0].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+        const metal_type = chipGroups[1]
+          ? Array.from(chipGroups[1].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+        const budget_range = chipGroups[2]
+          ? Array.from(chipGroups[2].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+
+        return {
+          jewelry_types : jewelry_types,
+          metal_type    : metal_type,
+          budget_range  : budget_range,
+        };
+      }
+
+      case 4: {
+        const chipGroups = panel.querySelectorAll('.chip-group');
+        const checkboxes = panel.querySelectorAll('.checkbox-list input[type="checkbox"]');
+
+        const style_preference = chipGroups[0]
+          ? Array.from(chipGroups[0].querySelectorAll('.chip.selected')).map(c => c.innerText.trim())
+          : [];
+
+        const shopping_occasions = Array.from(checkboxes)
+          .filter(cb => cb.checked)
+          .map(cb => {
+            const lbl = panel.querySelector(`label[for="${cb.id}"]`);
+            return lbl ? lbl.innerText.trim() : cb.id;
+          });
+
+        return {
+          style_preference   : style_preference,
+          shopping_occasions : shopping_occasions,
+        };
+      }
+
+      default:
+        return {};
+    }
   }
 
   // ── PERSIST ──────────────────────────────────────────────────────────────
