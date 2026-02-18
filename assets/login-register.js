@@ -629,7 +629,7 @@ function setLuciraSessionPopup() {
 document.addEventListener('DOMContentLoaded', function () {
   loadLatestWinner(); // <--- This function powers the ticker
   const POPUP_ID = 'login-popup';
-  const SHOW_DELAY = 8000;
+  const SHOW_DELAY = 15000;
 
   const popup = document.getElementById(POPUP_ID);
   if (!popup) return;
