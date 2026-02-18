@@ -244,8 +244,9 @@ if (verifyBtn) {
         pushLoginEvent(email, mobile);
 
         shopifyAutoLogin(email, data.credentials.password);
-        return;
+        return; // ✅ IMPORTANT: prevents register form
       }
+
 
 
       if (data.type === 'register') {
@@ -255,6 +256,7 @@ if (verifyBtn) {
         verifyBtn.disabled = false;
         return;
       }
+
       showError('otpError', data.msg || 'Invalid OTP');
     } catch (err) {
       console.error(err);
@@ -635,7 +637,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!popup) return;
 
   if (hasLuciraSessionPopup()) return;
-  if (document.body.classList.contains('customer-logged-in')) return;
+  if (window.Shopify && Shopify.customer) return;
   setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
