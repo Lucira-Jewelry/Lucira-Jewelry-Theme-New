@@ -562,27 +562,22 @@
 {% endif %}
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-    // ── Configuration ──
     const CONFIG = {
       storageKey: 'lucira_profile_data',
       apiBase: 'https://api.lucirajewelry.com/earn-rewards',
       totalSteps: 4,
       pointsPerStep: 100
     };
-
-    // ── State Management ──
     const defaultState = {
       currentStep: 1,
       maxStepReached: 0,
       formData: {},
-      rewardedSteps: [], // Changed to Array for easier JSON storage
+      rewardedSteps: [],
       profileComplete: false,
-      customerId: null // New: Store who owns this data
+      customerId: null
     };
 
     let state = JSON.parse(JSON.stringify(defaultState)); // Deep copy
-
-    // ── UI References ──
     const ui = {
       trackProgress: document.getElementById('trackProgress'),
       ringFill: document.getElementById('ringFill'),
@@ -596,29 +591,20 @@
     const CIRCUMFERENCE = 2 * Math.PI * 42;
     if(ui.ringFill) ui.ringFill.style.strokeDasharray = CIRCUMFERENCE;
 
-    // ── Initialization ──
     async function init() {
-      // 1. Load Local State first to prevent flashing
       loadLocalState();
-      
       bindEvents();
-
-      // 2. If Customer exists, force sync with server
-      // This is crucial: if server says 0, we overwrite local storage
       if (window.customerData && window.customerData.id) {
         await fetchProgressFromServer();
       }
-
       renderUI();
     }
 
-    // ── Navigation ──
     window.goToStep = function(step) {
       const direction = step > state.currentStep ? 'forward' : 'backward';
       scrapeFormData();
       
       if (direction === 'forward') {
-        // Convert array to Set for checking, then back to logic
         const rewardedSet = new Set(state.rewardedSteps);
         
         if (!rewardedSet.has(state.currentStep)) {
@@ -626,8 +612,6 @@
           state.maxStepReached = Math.max(state.maxStepReached, state.currentStep);
           
           saveLocalState();
-          
-          // Save to server
           saveStepToApi(state.currentStep);
         }
       }
@@ -653,22 +637,16 @@
       renderUI();
     };
 
-    // ── API Communication ──
-
     async function fetchProgressFromServer() {
       try {
         const customerId = `shopify-${window.customerData.id}`;
-        // Add timestamp to prevent caching
         const res = await fetch(`${CONFIG.apiBase}/get-progress.php?customer_id=${customerId}&t=${Date.now()}`);
         const data = await res.json();
-        
-        // CRITICAL FIX: If server returns valid data, we trust the server over local storage
+
         if (data && typeof data.completed_steps !== 'undefined') {
           
           const serverSteps = data.completed_steps.map(Number);
-          
-          // If server says 0 steps (empty array), but we have local progress, 
-          // it means the customer was reset/deleted on backend. We must reset local.
+
           if (serverSteps.length === 0 && state.rewardedSteps.length > 0) {
              resetState();
              return; 
