@@ -238,15 +238,22 @@ if (verifyBtn) {
       }
 
 
+      // Find this existing block:
       if (data.type === 'success' && data.credentials) {
         const email = data.credentials.email;
         const mobile = document.getElementById('otpMobile').value.trim();
         pushLoginEvent(email, mobile);
 
-        shopifyAutoLogin(email, data.credentials.password);
-        return; // ✅ IMPORTANT: prevents register form
-      }
+        // ✅ ADD THESE 4 LINES — hides spin wheel for existing customers in the 15-sec register popup
+        const wheelWrapper = document.querySelector('.spin-wheel-wrapper');
+        if (wheelWrapper) {
+          wheelWrapper.style.display = 'none';
+          wheelWrapper.style.visibility = 'hidden';
+        }
 
+        shopifyAutoLogin(email, data.credentials.password);
+        return;
+      }
 
 
       if (data.type === 'register') {
@@ -256,7 +263,6 @@ if (verifyBtn) {
         verifyBtn.disabled = false;
         return;
       }
-
       showError('otpError', data.msg || 'Invalid OTP');
     } catch (err) {
       console.error(err);
@@ -264,6 +270,26 @@ if (verifyBtn) {
     }
     verifyBtn.textContent = 'VERIFY OTP';
     verifyBtn.disabled = false;
+  });
+}
+
+// Add this after the verifyBtn block
+const editMobileBtn = document.getElementById('editMobile');
+if (editMobileBtn) {
+  editMobileBtn.addEventListener('click', () => {
+    document.getElementById('otpSection').style.display = 'none';
+    document.querySelector('.otp-number-wrapper').style.display = 'block';
+    document.getElementById('sendOtp').style.display = 'block';
+
+    const sendBtn = document.getElementById('sendOtp');
+    if (sendBtn) {
+      sendBtn.disabled = false;
+      sendBtn.style.opacity = '1';
+    }
+
+    document.querySelectorAll('.otp-inputs input').forEach((i) => (i.value = ''));
+    hideError('otpError');
+    clearInterval(timerInterval);
   });
 }
 
@@ -637,7 +663,7 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!popup) return;
 
   if (hasLuciraSessionPopup()) return;
-  if (window.Shopify && Shopify.customer) return;
+  if (document.body.classList.contains('customer-logged-in')) return;
   setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     popup.style.display = 'flex';
