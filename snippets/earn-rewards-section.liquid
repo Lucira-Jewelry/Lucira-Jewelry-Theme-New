@@ -1182,19 +1182,41 @@ document.addEventListener('DOMContentLoaded', function () {
     if (ui.ringPct) ui.ringPct.innerText = Math.round(percent);
   }
 
+  // ── RENDER ───────────────────────────────────────────────────────────────
   function renderUI() {
-    // Milestone dots
+    // Milestone dots — always run this regardless of completion
     for (let i = 0; i <= CONFIG.totalSteps; i++) {
       const dot = document.getElementById('dot' + i);
       const lbl = document.getElementById('lbl' + i);
       if (dot) {
-        dot.classList.toggle('done',    i < state.currentStep);
-        dot.classList.toggle('current', i === state.currentStep);
-        if (lbl) {
-          lbl.classList.toggle('done',    i < state.currentStep);
-          lbl.classList.toggle('current', i === state.currentStep);
+        if (state.profileComplete) {
+          // All steps done: mark all as done except the last open dot
+          dot.classList.toggle('done',    i < CONFIG.totalSteps + 1);
+          dot.classList.toggle('current', false);
+          if (lbl) {
+            lbl.classList.toggle('done',    true);
+            lbl.classList.toggle('current', false);
+          }
+        } else {
+          dot.classList.toggle('done',    i < state.currentStep);
+          dot.classList.toggle('current', i === state.currentStep);
+          if (lbl) {
+            lbl.classList.toggle('done',    i < state.currentStep);
+            lbl.classList.toggle('current', i === state.currentStep);
+          }
         }
       }
+    }
+
+    // Sidebar checklist — always run this
+    if (ui.stepList) {
+      ui.stepList.querySelectorAll('li').forEach((li, idx) => {
+        const n  = idx + 1;
+        const cc = li.querySelector('.check-circle');
+        const done = state.profileComplete || state.completedSteps.includes(n);
+        li.classList.toggle('done', done);
+        if (cc) cc.classList.toggle('done', done);
+      });
     }
 
     // Completion screen
@@ -1212,14 +1234,14 @@ document.addEventListener('DOMContentLoaded', function () {
     document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
     document.getElementById('step-' + state.currentStep)?.classList.add('active');
 
-    // Progress bar
-    const barPct = ((state.currentStep - 1) / CONFIG.totalSteps) * 100;
+    // Progress bar — fix: use completedSteps count for accuracy
+    const barPct = (state.completedSteps.length / CONFIG.totalSteps) * 100;
     if (ui.trackProgress) ui.trackProgress.style.width = barPct + '%';
 
     // Coins / ring
     const coins = state.rewardedSteps.length * CONFIG.pointsPerStep;
     if (ui.coinsDisplay) ui.coinsDisplay.innerText = coins;
-    updateProgressRing((state.maxStepReached / CONFIG.totalSteps) * 100);
+    updateProgressRing((state.rewardedSteps.length / CONFIG.totalSteps) * 100);
 
     // Points hint
     const remaining = CONFIG.totalSteps - state.rewardedSteps.length;
@@ -1227,17 +1249,6 @@ document.addEventListener('DOMContentLoaded', function () {
       ui.ptsHint.innerHTML = remaining > 0
         ? `You are just <strong>${remaining} more step${remaining > 1 ? 's' : ''}</strong> away for Bonus Lucira Coins`
         : `🎉 <strong>All coins earned!</strong> Complete your profile to finish.`;
-    }
-
-    // Sidebar checklist
-    if (ui.stepList) {
-      ui.stepList.querySelectorAll('li').forEach((li, idx) => {
-        const n  = idx + 1;
-        const cc = li.querySelector('.check-circle');
-        const done = state.completedSteps.includes(n);
-        li.classList.toggle('done', done);
-        if (cc) cc.classList.toggle('done', done);
-      });
     }
 
     setTimeout(renderPendingBanner, 50);
