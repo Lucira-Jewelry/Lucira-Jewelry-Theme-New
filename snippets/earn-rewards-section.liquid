@@ -562,13 +562,13 @@
 {% endif %}
 <script>
   /* ─── LUCIRA PROFILE — UPDATED SCRIPT ───────────────────────────────────────
-    Drop this into your theme in place of the existing <script> block.
-    Changes:
-      1. Per-step field validation before awarding coins / proceeding
-      2. form_data sent to API on every save
-      3. Pending steps banner shown if profile not complete on load
-      4. "Complete Profile" gating on step 4
-    ─────────────────────────────────────────────────────────────────────────── */
+   Drop this into your theme in place of the existing <script> block.
+   Changes:
+     1. Per-step field validation before awarding coins / proceeding
+     2. form_data sent to API on every save
+     3. Pending steps banner shown if profile not complete on load
+     4. "Complete Profile" gating on step 4
+   ─────────────────────────────────────────────────────────────────────────── */
 
   document.addEventListener('DOMContentLoaded', function () {
 
@@ -868,8 +868,19 @@
       }
     }
 
+    // Track in-flight API calls so rapid double-clicks can't fire twice
+    const _apiInFlight = new Set();
+
     function saveStepToApi(step, stepFormData) {
       if (!window.customerData?.id) return;
+
+      // GUARD: skip if a request for this step is already in-flight
+      if (_apiInFlight.has(step)) {
+        console.log('Step ' + step + ' request already in-flight, skipping.');
+        return;
+      }
+      _apiInFlight.add(step);
+
       fetch(`${CONFIG.apiBase}/save-step.php`, {
         method   : 'POST',
         headers  : { 'Content-Type': 'application/json' },
@@ -882,10 +893,11 @@
       })
       .then(r => r.json())
       .then(d => {
-        console.log(`Step ${step} saved`, d);
-        if (d.coins_awarded) showToast(`+${CONFIG.pointsPerStep} Lucira Coins earned! 🎉`, 'success');
+        console.log('Step ' + step + ' saved', d);
+        if (d.coins_awarded) showToast('+' + CONFIG.pointsPerStep + ' Lucira Coins earned! 🎉', 'success');
       })
-      .catch(err => console.error('API error', err));
+      .catch(err => console.error('API error', err))
+      .finally(() => _apiInFlight.delete(step));
     }
 
     // ── NAVIGATION ───────────────────────────────────────────────────────────
@@ -894,11 +906,10 @@
       scrapeFormData();
 
       if (direction === 'forward') {
-        // Validate before proceeding
         const check = validateStep(state.currentStep);
         if (!check.valid) {
           showToast(check.message);
-          return;  // Block navigation
+          return;
         }
 
         const prevStep = state.currentStep;
@@ -913,8 +924,11 @@
           state.completedSteps.push(prevStep);
         }
 
-        // Save to server (non-blocking)
-        saveStepToApi(prevStep, getStepFormData(prevStep));
+        // KEY FIX: only hit the API when this step is genuinely new.
+        // Going back then forward on an already-rewarded step must NOT re-trigger.
+        if (isNew) {
+          saveStepToApi(prevStep, getStepFormData(prevStep));
+        }
       }
 
       state.currentStep = step;
@@ -924,7 +938,6 @@
     };
 
     window.completeProfile = function () {
-      // Validate step 4
       const check = validateStep(4);
       if (!check.valid) {
         showToast(check.message);
@@ -935,10 +948,15 @@
       state.maxStepReached  = 4;
       state.profileComplete = true;
 
-      if (!state.rewardedSteps.includes(4))  state.rewardedSteps.push(4);
+      const step4IsNew = !state.rewardedSteps.includes(4);
+      if (step4IsNew) state.rewardedSteps.push(4);
       if (!state.completedSteps.includes(4)) state.completedSteps.push(4);
 
-      saveStepToApi(4, getStepFormData(4));
+      // KEY FIX: only fire API if step 4 hasn't been rewarded yet.
+      if (step4IsNew) {
+        saveStepToApi(4, getStepFormData(4));
+      }
+
       saveLocalState();
       renderUI();
     };
