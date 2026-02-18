@@ -686,17 +686,31 @@
       .catch(err => console.error('API Save Error:', err));
     }
 
-    // ── Helper Functions ──
-
     function resetState() {
-      // Reset to defaults
+      console.log("Resetting profile state...");
+
       state = JSON.parse(JSON.stringify(defaultState));
-      // Ensure we keep the current ID if logged in
+
       if (window.customerData?.id) {
         state.customerId = window.customerData.id;
       }
+
       localStorage.removeItem(CONFIG.storageKey);
+
+      // 🔥 Clear form inputs visually
+      document.querySelectorAll('input, select, textarea').forEach(el => {
+        if (el.type === 'checkbox' || el.type === 'radio') {
+          el.checked = false;
+        } else {
+          el.value = '';
+        }
+      });
+
+      document.querySelectorAll('.chip.selected').forEach(chip => {
+        chip.classList.remove('selected');
+      });
     }
+
 
     function scrapeFormData() {
       document.querySelectorAll('input, select, textarea').forEach(el => {
@@ -746,12 +760,13 @@
           // CRITICAL FIX: Check Ownership
           // If we are logged in, but the saved data belongs to a different ID (or no ID), reset.
           if (window.customerData && window.customerData.id) {
-             if (parsed.customerId && parsed.customerId.toString() !== window.customerData.id.toString()) {
-               console.log("User mismatch detected. Resetting form.");
-               resetState();
-               return;
-             }
+            if (!parsed.customerId || parsed.customerId.toString() !== window.customerData.id.toString()) {
+              console.log("Customer ID changed. Resetting.");
+              resetState();
+              return;
+            }
           }
+
 
           state = { ...state, ...parsed };
           
