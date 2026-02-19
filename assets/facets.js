@@ -50,6 +50,107 @@ class RequestManager {
   }
 }
 
+// =====================================================
+// DISCOUNT SORT UTILITY
+// Reads variant metafield custom.discount_percentage
+// from product card data attributes set by card-product
+// snippet, then reorders grid items client-side.
+// =====================================================
+const DiscountSort = {
+  SORT_VALUE: 'discount-high-to-low',
+
+  /**
+   * Parse the discount percentage from a grid <li> element.
+   * The card-product snippet must expose the value via:
+   *   data-discount-percentage="{{ product.variants.first.metafields.custom.discount_percentage }}"
+   * on the inner anchor / wrapper element.
+   * Falls back to 0 if not found.
+   */
+  getDiscount(liEl) {
+    // Try the product card link or wrapper that carries data attributes
+    const carrier =
+      liEl.querySelector('[data-discount-percentage]') ||
+      liEl.querySelector('[data-product-id]');
+
+    if (carrier && carrier.dataset.discountPercentage) {
+      const val = parseFloat(carrier.dataset.discountPercentage);
+      return isNaN(val) ? 0 : val;
+    }
+    return 0;
+  },
+
+  /**
+   * Sort the product grid by discount percentage descending.
+   * Called after renderProductGridContainer updates the DOM.
+   */
+  apply() {
+    const grid = document.getElementById('product-grid');
+    if (!grid) return;
+
+    const items = Array.from(grid.querySelectorAll('li.grid__item'));
+    if (!items.length) return;
+
+    // Separate banner items (they have the lucira-collec-banner class) from product items
+    const bannerItems = items.filter(li => li.classList.contains('lucira-collec-banner'));
+    const productItems = items.filter(li => !li.classList.contains('lucira-collec-banner'));
+
+    // Sort product items by discount descending
+    productItems.sort((a, b) => DiscountSort.getDiscount(b) - DiscountSort.getDiscount(a));
+
+    // Re-insert: place each banner back at its original index among all items,
+    // filling the rest with sorted product items.
+    const totalItems = items.length;
+    const bannerPositions = {};
+    bannerItems.forEach(bi => {
+      bannerPositions[items.indexOf(bi)] = bi;
+    });
+
+    // Build final ordered array
+    const finalOrder = [];
+    let productCursor = 0;
+    for (let i = 0; i < totalItems; i++) {
+      if (bannerPositions[i]) {
+        finalOrder.push(bannerPositions[i]);
+      } else {
+        if (productCursor < productItems.length) {
+          finalOrder.push(productItems[productCursor++]);
+        }
+      }
+    }
+
+    // Append in sorted order (moves nodes, doesn't clone)
+    finalOrder.forEach(el => grid.appendChild(el));
+  },
+
+  /**
+   * Check if discount sort is currently active from URL params.
+   */
+  isActive() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('sort_by') === DiscountSort.SORT_VALUE;
+  },
+
+  /**
+   * Check if the given searchParams string requests discount sort.
+   */
+  isActiveInParams(searchParams) {
+    const params = new URLSearchParams(searchParams);
+    return params.get('sort_by') === DiscountSort.SORT_VALUE;
+  },
+
+  /**
+   * Strip our custom sort value from params before sending to Shopify
+   * (Shopify doesn't know about discount-high-to-low).
+   * We fall back to manual-asc (or the default) so we get all products,
+   * then sort client-side.
+   */
+  stripFromParams(searchParams) {
+    const params = new URLSearchParams(searchParams);
+    params.set('sort_by', 'manual'); // fetch in default order; we sort client-side
+    return params.toString();
+  }
+};
+
 class FacetFiltersForm extends HTMLElement {
   constructor() {
     super();
@@ -202,6 +303,16 @@ class FacetFiltersForm extends HTMLElement {
   static async renderPage(searchParams, event, updateURLHash = true) {
     // Cancel any pending requests
     const signal = FacetFiltersForm.requestManagerInstance.cancelPending();
+
+    // -------------------------------------------------------
+    // DISCOUNT SORT: intercept before sending to Shopify
+    // -------------------------------------------------------
+    const isDiscountSort = DiscountSort.isActiveInParams(searchParams);
+    let shopifySearchParams = searchParams;
+    if (isDiscountSort) {
+      shopifySearchParams = DiscountSort.stripFromParams(searchParams);
+    }
+    // -------------------------------------------------------
     
     FacetFiltersForm.searchParamsPrev = searchParams;
     const sections = FacetFiltersForm.getSections();
@@ -212,12 +323,13 @@ class FacetFiltersForm extends HTMLElement {
     FacetFiltersForm.showPreloader();
     FacetFiltersForm.setLoadingStates(true);
     
-    // Check cache first
+    // Check cache first (use original searchParams as cache key so
+    // discount sort results are cached separately from default order)
     const cacheKey = `${window.location.pathname}?${searchParams}`;
     const cached = FacetFiltersForm.getFromCache(cacheKey);
     
     if (cached) {
-      FacetFiltersForm.applyUpdate(cached, event);
+      FacetFiltersForm.applyUpdate(cached, event, isDiscountSort);
       if (updateURLHash) FacetFiltersForm.updateURLHash(searchParams);
       return;
     }
@@ -225,7 +337,7 @@ class FacetFiltersForm extends HTMLElement {
     // Single optimized fetch for all sections
     try {
       const section = sections[0];
-      const url = `${window.location.pathname}?section_id=${section.section}&${searchParams}`;
+      const url = `${window.location.pathname}?section_id=${section.section}&${shopifySearchParams}`;
       
       const response = await fetch(url, { 
         signal,
@@ -238,11 +350,11 @@ class FacetFiltersForm extends HTMLElement {
       
       const html = await response.text();
       
-      // Cache the result with size limit
+      // Cache the result
       FacetFiltersForm.addToCache(cacheKey, html);
       
       // Apply the update
-      FacetFiltersForm.applyUpdate(html, event);
+      FacetFiltersForm.applyUpdate(html, event, isDiscountSort);
       
       if (updateURLHash) FacetFiltersForm.updateURLHash(searchParams);
       
@@ -286,7 +398,8 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   // OPTIMIZED: Apply update with efficient DOM manipulation
-  static applyUpdate(html, event) {
+  // isDiscountSort flag triggers client-side reorder after DOM update
+  static applyUpdate(html, event, isDiscountSort = false) {
     const parser = new DOMParser();
     const parsedHTML = parser.parseFromString(html, 'text/html');
     
@@ -298,6 +411,11 @@ class FacetFiltersForm extends HTMLElement {
       
       if (typeof initializeScrollAnimationTrigger === 'function') {
         initializeScrollAnimationTrigger(html);
+      }
+
+      // Apply discount sort AFTER products are in the DOM
+      if (isDiscountSort) {
+        DiscountSort.apply();
       }
       
       // Efficient scroll restoration
@@ -744,12 +862,20 @@ document.addEventListener('click', function(event) {
   }
 });
 
-// Initialize sort UI on page load
+// Initialize sort UI on page load — also apply discount sort if active in URL
 window.addEventListener('DOMContentLoaded', function() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentSort = urlParams.get('sort_by');
   if (currentSort) {
     updateSortUI(currentSort);
+  }
+
+  // If page was loaded directly with discount sort in URL, apply client-side sort
+  if (DiscountSort.isActive()) {
+    // Small delay to ensure grid is fully rendered
+    setTimeout(() => {
+      DiscountSort.apply();
+    }, 200);
   }
 });
 
