@@ -67,19 +67,19 @@ const DiscountSort = {
    * Falls back to 0 if not found.
    */
   getDiscount(liEl) {
-    // PRIMARY: read directly from the <li> data attribute (set in main-collection-product-grid.liquid)
+    // Read from the hidden <span class="js-discount-value" data-v="..."> injected
+    // inside each card by main-collection-product-grid.liquid.
+    // This survives every AJAX re-render because it's part of the card HTML.
+    const span = liEl.querySelector('.js-discount-value');
+    if (span) {
+      const val = parseFloat(span.dataset.v);
+      if (!isNaN(val)) return val;
+    }
+    // Fallback: check legacy data-discount-percentage on the li itself
     if (liEl.dataset.discountPercentage !== undefined && liEl.dataset.discountPercentage !== '') {
       const val = parseFloat(liEl.dataset.discountPercentage);
       if (!isNaN(val)) return val;
     }
-
-    // FALLBACK: check any child element that might carry the attribute
-    const carrier = liEl.querySelector('[data-discount-percentage]');
-    if (carrier && carrier.dataset.discountPercentage !== undefined) {
-      const val = parseFloat(carrier.dataset.discountPercentage);
-      if (!isNaN(val)) return val;
-    }
-
     return 0;
   },
 
@@ -427,7 +427,6 @@ class FacetFiltersForm extends HTMLElement {
     const parser = new DOMParser();
     const parsedHTML = parser.parseFromString(html, 'text/html');
     
-    // Batch DOM updates
     requestAnimationFrame(() => {
       FacetFiltersForm.renderFilters(html, event, parsedHTML);
       FacetFiltersForm.renderProductGridContainer(parsedHTML);
@@ -437,8 +436,11 @@ class FacetFiltersForm extends HTMLElement {
         initializeScrollAnimationTrigger(html);
       }
 
-      // Apply discount sort AFTER products are fully in the DOM
-      // Use a second rAF + small timeout to ensure the grid is rendered
+      // Always re-ensure the discount option exists in all sort selects
+      // because Shopify's AJAX response may have replaced parts of the sort UI
+      FacetFiltersForm.ensureDiscountSortOption();
+
+      // Apply discount sort AFTER products are fully painted
       if (isDiscountSort) {
         requestAnimationFrame(() => {
           setTimeout(() => {
@@ -447,7 +449,6 @@ class FacetFiltersForm extends HTMLElement {
         });
       }
       
-      // Efficient scroll restoration
       FacetFiltersForm.restoreScrollPosition();
     });
   }
@@ -620,35 +621,60 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderAdditionalElements(html) {
-    // NOTE: We intentionally exclude '.sorting' from here.
-    // Re-rendering .sorting from Shopify's response would overwrite our custom
-    // "Discount High to Low" <option> that was injected in the Liquid template.
-    // Mobile sort is handled via the custom mobile-sort-drawer, not .sorting.
+    // Intentionally excluded: '.sorting'
+    // Replacing .sorting from Shopify's AJAX response would wipe our custom
+    // "Discount High to Low" option since Shopify doesn't know about it.
     const mobileElementSelectors = ['.mobile-facets__open', '.mobile-facets__count'];
 
     mobileElementSelectors.forEach((selector) => {
       const newElement = html.querySelector(selector);
       const currentElement = document.querySelector(selector);
-      
       if (newElement && currentElement && newElement.innerHTML !== currentElement.innerHTML) {
         currentElement.innerHTML = newElement.innerHTML;
       }
     });
 
-    // Preserve current sort_by value across all selects after DOM updates
+    document.getElementById('FacetFiltersFormMobile')?.closest('menu-drawer')?.bindEvents();
+
+    // After any DOM update, ensure the custom "Discount High to Low" option
+    // exists in every sort select on the page and the correct value is selected.
+    FacetFiltersForm.ensureDiscountSortOption();
+  }
+
+  // Ensures "Discount High to Low" option is always present in all sort selects
+  // and the current URL sort_by value is reflected in the UI.
+  static ensureDiscountSortOption() {
+    const DISCOUNT_VALUE = 'discount-high-to-low';
+    const DISCOUNT_LABEL = 'Discount High to Low';
+
     const urlParams = new URLSearchParams(window.location.search);
     const currentSort = urlParams.get('sort_by') || '';
-    if (currentSort) {
-      document.querySelectorAll('select[name="sort_by"]').forEach(select => {
-        // Only update if the option actually exists in this select
-        const optionExists = Array.from(select.options).some(o => o.value === currentSort);
-        if (optionExists && select.value !== currentSort) {
-          select.value = currentSort;
+
+    document.querySelectorAll('select[name="sort_by"]').forEach(select => {
+      // 1. Remove A-Z / Z-A if present
+      Array.from(select.options).forEach(opt => {
+        if (opt.value === 'title-ascending' || opt.value === 'title-descending') {
+          opt.remove();
         }
       });
-    }
 
-    document.getElementById('FacetFiltersFormMobile')?.closest('menu-drawer')?.bindEvents();
+      // 2. Ensure Discount High to Low option exists
+      const hasDiscount = Array.from(select.options).some(o => o.value === DISCOUNT_VALUE);
+      if (!hasDiscount) {
+        const opt = document.createElement('option');
+        opt.value = DISCOUNT_VALUE;
+        opt.textContent = DISCOUNT_LABEL;
+        select.appendChild(opt);
+      }
+
+      // 3. Sync selected value to URL param
+      if (currentSort) {
+        const exists = Array.from(select.options).some(o => o.value === currentSort);
+        if (exists && select.value !== currentSort) {
+          select.value = currentSort;
+        }
+      }
+    });
   }
 
   static renderCounts(source, target) {
@@ -916,12 +942,14 @@ window.addEventListener('DOMContentLoaded', function() {
     updateSortUI(currentSort);
   }
 
+  // Always ensure discount option exists and A-Z/Z-A are hidden on initial load
+  FacetFiltersForm.ensureDiscountSortOption();
+
   // If page was loaded directly with discount sort in URL, apply client-side sort
   if (DiscountSort.isActive()) {
-    // Small delay to ensure grid is fully rendered
     setTimeout(() => {
       DiscountSort.apply();
-    }, 200);
+    }, 300);
   }
 });
 
