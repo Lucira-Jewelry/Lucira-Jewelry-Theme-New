@@ -67,15 +67,19 @@ const DiscountSort = {
    * Falls back to 0 if not found.
    */
   getDiscount(liEl) {
-    // Try the product card link or wrapper that carries data attributes
-    const carrier =
-      liEl.querySelector('[data-discount-percentage]') ||
-      liEl.querySelector('[data-product-id]');
-
-    if (carrier && carrier.dataset.discountPercentage) {
-      const val = parseFloat(carrier.dataset.discountPercentage);
-      return isNaN(val) ? 0 : val;
+    // PRIMARY: read directly from the <li> data attribute (set in main-collection-product-grid.liquid)
+    if (liEl.dataset.discountPercentage !== undefined && liEl.dataset.discountPercentage !== '') {
+      const val = parseFloat(liEl.dataset.discountPercentage);
+      if (!isNaN(val)) return val;
     }
+
+    // FALLBACK: check any child element that might carry the attribute
+    const carrier = liEl.querySelector('[data-discount-percentage]');
+    if (carrier && carrier.dataset.discountPercentage !== undefined) {
+      const val = parseFloat(carrier.dataset.discountPercentage);
+      if (!isNaN(val)) return val;
+    }
+
     return 0;
   },
 
@@ -85,32 +89,51 @@ const DiscountSort = {
    */
   apply() {
     const grid = document.getElementById('product-grid');
-    if (!grid) return;
+    if (!grid) {
+      console.warn('[DiscountSort] product-grid not found');
+      return;
+    }
 
     const items = Array.from(grid.querySelectorAll('li.grid__item'));
-    if (!items.length) return;
+    if (!items.length) {
+      console.warn('[DiscountSort] No grid items found');
+      return;
+    }
 
-    // Separate banner items (they have the lucira-collec-banner class) from product items
+    // Debug: log all discount values found
+    console.log('[DiscountSort] Items found:', items.length);
+    items.forEach((li, i) => {
+      console.log(`[DiscountSort] Item ${i}: data-discount-percentage="${li.dataset.discountPercentage}" → parsed=${DiscountSort.getDiscount(li)}`);
+    });
+
+    // Separate banner items from product items
     const bannerItems = items.filter(li => li.classList.contains('lucira-collec-banner'));
     const productItems = items.filter(li => !li.classList.contains('lucira-collec-banner'));
 
-    // Sort product items by discount descending
-    productItems.sort((a, b) => DiscountSort.getDiscount(b) - DiscountSort.getDiscount(a));
-
-    // Re-insert: place each banner back at its original index among all items,
-    // filling the rest with sorted product items.
-    const totalItems = items.length;
-    const bannerPositions = {};
+    // Track original positions of banners
+    const bannerOriginalIndices = {};
     bannerItems.forEach(bi => {
-      bannerPositions[items.indexOf(bi)] = bi;
+      bannerOriginalIndices[items.indexOf(bi)] = bi;
     });
 
-    // Build final ordered array
+    // Sort product items by discount percentage descending (highest first)
+    productItems.sort((a, b) => {
+      const discA = DiscountSort.getDiscount(a);
+      const discB = DiscountSort.getDiscount(b);
+      return discB - discA; // descending
+    });
+
+    console.log('[DiscountSort] Sorted order:',
+      productItems.map(li => DiscountSort.getDiscount(li))
+    );
+
+    // Rebuild final order: insert banners back at their original grid positions
     const finalOrder = [];
     let productCursor = 0;
-    for (let i = 0; i < totalItems; i++) {
-      if (bannerPositions[i]) {
-        finalOrder.push(bannerPositions[i]);
+
+    for (let i = 0; i < items.length; i++) {
+      if (bannerOriginalIndices[i]) {
+        finalOrder.push(bannerOriginalIndices[i]);
       } else {
         if (productCursor < productItems.length) {
           finalOrder.push(productItems[productCursor++]);
@@ -118,8 +141,9 @@ const DiscountSort = {
       }
     }
 
-    // Append in sorted order (moves nodes, doesn't clone)
+    // Re-append in sorted order (DOM move, not clone)
     finalOrder.forEach(el => grid.appendChild(el));
+    console.log('[DiscountSort] Sort applied successfully');
   },
 
   /**
@@ -413,9 +437,14 @@ class FacetFiltersForm extends HTMLElement {
         initializeScrollAnimationTrigger(html);
       }
 
-      // Apply discount sort AFTER products are in the DOM
+      // Apply discount sort AFTER products are fully in the DOM
+      // Use a second rAF + small timeout to ensure the grid is rendered
       if (isDiscountSort) {
-        DiscountSort.apply();
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            DiscountSort.apply();
+          }, 50);
+        });
       }
       
       // Efficient scroll restoration
@@ -591,7 +620,11 @@ class FacetFiltersForm extends HTMLElement {
   }
 
   static renderAdditionalElements(html) {
-    const mobileElementSelectors = ['.mobile-facets__open', '.mobile-facets__count', '.sorting'];
+    // NOTE: We intentionally exclude '.sorting' from here.
+    // Re-rendering .sorting from Shopify's response would overwrite our custom
+    // "Discount High to Low" <option> that was injected in the Liquid template.
+    // Mobile sort is handled via the custom mobile-sort-drawer, not .sorting.
+    const mobileElementSelectors = ['.mobile-facets__open', '.mobile-facets__count'];
 
     mobileElementSelectors.forEach((selector) => {
       const newElement = html.querySelector(selector);
@@ -601,6 +634,19 @@ class FacetFiltersForm extends HTMLElement {
         currentElement.innerHTML = newElement.innerHTML;
       }
     });
+
+    // Preserve current sort_by value across all selects after DOM updates
+    const urlParams = new URLSearchParams(window.location.search);
+    const currentSort = urlParams.get('sort_by') || '';
+    if (currentSort) {
+      document.querySelectorAll('select[name="sort_by"]').forEach(select => {
+        // Only update if the option actually exists in this select
+        const optionExists = Array.from(select.options).some(o => o.value === currentSort);
+        if (optionExists && select.value !== currentSort) {
+          select.value = currentSort;
+        }
+      });
+    }
 
     document.getElementById('FacetFiltersFormMobile')?.closest('menu-drawer')?.bindEvents();
   }
