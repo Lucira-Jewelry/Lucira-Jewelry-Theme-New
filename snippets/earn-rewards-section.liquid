@@ -1090,30 +1090,40 @@ document.addEventListener('DOMContentLoaded', function () {
   const _apiInFlight = new Set();
 
   function saveStepToApi(step, stepFormData) {
-    if (!window.customerData?.id) return;
-    if (_apiInFlight.has(step)) return;
-    _apiInFlight.add(step);
+      if (!window.customerData?.id) return;
+      if (_apiInFlight.has(step)) return;
+      _apiInFlight.add(step);
 
-    fetch(`${CONFIG.apiBase}/save-step.php`, {
-      method   : 'POST',
-      headers  : { 'Content-Type': 'application/json' },
-      keepalive: true,
-      body     : JSON.stringify({
-        customer_id: `shopify-${window.customerData.id}`,
-        step       : step,
-        form_data  : stepFormData,
-        auto_save  : false,   // ← trigger coin reward
-      }),
-    })
-    .then(r => r.json())
-    .then(d => {
-      console.log('Step ' + step + ' saved →', d);
-      if (d.coins_awarded) {
-        showToast('+' + CONFIG.pointsPerStep + ' Lucira Coins earned! 🎉', 'success');
-      }
-    })
-    .catch(err => console.error('API error step ' + step, err))
-    .finally(() => _apiInFlight.delete(step));
+      // Build full profile from JS state so WebEngage gets all steps, not just current
+      const allFormData = {
+          step_1: state.formData.step_1 || {},
+          step_2: state.formData.step_2 || {},
+          step_3: state.formData.step_3 || {},
+          step_4: state.formData.step_4 || {},
+      };
+      allFormData['step_' + step] = stepFormData; // ensure current step is fresh
+
+      fetch(`${CONFIG.apiBase}/save-step.php`, {
+          method   : 'POST',
+          headers  : { 'Content-Type': 'application/json' },
+          keepalive: true,
+          body     : JSON.stringify({
+              customer_id  : `shopify-${window.customerData.id}`,
+              step         : step,
+              form_data    : stepFormData,   // current step → metafield save
+              all_form_data: allFormData,    // all steps → WebEngage sync
+              auto_save    : false,
+          }),
+      })
+      .then(r => r.json())
+      .then(d => {
+          console.log('Step ' + step + ' saved →', d);
+          if (d.coins_awarded) {
+              showToast('+' + CONFIG.pointsPerStep + ' Lucira Coins earned! 🎉', 'success');
+          }
+      })
+      .catch(err => console.error('API error step ' + step, err))
+      .finally(() => _apiInFlight.delete(step));
   }
 
   // ── NAVIGATION ───────────────────────────────────────────────────────────
