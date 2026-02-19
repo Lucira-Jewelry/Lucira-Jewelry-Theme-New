@@ -1,34 +1,13 @@
-{% comment %} {% assign gender_labels = product.metafields.shopify['target-gender'].value | map: 'label' %}
-{% assign collection_handles_exclude = product.collections | map: 'handle' %}
+{% assign hide_mas_section = false %}
 
-{% unless gender_labels contains 'Male' or collection_handles_exclude contains 'nose-pins' %}
-  {% assign current_variant_price = product.selected_or_first_available_variant.price | divided_by: 100 %}
-  {% assign price_factor = section.settings.price_range | default: 20 %}
-  
-  {%- capture categories -%}
-    {%- if product.tags contains 'Rings' -%}
-      all-necklaces,all-earrings,all-bracelets
-    {%- elsif product.tags contains 'Necklaces' -%}
-      all-rings,all-earrings,all-bracelets
-    {%- elsif product.tags contains 'Bracelets' -%}
-      all-rings,all-earrings,all-necklaces
-    {%- elsif product.tags contains 'Earrings' -%}
-      all-rings,all-necklaces,all-bracelets
-    {%- else -%}
-      all-rings,all-necklaces,all-bracelets,all-earrings
-    {%- endif -%}
-  {%- endcapture -%}
-  
-  {% assign categories_array = categories | split: ',' %}
-  {% assign max_products = section.settings.product_limit | default: 8 %}
-  {% assign displayed_count = 0 %}
-  
-  {% assign range_value = current_variant_price | times: price_factor | divided_by: 100 %}
-  {% assign lower_limit = current_variant_price | minus: range_value %}
-  {% assign upper_limit = current_variant_price | plus: range_value %}
+{% comment %} --- 1. Centralized Logic to Hide Section --- {% endcomment %}
+{% if product.metafields.custom.shop_for contains 'Men' or product.metafields.shopify['target-gender'].value contains 'Men' or product.metafields.ornaverse.shop_for contains 'Men' %}
+  {% assign hide_mas_section = true %}
+{% endif %}
 
+{% if product.metafields.shopify--discovery--product_recommendation.complementary_products != blank and hide_mas_section == false %}
   <div class="mas-lazy" data-mas>
-    <!-- ===== SKELETON ===== -->
+    
     <div class="mas-skeleton page-width">
       <div class="mas-skeleton-wrapper">
         <div class="mas-skeleton-image"></div>
@@ -40,7 +19,6 @@
       </div>
     </div>
 
-    <!-- ===== ACTUAL CONTENT (HIDDEN INITIALLY) ===== -->
     <div class="mas-content" style="display:none">
       <div class="match-and-shine">
         <h2 class="mas-title">Match & Shine</h2>
@@ -48,63 +26,42 @@
 
         <div class="page-width">
           <div class="mas-image-features-product-wrapper">
+            
             <div class="mas-image-features-product desktop-show">
-              <img
-                src="{{ product.featured_media | img_url: '500x500' }}"
-                height="472"
-                width="472"
-                alt="{{ product.title }}"
-                title="{{ product.title }}"
-                loading="lazy"
-              >
+              {{ product.featured_media | image_url: width: 500 | image_tag: 
+                width: 500, 
+                height: 500, 
+                loading: 'lazy', 
+                alt: product.title, 
+                style: 'object-fit: cover;' 
+              }}
             </div>
 
             <div class="mas-grid">
-              {% for category in categories_array %}
-                {% assign collection = collections[category] %}
+              {% comment %} Loop through recommendations with a Limit setting {% endcomment %}
+              {% for mas_product in product.metafields.shopify--discovery--product_recommendation.complementary_products.value limit: section.settings.product_limit %}
                 
-                {% if collection and displayed_count < max_products %}
-                  {% assign found_product = false %}
-                  {% assign fallback_item = null %}
+                <div class="mas-product-card"
+                     data-handle="{{ mas_product.handle }}"
+                     data-name="{{ mas_product.title | escape }}"
+                     data-id="{{ mas_product.id }}"
+                     data-sku="{{ mas_product.selected_or_first_available_variant.sku }}"
+                     data-url="{{ mas_product.url }}">
                   
-                  {% for item in collection.products limit: 27 %}
-                    {% if item.handle == product.handle or found_product or displayed_count >= max_products %}
-                      {% continue %}
-                    {% endif %}
-                    
-                    {% assign item_price = item.selected_or_first_available_variant.price | divided_by: 100 %}
-                    {% assign item_gender_labels = item.metafields.shopify['target-gender'].value | map: 'label' %}
-                    
-                    {% if item_gender_labels contains 'Male' %}
-                      {% continue %}
-                    {% endif %}
-                    
-                    {% unless fallback_item %}
-                      {% assign fallback_item = item %}
-                    {% endunless %}
-                    
-                    {% if item_price >= lower_limit and item_price <= upper_limit %}
-                      {% assign found_product = item %}
-                    {% endif %}
-                  {% endfor %}
+                  {% comment %} Calculation Logic Preserved {% endcomment %}
+                  {% capture di_values %}
+                    {% render 'di-discount-calc', product: mas_product %}
+                  {% endcapture %}
+
+                  {% assign di_parts = di_values | strip | split: '|' %}
                   
-                  {% assign final_item = found_product | default: fallback_item %}
-                  
-                  {% if final_item %}
-                    {% assign displayed_count = displayed_count | plus: 1 %}
-                    
-                      <div class="mas-product-card"
-                         data-handle="{{ final_item.handle }}"
-                         data-name="{{ final_item.title | escape }}"
-                         data-id="{{ final_item.id }}"
-                         data-price="{{ final_item.price | divided_by: 100 }}"
-                         data-category="{{ final_item.type | escape }}"
-                         data-sku="{{ final_item.selected_or_first_available_variant.sku }}"
-                         data-url="{{ final_item.url }}">
-                      {% render 'card-product', card_product: final_item %}
-                    </div>
-                  {% endif %}
-                {% endif %}
+                  {% render 'card-product',
+                    card_product: mas_product,
+                    diamond_percent: di_parts[0] | plus: 0,
+                    mc_percent: di_parts[1] | plus: 0
+                  %}
+
+                </div>
               {% endfor %}
             </div>
           </div>
@@ -114,233 +71,6 @@
   </div>
 
   <script>
-  (function() {
-    'use strict';
-    
-    function initMatchAndShine() {
-      const mas = document.querySelector('[data-mas]');
-      if (!mas) return;
-      
-      // Intersection Observer for lazy loading
-      const io = new IntersectionObserver((entries) => {
-        if (entries[0].isIntersecting) {
-          const skeleton = mas.querySelector('.mas-skeleton');
-          const content = mas.querySelector('.mas-content');
-          
-          content.style.display = 'block';
-          requestAnimationFrame(() => {
-            content.style.opacity = '1';
-            skeleton && skeleton.remove();
-          });
-          
-          io.disconnect();
-          bindProductCardEvents();
-        }
-      }, { rootMargin: '200px' });
-      
-      io.observe(mas);
-    }
-    
-    function bindProductCardEvents() {
-      const masCards = document.querySelectorAll('.mas-product-card');
-      
-      masCards.forEach((card) => {
-        const productLink = card.querySelector('a[href*="/products/"]');
-        if (!productLink) return;
-        
-        productLink.addEventListener('click', function(e) {
-          e.preventDefault();
-          const cardData = card.dataset;
-          
-          // DataLayer push with fallback
-          window.dataLayer = window.dataLayer || [];
-          const timeout = setTimeout(() => {
-            window.location.href = cardData.url;
-          }, 100);
-          
-          window.dataLayer.push({
-            event: 'promoClick',
-            promoClick: {
-              promo_id: cardData.sku,
-              promo_name: cardData.name,
-              creative_name: 'Match and shine',
-            },
-            event_callback: function() {
-              clearTimeout(timeout);
-              window.location.href = cardData.url;
-            },
-            event_timeout: 2000
-          });
-        });
-      });
-    }
-    
-    // Initialize when DOM is ready
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initMatchAndShine);
-    } else {
-      initMatchAndShine();
-    }
-  })();
-  </script>
-
-  <style>
-    .mas-skeleton-wrapper{display:grid;grid-template-columns:calc(36% - 10px) calc(64% - 10px);gap:20px;background:#f2f2f2;padding:45px;border-radius:12px;min-height:500px}
-    .mas-skeleton-image{height:472px;border-radius:12px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
-    .mas-skeleton-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-    .mas-skeleton-card{height:360px;border-radius:8px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
-    @keyframes shimmer{
-      0%{background-position:200% 0}
-      100%{background-position:-200% 0}
-    }
-    @media(max-width:768px){
-      .mas-skeleton-wrapper{display:flex;padding:10px;min-height:300px}
-      .mas-skeleton-image{display:none}
-      .mas-skeleton-grid{display:flex;gap:10px;overflow-x:auto}
-      .mas-skeleton-card{flex:0 0 250px}
-    }
-    
-    .match-and-shine{padding:40px 0 0;background-color:transparent;text-align:center}
-    .mas-title{font-size:24px;margin:0;padding-top:10px}
-    .mas-subheading{color:#535361;font-weight:400;font-size:18px;line-height:2;margin:0 auto 40px}
-    .mas-content{opacity:0;transition:opacity .4s ease}
-    .mas-grid{display:grid;grid-template-columns:repeat(3,1fr);justify-content:center;gap:10px}
-    .mas-image-features-product-wrapper{display:grid;grid-template-columns:calc(36% - 10px) calc(64% - 10px);align-items:center;gap:20px;background:#f2f2f2;padding:45px;border-radius:12px;min-height:500px}
-    .mas-image-features-product img{border-radius:12px;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover}
-    
-    @media (max-width:768px){
-      .mas-image-features-product-wrapper{display:flex;padding:10px;min-height:300px}
-      .match-and-shine{padding:20px 0}
-      .mas-title{font-size:20px}
-      .mas-subheading{font-size:14px}
-      .mas-grid{display:flex;gap:10px;overflow-x:scroll;justify-content:flex-start;will-change:transform}
-      .mas-product-card{width:100%;flex:0 0 calc(250px - 0px);contain:layout style paint}
-      .mas-grid::-webkit-scrollbar{height:2px;background-color:#f5f5f5}
-      .mas-grid::-webkit-scrollbar-thumb{background-color:#b67665}
-      .mas-grid::-webkit-scrollbar-track{background-color:#f5f5f5}
-    }
-    
-    @media (max-width:480px){
-      .mas-title{font-size:20px}
-    }
-  </style>
-{% endunless %}
-
-{% schema %}
-{
-  "name": "Match and Shine New",
-  "settings": [
-    {
-      "type": "text",
-      "id": "collection_handle",
-      "label": "Base collection handle",
-      "default": "jewelry"
-    },
-    {
-      "type": "range",
-      "id": "price_range",
-      "label": "Price Range (%)",
-      "default": 20,
-      "min": 5,
-      "max": 50,
-      "step": 5,
-      "unit": "%"
-    },
-    {
-      "type": "range",
-      "id": "product_limit",
-      "label": "Number of products to show",
-      "default": 8,
-      "min": 3,
-      "max": 20,
-      "step": 1
-    }
-  ],
-  "presets": [
-    {
-      "name": "Match and Shine",
-      "category": "Cross-sell"
-    }
-  ]
-}
-{% endschema %} {% endcomment %}
-
-{% assign hide_mas_section = false %}
-
-{% if product.metafields.custom.shop_for contains 'Men' %}
-  {% assign hide_mas_section = true %}
-{% endif %}
-
-
-{% if product.metafields.shopify['target-gender'] != blank %}
-  {% assign gender_labels = product.metafields.shopify['target-gender'].value | map: 'label' %}
-  {% if gender_labels contains 'Men' %}
-    {% assign hide_mas_section = true %}
-  {% endif %}
-{% endif %}
-
-
-{% if product.metafields.ornaverse.shop_for contains 'Men' %}
-  {% assign hide_mas_section = true %}
-{% endif %}
-
-
-{% if product.metafields.shopify--discovery--product_recommendation.complementary_products != blank and hide_mas_section == false %}
-  <div class="mas-lazy" data-mas>
-    <!-- ===== SKELETON ===== -->
-    <div class="mas-skeleton page-width">
-      <div class="mas-skeleton-wrapper">
-        <div class="mas-skeleton-image"></div>
-        <div class="mas-skeleton-grid">
-          {% for i in (1..3) %}
-            <div class="mas-skeleton-card"></div>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <!-- ===== ACTUAL CONTENT (HIDDEN INITIALLY) ===== -->
-    <div class="mas-content" style="display:none">
-      <div class="match-and-shine">
-        <h2 class="mas-title">Match & Shine</h2>
-        <p class="mas-subheading">Designed to Complement, Meant to Shine</p>
-
-        <div class="page-width">
-          <div class="mas-image-features-product-wrapper">
-            <div class="mas-image-features-product desktop-show">
-              <img
-                src="{{ product.featured_media | img_url: '500x500' }}"
-                height="472"
-                width="472"
-                alt="{{ product.title }}"
-                title="{{ product.title }}"
-                loading="lazy"
-              >
-            </div>
-
-            <div class="mas-grid">
-              {% for mas_product in product.metafields.shopify--discovery--product_recommendation.complementary_products.value %}
-                <div class="mas-product-card"
-                     data-handle="{{ mas_product.handle }}"
-                     data-name="{{ mas_product.title | escape }}"
-                     data-id="{{ mas_product.id }}"
-                     data-price="{{ mas_product.price | divided_by: 100 }}"
-                     data-category="{{ mas_product.type | escape }}"
-                     data-sku="{{ mas_product.selected_or_first_available_variant.sku }}"
-                     data-url="{{ mas_product.url }}">
-                  {% render 'card-product', card_product: mas_product %}
-                </div>
-              {% endfor %}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-    
-
-    
-    <script>
     (function() {
       'use strict';
       
@@ -348,131 +78,97 @@
         const mas = document.querySelector('[data-mas]');
         if (!mas) return;
         
-        // Intersection Observer for lazy loading
+        // 1. Efficient Intersection Observer to load content
         const io = new IntersectionObserver((entries) => {
           if (entries[0].isIntersecting) {
             const skeleton = mas.querySelector('.mas-skeleton');
             const content = mas.querySelector('.mas-content');
             
+            // Show content
             content.style.display = 'block';
+            
+            // Smooth fade-in
             requestAnimationFrame(() => {
               content.style.opacity = '1';
-              skeleton && skeleton.remove();
+              if(skeleton) skeleton.remove();
             });
             
+            // Stop observing and bind click events
             io.disconnect();
-            bindProductCardEvents();
+            bindDelegatedEvents(mas);
           }
         }, { rootMargin: '200px' });
         
         io.observe(mas);
       }
       
-      function bindProductCardEvents() {
-        const masCards = document.querySelectorAll('.mas-product-card');
-        
-        masCards.forEach((card) => {
-          const productLink = card.querySelector('a[href*="/products/"]');
-          if (!productLink) return;
+      // 2. Optimized Event Delegation (Faster Performance)
+      function bindDelegatedEvents(container) {
+        container.addEventListener('click', function(e) {
+          const card = e.target.closest('.mas-product-card');
+          const link = e.target.closest('a');
           
-          productLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            const cardData = card.dataset;
+          if (card && link) {
+            const data = card.dataset;
             
-            // DataLayer push with fallback
+            // Non-blocking GTM push
             window.dataLayer = window.dataLayer || [];
-            const timeout = setTimeout(() => {
-              window.location.href = cardData.url;
-            }, 2000);
-            
             window.dataLayer.push({
               event: 'promoClick',
               promoClick: {
-                promo_id: cardData.sku,
-                promo_name: cardData.name,
+                promo_id: data.sku,
+                promo_name: data.name,
                 creative_name: 'Match and shine',
-              },
-              event_callback: function() {
-                clearTimeout(timeout);
-                window.location.href = cardData.url;
-              },
-              event_timeout: 300
+                location_id: 'pdp_complementary'
+              }
             });
-          });
+            // Link follows naturally without JS delay
+          }
         });
       }
       
-      // Initialize when DOM is ready
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initMatchAndShine);
       } else {
         initMatchAndShine();
       }
     })();
-    </script>
+  </script>
 
-    <style>
-      .mas-skeleton-wrapper{display:grid;grid-template-columns:calc(36% - 10px) calc(64% - 10px);gap:20px;background:#f2f2f2;padding:45px;border-radius:12px;min-height:500px}
-      .mas-skeleton-image{height:472px;border-radius:12px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
-      .mas-skeleton-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-      .mas-skeleton-card{height:360px;border-radius:8px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
-      @keyframes shimmer{
-        0%{background-position:200% 0}
-        100%{background-position:-200% 0}
-      }
-      @media(max-width:768px){
-        .mas-skeleton-wrapper{display:flex;padding:10px;min-height:300px}
-        .mas-skeleton-image{display:none}
-        .mas-skeleton-grid{display:flex;gap:10px;overflow-x:auto}
-        .mas-skeleton-card{flex:0 0 250px}
-      }
+  <style>
+    .mas-skeleton-wrapper{display:grid;grid-template-columns:36% 1fr;gap:20px;background:#f2f2f2;padding:45px;border-radius:12px;min-height:500px}
+    .mas-skeleton-image{height:472px;border-radius:12px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
+    .mas-skeleton-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .mas-skeleton-card{height:360px;border-radius:8px;background:linear-gradient(90deg,#eee 25%,#f5f5f5 37%,#eee 63%);background-size:400% 100%;animation:shimmer 1.4s infinite}
+    @keyframes shimmer{ 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    
+    .match-and-shine{padding:40px 0 0;text-align:center}
+    .mas-title{font-size:24px;margin:10px 0 0}
+    .mas-subheading{color:#535361;font-size:18px;margin:0 auto 25px;line-height:2}
+    .mas-content{opacity:0;transition:opacity .4s ease}
+    
+    .mas-image-features-product-wrapper{display:grid;grid-template-columns:36% 1fr;align-items:center;gap:20px;background:#f2f2f2;padding:45px;border-radius:12px}
+    .mas-image-features-product img{border-radius:12px;width:100%;height:auto;aspect-ratio:1/1}
+    
+    .mas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    
+    /* Mobile Optimizations */
+    @media(max-width:768px){
+      .mas-skeleton-wrapper, .mas-image-features-product-wrapper{display:flex;flex-direction:column;padding:15px;min-height:auto}
+      .mas-skeleton-image, .mas-image-features-product{display:none}
+      .mas-skeleton-grid, .mas-grid{display:flex;gap:10px;overflow-x:auto;width:100%;padding-bottom:10px;scroll-snap-type:x mandatory}
+      .mas-skeleton-card, .mas-product-card{flex:0 0 240px;scroll-snap-align:start}
       
-      .match-and-shine{padding:40px 0 0;background-color:transparent;text-align:center}
-      .mas-title{font-size:24px;margin:0;padding-top:10px}
-      .product-template-page .featured-in-section h2.featured-in-heading .mas-subheading{color:#535361;font-weight:400;font-size:18px;line-height:2;margin: 0 auto 25px;}
-      .mas-content{opacity:0;transition:opacity .4s ease}
-      .mas-grid{display:grid;grid-template-columns:repeat(3,1fr);justify-content:center;gap:10px}
-      .mas-image-features-product-wrapper{display:grid;grid-template-columns:calc(36% - 10px) calc(64% - 10px);align-items:center;gap:20px;background:#f2f2f2;padding:45px;border-radius:12px;min-height:500px}
-      .mas-image-features-product img{border-radius:12px;width:100%;height:auto;aspect-ratio:1/1;object-fit:cover}
-      
-      @media (max-width:768px){
-        .mas-image-features-product-wrapper{display:flex;padding:10px;min-height:300px}
-        .match-and-shine{padding:20px 0}
-        .mas-title{font-size:20px}
-        .mas-subheading{font-size:14px}
-        .mas-grid{display:flex;gap:10px;overflow-x:scroll;justify-content:flex-start;will-change:transform}
-        .mas-product-card{width:100%;flex:0 0 calc(250px - 0px);contain:layout style paint}
-        .mas-grid::-webkit-scrollbar{height:2px;background-color:#f5f5f5}
-        .mas-grid::-webkit-scrollbar-thumb{background-color:#b67665}
-        .mas-grid::-webkit-scrollbar-track{background-color:#f5f5f5}
-      }
-      
-      @media (max-width:480px){
-        .mas-title{font-size:20px}
-      }
-    </style>
-  {% endif %}
+      .mas-grid::-webkit-scrollbar { display: none; }
+      .mas-grid { -ms-overflow-style: none; scrollbar-width: none; }
+    }
+  </style>
+{% endif %}
 
 {% schema %}
 {
   "name": "Match and Shine New",
   "settings": [
-    {
-      "type": "text",
-      "id": "collection_handle",
-      "label": "Base collection handle",
-      "default": "jewelry"
-    },
-    {
-      "type": "range",
-      "id": "price_range",
-      "label": "Price Range (%)",
-      "default": 20,
-      "min": 5,
-      "max": 50,
-      "step": 5,
-      "unit": "%"
-    },
     {
       "type": "range",
       "id": "product_limit",
@@ -485,8 +181,7 @@
   ],
   "presets": [
     {
-      "name": "Match and Shine",
-      "category": "Cross-sell"
+      "name": "Match and Shine"
     }
   ]
 }
