@@ -781,6 +781,7 @@ function initWishlist() {
   }
 }
 
+// Utility: Enhanced debounce with immediate option
 function debounce(func, wait, immediate = false) {
   let timeout;
   return function executedFunction(...args) {
@@ -796,6 +797,7 @@ function debounce(func, wait, immediate = false) {
   };
 }
 
+// Request manager to handle cancellation
 class RequestManager {
   constructor() {
     this.controller = null;
@@ -821,16 +823,20 @@ class FacetFiltersForm extends HTMLElement {
     this.requestManager = new RequestManager();
     this.pendingUpdate = null;
 
+    // Reduced debounce for better UX (300ms for input, instant for checkboxes)
     this.debouncedOnSubmit = debounce((event) => {
       this.onSubmitHandler(event);
     }, 300);
 
     const facetForm = this.querySelector('form');
 
+    // Use different handlers for different input types
     facetForm.addEventListener('input', (event) => {
+      // Instant for checkboxes and radio buttons
       if (event.target.type === 'checkbox' || event.target.type === 'radio') {
         this.onSubmitHandler(event);
       } else {
+        // Debounced for text inputs (like price range)
         this.debouncedOnSubmit(event);
       }
     });
@@ -847,7 +853,6 @@ class FacetFiltersForm extends HTMLElement {
       // On popstate, check if the restored URL has discount-high-low
       const restoredParams = new URLSearchParams(searchParams);
       if (restoredParams.get('sort_by') === 'discount-high-low') {
-        // Fetch with manual sort, then apply client-side sort
         restoredParams.set('sort_by', 'manual');
         FacetFiltersForm._pendingDiscountSort = true;
         FacetFiltersForm.renderPage(restoredParams.toString(), null, false);
@@ -886,28 +891,72 @@ class FacetFiltersForm extends HTMLElement {
         style.id = 'facet-preloader-styles';
         style.textContent = `
           .facet-preloader {
-            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-            z-index: 999999; display: flex; align-items: center;
-            justify-content: center; opacity: 0; visibility: hidden;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 999999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            visibility: hidden;
             transition: opacity 0.15s ease, visibility 0.15s ease;
             pointer-events: none;
           }
-          .facet-preloader.active { opacity: 1; visibility: visible; pointer-events: auto; }
+          .facet-preloader.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+          }
           .facet-preloader__overlay {
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(255,255,255,0.85); backdrop-filter: blur(3px);
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(3px);
           }
-          .facet-preloader__spinner { position: relative; z-index: 1; }
-          .spinner { animation: rotate 1.5s linear infinite; width: 50px; height: 50px; }
-          .spinner .path { stroke: #000; stroke-linecap: round; animation: dash 1.5s ease-in-out infinite; }
-          @keyframes rotate { 100% { transform: rotate(360deg); } }
+          .facet-preloader__spinner {
+            position: relative;
+            z-index: 1;
+          }
+          .spinner {
+            animation: rotate 1.5s linear infinite;
+            width: 50px;
+            height: 50px;
+          }
+          .spinner .path {
+            stroke: #000;
+            stroke-linecap: round;
+            animation: dash 1.5s ease-in-out infinite;
+          }
+          @keyframes rotate {
+            100% { transform: rotate(360deg); }
+          }
           @keyframes dash {
-            0% { stroke-dasharray: 1,150; stroke-dashoffset: 0; }
-            50% { stroke-dasharray: 90,150; stroke-dashoffset: -35; }
-            100% { stroke-dasharray: 90,150; stroke-dashoffset: -124; }
+            0% {
+              stroke-dasharray: 1, 150;
+              stroke-dashoffset: 0;
+            }
+            50% {
+              stroke-dasharray: 90, 150;
+              stroke-dashoffset: -35;
+            }
+            100% {
+              stroke-dasharray: 90, 150;
+              stroke-dashoffset: -124;
+            }
           }
-          .collection.loading { opacity: 0.6; pointer-events: none; }
-          .loading { position: relative; }
+          .collection.loading {
+            opacity: 0.6;
+            pointer-events: none;
+          }
+          .loading {
+            position: relative;
+          }
         `;
         document.head.appendChild(style);
       }
@@ -925,10 +974,13 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
-  // ─── CORE: renderPage now accepts optional displaySortValue ───────────────
-  // displaySortValue = what goes into the browser URL (e.g. 'discount-high-low')
-  // searchParams     = what is actually sent to Shopify (e.g. 'sort_by=manual')
+  // ─────────────────────────────────────────────────────────────────────────────
+  // renderPage
+  //   searchParams     = params actually sent to Shopify (discount sort → 'manual')
+  //   displaySortValue = value written to the browser URL (e.g. 'discount-high-low')
+  // ─────────────────────────────────────────────────────────────────────────────
   static async renderPage(searchParams, event, updateURLHash = true, displaySortValue = null) {
+    // Cancel any pending requests
     const signal = FacetFiltersForm.requestManagerInstance.cancelPending();
 
     FacetFiltersForm.searchParamsPrev = searchParams;
@@ -936,13 +988,19 @@ class FacetFiltersForm extends HTMLElement {
     const scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     window.lastScrollPosition = scrollY;
 
+    // Show loading states
     FacetFiltersForm.showPreloader();
     FacetFiltersForm.setLoadingStates(true);
 
     // Build cache key using what the USER sees in the URL
     const urlKeyParams = displaySortValue
-      ? (() => { const p = new URLSearchParams(searchParams); p.set('sort_by', displaySortValue); return p.toString(); })()
+      ? (() => {
+          const p = new URLSearchParams(searchParams);
+          p.set('sort_by', displaySortValue);
+          return p.toString();
+        })()
       : searchParams;
+
     const cacheKey = `${window.location.pathname}?${urlKeyParams}`;
     const cached = FacetFiltersForm.getFromCache(cacheKey);
 
@@ -952,6 +1010,7 @@ class FacetFiltersForm extends HTMLElement {
       return;
     }
 
+    // Single optimised fetch for all sections
     try {
       const section = sections[0];
       const url = `${window.location.pathname}?section_id=${section.section}&${searchParams}`;
@@ -981,6 +1040,7 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
+  // LRU cache — keep last 20 filter combinations, expire after 5 min
   static addToCache(key, html) {
     const MAX_CACHE_SIZE = 20;
     if (FacetFiltersForm.filterData.length >= MAX_CACHE_SIZE) {
@@ -1000,6 +1060,7 @@ class FacetFiltersForm extends HTMLElement {
     return null;
   }
 
+  // Batch DOM updates
   static applyUpdate(html, event) {
     const parser = new DOMParser();
     const parsedHTML = parser.parseFromString(html, 'text/html');
@@ -1013,9 +1074,9 @@ class FacetFiltersForm extends HTMLElement {
         initializeScrollAnimationTrigger(html);
       }
 
-      // ── CLIENT-SIDE DISCOUNT SORT ──────────────────────────────────────────
+      // ── CLIENT-SIDE DISCOUNT SORT ───────────────────────────────────────────
+      // Runs after grid is painted whenever _pendingDiscountSort flag is set
       if (FacetFiltersForm._pendingDiscountSort) {
-        // Run after the grid has been painted
         requestAnimationFrame(() => {
           FacetFiltersForm.sortProductsByDiscount();
           FacetFiltersForm._pendingDiscountSort = false;
@@ -1026,28 +1087,35 @@ class FacetFiltersForm extends HTMLElement {
     });
   }
 
-  // ─── DISCOUNT SORT: sort rendered grid items by (comparePrice - price) / comparePrice ───
+  // ─────────────────────────────────────────────────────────────────────────────
+  // sortProductsByDiscount
+  //   Reads data-price / data-compare-price from each <li class="grid__item">
+  //   (set in main-collection-product-grid.liquid) and re-orders them highest
+  //   discount % → lowest discount %.
+  //   Shopify prices are in cents (integer), so no currency parsing needed.
+  // ─────────────────────────────────────────────────────────────────────────────
   static sortProductsByDiscount() {
     const grid = document.getElementById('product-grid');
     if (!grid) return;
 
-    // Collect only regular product items (not banner li's)
-    const items = Array.from(grid.querySelectorAll('li.grid__item'));
+    // Only sort regular product items — banner li's have no data-price
+    const items = Array.from(grid.querySelectorAll('li.grid__item[data-price]'));
 
     items.sort((a, b) => {
-      const aPrice = parseFloat(a.dataset.price) || 0;
+      const aPrice   = parseFloat(a.dataset.price)        || 0;
       const aCompare = parseFloat(a.dataset.comparePrice) || aPrice;
-      const bPrice = parseFloat(b.dataset.price) || 0;
+      const bPrice   = parseFloat(b.dataset.price)        || 0;
       const bCompare = parseFloat(b.dataset.comparePrice) || bPrice;
 
-      // Discount % = (comparePrice - price) / comparePrice * 100
+      // discount% = (comparePrice - price) / comparePrice * 100
       const aDiscount = aCompare > aPrice ? ((aCompare - aPrice) / aCompare) * 100 : 0;
       const bDiscount = bCompare > bPrice ? ((bCompare - bPrice) / bCompare) * 100 : 0;
 
       return bDiscount - aDiscount; // High → Low
     });
 
-    // Re-append in sorted order (preserves non-product banner items in place)
+    // Re-append in sorted order (banner li's stay in their original DOM position
+    // because they don't have data-price and aren't moved)
     items.forEach(item => grid.appendChild(item));
   }
 
@@ -1074,6 +1142,7 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
+  // Single RAF for scroll restoration
   static restoreScrollPosition() {
     const scrollY = window.lastScrollPosition || 0;
 
@@ -1096,7 +1165,9 @@ class FacetFiltersForm extends HTMLElement {
 
     const needsFullReplace =
       currentProducts.length !== newProducts.length ||
-      !currentProducts.every((el, i) => el.dataset.productId === newProducts[i]?.dataset.productId);
+      !currentProducts.every(
+        (el, i) => el.dataset.productId === newProducts[i]?.dataset.productId
+      );
 
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
@@ -1109,10 +1180,12 @@ class FacetFiltersForm extends HTMLElement {
       });
     }
 
+    // Cancel scroll animations
     container.querySelectorAll('.scroll-trigger').forEach((element) => {
       element.classList.add('scroll-trigger--cancel');
     });
 
+    // Always re-init wishlist after grid update
     requestAnimationFrame(() => {
       initWishlist();
     });
@@ -1143,6 +1216,7 @@ class FacetFiltersForm extends HTMLElement {
       '#FacetFiltersForm .js-filter, #FacetFiltersFormMobile .js-filter, #FacetFiltersPillsForm .js-filter'
     );
 
+    // Remove filters that no longer exist
     Array.from(facetDetailsElementsFromDom).forEach((currentElement) => {
       if (!Array.from(facetDetailsElementsFromFetch).some(({ id }) => currentElement.id === id)) {
         currentElement.remove();
@@ -1157,6 +1231,7 @@ class FacetFiltersForm extends HTMLElement {
     const facetsToRender = Array.from(facetDetailsElementsFromFetch).filter((element) => !matchesId(element));
     const countsToRender = Array.from(facetDetailsElementsFromFetch).find(matchesId);
 
+    // Batch render all facets
     facetsToRender.forEach((elementToRender, index) => {
       const currentElement = document.getElementById(elementToRender.id);
       if (currentElement) {
@@ -1191,45 +1266,54 @@ class FacetFiltersForm extends HTMLElement {
 
   static renderActiveFacets(html) {
     const activeFacetElementSelectors = ['.active-facets-mobile', '.active-facets-desktop'];
+
     activeFacetElementSelectors.forEach((selector) => {
       const activeFacetsElement = html.querySelector(selector);
       const currentElement = document.querySelector(selector);
+
       if (activeFacetsElement && currentElement) {
         if (currentElement.innerHTML !== activeFacetsElement.innerHTML) {
           currentElement.innerHTML = activeFacetsElement.innerHTML;
         }
       }
     });
+
     FacetFiltersForm.toggleActiveFacets(false);
   }
 
   static renderAdditionalElements(html) {
     const mobileElementSelectors = ['.mobile-facets__open', '.mobile-facets__count', '.sorting'];
+
     mobileElementSelectors.forEach((selector) => {
       const newElement = html.querySelector(selector);
       const currentElement = document.querySelector(selector);
+
       if (newElement && currentElement && newElement.innerHTML !== currentElement.innerHTML) {
         currentElement.innerHTML = newElement.innerHTML;
       }
     });
+
     document.getElementById('FacetFiltersFormMobile')?.closest('menu-drawer')?.bindEvents();
   }
 
   static renderCounts(source, target) {
     const targetSummary = target.querySelector('.facets__summary');
     const sourceSummary = source.querySelector('.facets__summary');
+
     if (sourceSummary && targetSummary && sourceSummary.outerHTML !== targetSummary.outerHTML) {
       targetSummary.outerHTML = sourceSummary.outerHTML;
     }
 
     const targetHeaderElement = target.querySelector('.facets__header');
     const sourceHeaderElement = source.querySelector('.facets__header');
+
     if (sourceHeaderElement && targetHeaderElement && sourceHeaderElement.outerHTML !== targetHeaderElement.outerHTML) {
       targetHeaderElement.outerHTML = sourceHeaderElement.outerHTML;
     }
 
     const targetWrapElement = target.querySelector('.facets-wrap');
     const sourceWrapElement = source.querySelector('.facets-wrap');
+
     if (sourceWrapElement && targetWrapElement) {
       const isShowingMore = Boolean(target.querySelector('show-more-button .label-show-more.hidden'));
       if (isShowingMore) {
@@ -1246,6 +1330,7 @@ class FacetFiltersForm extends HTMLElement {
   static renderMobileCounts(source, target) {
     const targetFacetsList = target?.querySelector('.mobile-facets__list');
     const sourceFacetsList = source.querySelector('.mobile-facets__list');
+
     if (sourceFacetsList && targetFacetsList && sourceFacetsList.outerHTML !== targetFacetsList.outerHTML) {
       targetFacetsList.outerHTML = sourceFacetsList.outerHTML;
     }
@@ -1317,7 +1402,9 @@ FacetFiltersForm._pendingDiscountSort = false; // flag for client-side discount 
 customElements.define('facet-filters-form', FacetFiltersForm);
 FacetFiltersForm.setListeners();
 
-// ── Price Range ───────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PriceRange component — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 class PriceRange extends HTMLElement {
   constructor() {
     super();
@@ -1360,7 +1447,9 @@ class PriceRange extends HTMLElement {
 
 customElements.define('price-range', PriceRange);
 
-// ── Facet Remove ──────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// FacetRemove component — unchanged
+// ─────────────────────────────────────────────────────────────────────────────
 class FacetRemove extends HTMLElement {
   constructor() {
     super();
@@ -1382,7 +1471,9 @@ class FacetRemove extends HTMLElement {
 
 customElements.define('facet-remove', FacetRemove);
 
-// ── Sort UI helpers ───────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Sort UI helpers
+// ─────────────────────────────────────────────────────────────────────────────
 function updateSortUI(value) {
   document.querySelectorAll('select[name="sort_by"]').forEach(select => {
     select.value = value;
@@ -1406,18 +1497,25 @@ function updateSortUI(value) {
   });
 }
 
-// ─── CORE SORT SUBMIT ─────────────────────────────────────────────────────────
-// Intercepts 'discount-high-low': sends 'manual' to Shopify, sorts DOM client-side
+// ─────────────────────────────────────────────────────────────────────────────
+// triggerSortSubmit
+//
+//  discount-high-low → sends sort_by=manual to Shopify (Shopify ignores unknown
+//  keys anyway but 'manual' = Featured which returns all products in store order).
+//  After the fetch completes, sortProductsByDiscount() re-orders the DOM.
+//
+//  All other sort values → sent directly to Shopify as-is.
+// ─────────────────────────────────────────────────────────────────────────────
 function triggerSortSubmit(sortValue) {
   const isDiscountSort = sortValue === 'discount-high-low';
 
-  // What Shopify actually receives — 'manual' = Featured (preserves all products)
+  // What Shopify actually receives
   const shopifySortValue = isDiscountSort ? 'manual' : sortValue;
 
-  // Set the flag before renderPage so applyUpdate picks it up
+  // Set flag BEFORE renderPage so applyUpdate picks it up
   FacetFiltersForm._pendingDiscountSort = isDiscountSort;
 
-  // Update all form inputs with the Shopify-safe sort value
+  // Sync all form sort inputs to the Shopify-safe value
   const forms = document.querySelectorAll('facet-filters-form form');
   forms.forEach(form => {
     let sortInput = form.querySelector('[name="sort_by"]');
@@ -1438,13 +1536,19 @@ function triggerSortSubmit(sortValue) {
       formData.set('sort_by', shopifySortValue);
       const searchParams = new URLSearchParams(formData).toString();
 
-      // Pass displaySortValue so URL shows 'discount-high-low' while Shopify gets 'manual'
-      FacetFiltersForm.renderPage(searchParams, null, true, isDiscountSort ? sortValue : null);
+      // Pass displaySortValue so the browser URL shows 'discount-high-low'
+      // while the actual Shopify fetch uses 'manual'
+      FacetFiltersForm.renderPage(
+        searchParams,
+        null,
+        true,
+        isDiscountSort ? sortValue : null
+      );
     }
   }
 }
 
-// Desktop & mobile select change handler
+// ── Desktop & mobile <select> change ─────────────────────────────────────────
 document.addEventListener('change', function(event) {
   if (event.target.matches('#SortBy, #SortBy-mobile')) {
     event.preventDefault();
@@ -1454,7 +1558,7 @@ document.addEventListener('change', function(event) {
   }
 });
 
-// Mobile sort drawer option click
+// ── Mobile sort drawer option click ──────────────────────────────────────────
 document.addEventListener('click', function(event) {
   const sortOption = event.target.closest('.mobile-sort-option');
   if (sortOption) {
@@ -1470,7 +1574,7 @@ document.addEventListener('click', function(event) {
   }
 });
 
-// On page load: if URL already has discount-high-low (direct link / refresh), sort immediately
+// ── Page load: handle direct links / refresh with sort in URL ─────────────────
 window.addEventListener('DOMContentLoaded', function() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentSort = urlParams.get('sort_by');
@@ -1479,14 +1583,16 @@ window.addEventListener('DOMContentLoaded', function() {
     updateSortUI(currentSort);
   }
 
+  // If the page was loaded with ?sort_by=discount-high-low (shared link / refresh),
+  // the server rendered with 'manual' sort — apply client-side discount sort immediately.
   if (currentSort === 'discount-high-low') {
-    // Grid is already server-rendered with manual/featured sort — apply client-side sort
     requestAnimationFrame(() => {
       FacetFiltersForm.sortProductsByDiscount();
     });
   }
 });
 
+// ── Performance logging (dev) ─────────────────────────────────────────────────
 if (window.performance && console.table) {
   const originalRenderPage = FacetFiltersForm.renderPage;
   FacetFiltersForm.renderPage = async function(...args) {
