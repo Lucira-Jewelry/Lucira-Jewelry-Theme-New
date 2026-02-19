@@ -179,18 +179,17 @@
                   {% endif %}
 
                   {%- comment -%}
-                    Read the discount_percentage variant metafield for client-side sorting.
-                    Use capture+strip to guarantee zero visible output even if the metafield
-                    object serialises with extra whitespace or debug text.
+                    Capture the discount_percentage metafield silently.
+                    We output it as a hidden <span> INSIDE the <li> (after the card render)
+                    so the value is embedded in the card HTML and survives every AJAX
+                    section re-render. facets.js reads it via
+                    li.querySelector('.js-discount-value').dataset.v
                   {%- endcomment -%}
-                  {%- capture sort_discount_raw -%}{{ product.variants.first.metafields.custom.discount_percentage }}{%- endcapture -%}
-                  {%- assign sort_discount = sort_discount_raw | strip | default: '0' -%}
+                  {%- capture _disc_raw -%}{{ product.variants.first.metafields.custom.discount_percentage }}{%- endcapture -%}
+                  {%- assign _disc_val = _disc_raw | strip | default: '0' -%}
 
-                  <li
-                    class="grid__item"
-                    data-discount-percentage="{{ sort_discount }}"
-                  >
-                    {% render 'card-product',
+                  <li class="grid__item">
+                    {%- render 'card-product',
                       card_product: product,
                       diamond_percent: diamond_percent,
                       mc_percent: mc_percent,
@@ -201,13 +200,13 @@
                       show_vendor: section.settings.show_vendor,
                       show_rating: section.settings.show_rating,
                       section_id: section.id
-                    %}
-                  </li>
-
-                                        <div>
+                    -%}
+                                          <div>
   {{ product.variants.first.metafields.custom.discount_percentage.value }}
 </div>
 
+                    <span class="js-discount-value" data-v="{{ _disc_val }}" style="display:none!important;visibility:hidden;position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true"></span>
+                  </li>
                 {% endunless %}
               {%- endfor -%}
             </ul>
