@@ -63,15 +63,9 @@ class FacetFiltersForm extends HTMLElement {
     }, 300);
 
     const facetForm = this.querySelector('form');
-
+    
     // Use different handlers for different input types
     facetForm.addEventListener('input', (event) => {
-      // Sort selects are fully handled by the document-level 'change' listener
-      // in triggerSortSubmit(). If we also handle them here, two competing fetch
-      // calls fire — the second one sends sort_by=discount-high-low raw to
-      // Shopify (which ignores it) and overwrites the correct manual+client-sort flow.
-      if (event.target.name === 'sort_by') return;
-
       // Instant for checkboxes and radio buttons
       if (event.target.type === 'checkbox' || event.target.type === 'radio') {
         this.onSubmitHandler(event);
@@ -89,17 +83,7 @@ class FacetFiltersForm extends HTMLElement {
     const onHistoryChange = (event) => {
       const searchParams = event.state ? event.state.searchParams : FacetFiltersForm.searchParamsInitial;
       if (searchParams === FacetFiltersForm.searchParamsPrev) return;
-
-      // On popstate, check if the restored URL has discount-high-low
-      const restoredParams = new URLSearchParams(searchParams);
-      if (restoredParams.get('sort_by') === 'discount-high-low') {
-        restoredParams.set('sort_by', 'manual');
-        FacetFiltersForm._pendingDiscountSort = true;
-        FacetFiltersForm.renderPage(restoredParams.toString(), null, false);
-      } else {
-        FacetFiltersForm._pendingDiscountSort = false;
-        FacetFiltersForm.renderPage(searchParams, null, false);
-      }
+      FacetFiltersForm.renderPage(searchParams, null, false);
     };
     window.addEventListener('popstate', onHistoryChange);
   }
@@ -125,7 +109,7 @@ class FacetFiltersForm extends HTMLElement {
         </div>
       `;
       document.body.appendChild(preloader);
-
+      
       if (!document.getElementById('facet-preloader-styles')) {
         const style = document.createElement('style');
         style.id = 'facet-preloader-styles';
@@ -201,7 +185,7 @@ class FacetFiltersForm extends HTMLElement {
         document.head.appendChild(style);
       }
     }
-
+    
     requestAnimationFrame(() => {
       preloader.classList.add('active');
     });
@@ -214,61 +198,54 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
-  // ─────────────────────────────────────────────────────────────────────────────
-  // renderPage
-  //   searchParams     = params actually sent to Shopify (discount sort → 'manual')
-  //   displaySortValue = value written to the browser URL (e.g. 'discount-high-low')
-  // ─────────────────────────────────────────────────────────────────────────────
-  static async renderPage(searchParams, event, updateURLHash = true, displaySortValue = null) {
+  // OPTIMIZED: Single fetch with better error handling and cancellation
+  static async renderPage(searchParams, event, updateURLHash = true) {
     // Cancel any pending requests
     const signal = FacetFiltersForm.requestManagerInstance.cancelPending();
-
+    
     FacetFiltersForm.searchParamsPrev = searchParams;
     const sections = FacetFiltersForm.getSections();
     const scrollY = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
     window.lastScrollPosition = scrollY;
-
+    
     // Show loading states
     FacetFiltersForm.showPreloader();
     FacetFiltersForm.setLoadingStates(true);
-
-    // Build cache key using what the USER sees in the URL
-    const urlKeyParams = displaySortValue
-      ? (() => {
-          const p = new URLSearchParams(searchParams);
-          p.set('sort_by', displaySortValue);
-          return p.toString();
-        })()
-      : searchParams;
-
-    const cacheKey = `${window.location.pathname}?${urlKeyParams}`;
+    
+    // Check cache first
+    const cacheKey = `${window.location.pathname}?${searchParams}`;
     const cached = FacetFiltersForm.getFromCache(cacheKey);
-
+    
     if (cached) {
       FacetFiltersForm.applyUpdate(cached, event);
-      if (updateURLHash) FacetFiltersForm.updateURLHash(urlKeyParams);
+      if (updateURLHash) FacetFiltersForm.updateURLHash(searchParams);
       return;
     }
 
-    // Single optimised fetch for all sections
+    // Single optimized fetch for all sections
     try {
       const section = sections[0];
       const url = `${window.location.pathname}?section_id=${section.section}&${searchParams}`;
-
-      const response = await fetch(url, {
+      
+      const response = await fetch(url, { 
         signal,
-        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest'
+        }
       });
-
+      
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
+      
       const html = await response.text();
-
+      
+      // Cache the result with size limit
       FacetFiltersForm.addToCache(cacheKey, html);
+      
+      // Apply the update
       FacetFiltersForm.applyUpdate(html, event);
-
-      if (updateURLHash) FacetFiltersForm.updateURLHash(urlKeyParams);
-
+      
+      if (updateURLHash) FacetFiltersForm.updateURLHash(searchParams);
+      
     } catch (error) {
       if (error.name === 'AbortError') {
         console.log('Request cancelled');
@@ -280,83 +257,52 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
-  // LRU cache — keep last 20 filter combinations, expire after 5 min
+  // OPTIMIZED: Smarter cache with LRU strategy
   static addToCache(key, html) {
-    const MAX_CACHE_SIZE = 20;
+    const MAX_CACHE_SIZE = 20; // Keep last 20 filter combinations
+    
+    // Remove oldest if cache is full
     if (FacetFiltersForm.filterData.length >= MAX_CACHE_SIZE) {
       FacetFiltersForm.filterData.shift();
     }
+    
     FacetFiltersForm.filterData.push({ url: key, html, timestamp: Date.now() });
   }
 
   static getFromCache(key) {
     const cached = FacetFiltersForm.filterData.find(item => item.url === key);
+    
+    // Cache expires after 5 minutes
     if (cached && (Date.now() - cached.timestamp) < 300000) {
       return cached.html;
     }
+    
+    // Remove expired cache
     if (cached) {
       FacetFiltersForm.filterData = FacetFiltersForm.filterData.filter(item => item.url !== key);
     }
+    
     return null;
   }
 
-  // Batch DOM updates
+  // OPTIMIZED: Apply update with efficient DOM manipulation
   static applyUpdate(html, event) {
     const parser = new DOMParser();
     const parsedHTML = parser.parseFromString(html, 'text/html');
-
+    
+    // Batch DOM updates
     requestAnimationFrame(() => {
       FacetFiltersForm.renderFilters(html, event, parsedHTML);
       FacetFiltersForm.renderProductGridContainer(parsedHTML);
       FacetFiltersForm.renderProductCount(parsedHTML);
-
+      
       if (typeof initializeScrollAnimationTrigger === 'function') {
         initializeScrollAnimationTrigger(html);
       }
-
-      // ── CLIENT-SIDE DISCOUNT SORT ───────────────────────────────────────────
-      // Runs after grid is painted whenever _pendingDiscountSort flag is set
-      if (FacetFiltersForm._pendingDiscountSort) {
-        requestAnimationFrame(() => {
-          FacetFiltersForm.sortProductsByDiscount();
-          FacetFiltersForm._pendingDiscountSort = false;
-        });
-      }
-
+      
+      // Efficient scroll restoration
       FacetFiltersForm.restoreScrollPosition();
     });
-  }
-
-  // ─────────────────────────────────────────────────────────────────────────────
-  // sortProductsByDiscount
-  //   Reads data-price / data-compare-price from each <li class="grid__item">
-  //   (set in main-collection-product-grid.liquid) and re-orders them highest
-  //   discount % → lowest discount %.
-  //   Shopify prices are in cents (integer), so no currency parsing needed.
-  // ─────────────────────────────────────────────────────────────────────────────
-  static sortProductsByDiscount() {
-    const grid = document.getElementById('product-grid');
-    if (!grid) return;
-
-    // Only sort regular product items — banner li's have no data-price
-    const items = Array.from(grid.querySelectorAll('li.grid__item[data-price]'));
-
-    items.sort((a, b) => {
-      const aPrice   = parseFloat(a.dataset.price)        || 0;
-      const aCompare = parseFloat(a.dataset.comparePrice) || aPrice;
-      const bPrice   = parseFloat(b.dataset.price)        || 0;
-      const bCompare = parseFloat(b.dataset.comparePrice) || bPrice;
-
-      // discount% = (comparePrice - price) / comparePrice * 100
-      const aDiscount = aCompare > aPrice ? ((aCompare - aPrice) / aCompare) * 100 : 0;
-      const bDiscount = bCompare > bPrice ? ((bCompare - bPrice) / bCompare) * 100 : 0;
-
-      return bDiscount - aDiscount; // High → Low
-    });
-
-    // Re-append in sorted order (banner li's stay in their original DOM position
-    // because they don't have data-price and aren't moved)
-    items.forEach(item => grid.appendChild(item));
   }
 
   static setLoadingStates(loading) {
@@ -364,7 +310,7 @@ class FacetFiltersForm extends HTMLElement {
     const countContainer = document.getElementById('ProductCount');
     const countContainerDesktop = document.getElementById('ProductCountDesktop');
     const spinners = document.querySelectorAll('.facets-container .loading__spinner, facet-filters-form .loading__spinner');
-
+    
     if (loading) {
       if (productGrid?.querySelector('.collection')) {
         productGrid.querySelector('.collection').classList.add('loading');
@@ -382,10 +328,10 @@ class FacetFiltersForm extends HTMLElement {
     }
   }
 
-  // Single RAF for scroll restoration
+  // OPTIMIZED: Single RAF for scroll restoration
   static restoreScrollPosition() {
     const scrollY = window.lastScrollPosition || 0;
-
+    
     requestAnimationFrame(() => {
       window.scrollTo(0, scrollY);
       FacetFiltersForm.hidePreloader();
@@ -397,18 +343,18 @@ class FacetFiltersForm extends HTMLElement {
   static renderProductGridContainer(parsedHTML) {
     const container = document.getElementById('ProductGridContainer');
     const newContainer = parsedHTML.getElementById('ProductGridContainer');
-
+    
     if (!container || !newContainer) return;
-
+    
     const currentProducts = Array.from(container.querySelectorAll('[data-product-id]'));
     const newProducts = Array.from(newContainer.querySelectorAll('[data-product-id]'));
-
+    
     const needsFullReplace =
-      currentProducts.length !== newProducts.length ||
+      currentProducts.length !== newProducts.length || 
       !currentProducts.every(
         (el, i) => el.dataset.productId === newProducts[i]?.dataset.productId
       );
-
+    
     if (needsFullReplace) {
       container.innerHTML = newContainer.innerHTML;
     } else {
@@ -419,17 +365,18 @@ class FacetFiltersForm extends HTMLElement {
         }
       });
     }
-
+    
     // Cancel scroll animations
     container.querySelectorAll('.scroll-trigger').forEach((element) => {
       element.classList.add('scroll-trigger--cancel');
     });
 
-    // Always re-init wishlist after grid update
+    // 🔥 ALWAYS re-init wishlist
     requestAnimationFrame(() => {
       initWishlist();
     });
   }
+
 
   static renderProductCount(parsedHTML) {
     const newCount = parsedHTML.getElementById('ProductCount');
@@ -441,6 +388,7 @@ class FacetFiltersForm extends HTMLElement {
     if (container && container.textContent !== newCount.textContent) {
       container.innerHTML = newCount.innerHTML;
     }
+
     if (containerDesktop && containerDesktop.textContent !== newCount.textContent) {
       containerDesktop.innerHTML = newCount.innerHTML;
     }
@@ -448,7 +396,7 @@ class FacetFiltersForm extends HTMLElement {
 
   static renderFilters(html, event, parsedHTML) {
     parsedHTML = parsedHTML || new DOMParser().parseFromString(html, 'text/html');
-
+    
     const facetDetailsElementsFromFetch = parsedHTML.querySelectorAll(
       '#FacetFiltersForm .js-filter, #FacetFiltersFormMobile .js-filter, #FacetFiltersPillsForm .js-filter'
     );
@@ -475,6 +423,7 @@ class FacetFiltersForm extends HTMLElement {
     facetsToRender.forEach((elementToRender, index) => {
       const currentElement = document.getElementById(elementToRender.id);
       if (currentElement) {
+        // Only update if content changed
         if (currentElement.innerHTML !== elementToRender.innerHTML) {
           currentElement.innerHTML = elementToRender.innerHTML;
         }
@@ -486,6 +435,7 @@ class FacetFiltersForm extends HTMLElement {
             return;
           }
         }
+
         if (elementToRender.parentElement) {
           document.querySelector(`#${elementToRender.parentElement.id} .js-filter`)?.before(elementToRender);
         }
@@ -497,6 +447,7 @@ class FacetFiltersForm extends HTMLElement {
 
     if (countsToRender) {
       const closestJSFilterID = event.target.closest('.js-filter')?.id;
+
       if (closestJSFilterID) {
         FacetFiltersForm.renderCounts(countsToRender, event.target.closest('.js-filter'));
         FacetFiltersForm.renderMobileCounts(countsToRender, document.getElementById(closestJSFilterID));
@@ -510,7 +461,7 @@ class FacetFiltersForm extends HTMLElement {
     activeFacetElementSelectors.forEach((selector) => {
       const activeFacetsElement = html.querySelector(selector);
       const currentElement = document.querySelector(selector);
-
+      
       if (activeFacetsElement && currentElement) {
         if (currentElement.innerHTML !== activeFacetsElement.innerHTML) {
           currentElement.innerHTML = activeFacetsElement.innerHTML;
@@ -527,7 +478,7 @@ class FacetFiltersForm extends HTMLElement {
     mobileElementSelectors.forEach((selector) => {
       const newElement = html.querySelector(selector);
       const currentElement = document.querySelector(selector);
-
+      
       if (newElement && currentElement && newElement.innerHTML !== currentElement.innerHTML) {
         currentElement.innerHTML = newElement.innerHTML;
       }
@@ -561,6 +512,7 @@ class FacetFiltersForm extends HTMLElement {
           .querySelectorAll('.facets__item.hidden')
           .forEach((hiddenItem) => hiddenItem.classList.replace('hidden', 'show-more-item'));
       }
+
       if (targetWrapElement.outerHTML !== sourceWrapElement.outerHTML) {
         targetWrapElement.outerHTML = sourceWrapElement.outerHTML;
       }
@@ -600,7 +552,7 @@ class FacetFiltersForm extends HTMLElement {
   onSubmitHandler(event) {
     event.preventDefault();
     const sortFilterForms = document.querySelectorAll('facet-filters-form form');
-
+    
     if (event.srcElement?.className === 'mobile-facets__checkbox') {
       const searchParams = this.createSearchParams(event.target.closest('form'));
       this.onSubmitForm(searchParams, event);
@@ -632,19 +584,18 @@ class FacetFiltersForm extends HTMLElement {
   }
 }
 
-// ── Static property initialisation ───────────────────────────────────────────
+// Initialize static properties
 FacetFiltersForm.filterData = [];
 FacetFiltersForm.searchParamsInitial = window.location.search.slice(1);
 FacetFiltersForm.searchParamsPrev = window.location.search.slice(1);
 FacetFiltersForm.requestManagerInstance = new RequestManager();
-FacetFiltersForm._pendingDiscountSort = false; // flag for client-side discount sort
 
 customElements.define('facet-filters-form', FacetFiltersForm);
 FacetFiltersForm.setListeners();
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PriceRange component — unchanged
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================
+// PRICE RANGE COMPONENT
+// ============================================
 class PriceRange extends HTMLElement {
   constructor() {
     super();
@@ -662,6 +613,7 @@ class PriceRange extends HTMLElement {
 
   onKeyDown(event) {
     if (event.metaKey) return;
+
     const pattern = /[0-9]|\.|,|'| |Tab|Backspace|Enter|ArrowUp|ArrowDown|ArrowLeft|ArrowRight|Delete|Escape/;
     if (!event.key.match(pattern)) event.preventDefault();
   }
@@ -680,6 +632,7 @@ class PriceRange extends HTMLElement {
     const value = Number(input.value);
     const min = Number(input.getAttribute('data-min'));
     const max = Number(input.getAttribute('data-max'));
+
     if (value < min) input.value = min;
     if (value > max) input.value = max;
   }
@@ -687,9 +640,9 @@ class PriceRange extends HTMLElement {
 
 customElements.define('price-range', PriceRange);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// FacetRemove component — unchanged
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================
+// FACET REMOVE COMPONENT
+// ============================================
 class FacetRemove extends HTMLElement {
   constructor() {
     super();
@@ -711,14 +664,14 @@ class FacetRemove extends HTMLElement {
 
 customElements.define('facet-remove', FacetRemove);
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sort UI helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================
+// SORT FUNCTIONALITY
+// ============================================
 function updateSortUI(value) {
   document.querySelectorAll('select[name="sort_by"]').forEach(select => {
     select.value = value;
   });
-
+  
   document.querySelectorAll('.mobile-sort-option').forEach(option => {
     const optionValue = option.getAttribute('data-value');
     if (optionValue === value) {
@@ -737,26 +690,9 @@ function updateSortUI(value) {
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// triggerSortSubmit
-//
-//  discount-high-low → sends sort_by=manual to Shopify (Shopify ignores unknown
-//  keys anyway but 'manual' = Featured which returns all products in store order).
-//  After the fetch completes, sortProductsByDiscount() re-orders the DOM.
-//
-//  All other sort values → sent directly to Shopify as-is.
-// ─────────────────────────────────────────────────────────────────────────────
 function triggerSortSubmit(sortValue) {
-  const isDiscountSort = sortValue === 'discount-high-low';
-
-  // What Shopify actually receives
-  const shopifySortValue = isDiscountSort ? 'manual' : sortValue;
-
-  // Set flag BEFORE renderPage so applyUpdate picks it up
-  FacetFiltersForm._pendingDiscountSort = isDiscountSort;
-
-  // Sync all form sort inputs to the Shopify-safe value
   const forms = document.querySelectorAll('facet-filters-form form');
+  
   forms.forEach(form => {
     let sortInput = form.querySelector('[name="sort_by"]');
     if (!sortInput) {
@@ -765,30 +701,22 @@ function triggerSortSubmit(sortValue) {
       sortInput.name = 'sort_by';
       form.appendChild(sortInput);
     }
-    sortInput.value = shopifySortValue;
+    sortInput.value = sortValue;
   });
-
+  
   const facetForm = document.querySelector('facet-filters-form');
   if (facetForm) {
     const mainForm = facetForm.querySelector('form');
     if (mainForm) {
       const formData = new FormData(mainForm);
-      formData.set('sort_by', shopifySortValue);
+      formData.set('sort_by', sortValue);
       const searchParams = new URLSearchParams(formData).toString();
-
-      // Pass displaySortValue so the browser URL shows 'discount-high-low'
-      // while the actual Shopify fetch uses 'manual'
-      FacetFiltersForm.renderPage(
-        searchParams,
-        null,
-        true,
-        isDiscountSort ? sortValue : null
-      );
+      FacetFiltersForm.renderPage(searchParams, null, true);
     }
   }
 }
 
-// ── Desktop & mobile <select> change ─────────────────────────────────────────
+// Desktop sort handler
 document.addEventListener('change', function(event) {
   if (event.target.matches('#SortBy, #SortBy-mobile')) {
     event.preventDefault();
@@ -798,15 +726,17 @@ document.addEventListener('change', function(event) {
   }
 });
 
-// ── Mobile sort drawer option click ──────────────────────────────────────────
+// Mobile sort drawer click handler
 document.addEventListener('click', function(event) {
   const sortOption = event.target.closest('.mobile-sort-option');
   if (sortOption) {
     event.preventDefault();
     const sortValue = sortOption.getAttribute('data-value');
+    
     if (sortValue) {
       updateSortUI(sortValue);
       triggerSortSubmit(sortValue);
+      
       if (typeof closeSortDrawer === 'function') {
         closeSortDrawer();
       }
@@ -814,25 +744,15 @@ document.addEventListener('click', function(event) {
   }
 });
 
-// ── Page load: handle direct links / refresh with sort in URL ─────────────────
+// Initialize sort UI on page load
 window.addEventListener('DOMContentLoaded', function() {
   const urlParams = new URLSearchParams(window.location.search);
   const currentSort = urlParams.get('sort_by');
-
   if (currentSort) {
     updateSortUI(currentSort);
   }
-
-  // If the page was loaded with ?sort_by=discount-high-low (shared link / refresh),
-  // the server rendered with 'manual' sort — apply client-side discount sort immediately.
-  if (currentSort === 'discount-high-low') {
-    requestAnimationFrame(() => {
-      FacetFiltersForm.sortProductsByDiscount();
-    });
-  }
 });
 
-// ── Performance logging (dev) ─────────────────────────────────────────────────
 if (window.performance && console.table) {
   const originalRenderPage = FacetFiltersForm.renderPage;
   FacetFiltersForm.renderPage = async function(...args) {
