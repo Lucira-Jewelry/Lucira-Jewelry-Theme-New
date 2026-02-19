@@ -1,32 +1,38 @@
 {% if product.metafields.custom.matching_product != blank %}
-  {% assign valid_product_count = 0 %}
-  {% for ymal_product in product.metafields.custom.matching_product.value %}
-    {% if ymal_product.id != product.id %}
-      {% assign valid_product_count = valid_product_count | plus: 1 %}
-    {% endif %}
+  
+  {%- comment -%} 
+    1. LOGIC: Count valid products (excluding the current one) 
+    and calculate how many to show so we always have full rows of 4.
+  {%- endcomment -%}
+  {% assign raw_count = 0 %}
+  {% for item in product.metafields.custom.matching_product.value %}
+    {% unless item.id == product.id %}
+      {% assign raw_count = raw_count | plus: 1 %}
+    {% endunless %}
   {% endfor %}
 
-  {% if valid_product_count < 4 %}
-    {% assign products_to_display = valid_product_count %}
+  {% if raw_count < 4 %}
+    {% assign products_to_display = raw_count %}
   {% else %}
-    {% assign products_to_display = valid_product_count | divided_by: 4 | times: 4 %}
+    {% assign products_to_display = raw_count | divided_by: 4 | times: 4 %}
   {% endif %}
 
   {% if products_to_display > 0 %}
-    <div class="ymal-section page-width">
+    <div class="ymal-section page-width" data-ymal-section>
       <h2 class="ymal-h2">You May Also Like</h2>
       <p class="ymal-p">Other picks based on your interest</p>
 
       <div class="ymal-grid">
         {% assign displayed_count = 0 %}
         {% for ymal_product in product.metafields.custom.matching_product.value %}
+          
+          {%- comment -%} Render only if it's not the current product AND we haven't hit the limit {%- endcomment -%}
           {% if ymal_product.id != product.id and displayed_count < products_to_display %}
+            
             <div class="related-product-card"
               data-handle="{{ ymal_product.handle }}"
               data-name="{{ ymal_product.title | escape }}"
               data-id="{{ ymal_product.id }}"
-              data-price="{{ ymal_product.price | divided_by: 100.0 }}"
-              data-category="{{ ymal_product.type | escape }}"
               data-sku="{{ ymal_product.selected_or_first_available_variant.sku }}"
               data-url="{{ ymal_product.url }}"
             >
@@ -35,16 +41,14 @@
               {% endcapture %}
 
               {% assign di_parts = di_values | strip | split: '|' %}
-              {% assign diamond_percent = di_parts[0] | plus: 0 %}
-              {% assign mc_percent = di_parts[1] | plus: 0 %}
-
+              
               {% render 'card-product',
                 card_product: ymal_product,
-                diamond_percent: diamond_percent,
-                mc_percent: mc_percent
+                diamond_percent: di_parts[0] | plus: 0,
+                mc_percent: di_parts[1] | plus: 0
               %}
-
             </div>
+            
             {% assign displayed_count = displayed_count | plus: 1 %}
           {% endif %}
         {% endfor %}
@@ -52,38 +56,36 @@
     </div>
 
     <script>
-      document.addEventListener('click', function (e) {
-        const link = e.target.closest('.related-product-card a[href*="/products/"]');
-        if (!link) return;
+      (function(){
+        // PERFORMANCE FIX: Scope the listener to this section only
+        const section = document.querySelector('[data-ymal-section]');
+        if(!section) return;
 
-        const card = link.closest('.related-product-card');
-        if (!card) return;
+        section.addEventListener('click', function (e) {
+          // Check if the click happened on a link inside a product card
+          const link = e.target.closest('a');
+          const card = e.target.closest('.related-product-card');
 
-        e.preventDefault();
-        e.stopImmediatePropagation();
+          if (link && card) {
+            const d = card.dataset;
 
-        const d = card.dataset;
-        const productUrl = d.url || link.href;
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "promoClick",
-          promoClick: {
-            promo_id: d.id,
-            promo_name: d.name,
-            creative_name: "You May Also Like",
-            promo_position: "product_page_ymal"
-          },
-          event_callback: function () {
-            window.location.href = productUrl;
+            // UX FIX: Fire GTM event asynchronously without blocking navigation
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: "promoClick",
+              promoClick: {
+                promo_id: d.id,
+                promo_name: d.name,
+                creative_name: "You May Also Like",
+                promo_position: "product_page_ymal"
+              }
+            });
+            
+            // The browser will now follow the link instantly.
+            // No setTimeout needed.
           }
         });
-
-        // Hard fallback
-        setTimeout(function () {
-          window.location.href = productUrl;
-        }, 600);
-      }, true);
+      })();
     </script>
 
     <style>
@@ -91,19 +93,16 @@
       .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:15px;}
       h2.ymal-h2{text-align: center; font-size: 24px; margin-bottom: 0px; margin-top: 0px;}
       p.ymal-p{text-align:center;color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
+      
       @media (max-width: 1080px) {
-        .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:10px;}
-        h2.ymal-h2{text-align: center; font-size: 22px; margin-bottom: 0px; margin-top: 0px;}
+        .ymal-grid{gap:10px;}
+        h2.ymal-h2{font-size: 22px;}
       }
       @media (max-width: 768px) {
-        .ymal-grid{display:grid;grid-template-columns: repeat(2,1fr);gap:10px;}
-        h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
+        .ymal-grid{grid-template-columns: repeat(2,1fr);gap:10px;}
+        h2.ymal-h2{font-size: 20px;}
         p.ymal-p {font-size: 14px;}
         .ymal-section.page-width { padding-top: 12px; }
-      }
-      @media (max-width: 428px) {
-        .ymal-grid{display:grid;grid-template-columns: repeat(2,1fr);gap:10px;}
-        h2.ymal-h2{text-align: center; font-size: 20px; margin-bottom: 0px; margin-top: 0px;}
       }
     </style>
   {% endif %}
