@@ -66,6 +66,12 @@ class FacetFiltersForm extends HTMLElement {
 
     // Use different handlers for different input types
     facetForm.addEventListener('input', (event) => {
+      // Sort selects are fully handled by the document-level 'change' listener
+      // in triggerSortSubmit(). If we also handle them here, two competing fetch
+      // calls fire — the second one sends sort_by=discount-high-low raw to
+      // Shopify (which ignores it) and overwrites the correct manual+client-sort flow.
+      if (event.target.name === 'sort_by') return;
+
       // Instant for checkboxes and radio buttons
       if (event.target.type === 'checkbox' || event.target.type === 'radio') {
         this.onSubmitHandler(event);
