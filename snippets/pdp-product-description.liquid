@@ -896,7 +896,7 @@
       });
     </script>
     
-    <script>
+    {% comment %} <script>
       document.addEventListener('DOMContentLoaded', function () {
       const productName = '{{ product.title }}';
       const sku = '{{ product.selected_or_first_available_variant.sku }}';
@@ -965,7 +965,110 @@
         }
       });
     });
-    </script>
+    </script> {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  const productData = {{ product | json }};
+  const variantData = {{ product.selected_or_first_available_variant | json }};
+  const totalSavings = {{ total_savings | default: 0 | money_without_currency | replace: ',', '' }};
+
+  function pushTabClick(tabName, savingsAmount = null) {
+
+    let promoPosition = 'Product Details Section';
+
+    if (tabName === 'Your Savings' && savingsAmount) {
+      promoPosition = savingsAmount;
+    }
+
+    const promoData = {
+      event: 'promoClick',
+      promoClick: {
+
+        // Promotion Info
+        creative_name: tabName === 'Price Breakup' ? 'priceBreakup' : 'yourSavings',
+        promo_id: variantData.sku || '',
+        promo_name: productData.title,
+        promo_position: promoPosition,
+        position: '-',
+
+        // Product Info
+        product_id: productData.id,
+        product_name: productData.title,
+        sku: variantData.sku,
+        variant_id: variantData.id,
+        location_id: variantData.id,
+
+        // URL & Image
+        product_url: window.location.href,
+        product_image: productData.featured_image 
+          ? productData.featured_image 
+          : '',
+
+        // Pricing (Numeric only)
+        price: variantData.price / 100,
+        offer_price: variantData.compare_at_price 
+          ? variantData.price / 100 
+          : variantData.price / 100,
+
+        // Price Breakup (FROM METAFIELDS – adjust namespace if needed)
+        metal_price: Number({{ product.selected_or_first_available_variant.metafields.custom.metal_price | default: 0 }}),
+        diamond_price: Number({{ product.selected_or_first_available_variant.metafields.custom.diamond_price | default: 0 }}),
+        making_price: Number({{ product.selected_or_first_available_variant.metafields.custom.making_charges | default: 0 }}),
+        gst_price: Number({{ product.selected_or_first_available_variant.metafields.custom.gst_price | default: 0 }}),
+
+        // Savings (only for savings tab)
+        savings_amount: savingsAmount || 0,
+
+        // Optional
+        email: '',
+        phone: ''
+      }
+    };
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push(promoData);
+  }
+
+  function onTabClick(event) {
+    const switchItem = event.target.closest('.contained-switch');
+    if (!switchItem) return;
+
+    const wrapper = switchItem.closest('.pdp-tab-wrapper');
+    if (!wrapper) return;
+
+    const tabId = switchItem.getAttribute('data-tab');
+
+    if (tabId === 'price-breakup') {
+      pushTabClick('Price Breakup');
+    } 
+    else if (tabId === 'comparison') {
+      pushTabClick('Your Savings', totalSavings);
+    }
+
+    const allSwitches = wrapper.querySelectorAll('.contained-switch');
+    allSwitches.forEach((s) => s.classList.remove('active'));
+    switchItem.classList.add('active');
+
+    const index = Array.from(allSwitches).indexOf(switchItem);
+    if (switchItem.parentElement) {
+      switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
+    }
+
+    const allContents = wrapper.querySelectorAll('.tab-content');
+    allContents.forEach((content) => content.classList.remove('active'));
+
+    const activeContent = wrapper.querySelector(`#${tabId}`);
+    if (activeContent) {
+      activeContent.classList.add('active');
+    }
+  }
+
+  document.addEventListener('click', onTabClick);
+
+});
+</script>
 
 
   {% endunless %}
