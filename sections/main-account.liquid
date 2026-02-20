@@ -904,6 +904,24 @@
 
   {% comment %} script for schemes tab  {% endcomment %}
 
+  {% comment %} ── Pre-process phone in Liquid ── {% endcomment %}
+  {% assign _raw = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+  {% if _raw.size == 12 %}
+    {% assign _prefix = _raw | slice: 0, 2 %}
+    {% if _prefix == "91" %}
+      {% assign _clean_phone = _raw | slice: 2, 10 %}
+    {% else %}
+      {% assign _clean_phone = _raw %}
+    {% endif %}
+  {% else %}
+    {% assign _clean_phone = _raw %}
+  {% endif %}
+
+  {% comment %} ── HMAC signature on "phone|timestamp" ── {% endcomment %}
+  {% assign _ts = 'now' | date: '%s' %}
+  {% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+  {% assign _sig = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
   <script>
     (function () {
       'use strict';
@@ -913,12 +931,12 @@
       var ORN_USERNAME  = {{ settings.orn_username | json }};
       var ORN_PASSWORD  = {{ settings.orn_password | json }};
 
-      var rawPhone = '{{ customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip }}';
-      var customerPhone = (rawPhone.length === 12 && rawPhone.slice(0, 2) === '91')
-        ? rawPhone.slice(2)
-        : rawPhone;
+      var customerPhone = {{ _clean_phone | json }};
 
-      var ENROLL_URL = 'https://schemes.lucirajewelry.com/enroll?p=' + customerPhone;
+      var ENROLL_URL = 'https://schemes.lucirajewelry.com/enroll'
+        + '?p='   + encodeURIComponent(customerPhone)
+        + '&ts='  + encodeURIComponent({{ _ts | json }})
+        + '&sig=' + encodeURIComponent({{ _sig | json }});
 
       var allSchemes  = [];
       var cachedToken = null;
@@ -1005,7 +1023,6 @@
       }
 
       function renderList() {
-        /* ── Mobile card view ── */
         var cards = allSchemes.map(function (s, i) {
           return [
             '<div class="sch-card" data-idx="' + i + '">',
@@ -1034,7 +1051,6 @@
           ].join('');
         }).join('');
 
-        /* ── Desktop table view ── */
         var rows = allSchemes.map(function (s, i) {
           return [
             '<tr class="sch-clickable-row" data-idx="' + i + '">',
@@ -1050,7 +1066,6 @@
         inner.innerHTML = [
           '<p class="sch-section-title">Enrolled Schemes</p>',
 
-          /* Desktop table */
           '<div class="sch-table-wrap">',
             '<table class="sch-table">',
               '<thead><tr>',
@@ -1064,7 +1079,6 @@
             '</table>',
           '</div>',
 
-          /* Mobile cards */
           '<div class="sch-cards">' + cards + '</div>',
 
           '<div class="sch-enroll-bar">',
@@ -1072,14 +1086,12 @@
           '</div>'
         ].join('');
 
-        /* Row click — desktop table */
         inner.querySelectorAll('.sch-clickable-row').forEach(function (tr) {
           tr.addEventListener('click', function () {
             renderDetail(allSchemes[parseInt(this.dataset.idx, 10)]);
           });
         });
 
-        /* Row click — mobile cards */
         inner.querySelectorAll('.sch-card').forEach(function (card) {
           card.addEventListener('click', function () {
             renderDetail(allSchemes[parseInt(this.dataset.idx, 10)]);
@@ -1090,7 +1102,6 @@
       function renderDetail(scheme) {
         var details = scheme.scheme_monthly_details || [];
 
-        /* ── Mobile cards for detail ── */
         var detailCards = details.map(function (d) {
           return [
             '<div class="sch-card sch-card--detail">',
@@ -1126,7 +1137,6 @@
           ].join('');
         }).join('');
 
-        /* ── Desktop table rows for detail ── */
         var rows = details.map(function (d) {
           return [
             '<tr>',
@@ -1146,11 +1156,10 @@
 
         inner.innerHTML = [
           '<div class="myaccount-scheme-buttons">',
-          '<button class="sch-back-btn" id="sch-back">&#8592;</button>',
-          '<p class="sch-section-title">' + esc(displayName) + '</p>',
+            '<button class="sch-back-btn" id="sch-back">&#8592;</button>',
+            '<p class="sch-section-title">' + esc(displayName) + '</p>',
           '</div>',
 
-          /* Desktop table */
           '<div class="sch-table-wrap">',
             '<table class="sch-table">',
               '<thead><tr>',
@@ -1166,7 +1175,6 @@
             '</table>',
           '</div>',
 
-          /* Mobile cards */
           '<div class="sch-cards">' + detailCards + '</div>',
 
           '<div class="sch-enroll-bar">',
