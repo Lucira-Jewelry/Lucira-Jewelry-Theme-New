@@ -101,6 +101,110 @@
 
 </div>
 
+{% comment %} ─── 1. VARIANT STOCK LOGIC ─── {% endcomment %}
+{% assign variant = product.selected_or_first_available_variant %}
+
+{% assign is_in_stock = false %}
+{% if variant.available and variant.inventory_quantity > 0 %}
+  {% assign is_in_stock = true %}
+{% elsif variant.available and variant.inventory_management == blank %}
+  {% assign is_in_stock = true %}
+{% endif %}
+
+{% comment %} ─── 2. DAYS CALCULATION ─── {% endcomment %}
+{% if is_in_stock %}
+  {% assign delivery_days = 2 %}
+{% else %}
+  {% assign delivery_days = 15 %}
+{% endif %}
+
+{% comment %} ─── 3. DATE FORMATTING ─── {% endcomment %}
+{% assign total_seconds = delivery_days | times: 86400 %}
+{% assign now_ts         = 'now' | date: '%s' %}
+{% assign future_ts      = now_ts | plus: total_seconds %}
+{% assign delivery_date = future_ts | date: '%B %d, %Y' %}
+
+{% comment %} ─── 4. PRE-COMPUTE ALL VARIANTS FOR JS HANDOFF ─── {% endcomment %}
+{% capture variant_stock_json %}
+{
+  {% for v in product.variants %}
+    {% assign v_in_stock = false %}
+    {% if v.available and v.inventory_quantity > 0 %}
+      {% assign v_in_stock = true %}
+    {% elsif v.available and v.inventory_management == blank %}
+      {% assign v_in_stock = true %}
+    {% endif %}
+    {% if v_in_stock %}
+      {% assign v_days = 2 %}
+    {% else %}
+      {% assign v_days = 15 %}
+    {% endif %}
+    {% assign v_seconds = v_days | times: 86400 %}
+    {% assign v_future  = now_ts | plus: v_seconds %}
+    "{{ v.id }}": {
+      "available": {{ v.available }},
+      "inventory": {{ v.inventory_quantity | default: 0 }},
+      "days": {{ v_days }},
+      "date": "{{ v_future | date: '%B %d, %Y' }}"
+    }{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}
+{% endcapture %}
+
+{% comment %} ─── 5. RENDER ─── {% endcomment %}
+<div
+  class="lucira-delivery-container"
+  id="pdp-delivery-check"
+  data-delivery-days="{{ delivery_days }}"
+  data-product-sku="{{ variant.sku | escape }}"
+  data-product-title="{{ product.title | escape }}"
+  data-variant-id="{{ variant.id }}"
+  data-inventory-quantity="{{ variant.inventory_quantity | default: 0 }}"
+  data-available="{{ variant.available }}"
+  data-variant-count="{{ product.variants.size }}"
+  data-is-in-stock="{{ is_in_stock }}"
+>
+  <script>
+    window.variantDeliveryData = {{ variant_stock_json }};
+  </script>
+
+  <div class="lucira-delivery-input-container">
+    <div class="input-wrapper">
+      <svg class="pin-beside-pincode" width="18" height="18">
+        <use href="#icon-location"></use>
+      </svg>
+      <input
+        type="text"
+        id="lucira-delivery-zipcode"
+        placeholder="Enter Pincode"
+        maxlength="6"
+        inputmode="numeric"
+        title="enter pincode"
+      >
+      <button class="submitButton" id="lucira-locate-btn" type="button">
+        <svg class="locate-me-icon" width="16" height="16">
+          <use xlink:href="#icon-locate"></use>
+        </svg>
+        <span class="locate-btn-label">Locate Me</span>
+      </button>
+    </div>
+    <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
+  </div>
+
+  <div class="lucira-delivery-info">
+    <span class="lucira-delivery-time">
+      <span id="delivery-status-text">
+        {% if is_in_stock %}
+          Estimated Free Dispatch by
+        {% else %}
+          Available &amp; Dispatched by
+        {% endif %}
+      </span>
+      <span class="delivry_txt" id="delivery-date-display">{{ delivery_date }}</span>
+    </span>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -118,10 +222,10 @@
     var label = btn && btn.querySelector('.locate-btn-label');
     if (!btn) return;
     btn.disabled = loading;
-    if (label) label.textContent = loading ? 'Detecting…' : 'Locate Me';
+    if (label) label.textContent = loading ? 'Locating...' : 'Locate Me';
   }
 
-  /* ── DataLayer push ── */
+  /* ── DataLayer ── */
   function pushPromoClick(pincode) {
     var container    = document.getElementById('pdp-delivery-check');
     var productSku   = container ? container.dataset.productSku   : '';
@@ -140,59 +244,34 @@
     });
   }
 
-  function handlePincodeCheck(pincode) {
-    // Add logic here to update UI with pincode-specific delivery dates if needed
-  }
-
-  /* ── Fetch pincode from coords (Reverse Geocoding) ── */
-  function fetchPincodeFromCoords(lat, lon) {
-    var url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json';
-
-    fetch(url, { 
-      headers: { 
-        'Accept-Language': 'en',
-        'User-Agent': 'LuciraEcomStore/1.0' 
-      } 
-    })
-    .then(function (res) { 
-      if (!res.ok) throw new Error('Network response was not ok');
-      return res.json(); 
-    })
-    .then(function (data) {
-      var pincode = data && data.address && data.address.postcode;
-
-      if (pincode) pincode = pincode.replace(/\s+/g, '');
-
-      if (pincode && /^\d{6}$/.test(pincode)) {
-        var input = document.getElementById('lucira-delivery-zipcode');
-        if (input) input.value = pincode;
-        showError('');
-        pushPromoClick(pincode);
-        handlePincodeCheck(pincode);
-      } else {
-        showError('Pincode not found. Please enter manually.');
-      }
-    })
-    .catch(function (err) {
-      showError('Location lookup failed. Please enter pincode manually.');
-    })
-    .finally(function () {
-      setLocateBtnState(false);
-    });
-  }
-
-  /* ── Validate manual pincode entry ── */
-  function fetchPincodeFromQuery(query) {
-    var url = 'https://nominatim.openstreetmap.org/search?postalcode=' +
-              encodeURIComponent(query) + '&country=India&format=json';
-    return fetch(url, { headers: { 'User-Agent': 'LuciraEcomStore/1.0' } })
-      .then(function (res) { return res.json(); });
-  }
-
   /* ── Init ── */
   document.addEventListener('DOMContentLoaded', function () {
-
     var locateBtn = document.getElementById('lucira-locate-btn');
+    var pincodeInput = document.getElementById('lucira-delivery-zipcode');
+
+    function handleManualSearch() {
+      var val = pincodeInput.value.trim();
+      if (/^\d{6}$/.test(val)) {
+        showError('');
+        // Using the exact search logic from your store locator
+        fetch('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data && data.length > 0) {
+              pushPromoClick(val);
+              // You can add logic here to check serviceability 
+            } else {
+              showError('Pincode not found. Please check and try again.');
+            }
+          })
+          .catch(function() {
+            showError('Service currently unavailable. Please try again later.');
+          });
+      } else {
+        showError('Please enter a valid 6-digit pincode.');
+      }
+    }
+
     if (locateBtn) {
       locateBtn.addEventListener('click', function () {
         showError('');
@@ -205,46 +284,53 @@
 
         navigator.geolocation.getCurrentPosition(
           function (position) {
-            fetchPincodeFromCoords(position.coords.latitude, position.coords.longitude);
+            var lat = position.coords.latitude;
+            var lon = position.coords.longitude;
+            
+            // Using the exact reverse geocode logic from your store locator
+            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
+              .then(function(r) { return r.json(); })
+              .then(function(data) {
+                var pincode = data && data.address && data.address.postcode;
+                
+                // Clean pincode (handle spaces like "400 001")
+                if (pincode) pincode = pincode.replace(/\s+/g, '');
+
+                if (pincode && /^\d{6}$/.test(pincode)) {
+                  pincodeInput.value = pincode;
+                  showError('');
+                  pushPromoClick(pincode);
+                } else {
+                  showError('Could not detect a valid pincode. Please enter manually.');
+                }
+              })
+              .catch(function() {
+                showError('Location lookup failed. Please enter pincode manually.');
+              })
+              .finally(function() {
+                setLocateBtnState(false);
+              });
           },
           function (err) {
             setLocateBtnState(false);
             var messages = {
               1: 'Permission denied. Please enter manually.',
               2: 'Location unavailable. Please enter manually.'
-              // Error 3 (timeout) removed from logic as timeout is Infinity
             };
             showError(messages[err.code] || 'Could not detect location. Please enter manually.');
           },
           { 
-            // timeout: removed (defaults to Infinity)
-            maximumAge: Infinity,     // Allow using any cached location for instant results
-            enableHighAccuracy: false // Faster response using cell towers/WiFi
+            maximumAge: Infinity, 
+            enableHighAccuracy: false 
           }
         );
       });
     }
 
-    var pincodeInput = document.getElementById('lucira-delivery-zipcode');
     if (pincodeInput) {
       pincodeInput.addEventListener('keydown', function (e) {
         if (e.key === 'Enter') {
-          var val = pincodeInput.value.trim();
-          if (/^\d{6}$/.test(val)) {
-            showError('');
-            fetchPincodeFromQuery(val).then(function (results) {
-              if (results && results.length) {
-                pushPromoClick(val);
-                handlePincodeCheck(val);
-              } else {
-                showError('Pincode not found. Please check and try again.');
-              }
-            }).catch(function() {
-              showError('Network error. Please try again later.');
-            });
-          } else {
-            showError('Please enter a valid 6-digit pincode.');
-          }
+          handleManualSearch();
         }
       });
     }
