@@ -632,6 +632,7 @@ setTimeout(() => {
     if (sessionStorage.getItem('lucira_login_manually_opened') === 'true') return;
     popup.style.display = 'flex';
     popup.classList.add('register-popup');
+    document.body.style.overflow = 'hidden';
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
