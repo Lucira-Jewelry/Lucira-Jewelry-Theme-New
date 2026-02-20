@@ -142,21 +142,19 @@
   }
 
   /* ── Init ── */
-  document.addEventListener('DOMContentLoaded', function () {
-    var locateBtn = document.getElementById('lucira-locate-btn');
+  function initDeliveryWidget() {
+    var locateBtn    = document.getElementById('lucira-locate-btn');
     var pincodeInput = document.getElementById('lucira-delivery-zipcode');
 
     function handleManualSearch() {
       var val = pincodeInput.value.trim();
       if (/^\d{6}$/.test(val)) {
         showError('');
-        // Using the exact search logic from your store locator
         fetch('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
           .then(function(r) { return r.json(); })
           .then(function(data) {
             if (data && data.length > 0) {
               pushPromoClick(val);
-              // You can add logic here to check serviceability 
             } else {
               showError('Pincode not found. Please check and try again.');
             }
@@ -183,14 +181,12 @@
           function (position) {
             var lat = position.coords.latitude;
             var lon = position.coords.longitude;
-            
-            // Using the exact reverse geocode logic from your store locator
+
             fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
               .then(function(r) { return r.json(); })
               .then(function(data) {
                 var pincode = data && data.address && data.address.postcode;
-                
-                // Clean pincode (handle spaces like "400 001")
+
                 if (pincode) pincode = pincode.replace(/\s+/g, '');
 
                 if (pincode && /^\d{6}$/.test(pincode)) {
@@ -216,9 +212,9 @@
             };
             showError(messages[err.code] || 'Could not detect location. Please enter manually.');
           },
-          { 
-            maximumAge: Infinity, 
-            enableHighAccuracy: false 
+          {
+            maximumAge: Infinity,
+            enableHighAccuracy: false
           }
         );
       });
@@ -231,6 +227,14 @@
         }
       });
     }
-  });
+  }
+
+  /* ── FIX: Guard against DOMContentLoaded already having fired ── */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initDeliveryWidget);
+  } else {
+    initDeliveryWidget();
+  }
+
 })();
 </script>
