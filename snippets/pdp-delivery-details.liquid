@@ -97,6 +97,105 @@
   </div>
 </div>
 
+{% assign variant = product.selected_or_first_available_variant %}
+
+{% assign is_in_stock = false %}
+{% if variant.available and variant.inventory_quantity > 0 %}
+  {% assign is_in_stock = true %}
+{% elsif variant.available and variant.inventory_management == blank %}
+  {% assign is_in_stock = true %}
+{% endif %}
+
+{% if is_in_stock %}
+  {% assign delivery_days = 2 %}
+{% else %}
+  {% assign delivery_days = 15 %}
+{% endif %}
+
+{% assign total_seconds = delivery_days | times: 86400 %}
+{% assign now_ts         = 'now' | date: '%s' %}
+{% assign future_ts      = now_ts | plus: total_seconds %}
+{% assign delivery_date = future_ts | date: '%B %d, %Y' %}
+
+{% capture variant_stock_json %}
+{
+  {% for v in product.variants %}
+    {% assign v_in_stock = false %}
+    {% if v.available and v.inventory_quantity > 0 %}
+      {% assign v_in_stock = true %}
+    {% elsif v.available and v.inventory_management == blank %}
+      {% assign v_in_stock = true %}
+    {% endif %}
+    {% if v_in_stock %}
+      {% assign v_days = 2 %}
+    {% else %}
+      {% assign v_days = 15 %}
+    {% endif %}
+    {% assign v_seconds = v_days | times: 86400 %}
+    {% assign v_future  = now_ts | plus: v_seconds %}
+    "{{ v.id }}": {
+      "available": {{ v.available }},
+      "inventory": {{ v.inventory_quantity | default: 0 }},
+      "days": {{ v_days }},
+      "date": "{{ v_future | date: '%B %d, %Y' }}"
+    }{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}
+{% endcapture %}
+
+<div
+  class="lucira-delivery-container"
+  id="pdp-delivery-check"
+  data-delivery-days="{{ delivery_days }}"
+  data-product-sku="{{ variant.sku | escape }}"
+  data-product-title="{{ product.title | escape }}"
+  data-variant-id="{{ variant.id }}"
+  data-inventory-quantity="{{ variant.inventory_quantity | default: 0 }}"
+  data-available="{{ variant.available }}"
+  data-variant-count="{{ product.variants.size }}"
+  data-is-in-stock="{{ is_in_stock }}"
+>
+  <script>
+    window.variantDeliveryData = {{ variant_stock_json }};
+  </script>
+
+  <div class="lucira-delivery-input-container">
+    <div class="input-wrapper">
+      <svg class="pin-beside-pincode" width="18" height="18">
+        <use href="#icon-location"></use>
+      </svg>
+      <input
+        type="text"
+        id="lucira-delivery-zipcode"
+        placeholder="Enter Pincode"
+        maxlength="6"
+        inputmode="numeric"
+        title="enter pincode"
+      >
+      <button class="submitButton" id="lucira-locate-btn" type="button">
+        <svg class="locate-me-icon" width="16" height="16">
+          <use xlink:href="#icon-locate"></use>
+        </svg>
+        <span class="locate-btn-label">Locate Me</span>
+      </button>
+    </div>
+  </div>
+  <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
+
+  <div class="lucira-delivery-info">
+    <span class="lucira-delivery-time">
+      <span id="delivery-status-text">
+        {% if is_in_stock %}
+          Estimated Free Dispatch by
+        {% else %}
+          Available &amp; Dispatched by
+        {% endif %}
+      </span>
+      <span class="delivry_txt" id="delivery-date-display">{{ delivery_date }}</span>
+    </span>
+  </div>
+</div>
+
 <script>
 (function () {
   'use strict';
@@ -134,16 +233,27 @@
     });
   }
 
+  // Retry wrapper
+  function fetchWithRetry(url, retries = 1) {
+    return fetch(url)
+      .then(r => r.json())
+      .catch(err => {
+        if (retries > 0) {
+          return fetchWithRetry(url, retries - 1);
+        }
+        throw err;
+      });
+  }
+
   function initDeliveryWidget() {
     var locateBtn    = document.getElementById('lucira-locate-btn');
     var pincodeInput = document.getElementById('lucira-delivery-zipcode');
 
     function handleManualSearch() {
-      var val = pincodeInput.value.trim();
+      var val = pincodeInput.value.replace(/\s+/g, '').trim();
       if (/^\d{6}$/.test(val)) {
         showError('');
-        fetch('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
-          .then(function(r) { return r.json(); })
+        fetchWithRetry('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json', 1)
           .then(function(data) {
             if (data && data.length > 0) {
               pushPromoClick(val);
@@ -174,13 +284,10 @@
             var lat = position.coords.latitude;
             var lon = position.coords.longitude;
 
-            fetch('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json')
-              .then(function(r) { return r.json(); })
+            fetchWithRetry('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json', 1)
               .then(function(data) {
                 var pincode = data && data.address && data.address.postcode;
-
                 if (pincode) pincode = pincode.replace(/\s+/g, '');
-
                 if (pincode && /^\d{6}$/.test(pincode)) {
                   pincodeInput.value = pincode;
                   showError('');
