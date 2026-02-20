@@ -43,12 +43,14 @@ const wheelSegments = [
 ];
 
 function openloginPopup(id) {
-document.getElementById(id).style.display = 'flex';
+    document.getElementById(id).style.display = 'flex';
+    sessionStorage.setItem('lucira_login_manually_opened', 'true');
 }
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
   document.getElementById(id).style.display = 'none';
+  document.getElementById(id)?.classList.remove('register-popup');
   resetToLoginView();
   const popup = document.getElementById('login-popup');
   if (!popup) return;
@@ -627,7 +629,9 @@ if (document.body.classList.contains('customer-logged-in')) return;
 
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
+    if (sessionStorage.getItem('lucira_login_manually_opened') === 'true') return;
     popup.style.display = 'flex';
+    popup.classList.add('register-popup');
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
