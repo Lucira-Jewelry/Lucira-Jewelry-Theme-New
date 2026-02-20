@@ -5,7 +5,6 @@
 {% if variant.available and variant.inventory_quantity > 0 %}
   {% assign is_in_stock = true %}
 {% elsif variant.available and variant.inventory_management == blank %}
-  {% comment %} No inventory tracking = always in stock {% endcomment %}
   {% assign is_in_stock = true %}
 {% endif %}
 
@@ -17,10 +16,10 @@
 {% endif %}
 
 {% comment %} ─── 3. DATE FORMATTING ─── {% endcomment %}
-{% assign total_seconds  = delivery_days | times: 86400 %}
-{% assign now_ts         = 'now' | date: '%s' %}
-{% assign future_ts      = now_ts | plus: total_seconds %}
-{% assign delivery_date  = future_ts | date: '%B %d, %Y' %}
+{% assign total_seconds = delivery_days | times: 86400 %}
+{% assign now_ts        = 'now' | date: '%s' %}
+{% assign future_ts     = now_ts | plus: total_seconds %}
+{% assign delivery_date = future_ts | date: '%B %d, %Y' %}
 
 {% comment %} ─── 4. PRE-COMPUTE ALL VARIANTS FOR JS HANDOFF ─── {% endcomment %}
 {% capture variant_stock_json %}
@@ -62,7 +61,6 @@
   data-variant-count="{{ product.variants.size }}"
   data-is-in-stock="{{ is_in_stock }}"
 >
-
   <script>
     window.variantDeliveryData = {{ variant_stock_json }};
   </script>
@@ -80,12 +78,14 @@
         inputmode="numeric"
         title="enter pincode"
       >
-      <button class="submitButton" data-mode="locate">
+      <button class="submitButton" id="lucira-locate-btn" data-mode="locate">
         <svg class="locate-me-icon" width="16" height="16">
           <use xlink:href="#icon-locate"></use>
-        </svg> Locate Me
+        </svg>
+        <span class="locate-btn-label">Locate Me</span>
       </button>
     </div>
+    <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;"></span>
   </div>
 
   <div class="lucira-delivery-info">
@@ -102,242 +102,145 @@
 </div>
 
 <script>
-  (() => {
-    const container = document.getElementById("pdp-delivery-check");
-    if (!container) return;
+(function () {
+  'use strict';
 
-    const submitBtn = container.querySelector(".submitButton");
-    const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-    const dateSpan = container.querySelector(".lucira-delivery-time .delivry_txt");
-    const timeSpan = container.querySelector(".lucira-delivery-time");
+  /* ── Helpers ── */
+  function showError(msg) {
+    var el = document.getElementById('lucira-pincode-error');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+  }
 
-    let isProcessingLocate = false;
-    let lastEnteredPincode = null;
+  function setLocateBtnState(loading) {
+    var btn   = document.getElementById('lucira-locate-btn');
+    var label = btn && btn.querySelector('.locate-btn-label');
+    if (!btn) return;
+    btn.disabled = loading;
+    if (label) label.textContent = loading ? 'Detecting…' : 'Locate Me';
+  }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
+  /* ── DataLayer push ── */
+  function pushPromoClick(pincode) {
+    var container    = document.getElementById('pdp-delivery-check');
+    var productSku   = container ? container.dataset.productSku   : '';
+    var productTitle = container ? container.dataset.productTitle : '';
 
-    const fmtDatePlus = (plusDays) => {
-      const d = new Date();
-      d.setDate(d.getDate() + Number(plusDays));
-      return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-    };
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        promo_id:       productSku,
+        promo_name:     productTitle,
+        creative_name:  'pincodeEntered',
+        promo_position: pincode,
+        location_id:    'pdp'
+      }
+    });
+  }
 
-    const getVariantData = () => {
-      const id = container.dataset.variantId;
-      return window.variantDeliveryData?.[id] || null;
-    };
+  /* ── Fetch pincode from coords via Nominatim ── */
+  function fetchPincodeFromCoords(lat, lon) {
+    var url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat +
+              '&lon=' + lon + '&country=India&format=json';
 
-    const computeDays = () => {
-      const data = getVariantData();
-      if (data) return data.days;
-      // fallback: read data attributes set by product-info.js
-      const avail = String(container.dataset.available || "").toLowerCase();
-      const qty   = Number(container.dataset.inventoryQuantity || 0);
-      return (avail === "true" && qty > 0) ? 2 : 15;
-    };
-
-    const updateLabel = (isInStock) => {
-      if (!timeSpan) return;
-      timeSpan.childNodes.forEach((node) => {
-        if (node.nodeType === Node.TEXT_NODE) node.remove();
+    fetch(url, { headers: { 'Accept-Language': 'en' } })
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        var pincode = data && data.address && data.address.postcode;
+        if (pincode) {
+          var input = document.getElementById('lucira-delivery-zipcode');
+          if (input) input.value = pincode;
+          showError('');
+          pushPromoClick(pincode);          // ← dataLayer fired here
+          handlePincodeCheck(pincode);      // optional: trigger your check logic
+        } else {
+          showError('Could not detect pincode. Please enter manually.');
+        }
+      })
+      .catch(function () {
+        showError('Location lookup failed. Please enter pincode manually.');
+      })
+      .finally(function () {
+        setLocateBtnState(false);
       });
-      const label = isInStock ? "Estimated Free Dispatch by " : "Available & Dispatched by ";
-      timeSpan.insertBefore(document.createTextNode(label), timeSpan.firstChild);
-    };
+  }
 
-    function repaint() {
-      if (!dateSpan) return;
-      const data = getVariantData();
-      const days = computeDays();
+  /* ── Fetch pincode from text query (for manual search) ── */
+  function fetchPincodeFromQuery(query) {
+    var url = 'https://nominatim.openstreetmap.org/search?postalcode=' +
+              encodeURIComponent(query) + '&country=India&format=json';
+    return fetch(url).then(function (res) { return res.json(); });
+  }
 
-      if (data) {
-        dateSpan.textContent = data.date;
-        updateLabel(data.available && data.inventory > 0);
-      } else {
-        dateSpan.textContent = fmtDatePlus(days);
-        updateLabel(days === 2);
-      }
+  /* ── Delivery date update helper ── */
+  function handlePincodeCheck(pincode) {
+    // Plug your serviceability / delivery-date logic here.
+    // For now we just fire the dataLayer if called from manual input.
+    if (pincode) pushPromoClick(pincode);
+  }
 
-      console.log("Repaint:", { days, date: dateSpan.textContent });
-    }
+  /* ── Locate Me click ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    var locateBtn = document.getElementById('lucira-locate-btn');
 
-    // ── Button state views ────────────────────────────────────────────────────
+    if (locateBtn) {
+      locateBtn.addEventListener('click', function () {
+        showError('');
 
-    function setLocateView() {
-      isProcessingLocate = false;
-      lastEnteredPincode = null;
-      submitBtn.setAttribute("data-mode", "locate");
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locate Me
-      `;
-      submitBtn.disabled = false;
-      if (pincodeInput) pincodeInput.disabled = false;
-    }
+        if (!navigator.geolocation) {
+          showError('Geolocation is not supported by your browser.');
+          return;
+        }
 
-    function setSubmitView() {
-      submitBtn.setAttribute("data-mode", "submit");
-      submitBtn.textContent = "Submit";
-      submitBtn.disabled = false;
-      if (pincodeInput) pincodeInput.disabled = false;
-    }
+        setLocateBtnState(true);
 
-    function setChangeView() {
-      submitBtn.setAttribute("data-mode", "change");
-      submitBtn.innerHTML = `Change`;
-      submitBtn.disabled = false;
-    }
-
-    // ── Locate Me ─────────────────────────────────────────────────────────────
-
-    async function handleLocateMe() {
-      if (typeof window.luciraLocateMe !== "function") {
-        console.warn("luciraLocateMe function not found");
-        // Fallback: just let the user type manually
-        pincodeInput?.focus();
-        return;
-      }
-
-      if (isProcessingLocate) return;
-      isProcessingLocate = true;
-
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locating...
-      `;
-
-      try {
-        await window.luciraLocateMe(); // fills pincodeInput.value
-
-        // Poll for up to 5 seconds until a valid 6-digit pin appears
-        let waited = 0;
-        const pollInterval = 200;
-        const maxWait = 5000;
-
-        const poll = setInterval(() => {
-          const newPin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
-          waited += pollInterval;
-
-          if (newPin.length === 6) {
-            clearInterval(poll);
-            isProcessingLocate = false;
-
-            // Dispatch synthetic input event so input listener stays in sync
-            pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
-
-            processDelivery(newPin);
-
-          } else if (waited >= maxWait) {
-            clearInterval(poll);
-            isProcessingLocate = false;
-            setLocateView();
-            console.warn("Locate Me: no valid pincode found after timeout");
-          }
-        }, pollInterval);
-
-      } catch (error) {
-        console.error("Location fetch failed:", error);
-        isProcessingLocate = false;
-        setLocateView();
-      }
-    }
-
-    // ── Process delivery after pincode submit / locate ────────────────────────
-
-    function processDelivery(pin) {
-      lastEnteredPincode = pin;
-
-      try {
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "promoClick",
-          promoClick: {
-            promo_id: container.dataset.productSku,
-            promo_name: container.dataset.productTitle,
-            creative_name: "Pincode_Entered",
-            location_id: pin,
+        navigator.geolocation.getCurrentPosition(
+          /* success */
+          function (position) {
+            fetchPincodeFromCoords(
+              position.coords.latitude,
+              position.coords.longitude
+            );
           },
-        });
-      } catch (_) {}
-
-      const data = getVariantData();
-      if (dateSpan) {
-        dateSpan.textContent = data ? data.date : fmtDatePlus(computeDays());
-      }
-      if (data) updateLabel(data.available && data.inventory > 0);
-
-      setChangeView();
+          /* error */
+          function (err) {
+            setLocateBtnState(false);
+            var messages = {
+              1: 'Location permission denied. Please enter pincode manually.',
+              2: 'Location unavailable. Please enter pincode manually.',
+              3: 'Location request timed out. Please try again.'
+            };
+            showError(messages[err.code] || 'Unknown location error.');
+          },
+          { timeout: 10000, maximumAge: 60000 }
+        );
+      });
     }
 
-    // ── Pincode input events ──────────────────────────────────────────────────
-
+    /* ── Manual pincode input (Enter key or blur) ── */
+    var pincodeInput = document.getElementById('lucira-delivery-zipcode');
     if (pincodeInput) {
-      pincodeInput.addEventListener("input", (e) => {
-        const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-        pincodeInput.value = val;
-
-        const mode      = submitBtn.getAttribute("data-mode");
-        const isEmpty   = val.length === 0;
-        const isComplete = val.length === 6;
-
-        if (isEmpty) {
-          setLocateView();
-          repaint();
-          return;
+      pincodeInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+          var val = pincodeInput.value.trim();
+          if (/^\d{6}$/.test(val)) {
+            showError('');
+            fetchPincodeFromQuery(val).then(function (results) {
+              if (results && results.length) {
+                pushPromoClick(val);   // ← dataLayer fired for manual entry too
+                handlePincodeCheck(val);
+              } else {
+                showError('Pincode not found. Please check and try again.');
+              }
+            });
+          } else {
+            showError('Please enter a valid 6-digit pincode.');
+          }
         }
-
-        if (mode === "locate") {
-          if (isComplete) setSubmitView();
-          return;
-        }
-
-        if (mode === "submit") {
-          if (!isComplete) { setLocateView(); repaint(); }
-          return;
-        }
-
-        if (mode === "change") {
-          if (isComplete) setSubmitView();
-          else { setLocateView(); repaint(); }
-          return;
-        }
-      });
-
-      pincodeInput.addEventListener("click", () => {
-        if (submitBtn.getAttribute("data-mode") === "change") {
-          setLocateView();
-          repaint();
-          setTimeout(() => {
-            pincodeInput.focus();
-            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
-          }, 50);
-        }
-      });
-
-      pincodeInput.addEventListener("focus", () => {
-        if (submitBtn.getAttribute("data-mode") === "change") {
-          setLocateView();
-          repaint();
-          setTimeout(() => {
-            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
-          }, 10);
-        }
-      });
-
-      pincodeInput.addEventListener("keydown", () => {
-        isProcessingLocate = false;
       });
     }
-
-    // ── Button click ──────────────────────────────────────────────────────────
-
-    if (submitBtn) {
-      submitBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        const mode = submitBtn.getAttribute("data-mode");
-        const pin  = (pincodeInput?.value || "").replace(/\D/g, ""
+  });
+})();
+</script>
