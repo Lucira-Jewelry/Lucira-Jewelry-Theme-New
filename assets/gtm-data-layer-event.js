@@ -17,14 +17,6 @@
 
 // window.location.assign(target.href);
 // }
-
-function decodeHtmlEntities(str) {
-  if (!str) return "";
-  const txt = document.createElement("textarea");
-  txt.innerHTML = str;
-  return txt.value;
-}
-
 window.handleGTMProductCardClick = function(event) {
   event.preventDefault();
   const target = event.currentTarget;
@@ -33,32 +25,27 @@ window.handleGTMProductCardClick = function(event) {
   console.log("Data attributes:", target.dataset);
 
   const productData = {
-    event: "select_item", // GA4 standard event name
-    ecommerce: {
-      items: [
-        {
-          item_id: target.dataset.productId,
-          item_variant: target.dataset.variantId,
-          sku: target.dataset.sku,
-          item_name: decodeHtmlEntities(target.dataset.productName),
-          item_category: target.dataset.productCategory,
-          item_category2: target.dataset.category,
-          item_category3: target.dataset.subCategory,
-          item_type: target.dataset.productType,
-          price: Number(target.dataset.price) || 0,
-          discount_price: Number(target.dataset.offerPrice) || 0,
-          index: target.dataset.indexPosition,
-          item_brand: "Lucira", // optional
-          item_list_name: "Product Listing",
-          thumbnail: target.dataset.thumbnailImage,
-          purity: target.dataset.purity,
-          making_charges: target.dataset.makingCharges,
-          rating: target.dataset.rating,
-          reviews: target.dataset.numberOfReview,
-          coupon: target.dataset.couponCode,
-          expected_delivery: target.dataset.expectedDeliveryDate
-        }
-      ]
+    event: "productClick",
+    products:{
+    productId: target.dataset.productId,
+    variantId: target.dataset.variantId,
+    sku: target.dataset.sku,
+    productName: target.dataset.productName,
+    productType: target.dataset.productType,
+    productCategory: target.dataset.productCategory,
+    category: target.dataset.category,
+    subCategory: target.dataset.subCategory,
+    productUrl: target.dataset.productUrl,
+    thumbnailImage: target.dataset.thumbnailImage,
+    purity: target.dataset.purity,
+    price: target.dataset.price,
+    offerPrice: target.dataset.offerPrice,
+    expectedDeliveryDate: target.dataset.expectedDeliveryDate,
+    couponCode: target.dataset.couponCode,
+    makingCharges: target.dataset.makingCharges,
+    numberOfReview: target.dataset.numberOfReview,
+    rating: target.dataset.rating,
+    indexPosition: target.dataset.indexPosition
     }
   };
 
@@ -66,10 +53,9 @@ window.handleGTMProductCardClick = function(event) {
   console.log("Pushing to dataLayer:", productData);
   window.dataLayer.push(productData);
 
-  // small delay ensures GTM reads the push
-  setTimeout(() => {
+  setTimeout(function() {
     window.location.href = target.href;
-  }, 200);
+  }, 300);
 };
 
 function handleGTMAddToCartSubmit(event) {
