@@ -100,3 +100,227 @@
   </div>
 
 </div>
+
+<script>
+  (() => {
+    const container = document.getElementById("pdp-delivery-check");
+    if (!container) return;
+
+    const submitBtn = container.querySelector(".submitButton");
+    const pincodeInput = document.getElementById("lucira-delivery-zipcode");
+    const dateSpan = container.querySelector(".lucira-delivery-time .delivry_txt");
+    const timeSpan = container.querySelector(".lucira-delivery-time");
+
+    let isProcessingLocate = false;
+    let lastEnteredPincode = null;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    const fmtDatePlus = (plusDays) => {
+      const d = new Date();
+      d.setDate(d.getDate() + Number(plusDays));
+      return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
+    };
+
+    const getVariantData = () => {
+      const id = container.dataset.variantId;
+      return window.variantDeliveryData?.[id] || null;
+    };
+
+    const computeDays = () => {
+      const data = getVariantData();
+      if (data) return data.days;
+      // fallback: read data attributes set by product-info.js
+      const avail = String(container.dataset.available || "").toLowerCase();
+      const qty   = Number(container.dataset.inventoryQuantity || 0);
+      return (avail === "true" && qty > 0) ? 2 : 15;
+    };
+
+    const updateLabel = (isInStock) => {
+      if (!timeSpan) return;
+      timeSpan.childNodes.forEach((node) => {
+        if (node.nodeType === Node.TEXT_NODE) node.remove();
+      });
+      const label = isInStock ? "Estimated Free Dispatch by " : "Available & Dispatched by ";
+      timeSpan.insertBefore(document.createTextNode(label), timeSpan.firstChild);
+    };
+
+    function repaint() {
+      if (!dateSpan) return;
+      const data = getVariantData();
+      const days = computeDays();
+
+      if (data) {
+        dateSpan.textContent = data.date;
+        updateLabel(data.available && data.inventory > 0);
+      } else {
+        dateSpan.textContent = fmtDatePlus(days);
+        updateLabel(days === 2);
+      }
+
+      console.log("Repaint:", { days, date: dateSpan.textContent });
+    }
+
+    // ── Button state views ────────────────────────────────────────────────────
+
+    function setLocateView() {
+      isProcessingLocate = false;
+      lastEnteredPincode = null;
+      submitBtn.setAttribute("data-mode", "locate");
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" class="icon icon-locate">
+          <use xlink:href="#icon-locate"></use>
+        </svg> Locate Me
+      `;
+      submitBtn.disabled = false;
+      if (pincodeInput) pincodeInput.disabled = false;
+    }
+
+    function setSubmitView() {
+      submitBtn.setAttribute("data-mode", "submit");
+      submitBtn.textContent = "Submit";
+      submitBtn.disabled = false;
+      if (pincodeInput) pincodeInput.disabled = false;
+    }
+
+    function setChangeView() {
+      submitBtn.setAttribute("data-mode", "change");
+      submitBtn.innerHTML = `Change`;
+      submitBtn.disabled = false;
+    }
+
+    // ── Locate Me ─────────────────────────────────────────────────────────────
+
+    async function handleLocateMe() {
+      if (typeof window.luciraLocateMe !== "function") {
+        console.warn("luciraLocateMe function not found");
+        return;
+      }
+
+      if (isProcessingLocate) return;
+      isProcessingLocate = true;
+
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <svg width="16" height="16" class="icon icon-locate">
+          <use xlink:href="#icon-locate"></use>
+        </svg> Locating...
+      `;
+
+      try {
+        await window.luciraLocateMe(); // ← this fills pincodeInput.value
+
+        setTimeout(() => {
+          const newPin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
+          isProcessingLocate = false;
+
+          if (newPin.length === 6) {
+            processDelivery(newPin);
+          } else {
+            setLocateView();
+          }
+        }, 1000);
+
+      } catch (error) {
+        console.error("Location fetch failed:", error);
+        isProcessingLocate = false;
+        setLocateView();
+      }
+    }
+
+    // ── Process delivery after pincode submit / locate ────────────────────────
+
+    function processDelivery(pin) {
+      lastEnteredPincode = pin;
+
+      try {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: "promoClick",
+          promoClick: {
+            promo_id: container.dataset.productSku,
+            promo_name: container.dataset.productTitle,
+            creative_name: "Pincode_Entered",
+            location_id: pin,
+          },
+        });
+      } catch (_) {}
+
+      const data = getVariantData();
+      if (dateSpan) {
+        dateSpan.textContent = data ? data.date : fmtDatePlus(computeDays());
+      }
+      if (data) updateLabel(data.available && data.inventory > 0);
+
+      setChangeView();
+    }
+
+    // ── Pincode input events ──────────────────────────────────────────────────
+
+    if (pincodeInput) {
+      pincodeInput.addEventListener("input", (e) => {
+        const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+        pincodeInput.value = val;
+
+        const mode      = submitBtn.getAttribute("data-mode");
+        const isEmpty   = val.length === 0;
+        const isComplete = val.length === 6;
+
+        if (isEmpty) {
+          setLocateView();
+          repaint();
+          return;
+        }
+
+        if (mode === "locate") {
+          if (isComplete) setSubmitView();
+          return;
+        }
+
+        if (mode === "submit") {
+          if (!isComplete) { setLocateView(); repaint(); }
+          return;
+        }
+
+        if (mode === "change") {
+          if (isComplete) setSubmitView();
+          else { setLocateView(); repaint(); }
+          return;
+        }
+      });
+
+      pincodeInput.addEventListener("click", () => {
+        if (submitBtn.getAttribute("data-mode") === "change") {
+          setLocateView();
+          repaint();
+          setTimeout(() => {
+            pincodeInput.focus();
+            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
+          }, 50);
+        }
+      });
+
+      pincodeInput.addEventListener("focus", () => {
+        if (submitBtn.getAttribute("data-mode") === "change") {
+          setLocateView();
+          repaint();
+          setTimeout(() => {
+            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
+          }, 10);
+        }
+      });
+
+      pincodeInput.addEventListener("keydown", () => {
+        isProcessingLocate = false;
+      });
+    }
+
+    // ── Button click ──────────────────────────────────────────────────────────
+
+    if (submitBtn) {
+      submitBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+
+        const mode = submitBtn.getAttribute("data-mode");
+        const pin  = (pincodeInput?.value || "").replace(/\D/g, ""
