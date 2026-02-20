@@ -8,7 +8,7 @@ class InfiniteScroll extends HTMLElement {
       return;
     }
     
-    // Cache the target grid so we don't query it repeatedly
+    // Cache the target grid
     this.targetGrid = document.querySelector("[data-product-grid]");
     
     this.observer = new IntersectionObserver((entries) => {
@@ -35,17 +35,12 @@ class InfiniteScroll extends HTMLElement {
       </div>
     `;
 
-    let url = this.anchor.getAttribute("href");
+    const url = this.anchor.getAttribute("href");
     if (!url) return;
 
     try {
-      // PERFORMANCE FIX 1: Shopify Section Rendering API
-      // Appending this parameter tells Shopify to ONLY send the grid, not the header/footer.
-      // IMPORTANT: Update this ID to match your actual Shopify section ID.
-      const sectionId = 'template--your_actual_section_id__main'; 
-      const fetchUrl = url.includes('?') ? `${url}&section_id=${sectionId}` : `${url}?section_id=${sectionId}`;
-
-      const response = await fetch(fetchUrl);
+      // Reverted to your original full-page fetch to ensure it doesn't break
+      const response = await fetch(url);
       const text = await response.text();
       
       const parser = new DOMParser();
@@ -53,8 +48,7 @@ class InfiniteScroll extends HTMLElement {
       const fetchedGrid = doc.querySelector("[data-product-grid]");
 
       if (fetchedGrid && this.targetGrid) {
-        // PERFORMANCE FIX 2: Batch DOM Append
-        // Instead of looping appendChild, we use a DocumentFragment to update the DOM exactly once.
+        // PERFORMANCE FIX: Document Fragment (Prevents DOM Thrashing)
         const fragment = document.createDocumentFragment();
         Array.from(fetchedGrid.children).forEach(el => fragment.appendChild(el));
         this.targetGrid.appendChild(fragment);
@@ -107,7 +101,6 @@ class InfiniteScroll extends HTMLElement {
       endEl.style.opacity = "0";
       endEl.style.transition = "opacity 0.8s ease-in-out";
       
-      // Allow DOM to register the block display before fading in
       requestAnimationFrame(() => {
         endEl.style.opacity = "1";
       });
@@ -121,7 +114,7 @@ class InfiniteScroll extends HTMLElement {
       document.dispatchEvent(new CustomEvent("wishlist:init"));
       if (typeof iWishCounter === "function") iWishCounter();
     } catch (e) {
-      console.error("Wishlist Init Error:", e);
+      console.error("Wishlist Error:", e);
     }
   }
 }
