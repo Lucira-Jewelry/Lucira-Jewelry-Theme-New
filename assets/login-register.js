@@ -44,6 +44,7 @@ const wheelSegments = [
 
 function openloginPopup(id) {
     document.getElementById(id).style.display = 'flex';
+    document.body.style.overflow = 'hidden';
     sessionStorage.setItem('lucira_login_manually_opened', 'true');
 }
 
