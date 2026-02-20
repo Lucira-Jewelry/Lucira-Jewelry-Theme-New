@@ -194,6 +194,8 @@
     async function handleLocateMe() {
       if (typeof window.luciraLocateMe !== "function") {
         console.warn("luciraLocateMe function not found");
+        // Fallback: just let the user type manually
+        pincodeInput?.focus();
         return;
       }
 
@@ -208,18 +210,33 @@
       `;
 
       try {
-        await window.luciraLocateMe(); // ← this fills pincodeInput.value
+        await window.luciraLocateMe(); // fills pincodeInput.value
 
-        setTimeout(() => {
+        // Poll for up to 5 seconds until a valid 6-digit pin appears
+        let waited = 0;
+        const pollInterval = 200;
+        const maxWait = 5000;
+
+        const poll = setInterval(() => {
           const newPin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
-          isProcessingLocate = false;
+          waited += pollInterval;
 
           if (newPin.length === 6) {
+            clearInterval(poll);
+            isProcessingLocate = false;
+
+            // Dispatch synthetic input event so input listener stays in sync
+            pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
+
             processDelivery(newPin);
-          } else {
+
+          } else if (waited >= maxWait) {
+            clearInterval(poll);
+            isProcessingLocate = false;
             setLocateView();
+            console.warn("Locate Me: no valid pincode found after timeout");
           }
-        }, 1000);
+        }, pollInterval);
 
       } catch (error) {
         console.error("Location fetch failed:", error);
