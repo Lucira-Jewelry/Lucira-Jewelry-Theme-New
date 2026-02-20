@@ -474,7 +474,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const deliveryTextElement = document.querySelector(".lucira-delivery-time");
       if (deliveryTextElement) {
-        deliveryTextElement.innerHTML = `Expected Delivery By <span style="color:#147217;font-weight:600;">${formattedDate}</span>`;
+        deliveryTextElement.innerHTML = `Estimated Dispatch by <span style="color:#147217;font-weight:600;">${formattedDate}</span>`;
       }
 
       const deliveryHint = document.querySelector(".lucira-delivery-text");
