@@ -145,18 +145,27 @@
     // Add your delivery date update or serviceability logic here only
   }
 
-  /* ── Fetch pincode from coords via Nominatim reverse geocoding ── */
   function fetchPincodeFromCoords(lat, lon) {
-    // ✅ Removed &country=India — not a valid param for /reverse
     var url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat +
               '&lon=' + lon + '&format=json';
 
     fetch(url, { headers: { 'Accept-Language': 'en' } })
-      .then(function (res) { return res.json(); })
+      .then(function (res) { 
+        // 1. Check if the server actually responded successfully
+        if (!res.ok) {
+          throw new Error('Server returned HTTP status ' + res.status);
+        }
+        return res.json(); 
+      })
       .then(function (data) {
         var pincode = data && data.address && data.address.postcode;
 
-        // ✅ Extra guard: ensure it's a valid 6-digit Indian pincode
+        // 2. Sometimes Nominatim returns pincodes with spaces (e.g., "400 001"). 
+        // We need to strip spaces before running our 6-digit regex test.
+        if (pincode) {
+          pincode = pincode.replace(/\s/g, ''); 
+        }
+
         if (pincode && /^\d{6}$/.test(pincode)) {
           var input = document.getElementById('lucira-delivery-zipcode');
           if (input) input.value = pincode;
@@ -167,7 +176,9 @@
           showError('Could not detect pincode. Please enter manually.');
         }
       })
-      .catch(function () {
+      .catch(function (error) {
+        // 3. Log the exact error so we can see what's actually failing
+        console.error('Nominatim API Error:', error);
         showError('Location lookup failed. Please enter pincode manually.');
       })
       .finally(function () {
