@@ -51,6 +51,7 @@ function openloginPopup(id) {
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
   document.getElementById(id).style.display = 'none';
+  document.body.style.overflow = '';
   document.getElementById(id)?.classList.remove('register-popup');
   resetToLoginView();
   const popup = document.getElementById('login-popup');
