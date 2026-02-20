@@ -174,6 +174,7 @@ if (!customElements.get('product-info')) {
           this.updatePriceBreakup(html);
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
+          this.updateDeliveryWidget(variant);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);
@@ -443,6 +444,43 @@ if (!customElements.get('product-info')) {
         const modalContent = this.productModal?.querySelector(`.product-media-modal__content`);
         const newModalContent = html.querySelector(`product-modal .product-media-modal__content`);
         if (modalContent && newModalContent) modalContent.innerHTML = newModalContent.innerHTML;
+      }
+
+      updateDeliveryWidget(variant) {
+        try {
+          if (!variant || !window.variantDeliveryData) return;
+
+          const data = window.variantDeliveryData[variant.id];
+          if (!data) return;
+
+          const container = document.getElementById('pdp-delivery-check');
+          if (!container) return;
+
+          // Update data attributes so the widget JS stays in sync
+          container.dataset.variantId         = String(variant.id);
+          container.dataset.available         = String(!!variant.available);
+          container.dataset.inventoryQuantity = String(variant.inventory_quantity ?? 0);
+          container.dataset.isInStock         = String(data.available && data.inventory > 0);
+
+          // Update the displayed date
+          const dateSpan = container.querySelector('.lucira-delivery-time .delivry_txt');
+          if (dateSpan) dateSpan.textContent = data.date;
+
+          // Update the label text (in-stock vs out-of-stock messaging)
+          const timeSpan = container.querySelector('.lucira-delivery-time');
+          if (timeSpan) {
+            const isInStock = data.available && data.inventory > 0;
+            const label = isInStock ? 'Estimated Free Dispatch by ' : 'Available & Dispatched by ';
+            // Replace only the text node, keep the dateSpan intact
+            timeSpan.childNodes.forEach((node) => {
+              if (node.nodeType === Node.TEXT_NODE) node.remove();
+            });
+            timeSpan.insertBefore(document.createTextNode(label), timeSpan.firstChild);
+          }
+
+        } catch (e) {
+          console.error('updateDeliveryWidget error', e);
+        }
       }
 
       updateStickyATC({ html, variant }) {

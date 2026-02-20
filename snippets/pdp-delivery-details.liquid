@@ -1,20 +1,77 @@
-{% assign delivery_days = product.metafields.custom.shipping | default: 4 %}
+{% comment %} ─── 1. VARIANT STOCK LOGIC ─── {% endcomment %}
+{% assign variant = product.selected_or_first_available_variant %}
 
-<div 
-  class="lucira-delivery-container" 
+{% assign is_in_stock = false %}
+{% if variant.available and variant.inventory_quantity > 0 %}
+  {% assign is_in_stock = true %}
+{% elsif variant.available and variant.inventory_management == blank %}
+  {% comment %} No inventory tracking = always in stock {% endcomment %}
+  {% assign is_in_stock = true %}
+{% endif %}
+
+{% comment %} ─── 2. DAYS CALCULATION ─── {% endcomment %}
+{% if is_in_stock %}
+  {% assign delivery_days = 2 %}
+{% else %}
+  {% assign delivery_days = 15 %}
+{% endif %}
+
+{% comment %} ─── 3. DATE FORMATTING ─── {% endcomment %}
+{% assign total_seconds  = delivery_days | times: 86400 %}
+{% assign now_ts         = 'now' | date: '%s' %}
+{% assign future_ts      = now_ts | plus: total_seconds %}
+{% assign delivery_date  = future_ts | date: '%B %d, %Y' %}
+
+{% comment %} ─── 4. PRE-COMPUTE ALL VARIANTS FOR JS HANDOFF ─── {% endcomment %}
+{% capture variant_stock_json %}
+{
+  {% for v in product.variants %}
+    {% assign v_in_stock = false %}
+    {% if v.available and v.inventory_quantity > 0 %}
+      {% assign v_in_stock = true %}
+    {% elsif v.available and v.inventory_management == blank %}
+      {% assign v_in_stock = true %}
+    {% endif %}
+    {% if v_in_stock %}
+      {% assign v_days = 2 %}
+    {% else %}
+      {% assign v_days = 15 %}
+    {% endif %}
+    {% assign v_seconds = v_days | times: 86400 %}
+    {% assign v_future  = now_ts | plus: v_seconds %}
+    "{{ v.id }}": {
+      "available": {{ v.available }},
+      "inventory": {{ v.inventory_quantity | default: 0 }},
+      "days": {{ v_days }},
+      "date": "{{ v_future | date: '%B %d, %Y' }}"
+    }{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}
+{% endcapture %}
+
+{% comment %} ─── 5. RENDER ─── {% endcomment %}
+<div
+  class="lucira-delivery-container"
   id="pdp-delivery-check"
   data-delivery-days="{{ delivery_days }}"
-  data-product-sku="{{ product.selected_or_first_available_variant.sku }}"
+  data-product-sku="{{ variant.sku | escape }}"
   data-product-title="{{ product.title | escape }}"
-  data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-  data-inventory-quantity="{{ product.selected_or_first_available_variant.inventory_quantity }}"
-  data-available="{{ product.selected_or_first_available_variant.available }}"
+  data-variant-id="{{ variant.id }}"
+  data-inventory-quantity="{{ variant.inventory_quantity | default: 0 }}"
+  data-available="{{ variant.available }}"
   data-variant-count="{{ product.variants.size }}"
+  data-is-in-stock="{{ is_in_stock }}"
 >
+
+  <script>
+    window.variantDeliveryData = {{ variant_stock_json }};
+  </script>
 
   <div class="lucira-delivery-input-container">
     <div class="input-wrapper">
-      <svg class="pin-beside-pincode" width="18" height="18"> <use href="#icon-location"></use> </svg>
+      <svg class="pin-beside-pincode" width="18" height="18">
+        <use href="#icon-location"></use>
+      </svg>
       <input
         type="text"
         id="lucira-delivery-zipcode"
@@ -24,413 +81,22 @@
         title="enter pincode"
       >
       <button class="submitButton" data-mode="locate">
-        <svg class="locate-me-icon" width="16" height="16" class="icon icon-locate"> 
-          <use xlink:href="#icon-locate"></use> 
+        <svg class="locate-me-icon" width="16" height="16">
+          <use xlink:href="#icon-locate"></use>
         </svg> Locate Me
       </button>
     </div>
   </div>
 
-  {% assign total_seconds = delivery_days | times: 86400 %}
-  {% assign now = 'now' | date: '%s' %}
-  {% assign future_timestamp = now | plus: total_seconds %}
-  {% assign delivery_date = future_timestamp | date: '%B %d, %Y' %}
-
   <div class="lucira-delivery-info">
-    <span class="lucira-delivery-time">Estimated Free Dispatch by 
+    <span class="lucira-delivery-time">
+      {% if is_in_stock %}
+        Estimated Free Dispatch by
+      {% else %}
+        Available &amp; Dispatched by
+      {% endif %}
       <span class="delivry_txt">{{ delivery_date }}</span>
     </span>
   </div>
+
 </div>
-
-<script>
-  (() => {
-    const container = document.getElementById("pdp-delivery-check");
-    if (!container) return;
-
-    const submitBtn = container.querySelector(".submitButton");
-    const pincodeInput = document.getElementById("lucira-delivery-zipcode");
-    const dateSpan = container.querySelector(".lucira-delivery-time .delivry_txt");
-
-    const META_DAYS = Number(container?.dataset?.deliveryDays || 4);
-    let isProcessingLocate = false;
-    let lastEnteredPincode = null; // Track the last submitted pincode
-
-    const fmtDatePlus = (plusDays) => {
-      const d = new Date();
-      d.setDate(d.getDate() + Number(plusDays));
-      return d.toLocaleDateString("en-US", { day: "numeric", month: "long", year: "numeric" });
-    };
-
-    const getSelected = (label) => {
-      const radio = document.querySelector(`input[name*="${label}"]:checked`);
-      if (radio) return radio.value;
-      const sel = document.querySelector(`select[name*="${label}"]`);
-      if (sel) return sel.value;
-      return null;
-    };
-
-    const hasPicker = (label) =>
-      !!document.querySelector(`input[name*="${label}"], select[name*="${label}"]`);
-
-    const getBadgeActive = (label) =>
-      document.querySelector(
-        `input[name*="${label}"]:checked + label .Variant_Stock_Status .stock-active,` +
-        `select[name*="${label}"] + label .Variant_Stock_Status .stock-active`
-      );
-
-    const ds = () => {
-      const avail = String(container.dataset.available || "").toLowerCase();
-      const qty = Number(container.dataset.inventoryQuantity || 0);
-      const variantCount = Number(container.dataset.variantCount || 0);
-      return { avail, qty, variantCount };
-    };
-
-    function isVariantInStock() {
-      const colorVal = getSelected("Color");
-      const sizeVal = getSelected("Size");
-      const hasColor = hasPicker("Color");
-      const hasSize = hasPicker("Size");
-      const { avail, qty, variantCount } = ds();
-
-      if (window.variantStockData) {
-        if (colorVal && sizeVal && window.variantStockData[colorVal]) {
-          const node = window.variantStockData[colorVal][sizeVal];
-          if (node && node.available && Number(node.inventory) > 0) return true;
-        }
-
-        if (colorVal && !sizeVal && window.variantStockData[colorVal]) {
-          const node = window.variantStockData[colorVal];
-          if (node && node.available && Number(node.inventory) > 0) return true;
-        }
-
-        if (!colorVal && sizeVal && window.variantStockData[sizeVal]) {
-          const node = window.variantStockData[sizeVal];
-          if (node && node.available && Number(node.inventory) > 0) return true;
-        }
-      }
-
-      if (hasColor && !hasSize && getBadgeActive("Color")) return true;
-      if (!hasColor && hasSize && getBadgeActive("Size")) return true;
-      if (hasColor && hasSize && getBadgeActive("Color") && getBadgeActive("Size")) return true;
-
-      const singleOptionContext =
-        (!hasColor && !hasSize) || (hasColor ^ hasSize) || variantCount === 1;
-
-      if (singleOptionContext) {
-        if ((avail === "true" || avail === "1") && qty > 0) return true;
-        if (avail === "true" && !Number.isFinite(qty)) return true;
-      }
-
-      if (qty > 0) return true;
-
-      return false;
-    }
-
-    const computeDays = () => (isVariantInStock() ? 2 : 15);
-
-    function repaint() {
-      if (!dateSpan) return;
-      const days = computeDays();
-      dateSpan.textContent = fmtDatePlus(days);
-      
-      console.log('Repaint called:', {
-        inStock: isVariantInStock(),
-        days: days,
-        date: dateSpan.textContent,
-        mode: submitBtn?.getAttribute("data-mode"),
-        hasPincode: !!lastEnteredPincode
-      });
-    }
-
-    function setLocateView() {
-      isProcessingLocate = false;
-      lastEnteredPincode = null; // Clear pincode when going back to locate
-      submitBtn.setAttribute("data-mode", "locate");
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locate Me
-      `;
-      submitBtn.disabled = false;
-      if (pincodeInput) pincodeInput.disabled = false;
-    }
-
-    function setSubmitView() {
-      submitBtn.setAttribute("data-mode", "submit");
-      submitBtn.textContent = "Submit";
-      submitBtn.disabled = false;
-      if (pincodeInput) pincodeInput.disabled = false;
-    }
-
-    function setChangeView() {
-      submitBtn.setAttribute("data-mode", "change");
-      submitBtn.innerHTML = `Change`;
-      submitBtn.disabled = false;
-    }
-
-    async function handleLocateMe() {
-      if (typeof window.luciraLocateMe !== "function") {
-        console.warn('luciraLocateMe function not found');
-        return false;
-      }
-
-      if (isProcessingLocate) {
-        console.log('Location fetch already in progress');
-        return false;
-      }
-
-      isProcessingLocate = true;
-      
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `
-        <svg width="16" height="16" class="icon icon-locate">
-          <use xlink:href="#icon-locate"></use>
-        </svg> Locating...
-      `;
-
-      try {
-        console.log('Starting location fetch...');
-        await window.luciraLocateMe();
-        console.log('Location fetch completed');
-
-        setTimeout(() => {
-          const newPin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
-          console.log('Pincode after location fetch:', newPin);
-          
-          isProcessingLocate = false;
-
-          if (newPin.length === 6) {
-            processDelivery(newPin);
-          } else {
-            setLocateView();
-            console.log('No valid pincode found after location fetch');
-          }
-        }, 1000);
-
-      } catch (error) {
-        console.error('Location fetch failed:', error);
-        isProcessingLocate = false;
-        setLocateView();
-        return false;
-      }
-    }
-
-    function processDelivery(pin) {
-      console.log('Processing delivery for pincode:', pin);
-      
-      // Store the pincode for variant change recalculations
-      lastEnteredPincode = pin;
-      
-      try {
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: "promoClick",
-          promoClick: {
-            promo_id: container.dataset.productSku,
-            promo_name: container.dataset.productTitle,
-            creative_name: 'Pincode_Entered',
-            location_id: pin
-          }
-        });
-      } catch (_) {}
-
-      const days = computeDays();
-      const formatted = fmtDatePlus(days);
-
-      if (dateSpan) dateSpan.textContent = formatted;
-      
-      setChangeView();
-      
-      console.log('Delivery processed:', { pin, days, formatted, inStock: isVariantInStock() });
-    }
-
-    if (pincodeInput) {
-      pincodeInput.addEventListener("input", (e) => {
-        const originalValue = e.target.value;
-        const val = originalValue.replace(/\D/g, "").slice(0, 6);
-        pincodeInput.value = val;
-
-        console.log('Input event:', { originalValue, cleanedValue: val, length: val.length });
-
-        const currentMode = submitBtn.getAttribute("data-mode");
-        const isEmpty = val.length === 0;
-        const isComplete = val.length === 6;
-
-        if (isEmpty) {
-          console.log('Field is empty, forcing locate mode');
-          setLocateView();
-          repaint(); // Reset to default date
-          return;
-        }
-
-        if (currentMode === "locate") {
-          if (isComplete) {
-            console.log('Complete pincode in locate mode, switching to submit');
-            setSubmitView();
-          }
-          return;
-        }
-
-        if (currentMode === "submit") {
-          if (!isComplete) {
-            console.log('Incomplete pincode in submit mode, switching to locate');
-            setLocateView();
-            repaint(); // Reset to default date
-          }
-          return;
-        }
-
-        if (currentMode === "change") {
-          if (isComplete) {
-            console.log('Complete pincode in change mode, switching to submit');
-            setSubmitView();
-          } else {
-            console.log('Incomplete pincode in change mode, switching to locate');
-            setLocateView();
-            repaint(); // Reset to default date
-          }
-          return;
-        }
-      });
-
-      pincodeInput.addEventListener("click", (e) => {
-        const currentMode = submitBtn.getAttribute("data-mode");
-        console.log('Input clicked, current mode:', currentMode, 'value:', pincodeInput.value);
-        
-        if (currentMode === "change") {
-          e.preventDefault();
-          setLocateView();
-          repaint(); // Reset to default date
-          setTimeout(() => {
-            pincodeInput.focus();
-            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
-          }, 50);
-        }
-      });
-
-      pincodeInput.addEventListener("focus", (e) => {
-        const currentMode = submitBtn.getAttribute("data-mode");
-        console.log('Input focused, current mode:', currentMode, 'value:', pincodeInput.value);
-        
-        if (currentMode === "change") {
-          setLocateView();
-          repaint(); // Reset to default date
-          setTimeout(() => {
-            pincodeInput.setSelectionRange(pincodeInput.value.length, pincodeInput.value.length);
-          }, 10);
-        }
-      });
-
-      pincodeInput.addEventListener("keydown", (e) => {
-        isProcessingLocate = false;
-      });
-    }
-
-    if (submitBtn) {
-      submitBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-
-        const mode = submitBtn.getAttribute("data-mode");
-        const pin = (pincodeInput?.value || "").replace(/\D/g, "").trim();
-
-        console.log('=== BUTTON CLICKED ===', { 
-          mode, 
-          pin, 
-          pinLength: pin.length,
-          isProcessingLocate,
-          inputValue: pincodeInput?.value
-        });
-
-        if (isProcessingLocate) {
-          console.warn('Force resetting stuck location processing');
-          isProcessingLocate = false;
-          setLocateView();
-          return;
-        }
-
-        if (mode === "change") {
-          console.log('Change mode: focusing input');
-          pincodeInput?.focus();
-          return;
-        }
-
-        if (mode === "locate") {
-          console.log('Locate mode: fetching location');
-          await handleLocateMe();
-          return;
-        }
-
-        if (mode === "submit" && pin.length === 6) {
-          console.log('Submit mode: processing delivery');
-          processDelivery(pin);
-          return;
-        }
-
-        console.log('No action taken - conditions not met:', { mode, pinLength: pin.length });
-      });
-    }
-
-    function onVariantChange(e) {
-      console.log('=== VARIANT CHANGE DETECTED ===');
-      
-      const v = e?.detail?.variant;
-      if (v) {
-        container.dataset.variantId = String(v.id || "");
-        if (typeof v.inventory_quantity === "number") {
-          container.dataset.inventoryQuantity = String(v.inventory_quantity);
-        }
-        if (typeof v.available !== "undefined") {
-          container.dataset.available = String(!!v.available);
-        }
-        
-        console.log('Variant data updated:', {
-          id: v.id,
-          inventory: v.inventory_quantity,
-          available: v.available
-        });
-      }
-      
-      // CRITICAL FIX: Always recalculate and update the date
-      // This happens whether or not a pincode was entered
-      repaint();
-      
-      // If user had entered a pincode before, the date updates automatically
-      // because repaint() calls computeDays() which checks current stock status
-      console.log('Delivery date recalculated after variant change');
-    }
-
-    document.addEventListener("variant:change", onVariantChange);
-    document.addEventListener("variant:changed", onVariantChange);
-
-    document.addEventListener("change", (evt) => {
-      const n = evt.target?.name || "";
-      if (n.includes("Color") || n.includes("Size")) {
-        console.log('Option changed:', n);
-        repaint();
-      }
-    });
-
-    // Initialize
-    console.log('Initializing delivery widget');
-    setLocateView();
-    repaint();
-
-    // Debug helper
-    window.debugDeliveryWidget = () => {
-      return {
-        currentMode: submitBtn?.getAttribute("data-mode"),
-        inputValue: pincodeInput?.value,
-        inputLength: pincodeInput?.value?.length,
-        isProcessingLocate,
-        lastEnteredPincode,
-        inStock: isVariantInStock(),
-        computedDays: computeDays(),
-        luciraLocateMe: typeof window.luciraLocateMe
-      };
-    };
-
-    console.log('Delivery widget initialized:', window.debugDeliveryWidget());
-  })();
-</script>
