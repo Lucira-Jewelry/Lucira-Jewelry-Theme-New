@@ -974,10 +974,30 @@ document.addEventListener('DOMContentLoaded', function () {
   const variantData = {{ product.selected_or_first_available_variant | json }};
   const totalSavings = {{ total_savings | default: 0 | money_without_currency | replace: ',', '' }};
 
+  // Price Breakup Values
+  const priceBreakup = {
+    metal_cost:           {{ metal_cost | divided_by: 100.0 | round: 2 }},
+    diamond_original:     {{ diamond_original | divided_by: 100.0 | round: 2 }},
+    diamond_final:        {{ diamond_final | divided_by: 100.0 | round: 2 }},
+    diamond_discount_pct: {{ diamond_percent | default: 0 }},
+    diamond_pcs:          {{ diamond_pcs | default: 0 }},
+    making_original:      {{ mc_cost_original | divided_by: 100.0 | round: 2 }},
+    making_final:         {{ mc_cost_final | divided_by: 100.0 | round: 2 }},
+    making_discount_pct:  {{ mc_percent | default: 0 }},
+    gst_percent:          {{ metal_rates.default_tax | default: 0 }},
+    gst_amount:           {{ tax_amount | divided_by: 100.0 | round: 2 }},
+    grand_total:          {{ grand_total | divided_by: 100.0 | round: 2 }},
+    gold_rate_per_g:      {{ display_rate_per_g | round: 2 }},
+    metal_color:          '{{ metal_color }}',
+    metal_purity:         '{{ config.purity }}',
+    gemstone_original:    {{ gemstone_original | divided_by: 100.0 | round: 2 }},
+    gemstone_final:       {{ gemstone_final | divided_by: 100.0 | round: 2 }},
+    gemstone_pcs:         {{ gemstone_pcs | default: 0 }}
+  };
+
   function pushTabClick(tabName, savingsAmount = null) {
 
     let promoPosition = 'Product Details Section';
-
     if (tabName === 'Your Savings' && savingsAmount) {
       promoPosition = savingsAmount;
     }
@@ -1002,21 +1022,34 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // URL & Image
         product_url: window.location.href,
-        product_image: productData.featured_image 
-          ? productData.featured_image 
-          : '',
+        product_image: productData.featured_image ? productData.featured_image : '',
 
-        // Pricing (Numeric only)
+        // Pricing
         price: variantData.price / 100,
-        offer_price: variantData.compare_at_price 
-          ? variantData.price / 100 
-          : variantData.price / 100,
+        offer_price: variantData.price / 100,
 
-        // Price Breakup (FROM METAFIELDS – adjust namespace if needed)
-        metal_price: Number({{ product.selected_or_first_available_variant.metafields.custom.metal_price | default: 0 }}),
-        diamond_price: Number({{ product.selected_or_first_available_variant.metafields.custom.diamond_price | default: 0 }}),
-        making_price: Number({{ product.selected_or_first_available_variant.metafields.custom.making_charges | default: 0 }}),
-        gst_price: Number({{ product.selected_or_first_available_variant.metafields.custom.gst_price | default: 0 }}),
+        // ✅ Price Breakup Values (from image)
+        metal_label:          priceBreakup.metal_purity + ' ' + priceBreakup.metal_color + ' Gold',
+        gold_rate_per_g:      priceBreakup.gold_rate_per_g,
+        metal_price:          priceBreakup.metal_cost,
+
+        diamond_price_original:     priceBreakup.diamond_original,
+        diamond_price_final:        priceBreakup.diamond_final,
+        diamond_discount_percent:   priceBreakup.diamond_discount_pct,
+        diamond_pcs:                priceBreakup.diamond_pcs,
+
+        making_charges_original:    priceBreakup.making_original,
+        making_charges_final:       priceBreakup.making_final,
+        making_charges_discount_pct: priceBreakup.making_discount_pct,
+
+        gst_percent:          priceBreakup.gst_percent,
+        gst_amount:           priceBreakup.gst_amount,
+
+        gemstone_price_original:    priceBreakup.gemstone_original,
+        gemstone_price_final:       priceBreakup.gemstone_final,
+        gemstone_pcs:               priceBreakup.gemstone_pcs,
+
+        grand_total:          priceBreakup.grand_total,
 
         // Savings (only for savings tab)
         savings_amount: savingsAmount || 0,
@@ -1042,8 +1075,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (tabId === 'price-breakup') {
       pushTabClick('Price Breakup');
-    } 
-    else if (tabId === 'comparison') {
+    } else if (tabId === 'comparison') {
       pushTabClick('Your Savings', totalSavings);
     }
 
@@ -1060,9 +1092,7 @@ document.addEventListener('DOMContentLoaded', function () {
     allContents.forEach((content) => content.classList.remove('active'));
 
     const activeContent = wrapper.querySelector(`#${tabId}`);
-    if (activeContent) {
-      activeContent.classList.add('active');
-    }
+    if (activeContent) activeContent.classList.add('active');
   }
 
   document.addEventListener('click', onTabClick);
