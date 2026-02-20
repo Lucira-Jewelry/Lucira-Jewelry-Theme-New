@@ -121,7 +121,7 @@
     if (label) label.textContent = loading ? 'Detecting…' : 'Locate Me';
   }
 
-  /* ── DataLayer push ── */
+  /* ── DataLayer push (called ONCE per user action, never inside helpers) ── */
   function pushPromoClick(pincode) {
     var container    = document.getElementById('pdp-delivery-check');
     var productSku   = container ? container.dataset.productSku   : '';
@@ -140,7 +140,12 @@
     });
   }
 
-  /* ── Fetch pincode from coords via Nominatim ── */
+  /* ── Serviceability / delivery-date logic (NO dataLayer call here) ── */
+  function handlePincodeCheck(pincode) {
+    // Add your delivery date update or serviceability logic here only
+  }
+
+  /* ── Fetch pincode from coords via Nominatim reverse geocoding ── */
   function fetchPincodeFromCoords(lat, lon) {
     var url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat +
               '&lon=' + lon + '&country=India&format=json';
@@ -153,8 +158,8 @@
           var input = document.getElementById('lucira-delivery-zipcode');
           if (input) input.value = pincode;
           showError('');
-          pushPromoClick(pincode);          // ← dataLayer fired here
-          handlePincodeCheck(pincode);      // optional: trigger your check logic
+          pushPromoClick(pincode);     // ← fires ONCE here
+          handlePincodeCheck(pincode); // ← no push inside
         } else {
           showError('Could not detect pincode. Please enter manually.');
         }
@@ -167,24 +172,18 @@
       });
   }
 
-  /* ── Fetch pincode from text query (for manual search) ── */
+  /* ── Validate pincode via Nominatim search (manual entry) ── */
   function fetchPincodeFromQuery(query) {
     var url = 'https://nominatim.openstreetmap.org/search?postalcode=' +
               encodeURIComponent(query) + '&country=India&format=json';
     return fetch(url).then(function (res) { return res.json(); });
   }
 
-  /* ── Delivery date update helper ── */
-  function handlePincodeCheck(pincode) {
-    // Plug your serviceability / delivery-date logic here.
-    // For now we just fire the dataLayer if called from manual input.
-    if (pincode) pushPromoClick(pincode);
-  }
-
-  /* ── Locate Me click ── */
+  /* ── Init ── */
   document.addEventListener('DOMContentLoaded', function () {
-    var locateBtn = document.getElementById('lucira-locate-btn');
 
+    /* Locate Me click */
+    var locateBtn = document.getElementById('lucira-locate-btn');
     if (locateBtn) {
       locateBtn.addEventListener('click', function () {
         showError('');
@@ -197,14 +196,12 @@
         setLocateBtnState(true);
 
         navigator.geolocation.getCurrentPosition(
-          /* success */
           function (position) {
             fetchPincodeFromCoords(
               position.coords.latitude,
               position.coords.longitude
             );
           },
-          /* error */
           function (err) {
             setLocateBtnState(false);
             var messages = {
@@ -219,7 +216,7 @@
       });
     }
 
-    /* ── Manual pincode input (Enter key or blur) ── */
+    /* Manual pincode — Enter key */
     var pincodeInput = document.getElementById('lucira-delivery-zipcode');
     if (pincodeInput) {
       pincodeInput.addEventListener('keydown', function (e) {
@@ -229,8 +226,8 @@
             showError('');
             fetchPincodeFromQuery(val).then(function (results) {
               if (results && results.length) {
-                pushPromoClick(val);   // ← dataLayer fired for manual entry too
-                handlePincodeCheck(val);
+                pushPromoClick(val);     // ← fires ONCE here
+                handlePincodeCheck(val); // ← no push inside
               } else {
                 showError('Pincode not found. Please check and try again.');
               }
@@ -241,6 +238,7 @@
         }
       });
     }
+
   });
 })();
 </script>
