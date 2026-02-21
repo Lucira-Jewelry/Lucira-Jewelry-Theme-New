@@ -43,12 +43,24 @@ const wheelSegments = [
 ];
 
 function openloginPopup(id) {
-document.getElementById(id).style.display = 'flex';
+    document.getElementById(id).style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    sessionStorage.setItem('lucira_login_manually_opened', 'true');
 }
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+
+  // If on login or register page, go back instead of closing
+  const path = window.location.pathname.toLowerCase();
+  if (path === '/account/login' || path === '/account/register') {
+    history.back();
+    return;
+  }
+
   document.getElementById(id).style.display = 'none';
+  document.body.style.overflow = '';
+  document.getElementById(id)?.classList.remove('register-popup');
   resetToLoginView();
   const popup = document.getElementById('login-popup');
   if (!popup) return;
@@ -613,7 +625,7 @@ sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
 document.addEventListener('DOMContentLoaded', function () {
 const POPUP_ID = 'login-popup';
-const SHOW_DELAY = 8000;
+const SHOW_DELAY = 15000;
 
 const popup = document.getElementById(POPUP_ID);
 if (!popup) return;
@@ -627,7 +639,10 @@ if (document.body.classList.contains('customer-logged-in')) return;
 
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
+    if (sessionStorage.getItem('lucira_login_manually_opened') === 'true') return;
     popup.style.display = 'flex';
+    popup.classList.add('register-popup');
+    document.body.style.overflow = 'hidden';
     document.querySelector('.otp-login-form-wrapper')
     ?.classList.add('signup-active');
     document.querySelector('.otp-number-wrapper')
