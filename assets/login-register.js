@@ -50,6 +50,14 @@ function openloginPopup(id) {
 
 function closeloginPopup(e, id) {
   if (typeof id === 'undefined') id = e;
+
+  // If on login or register page, go back instead of closing
+  const path = window.location.pathname.toLowerCase();
+  if (path === '/account/login' || path === '/account/register') {
+    history.back();
+    return;
+  }
+
   document.getElementById(id).style.display = 'none';
   document.body.style.overflow = '';
   document.getElementById(id)?.classList.remove('register-popup');
