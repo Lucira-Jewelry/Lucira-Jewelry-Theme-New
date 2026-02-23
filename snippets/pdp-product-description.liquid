@@ -574,11 +574,13 @@
 
 {% if template contains 'product' %}
   {% assign product_collection_handles = product.collections | map: 'handle' %}
+  {% assign grand_total_check = grand_total | plus: 0 %}
 
   {% unless product.metafields.custom.do_not_show_price_breakup
-    or product.price <= 1500000
-    or product_collection_handles contains 'nose-pins'
-  %}
+      or product.price <= 1500000
+      or product_collection_handles contains 'nose-pins'
+      or grand_total_check == 0
+    %}
     <section class="pdp-price-breakup-tabs">
       <div class="pdp-tab-wrapper pdp-price-breakup-tabs-wrapper">
         <div class="tab-switcher">
@@ -895,31 +897,98 @@
         });
       });
     </script>
-    
-    {% comment %} <script>
-      document.addEventListener('DOMContentLoaded', function () {
-      const productName = '{{ product.title }}';
-      const sku = '{{ product.selected_or_first_available_variant.sku }}';
-      const totalSavings = '{{ total_savings | money }}'; // Get the total savings value
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+
+      const productData = {{ product | json }};
+      const variantData = {{ product.selected_or_first_available_variant | json }};
+      const totalSavings = {{ total_savings | default: 0 | money_without_currency | replace: ',', '' }};
+
+      // Price Breakup Values
+      const priceBreakup = {
+        metal_cost:           {{ metal_cost | divided_by: 100.0 | round: 2 }},
+        diamond_original:     {{ diamond_original | divided_by: 100.0 | round: 2 }},
+        diamond_final:        {{ diamond_final | divided_by: 100.0 | round: 2 }},
+        diamond_discount_pct: {{ diamond_percent | default: 0 }},
+        diamond_pcs:          {{ diamond_pcs | default: 0 }},
+        making_original:      {{ mc_cost_original | divided_by: 100.0 | round: 2 }},
+        making_final:         {{ mc_cost_final | divided_by: 100.0 | round: 2 }},
+        making_discount_pct:  {{ mc_percent | default: 0 }},
+        gst_percent:          {{ metal_rates.default_tax | default: 0 }},
+        gst_amount:           {{ tax_amount | divided_by: 100.0 | round: 2 }},
+        grand_total:          {{ grand_total | divided_by: 100.0 | round: 2 }},
+        gold_rate_per_g:      {{ display_rate_per_g | round: 2 }},
+        metal_color:          '{{ metal_color }}',
+        metal_purity:         '{{ config.purity }}',
+        gemstone_original:    {{ gemstone_original | divided_by: 100.0 | round: 2 }},
+        gemstone_final:       {{ gemstone_final | divided_by: 100.0 | round: 2 }},
+        gemstone_pcs:         {{ gemstone_pcs | default: 0 }}
+      };
 
       function pushTabClick(tabName, savingsAmount = null) {
-        let promoPosition = 'Product Details Section';
-        
-        // Update promo_position with savings amount if it's the Your Savings tab
-        if (tabName === 'Your Savings' && savingsAmount) {
 
-          promoPosition = `${savingsAmount}`;
+        let promoPosition = 'Product Details Section';
+        if (tabName === 'Your Savings' && savingsAmount) {
+          promoPosition = savingsAmount;
         }
 
         const promoData = {
           event: 'promoClick',
           promoClick: {
-            promo_id: sku,
-            creative_name: tabName,
+
+            // Promotion Info
+            creative_name: tabName === 'Price Breakup' ? 'priceBreakup' : 'yourSavings',
+            promo_id: variantData.sku || '',
+            promo_name: productData.title,
             promo_position: promoPosition,
-            promo_name: productName,
-            location_id: "{{ product.selected_or_first_available_variant.id }}"
-          },
+            position: '-',
+
+            // Product Info
+            product_id: productData.id,
+            product_name: productData.title,
+            sku: variantData.sku,
+            variant_id: variantData.id,
+            location_id: variantData.id,
+
+            // URL & Image
+            product_url: window.location.href,
+            product_image: productData.featured_image ? productData.featured_image : '',
+
+            // Pricing
+            price: variantData.price / 100,
+            offer_price: variantData.price / 100,
+
+            // ✅ Price Breakup Values (from image)
+            metal_label:          priceBreakup.metal_purity + ' ' + priceBreakup.metal_color + ' Gold',
+            gold_rate_per_g:      priceBreakup.gold_rate_per_g,
+            metal_price:          priceBreakup.metal_cost,
+
+            diamond_price_original:     priceBreakup.diamond_original,
+            diamond_price_final:        priceBreakup.diamond_final,
+            diamond_discount_percent:   priceBreakup.diamond_discount_pct,
+            diamond_pcs:                priceBreakup.diamond_pcs,
+
+            making_charges_original:    priceBreakup.making_original,
+            making_charges_final:       priceBreakup.making_final,
+            making_charges_discount_pct: priceBreakup.making_discount_pct,
+
+            gst_percent:          priceBreakup.gst_percent,
+            gst_amount:           priceBreakup.gst_amount,
+
+            gemstone_price_original:    priceBreakup.gemstone_original,
+            gemstone_price_final:       priceBreakup.gemstone_final,
+            gemstone_pcs:               priceBreakup.gemstone_pcs,
+
+            grand_total:          priceBreakup.grand_total,
+
+            // Savings (only for savings tab)
+            savings_amount: savingsAmount || 0,
+
+            // Optional
+            email: '',
+            phone: ''
+          }
         };
 
         window.dataLayer = window.dataLayer || [];
@@ -929,176 +998,38 @@
       function onTabClick(event) {
         const switchItem = event.target.closest('.contained-switch');
         if (!switchItem) return;
+
         const wrapper = switchItem.closest('.pdp-tab-wrapper');
         if (!wrapper) return;
+
         const tabId = switchItem.getAttribute('data-tab');
-        
+
         if (tabId === 'price-breakup') {
           pushTabClick('Price Breakup');
         } else if (tabId === 'comparison') {
           pushTabClick('Your Savings', totalSavings);
         }
-        
+
         const allSwitches = wrapper.querySelectorAll('.contained-switch');
         allSwitches.forEach((s) => s.classList.remove('active'));
         switchItem.classList.add('active');
+
         const index = Array.from(allSwitches).indexOf(switchItem);
         if (switchItem.parentElement) {
           switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
         }
+
         const allContents = wrapper.querySelectorAll('.tab-content');
         allContents.forEach((content) => content.classList.remove('active'));
+
         const activeContent = wrapper.querySelector(`#${tabId}`);
-        if (activeContent) {
-          activeContent.classList.add('active');
-        }
+        if (activeContent) activeContent.classList.add('active');
       }
 
       document.addEventListener('click', onTabClick);
-      document.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          const switchItem = e.target.closest('.contained-switch');
-          if (switchItem) {
-            e.preventDefault();
-            switchItem.click();
-          }
-        }
-      });
+
     });
-    </script> {% endcomment %}
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-
-  const productData = {{ product | json }};
-  const variantData = {{ product.selected_or_first_available_variant | json }};
-  const totalSavings = {{ total_savings | default: 0 | money_without_currency | replace: ',', '' }};
-
-  // Price Breakup Values
-  const priceBreakup = {
-    metal_cost:           {{ metal_cost | divided_by: 100.0 | round: 2 }},
-    diamond_original:     {{ diamond_original | divided_by: 100.0 | round: 2 }},
-    diamond_final:        {{ diamond_final | divided_by: 100.0 | round: 2 }},
-    diamond_discount_pct: {{ diamond_percent | default: 0 }},
-    diamond_pcs:          {{ diamond_pcs | default: 0 }},
-    making_original:      {{ mc_cost_original | divided_by: 100.0 | round: 2 }},
-    making_final:         {{ mc_cost_final | divided_by: 100.0 | round: 2 }},
-    making_discount_pct:  {{ mc_percent | default: 0 }},
-    gst_percent:          {{ metal_rates.default_tax | default: 0 }},
-    gst_amount:           {{ tax_amount | divided_by: 100.0 | round: 2 }},
-    grand_total:          {{ grand_total | divided_by: 100.0 | round: 2 }},
-    gold_rate_per_g:      {{ display_rate_per_g | round: 2 }},
-    metal_color:          '{{ metal_color }}',
-    metal_purity:         '{{ config.purity }}',
-    gemstone_original:    {{ gemstone_original | divided_by: 100.0 | round: 2 }},
-    gemstone_final:       {{ gemstone_final | divided_by: 100.0 | round: 2 }},
-    gemstone_pcs:         {{ gemstone_pcs | default: 0 }}
-  };
-
-  function pushTabClick(tabName, savingsAmount = null) {
-
-    let promoPosition = 'Product Details Section';
-    if (tabName === 'Your Savings' && savingsAmount) {
-      promoPosition = savingsAmount;
-    }
-
-    const promoData = {
-      event: 'promoClick',
-      promoClick: {
-
-        // Promotion Info
-        creative_name: tabName === 'Price Breakup' ? 'priceBreakup' : 'yourSavings',
-        promo_id: variantData.sku || '',
-        promo_name: productData.title,
-        promo_position: promoPosition,
-        position: '-',
-
-        // Product Info
-        product_id: productData.id,
-        product_name: productData.title,
-        sku: variantData.sku,
-        variant_id: variantData.id,
-        location_id: variantData.id,
-
-        // URL & Image
-        product_url: window.location.href,
-        product_image: productData.featured_image ? productData.featured_image : '',
-
-        // Pricing
-        price: variantData.price / 100,
-        offer_price: variantData.price / 100,
-
-        // ✅ Price Breakup Values (from image)
-        metal_label:          priceBreakup.metal_purity + ' ' + priceBreakup.metal_color + ' Gold',
-        gold_rate_per_g:      priceBreakup.gold_rate_per_g,
-        metal_price:          priceBreakup.metal_cost,
-
-        diamond_price_original:     priceBreakup.diamond_original,
-        diamond_price_final:        priceBreakup.diamond_final,
-        diamond_discount_percent:   priceBreakup.diamond_discount_pct,
-        diamond_pcs:                priceBreakup.diamond_pcs,
-
-        making_charges_original:    priceBreakup.making_original,
-        making_charges_final:       priceBreakup.making_final,
-        making_charges_discount_pct: priceBreakup.making_discount_pct,
-
-        gst_percent:          priceBreakup.gst_percent,
-        gst_amount:           priceBreakup.gst_amount,
-
-        gemstone_price_original:    priceBreakup.gemstone_original,
-        gemstone_price_final:       priceBreakup.gemstone_final,
-        gemstone_pcs:               priceBreakup.gemstone_pcs,
-
-        grand_total:          priceBreakup.grand_total,
-
-        // Savings (only for savings tab)
-        savings_amount: savingsAmount || 0,
-
-        // Optional
-        email: '',
-        phone: ''
-      }
-    };
-
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push(promoData);
-  }
-
-  function onTabClick(event) {
-    const switchItem = event.target.closest('.contained-switch');
-    if (!switchItem) return;
-
-    const wrapper = switchItem.closest('.pdp-tab-wrapper');
-    if (!wrapper) return;
-
-    const tabId = switchItem.getAttribute('data-tab');
-
-    if (tabId === 'price-breakup') {
-      pushTabClick('Price Breakup');
-    } else if (tabId === 'comparison') {
-      pushTabClick('Your Savings', totalSavings);
-    }
-
-    const allSwitches = wrapper.querySelectorAll('.contained-switch');
-    allSwitches.forEach((s) => s.classList.remove('active'));
-    switchItem.classList.add('active');
-
-    const index = Array.from(allSwitches).indexOf(switchItem);
-    if (switchItem.parentElement) {
-      switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
-    }
-
-    const allContents = wrapper.querySelectorAll('.tab-content');
-    allContents.forEach((content) => content.classList.remove('active'));
-
-    const activeContent = wrapper.querySelector(`#${tabId}`);
-    if (activeContent) activeContent.classList.add('active');
-  }
-
-  document.addEventListener('click', onTabClick);
-
-});
-</script>
+    </script>
 
 
   {% endunless %}
