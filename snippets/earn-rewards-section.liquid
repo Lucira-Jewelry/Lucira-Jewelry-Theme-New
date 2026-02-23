@@ -879,33 +879,27 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
+  // ── PERSIST ──────────────────────────────────────────────────────────────
   function saveLocalState() {
-      try {
-          if (window.customerData?.id) state.customerId = window.customerData.id;
-          localStorage.setItem(CONFIG.storageKey, JSON.stringify(state));
-      } catch (e) {
-          console.warn("Storage access denied. Progress will not persist if page is refreshed.");
-      }
+    if (window.customerData?.id) state.customerId = window.customerData.id;
+    localStorage.setItem(CONFIG.storageKey, JSON.stringify(state));
   }
 
   function loadLocalState() {
-      try {
-          const saved = localStorage.getItem(CONFIG.storageKey);
-          if (!saved) return;
-          const parsed = JSON.parse(saved);
-          if (window.customerData?.id) {
-              if (!parsed.customerId || parsed.customerId.toString() !== window.customerData.id.toString()) {
-                  resetState(); return;
-              }
-          }
-          state = { ...state, ...parsed };
-          if (!Array.isArray(state.rewardedSteps))  state.rewardedSteps  = [];
-          if (!Array.isArray(state.completedSteps)) state.completedSteps = [];
-          restoreFormInputs();
-      } catch(e) { 
-          console.error('State load error', e); 
-          // We don't call resetState() here to avoid recursive try/catch loops
+    const saved = localStorage.getItem(CONFIG.storageKey);
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved);
+      if (window.customerData?.id) {
+        if (!parsed.customerId || parsed.customerId.toString() !== window.customerData.id.toString()) {
+          resetState(); return;
+        }
       }
+      state = { ...state, ...parsed };
+      if (!Array.isArray(state.rewardedSteps))  state.rewardedSteps  = [];
+      if (!Array.isArray(state.completedSteps)) state.completedSteps = [];
+      restoreFormInputs();
+    } catch(e) { console.error('State parse error', e); resetState(); }
   }
 
   function resetState() {
@@ -1057,61 +1051,33 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }, 800);
 
+  // ── API — fetch progress from server ─────────────────────────────────────
   async function fetchProgressFromServer() {
     try {
-        if (!window.customerData?.id) return;
+      const id  = `shopify-${window.customerData.id}`;
+      const res = await fetch(`${CONFIG.apiBase}/get-progress.php?customer_id=${id}&t=${Date.now()}`);
+      const d   = await res.json();
+      if (!d.success) return;
 
-        // Format as shopify-XXXXX for the backend
-        const customerId = 'shopify-' + window.customerData.id.toString().replace('shopify-', '');
-        const url = `${CONFIG.apiBase}/get-progress.php?customer_id=${encodeURIComponent(customerId)}&t=${Date.now()}`;
-        console.log('Fetching progress from:', url);
-        
-        const res = await fetch(url);
+      state.rewardedSteps  = (d.rewarded_steps  || []).map(Number);
+      state.completedSteps = (d.completed_steps || []).map(Number);
+      state.maxStepReached = Math.max(0, ...state.rewardedSteps);
+      state.profileComplete = !!d.profile_complete;
 
-        if (!res.ok) {
-            console.warn('Server returned HTTP', res.status);
-            return;
-        }
+      // Restore step data from server — stored as { step_1: {...}, step_2: {...} }
+      if (d.form_data && typeof d.form_data === 'object') {
+        Object.entries(d.form_data).forEach(([key, stepData]) => {
+          // get-progress.php returns keys like "step_1", "step_2"
+          if (stepData && typeof stepData === 'object') {
+            state.formData[key] = stepData;
+          }
+        });
+        restoreFormInputs();
+      }
 
-        const text = await res.text();
-
-        // Safety check: If the response contains HTML tags, it's a PHP error, not JSON
-        if (text.includes('<b>') || text.includes('<br')) {
-            console.error('PHP Error detected in response:', text);
-            return;
-        }
-
-        let d;
-        try {
-            d = JSON.parse(text);
-        } catch (e) {
-            console.error('Parsing Error. Raw response:', text);
-            return;
-        }
-
-        if (!d.success) return;
-
-        // ... rest of your existing logic to update state ...
-        state.rewardedSteps  = (d.rewarded_steps  || []).map(Number);
-        state.completedSteps = (d.completed_steps || []).map(Number);
-        state.maxStepReached = Math.max(0, ...state.rewardedSteps);
-        state.profileComplete = !!d.profile_complete;
-
-        if (d.form_data && typeof d.form_data === 'object') {
-            Object.entries(d.form_data).forEach(([key, stepData]) => {
-                if (stepData && typeof stepData === 'object') {
-                    state.formData[key] = stepData;
-                }
-            });
-            restoreFormInputs();
-        }
-
-        if (state.profileComplete) state.currentStep = 4;
-        saveLocalState();
-
-    } catch (e) {
-        console.error('Server sync failed', e);
-    }
+      if (state.profileComplete) state.currentStep = 4;
+      saveLocalState();
+    } catch(e) { console.error('Server sync failed', e); }
   }
 
   // ── API — save step (on Continue click, with coin reward) ─────────────────
