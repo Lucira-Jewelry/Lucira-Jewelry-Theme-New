@@ -404,12 +404,38 @@ try {
 }
 
 function shopifyAutoLogin(email, password) {
-var currentPath = window.location.pathname + window.location.search;
-document.getElementById('loginReturnTo').value = currentPath;
-document.getElementById('ShopifyEmail').value = email;
-document.getElementById('ShopifyPassword').value = password;
-document.getElementById('shopify-auto-login-form').submit();
+    // Create a hidden form for Shopify login
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/account/login';
+    form.style.display = 'none';
+
+    // Add email field
+    const emailInput = document.createElement('input');
+    emailInput.type = 'hidden';
+    emailInput.name = 'customer[email]';
+    emailInput.value = email;
+    form.appendChild(emailInput);
+
+    // Add password field
+    const passwordInput = document.createElement('input');
+    passwordInput.type = 'hidden';
+    passwordInput.name = 'customer[password]';
+    passwordInput.value = password;
+    form.appendChild(passwordInput);
+
+    // Add return URL to redirect after login
+    const returnInput = document.createElement('input');
+    returnInput.type = 'hidden';
+    returnInput.name = 'return_to';
+    returnInput.value = window.location.pathname + window.location.search;
+    form.appendChild(returnInput);
+
+    // Add form to page and submit
+    document.body.appendChild(form);
+    form.submit();
 }
+
 
 function showSignupWithSpinWheel() {
 const wrapper = document.querySelector('.otp-login-form-wrapper');
