@@ -350,69 +350,206 @@
 
   {% if product.metafields.custom.matching_product != blank %}
 <script>
-  (function () {
-    const STORAGE_KEY = 'exit_intent_triggered_{{ product.id }}';
-    let drawerOpenedThisSession = false;
+(function () {
+  'use strict';
 
-    function openSimilarDrawer() {
-      const btn = document.querySelector('.view-similar-btn');
-      if (btn) {
-        btn.click();
-      }
+  const STORAGE_KEY = 'exit_intent_{{ product.id }}';
+  const MIN_TIME_ON_PAGE_MS = 5000;       // Must spend 5s before we even consider triggering
+  const MIN_SCROLL_DEPTH_PERCENT = 25;    // Must scroll 25% of page depth before trigger is armed
+  const MOBILE_SCROLL_UP_THRESHOLD = 0.30; // Must scroll back UP 30% from their max scroll point
+  const MOBILE_MAX_DEPTH_TO_ARM = 0.30;   // Max scroll depth % user must reach to arm mobile trigger
+
+  let triggered = false;
+  let armed = false; // trigger is "armed" only after engagement conditions are met
+  const pageEnterTime = Date.now();
+
+  // ── Utilities ────────────────────────────────────────────────────────────────
+
+  function hasTriggeredThisSession() {
+    return !!sessionStorage.getItem(STORAGE_KEY);
+  }
+
+  function markTriggered() {
+    triggered = true;
+    sessionStorage.setItem(STORAGE_KEY, '1');
+  }
+
+  function openSimilarDrawer() {
+    const btn = document.querySelector('.view-similar-btn');
+    if (btn) btn.click();
+  }
+
+  function timeOnPage() {
+    return Date.now() - pageEnterTime;
+  }
+
+  function getPageScrollPercent() {
+    const scrollTop = window.scrollY || document.documentElement.scrollTop;
+    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+    return docHeight > 0 ? scrollTop / docHeight : 0;
+  }
+
+  function canTrigger() {
+    if (triggered) return false;
+    if (hasTriggeredThisSession()) return false;
+    if (timeOnPage() < MIN_TIME_ON_PAGE_MS) return false;
+    return true;
+  }
+
+  // ── ARM: watch scroll depth to arm the trigger ───────────────────────────────
+  // We only arm after the user has shown genuine engagement (scrolled down enough)
+
+  function checkArmCondition() {
+    if (armed) return;
+    const depth = getPageScrollPercent() * 100;
+    if (depth >= MIN_SCROLL_DEPTH_PERCENT) {
+      armed = true;
     }
+  }
 
-    function shouldTrigger() {
-      // Already opened in this page load → let them exit freely
-      if (drawerOpenedThisSession) return false;
-      // Already triggered in this session for this product → let them exit freely
-      if (sessionStorage.getItem(STORAGE_KEY)) return false;
-      return true;
-    }
+  // ════════════════════════════════════════════════════════════════════════════
+  // DESKTOP LOGIC
+  // Better exit detection: mouse must be moving UPWARD and exit from top 50px
+  // ════════════════════════════════════════════════════════════════════════════
 
-    function trigger() {
-      drawerOpenedThisSession = true;
-      sessionStorage.setItem(STORAGE_KEY, '1');
-      openSimilarDrawer();
-    }
+  let lastMouseY = null;
+  let mouseVelocityY = 0;
+  let mouseTrackInterval = null;
+  let pendingMouseY = null;
 
-    // ── Desktop: mouse leaves from the top of the viewport ──
-    function onMouseLeave(e) {
-      // Only fire when cursor exits from the TOP (towards browser chrome/tab bar)
-      if (e.clientY > 20) return;
-      if (!shouldTrigger()) return;
-      trigger();
-    }
+  function trackMouseVelocity(e) {
+    pendingMouseY = e.clientY;
+  }
 
-    // ── Mobile: Page Visibility (tab switch / back gesture) ──
-    // Note: we can't open UI when hidden, so we store intent
-    // and open drawer if user comes back quickly (within 3s)
-    let hiddenAt = null;
+  function startMouseTracking() {
+    document.addEventListener('mousemove', trackMouseVelocity, { passive: true });
 
-    function onVisibilityChange() {
-      if (document.visibilityState === 'hidden') {
-        if (!shouldTrigger()) return;
-        hiddenAt = Date.now();
-        // Mark session now so second hide = free exit
-        sessionStorage.setItem(STORAGE_KEY, '1');
-        drawerOpenedThisSession = true;
-      } else if (document.visibilityState === 'visible') {
-        // User came back — open the drawer if they left recently (back gesture / tab switch)
-        if (hiddenAt && (Date.now() - hiddenAt) < 3000) {
-          openSimilarDrawer();
+    // Sample velocity every 100ms to avoid firing on every pixel
+    mouseTrackInterval = setInterval(() => {
+      if (pendingMouseY !== null) {
+        if (lastMouseY !== null) {
+          mouseVelocityY = pendingMouseY - lastMouseY; // negative = moving up
         }
-        hiddenAt = null;
+        lastMouseY = pendingMouseY;
+        pendingMouseY = null;
       }
+    }, 100);
+  }
+
+  function onMouseLeave(e) {
+    // Only care about exits from the TOP of the viewport
+    if (e.clientY > 50) return;
+
+    // Mouse must be moving UPWARD (negative velocity) — ignore accidental clips
+    if (mouseVelocityY >= 0) return;
+
+    // Engagement gate
+    if (!armed) return;
+    if (!canTrigger()) return;
+
+    markTriggered();
+    openSimilarDrawer();
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MOBILE LOGIC
+  // Behavior model: user scrolled deep → now scrolling back UP significantly
+  // = high probability they are done and going to navigate away
+  // ════════════════════════════════════════════════════════════════════════════
+
+  let maxScrollY = 0;                  // Deepest point user has scrolled to
+  let maxScrollReached = false;        // Did they hit our arm depth?
+  let mobileScrollDebounce = null;
+  let lastScrollY = window.scrollY;
+  let scrollDirectionChangedAt = null; // When did they start scrolling up?
+  let scrollUpStartY = null;           // ScrollY at the moment they reversed direction
+
+  function onMobileScroll() {
+    const currentScrollY = window.scrollY;
+    const scrollPercent = getPageScrollPercent();
+
+    // Track deepest point
+    if (currentScrollY > maxScrollY) {
+      maxScrollY = currentScrollY;
     }
 
-    // ── Init: only attach if the similar button actually exists in DOM ──
-    document.addEventListener('DOMContentLoaded', function () {
-      const btn = document.querySelector('.view-similar-btn');
-      if (!btn) return; // metafield exists in Liquid but double-check at runtime
+    // Arm if they've scrolled deep enough
+    if (scrollPercent >= MOBILE_MAX_DEPTH_TO_ARM) {
+      maxScrollReached = true;
+    }
 
+    // Detect direction change: were going down, now going up
+    const scrollingUp = currentScrollY < lastScrollY;
+
+    if (scrollingUp) {
+      if (scrollDirectionChangedAt === null) {
+        // Just started scrolling up — record this pivot point
+        scrollDirectionChangedAt = currentScrollY;
+        scrollUpStartY = currentScrollY;
+      }
+    } else {
+      // Scrolling down again — reset the upward tracking
+      scrollDirectionChangedAt = null;
+      scrollUpStartY = null;
+    }
+
+    lastScrollY = currentScrollY;
+
+    // Check trigger conditions on a debounce
+    clearTimeout(mobileScrollDebounce);
+    mobileScrollDebounce = setTimeout(() => {
+      if (!maxScrollReached) return;
+      if (!canTrigger()) return;
+      if (scrollUpStartY === null) return;
+
+      // How much have they scrolled up from their max depth?
+      const scrolledUpPx = maxScrollY - currentScrollY;
+      const viewportHeight = window.innerHeight;
+      const scrolledUpRatio = scrolledUpPx / viewportHeight;
+
+      // How close to the top are they now?
+      const currentDepthPercent = getPageScrollPercent();
+
+      // Trigger if: scrolled up 30%+ of viewport height AND heading back toward top
+      if (scrolledUpRatio >= MOBILE_SCROLL_UP_THRESHOLD && currentDepthPercent < 0.25) {
+        markTriggered();
+        openSimilarDrawer();
+      }
+    }, 150); // 150ms debounce
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // INIT
+  // ════════════════════════════════════════════════════════════════════════════
+
+  function isMobile() {
+    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
+  }
+
+  function init() {
+    const btn = document.querySelector('.view-similar-btn');
+    if (!btn) return; // No similar items → don't attach anything
+
+    if (hasTriggeredThisSession()) return; // Already shown this session
+
+    // Always track scroll for arming (both desktop + mobile)
+    window.addEventListener('scroll', checkArmCondition, { passive: true });
+
+    if (isMobile()) {
+      window.addEventListener('scroll', onMobileScroll, { passive: true });
+    } else {
+      startMouseTracking();
       document.addEventListener('mouseleave', onMouseLeave);
-      document.addEventListener('visibilitychange', onVisibilityChange);
-    });
-  })();
+    }
+  }
+
+  // Wait for DOM to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();
 </script>
 {% endif %}
 
