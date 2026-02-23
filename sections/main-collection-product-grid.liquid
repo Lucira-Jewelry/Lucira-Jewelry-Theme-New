@@ -138,14 +138,6 @@
                       <div class="lucira-plp-pg-component">
                         <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
                           {% if section.settings.plp_banner_id != blank %}
-                            {% comment %}
-                              <img class="lucira-plp-pg-component-image"
-                              src="{{ section.settings.plp_banner_id | img_url: 'master' }}"
-                              alt="PLP Banner"
-                              title="PLP Banner"
-                              href="https://www.lucirajewelry.com/collections/hexa"
-                              width="374" height="420">
-                            {% endcomment %}
                             <picture class="lucira-plp-pg-component-image-wrapper-picture">
                               {% if section.settings.plp_banner_mobile_id != blank %}
                                 <source
@@ -185,8 +177,19 @@
                   {% if forloop.index <= 4 %}
                     {% assign lazy_load_image = false %}
                   {% endif %}
+
+                  {%- comment -%}
+                    Capture the discount_percentage metafield silently.
+                    We output it as a hidden <span> INSIDE the <li> (after the card render)
+                    so the value is embedded in the card HTML and survives every AJAX
+                    section re-render. facets.js reads it via
+                    li.querySelector('.js-discount-value').dataset.v
+                  {%- endcomment -%}
+                  {%- capture _disc_raw -%}{{ product.variants.first.metafields.custom.discount_percentage }}{%- endcapture -%}
+                  {%- assign _disc_val = _disc_raw | strip | default: '0' -%}
+
                   <li class="grid__item">
-                    {% render 'card-product',
+                    {%- render 'card-product',
                       card_product: product,
                       diamond_percent: diamond_percent,
                       mc_percent: mc_percent,
@@ -197,7 +200,11 @@
                       show_vendor: section.settings.show_vendor,
                       show_rating: section.settings.show_rating,
                       section_id: section.id
-                    %}
+                    -%}
+
+
+                    <span class="js-discount-value" data-v="{{ _disc_val }}" style="display:none!important;visibility:hidden;position:absolute;width:0;height:0;overflow:hidden;" aria-hidden="true"></span>
+                    
                   </li>
                 {% endunless %}
               {%- endfor -%}
@@ -212,12 +219,6 @@
                 </a>
               {%- endif -%}
             </infinite-scroll>
-
-            {% comment %}
-              {%- if paginate.pages > 1 -%}
-                {% render 'pagination', paginate: paginate, anchor: '' %}
-              {%- endif -%}
-            {% endcomment %}
           </div>
         {%- endif -%}
       </div>
