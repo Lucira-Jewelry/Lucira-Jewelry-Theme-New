@@ -1051,7 +1051,34 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }, 800);
 
-  
+  // ── API — fetch progress from server ─────────────────────────────────────
+  async function fetchProgressFromServer() {
+    try {
+      const id  = `shopify-${window.customerData.id}`;
+      const res = await fetch(`${CONFIG.apiBase}/get-progress.php?customer_id=${id}&t=${Date.now()}`);
+      const d   = await res.json();
+      if (!d.success) return;
+
+      state.rewardedSteps  = (d.rewarded_steps  || []).map(Number);
+      state.completedSteps = (d.completed_steps || []).map(Number);
+      state.maxStepReached = Math.max(0, ...state.rewardedSteps);
+      state.profileComplete = !!d.profile_complete;
+
+      // Restore step data from server — stored as { step_1: {...}, step_2: {...} }
+      if (d.form_data && typeof d.form_data === 'object') {
+        Object.entries(d.form_data).forEach(([key, stepData]) => {
+          // get-progress.php returns keys like "step_1", "step_2"
+          if (stepData && typeof stepData === 'object') {
+            state.formData[key] = stepData;
+          }
+        });
+        restoreFormInputs();
+      }
+
+      if (state.profileComplete) state.currentStep = 4;
+      saveLocalState();
+    } catch(e) { console.error('Server sync failed', e); }
+  }
 
   // ── API — save step (on Continue click, with coin reward) ─────────────────
   const _apiInFlight = new Set();
@@ -1330,7 +1357,13 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  
+  // ── INIT ─────────────────────────────────────────────────────────────────
+  async function init() {
+    loadLocalState();
+    bindEvents();
+    if (window.customerData?.id) await fetchProgressFromServer();
+    renderUI();
+  }
 
   init();
 });
