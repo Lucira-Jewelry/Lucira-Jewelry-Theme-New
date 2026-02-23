@@ -353,203 +353,322 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'exit_intent_{{ product.id }}';
-  const MIN_TIME_ON_PAGE_MS = 5000;       // Must spend 5s before we even consider triggering
-  const MIN_SCROLL_DEPTH_PERCENT = 25;    // Must scroll 25% of page depth before trigger is armed
-  const MOBILE_SCROLL_UP_THRESHOLD = 0.30; // Must scroll back UP 30% from their max scroll point
-  const MOBILE_MAX_DEPTH_TO_ARM = 0.30;   // Max scroll depth % user must reach to arm mobile trigger
+  // ─── Config ──────────────────────────────────────────────────────────────────
+  const CONFIG = Object.freeze({
+    STORAGE_KEY:              'exit_intent_{{ product.id }}',
+    MIN_TIME_ON_PAGE_MS:      4000,    // Must spend 4s on page before trigger can fire
+    MIN_SCROLL_DEPTH_PERCENT: 25,      // Must scroll 25% before trigger is armed
 
-  let triggered = false;
-  let armed = false; // trigger is "armed" only after engagement conditions are met
-  const pageEnterTime = Date.now();
+    // Desktop
+    MOUSE_EXIT_MAX_Y:         50,      // px from top — cursor must exit above this line
 
-  // ── Utilities ────────────────────────────────────────────────────────────────
+    // Mobile scroll-based
+    SCROLL_ARM_DEPTH:         0.30,    // Must reach 30% depth to arm
+    SCROLL_UP_RATIO:          0.30,    // Must scroll back up 30% of viewport height
+    SCROLL_RETURN_TO_TOP:     0.20,    // Must be back in top 20% of page
+
+    // Mobile edge-swipe (back gesture)
+    IOS_EDGE_MAX_X:           50,      // px from LEFT edge for iOS back swipe start
+    ANDROID_EDGE_MIN_X_RATIO: 0.85,   // % from RIGHT edge for Android back swipe start
+    SWIPE_MIN_DELTA_X:        80,      // Min horizontal travel (px) to count as back swipe
+    SWIPE_MAX_DELTA_Y:        80,      // Max vertical drift allowed (keeps it a horizontal swipe)
+    SWIPE_MIN_VELOCITY:       0.4,     // px/ms — must be fast enough to be intentional
+
+    // Mobile visibility (tab hide / home button)
+    VISIBILITY_RETURN_WINDOW: 3000,    // ms — if user returns within this, open drawer
+  });
+
+  // ─── State (fully isolated — no globals) ────────────────────────────────────
+  const state = {
+    triggered:          false,
+    armed:              false,
+    pageEnterTime:      Date.now(),
+
+    // Mouse tracking (desktop)
+    lastMouseY:         null,
+    mouseVelocityY:     0,
+    pendingMouseY:      null,
+    mouseTrackTimer:    null,
+
+    // Mobile scroll
+    maxScrollY:         0,
+    lastScrollY:        window.scrollY,
+    scrollUpStartY:     null,
+    scrollDebounce:     null,
+
+    // Touch / swipe
+    touchStartX:        null,
+    touchStartY:        null,
+    touchStartTime:     null,
+    touchEdgeType:      null, // 'ios-left' | 'android-right' | null
+
+    // Visibility
+    hiddenAt:           null,
+  };
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────────
 
   function hasTriggeredThisSession() {
-    return !!sessionStorage.getItem(STORAGE_KEY);
+    try { return !!sessionStorage.getItem(CONFIG.STORAGE_KEY); } catch (e) { return false; }
   }
 
   function markTriggered() {
-    triggered = true;
-    sessionStorage.setItem(STORAGE_KEY, '1');
+    state.triggered = true;
+    try { sessionStorage.setItem(CONFIG.STORAGE_KEY, '1'); } catch (e) {}
   }
 
   function openSimilarDrawer() {
-    const btn = document.querySelector('.view-similar-btn');
+    // Scoped querySelector — only touches .view-similar-btn, nothing else
+    const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
     if (btn) btn.click();
   }
 
   function timeOnPage() {
-    return Date.now() - pageEnterTime;
+    return Date.now() - state.pageEnterTime;
   }
 
-  function getPageScrollPercent() {
-    const scrollTop = window.scrollY || document.documentElement.scrollTop;
-    const docHeight = document.documentElement.scrollHeight - window.innerHeight;
-    return docHeight > 0 ? scrollTop / docHeight : 0;
+  function getScrollPercent() {
+    const docH = document.documentElement.scrollHeight - window.innerHeight;
+    return docH > 0 ? window.scrollY / docH : 0;
   }
 
   function canTrigger() {
-    if (triggered) return false;
-    if (hasTriggeredThisSession()) return false;
-    if (timeOnPage() < MIN_TIME_ON_PAGE_MS) return false;
+    if (state.triggered)               return false;
+    if (hasTriggeredThisSession())     return false;
+    if (timeOnPage() < CONFIG.MIN_TIME_ON_PAGE_MS) return false;
+    if (!state.armed)                  return false;
     return true;
   }
 
-  // ── ARM: watch scroll depth to arm the trigger ───────────────────────────────
-  // We only arm after the user has shown genuine engagement (scrolled down enough)
-
-  function checkArmCondition() {
-    if (armed) return;
-    const depth = getPageScrollPercent() * 100;
-    if (depth >= MIN_SCROLL_DEPTH_PERCENT) {
-      armed = true;
-    }
-  }
-
-  // ════════════════════════════════════════════════════════════════════════════
-  // DESKTOP LOGIC
-  // Better exit detection: mouse must be moving UPWARD and exit from top 50px
-  // ════════════════════════════════════════════════════════════════════════════
-
-  let lastMouseY = null;
-  let mouseVelocityY = 0;
-  let mouseTrackInterval = null;
-  let pendingMouseY = null;
-
-  function trackMouseVelocity(e) {
-    pendingMouseY = e.clientY;
-  }
-
-  function startMouseTracking() {
-    document.addEventListener('mousemove', trackMouseVelocity, { passive: true });
-
-    // Sample velocity every 100ms to avoid firing on every pixel
-    mouseTrackInterval = setInterval(() => {
-      if (pendingMouseY !== null) {
-        if (lastMouseY !== null) {
-          mouseVelocityY = pendingMouseY - lastMouseY; // negative = moving up
-        }
-        lastMouseY = pendingMouseY;
-        pendingMouseY = null;
-      }
-    }, 100);
-  }
-
-  function onMouseLeave(e) {
-    // Only care about exits from the TOP of the viewport
-    if (e.clientY > 50) return;
-
-    // Mouse must be moving UPWARD (negative velocity) — ignore accidental clips
-    if (mouseVelocityY >= 0) return;
-
-    // Engagement gate
-    if (!armed) return;
+  function doTrigger(source) {
     if (!canTrigger()) return;
-
     markTriggered();
     openSimilarDrawer();
   }
 
-  // ════════════════════════════════════════════════════════════════════════════
-  // MOBILE LOGIC
-  // Behavior model: user scrolled deep → now scrolling back UP significantly
-  // = high probability they are done and going to navigate away
-  // ════════════════════════════════════════════════════════════════════════════
+  function isMobileDevice() {
+    return (
+      /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      ('ontouchstart' in window) ||
+      (window.innerWidth <= 768)
+    );
+  }
 
-  let maxScrollY = 0;                  // Deepest point user has scrolled to
-  let maxScrollReached = false;        // Did they hit our arm depth?
-  let mobileScrollDebounce = null;
-  let lastScrollY = window.scrollY;
-  let scrollDirectionChangedAt = null; // When did they start scrolling up?
-  let scrollUpStartY = null;           // ScrollY at the moment they reversed direction
+  function isIOS() {
+    return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  }
 
-  function onMobileScroll() {
-    const currentScrollY = window.scrollY;
-    const scrollPercent = getPageScrollPercent();
+  // ─── ARM: scroll engagement gate (shared desktop + mobile) ──────────────────
 
-    // Track deepest point
-    if (currentScrollY > maxScrollY) {
-      maxScrollY = currentScrollY;
+  function checkArm() {
+    if (state.armed) return;
+    if (getScrollPercent() * 100 >= CONFIG.MIN_SCROLL_DEPTH_PERCENT) {
+      state.armed = true;
     }
+  }
 
-    // Arm if they've scrolled deep enough
-    if (scrollPercent >= MOBILE_MAX_DEPTH_TO_ARM) {
-      maxScrollReached = true;
-    }
+  // ════════════════════════════════════════════════════════════════════════════
+  // DESKTOP
+  // ════════════════════════════════════════════════════════════════════════════
 
-    // Detect direction change: were going down, now going up
-    const scrollingUp = currentScrollY < lastScrollY;
+  function initDesktop() {
+    // Sample mouse Y every 100ms for velocity without hogging scroll thread
+    document.addEventListener('mousemove', function(e) {
+      state.pendingMouseY = e.clientY;
+    }, { passive: true });
 
-    if (scrollingUp) {
-      if (scrollDirectionChangedAt === null) {
-        // Just started scrolling up — record this pivot point
-        scrollDirectionChangedAt = currentScrollY;
-        scrollUpStartY = currentScrollY;
+    state.mouseTrackTimer = setInterval(function() {
+      if (state.pendingMouseY !== null) {
+        if (state.lastMouseY !== null) {
+          state.mouseVelocityY = state.pendingMouseY - state.lastMouseY;
+        }
+        state.lastMouseY = state.pendingMouseY;
+        state.pendingMouseY = null;
       }
-    } else {
-      // Scrolling down again — reset the upward tracking
-      scrollDirectionChangedAt = null;
-      scrollUpStartY = null;
-    }
+    }, 100);
 
-    lastScrollY = currentScrollY;
+    document.addEventListener('mouseleave', function(e) {
+      if (e.clientY > CONFIG.MOUSE_EXIT_MAX_Y) return; // Not exiting from top
+      if (state.mouseVelocityY >= 0) return;           // Not moving upward
+      doTrigger('desktop-mouseleave');
+    });
+  }
 
-    // Check trigger conditions on a debounce
-    clearTimeout(mobileScrollDebounce);
-    mobileScrollDebounce = setTimeout(() => {
-      if (!maxScrollReached) return;
+  // ════════════════════════════════════════════════════════════════════════════
+  // MOBILE — SCROLL BEHAVIOR MODEL
+  // Scroll deep → scroll back up significantly → near top = exit intent
+  // ════════════════════════════════════════════════════════════════════════════
+
+  function initMobileScroll() {
+    window.addEventListener('scroll', function() {
+      const currentY   = window.scrollY;
+      const scrollPct  = getScrollPercent();
+      const scrollingUp = currentY < state.lastScrollY;
+
+      // Track deepest point
+      if (currentY > state.maxScrollY) state.maxScrollY = currentY;
+
+      // Arm on depth
+      if (scrollPct >= CONFIG.SCROLL_ARM_DEPTH) state.armed = true;
+
+      // Track upward scroll pivot
+      if (scrollingUp && state.scrollUpStartY === null) {
+        state.scrollUpStartY = currentY;
+      }
+      if (!scrollingUp) {
+        state.scrollUpStartY = null; // reset if they go back down
+      }
+
+      state.lastScrollY = currentY;
+
+      clearTimeout(state.scrollDebounce);
+      state.scrollDebounce = setTimeout(function() {
+        if (!canTrigger()) return;
+        if (state.scrollUpStartY === null) return;
+
+        const scrolledUpPx   = state.maxScrollY - currentY;
+        const upRatio        = scrolledUpPx / window.innerHeight;
+        const currentDepth   = getScrollPercent();
+
+        if (upRatio >= CONFIG.SCROLL_UP_RATIO && currentDepth < CONFIG.SCROLL_RETURN_TO_TOP) {
+          doTrigger('mobile-scroll-up');
+        }
+      }, 150);
+    }, { passive: true });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MOBILE — EDGE SWIPE BACK GESTURE
+  //
+  // iOS Safari:   Swipe RIGHT from LEFT edge   → back navigation
+  // Android:      Swipe LEFT from RIGHT edge   → back navigation (gesture nav)
+  //
+  // We intercept the INTENT (touchstart near edge + directional swipe)
+  // BEFORE the browser processes it — giving time to open the drawer.
+  // ════════════════════════════════════════════════════════════════════════════
+
+  function initEdgeSwipe() {
+    const screenW = window.innerWidth;
+    const androidEdgeMinX = screenW * CONFIG.ANDROID_EDGE_MIN_X_RATIO;
+
+    document.addEventListener('touchstart', function(e) {
+      const touch = e.touches[0];
+      state.touchStartX    = touch.clientX;
+      state.touchStartY    = touch.clientY;
+      state.touchStartTime = Date.now();
+      state.touchEdgeType  = null;
+
+      // Detect edge origin
+      if (isIOS() && touch.clientX <= CONFIG.IOS_EDGE_MAX_X) {
+        state.touchEdgeType = 'ios-left';
+      } else if (!isIOS() && touch.clientX >= androidEdgeMinX) {
+        state.touchEdgeType = 'android-right';
+      }
+    }, { passive: true });
+
+    document.addEventListener('touchend', function(e) {
+      if (!state.touchEdgeType) return;          // Not an edge touch
       if (!canTrigger()) return;
-      if (scrollUpStartY === null) return;
 
-      // How much have they scrolled up from their max depth?
-      const scrolledUpPx = maxScrollY - currentScrollY;
-      const viewportHeight = window.innerHeight;
-      const scrolledUpRatio = scrolledUpPx / viewportHeight;
+      const touch     = e.changedTouches[0];
+      const deltaX    = touch.clientX - state.touchStartX;
+      const deltaY    = Math.abs(touch.clientY - state.touchStartY);
+      const elapsed   = Date.now() - state.touchStartTime;
+      const velocityX = Math.abs(deltaX) / (elapsed || 1);
 
-      // How close to the top are they now?
-      const currentDepthPercent = getPageScrollPercent();
+      const isRightSwipe = deltaX > 0;   // iOS back = swipe right
+      const isLeftSwipe  = deltaX < 0;   // Android back = swipe left
 
-      // Trigger if: scrolled up 30%+ of viewport height AND heading back toward top
-      if (scrolledUpRatio >= MOBILE_SCROLL_UP_THRESHOLD && currentDepthPercent < 0.25) {
-        markTriggered();
-        openSimilarDrawer();
+      const horizontalEnough = Math.abs(deltaX) >= CONFIG.SWIPE_MIN_DELTA_X;
+      const verticalOk       = deltaY <= CONFIG.SWIPE_MAX_DELTA_Y;
+      const fastEnough       = velocityX >= CONFIG.SWIPE_MIN_VELOCITY;
+
+      let isBackSwipe = false;
+
+      if (state.touchEdgeType === 'ios-left' && isRightSwipe) {
+        isBackSwipe = horizontalEnough && verticalOk && fastEnough;
+      } else if (state.touchEdgeType === 'android-right' && isLeftSwipe) {
+        isBackSwipe = horizontalEnough && verticalOk && fastEnough;
       }
-    }, 150); // 150ms debounce
+
+      if (isBackSwipe) {
+        doTrigger('mobile-edge-swipe');
+      }
+
+      // Reset
+      state.touchEdgeType  = null;
+      state.touchStartX    = null;
+      state.touchStartY    = null;
+      state.touchStartTime = null;
+    }, { passive: true });
+
+    // Cancel if touch is cancelled (interrupted)
+    document.addEventListener('touchcancel', function() {
+      state.touchEdgeType  = null;
+      state.touchStartX    = null;
+      state.touchStartY    = null;
+    }, { passive: true });
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // MOBILE — PAGE VISIBILITY
+  // Catches: home button press, tab switch, lock screen, browser chrome pull
+  // ════════════════════════════════════════════════════════════════════════════
+
+  function initVisibility() {
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        if (!hasTriggeredThisSession() && !state.triggered) {
+          // Mark session now — second hide = real exit, no drawer
+          markTriggered();
+          state.hiddenAt = Date.now();
+        } else {
+          state.hiddenAt = null;
+        }
+      } else if (document.visibilityState === 'visible') {
+        // User came back quickly = they used the back gesture or switched tab briefly
+        if (state.hiddenAt && (Date.now() - state.hiddenAt) < CONFIG.VISIBILITY_RETURN_WINDOW) {
+          // Small delay so page has rendered before we open drawer
+          setTimeout(openSimilarDrawer, 100);
+        }
+        state.hiddenAt = null;
+      }
+    });
   }
 
   // ════════════════════════════════════════════════════════════════════════════
   // INIT
   // ════════════════════════════════════════════════════════════════════════════
 
-  function isMobile() {
-    return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 768;
-  }
-
   function init() {
-    const btn = document.querySelector('.view-similar-btn');
-    if (!btn) return; // No similar items → don't attach anything
+    // Bail if drawer button doesn't exist in DOM
+    const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
+    if (!btn) return;
 
-    if (hasTriggeredThisSession()) return; // Already shown this session
+    // Bail if already shown this session
+    if (hasTriggeredThisSession()) return;
 
-    // Always track scroll for arming (both desktop + mobile)
-    window.addEventListener('scroll', checkArmCondition, { passive: true });
+    // Shared scroll arm listener
+    window.addEventListener('scroll', checkArm, { passive: true });
 
-    if (isMobile()) {
-      window.addEventListener('scroll', onMobileScroll, { passive: true });
+    if (isMobileDevice()) {
+      initMobileScroll();
+      initEdgeSwipe();
+      initVisibility();
     } else {
-      startMouseTracking();
-      document.addEventListener('mouseleave', onMouseLeave);
+      initDesktop();
     }
   }
 
-  // Wait for DOM to be ready
+  // Safe init
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
   }
-})();
+
+})(); // End IIFE — zero global leakage
 </script>
 {% endif %}
 
