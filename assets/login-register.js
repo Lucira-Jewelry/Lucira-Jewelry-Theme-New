@@ -230,6 +230,7 @@ verifyBtn.addEventListener('click', async () => {
     }
 
 
+    // Find this section in verifyBtn click handler (around line 120)
     if (data.type === 'success' && data.credentials) {
         const email = data.credentials.email;
         const mobile = document.getElementById('otpMobile').value.trim();
@@ -238,6 +239,15 @@ verifyBtn.addEventListener('click', async () => {
         shopifyAutoLogin(email, data.credentials.password);
         return;
     }
+
+    // ADD THIS NEW CONDITION:
+    if (data.type === 'already_logged_in') {
+        // Customer is already logged in, just close popup
+        closeloginPopup('login-popup');
+        window.location.reload(); // Refresh to show logged-in state
+        return;
+    }
+
 
 
     if (data.type === 'register') {
@@ -404,36 +414,38 @@ try {
 }
 
 function shopifyAutoLogin(email, password) {
-    // Create a hidden form for Shopify login
-    const form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/account/login';
-    form.style.display = 'none';
+    setTimeout(() => {
+        // Create a hidden form for Shopify login
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/account/login';
+        form.style.display = 'none';
 
-    // Add email field
-    const emailInput = document.createElement('input');
-    emailInput.type = 'hidden';
-    emailInput.name = 'customer[email]';
-    emailInput.value = email;
-    form.appendChild(emailInput);
+        // Add email field
+        const emailInput = document.createElement('input');
+        emailInput.type = 'hidden';
+        emailInput.name = 'customer[email]';
+        emailInput.value = email;
+        form.appendChild(emailInput);
 
-    // Add password field
-    const passwordInput = document.createElement('input');
-    passwordInput.type = 'hidden';
-    passwordInput.name = 'customer[password]';
-    passwordInput.value = password;
-    form.appendChild(passwordInput);
+        // Add password field
+        const passwordInput = document.createElement('input');
+        passwordInput.type = 'hidden';
+        passwordInput.name = 'customer[password]';
+        passwordInput.value = password;
+        form.appendChild(passwordInput);
 
-    // Add return URL to redirect after login
-    const returnInput = document.createElement('input');
-    returnInput.type = 'hidden';
-    returnInput.name = 'return_to';
-    returnInput.value = window.location.pathname + window.location.search;
-    form.appendChild(returnInput);
+        // Add return URL to redirect after login
+        const returnInput = document.createElement('input');
+        returnInput.type = 'hidden';
+        returnInput.name = 'return_to';
+        returnInput.value = window.location.pathname + window.location.search;
+        form.appendChild(returnInput);
 
-    // Add form to page and submit
-    document.body.appendChild(form);
-    form.submit();
+        // Add form to page and submit
+        document.body.appendChild(form);
+        form.submit();
+    }, 500);
 }
 
 
