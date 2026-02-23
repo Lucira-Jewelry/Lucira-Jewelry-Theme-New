@@ -347,6 +347,75 @@
       </div>
     </div>
   </div>
+
+  {% if product.metafields.custom.matching_product != blank %}
+<script>
+  (function () {
+    const STORAGE_KEY = 'exit_intent_triggered_{{ product.id }}';
+    let drawerOpenedThisSession = false;
+
+    function openSimilarDrawer() {
+      const btn = document.querySelector('.view-similar-btn');
+      if (btn) {
+        btn.click();
+      }
+    }
+
+    function shouldTrigger() {
+      // Already opened in this page load → let them exit freely
+      if (drawerOpenedThisSession) return false;
+      // Already triggered in this session for this product → let them exit freely
+      if (sessionStorage.getItem(STORAGE_KEY)) return false;
+      return true;
+    }
+
+    function trigger() {
+      drawerOpenedThisSession = true;
+      sessionStorage.setItem(STORAGE_KEY, '1');
+      openSimilarDrawer();
+    }
+
+    // ── Desktop: mouse leaves from the top of the viewport ──
+    function onMouseLeave(e) {
+      // Only fire when cursor exits from the TOP (towards browser chrome/tab bar)
+      if (e.clientY > 20) return;
+      if (!shouldTrigger()) return;
+      trigger();
+    }
+
+    // ── Mobile: Page Visibility (tab switch / back gesture) ──
+    // Note: we can't open UI when hidden, so we store intent
+    // and open drawer if user comes back quickly (within 3s)
+    let hiddenAt = null;
+
+    function onVisibilityChange() {
+      if (document.visibilityState === 'hidden') {
+        if (!shouldTrigger()) return;
+        hiddenAt = Date.now();
+        // Mark session now so second hide = free exit
+        sessionStorage.setItem(STORAGE_KEY, '1');
+        drawerOpenedThisSession = true;
+      } else if (document.visibilityState === 'visible') {
+        // User came back — open the drawer if they left recently (back gesture / tab switch)
+        if (hiddenAt && (Date.now() - hiddenAt) < 3000) {
+          openSimilarDrawer();
+        }
+        hiddenAt = null;
+      }
+    }
+
+    // ── Init: only attach if the similar button actually exists in DOM ──
+    document.addEventListener('DOMContentLoaded', function () {
+      const btn = document.querySelector('.view-similar-btn');
+      if (!btn) return; // metafield exists in Liquid but double-check at runtime
+
+      document.addEventListener('mouseleave', onMouseLeave);
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    });
+  })();
+</script>
+{% endif %}
+
 </div>
 
 {{ 'photoswipe.min.css' | asset_url | stylesheet_tag }}
