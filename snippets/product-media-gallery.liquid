@@ -341,43 +341,347 @@
   </div>
 </div>
 
+{% comment %} exit intent for similar items shown {% endcomment %}
+
+{% comment %}
+  {% if product.metafields.custom.matching_product != blank %}
+    <script>
+      (function () {
+        'use strict';
+
+        const STORAGE_KEY = 'exit_intent_{{ product.id }}';
+
+        // ─── Config ──────────────────────────────────────────────────────────────────
+        const CONFIG = Object.freeze({
+          // Rapid scroll up (gold standard)
+          RAPID_SCROLL_PX: 120, // px scrolled upward
+          RAPID_SCROLL_MS: 300, // within this many ms
+          SCROLL_ARM_DEPTH_PX: 300, // must scroll down 300px first before trigger arms
+
+          // Visibility return window
+          VISIBILITY_RETURN_MS: 8000, // if user returns within 8s, show drawer
+
+          // Desktop mouse
+          MOUSE_EXIT_MAX_Y: 50,
+        });
+
+        // ─── State ───────────────────────────────────────────────────────────────────
+        const state = {
+          drawn: false, // drawer has been opened once
+          armed: false, // user scrolled deep enough to arm trigger
+          hiddenAt: null, // timestamp when tab went hidden
+          historyPushed: false, // have we pushed our dummy history state
+
+          // Rapid scroll tracking
+          scrollSamples: [], // ring buffer of { y, t }
+          lastScrollY: window.scrollY,
+
+          // Mouse velocity (desktop)
+          lastMouseY: null,
+          mouseVelY: 0,
+          pendingMouseY: null,
+        };
+
+        // ─── Core Helpers ────────────────────────────────────────────────────────────
+
+        function alreadyShown() {
+          try {
+            return !!sessionStorage.getItem(STORAGE_KEY);
+          } catch (e) {
+            return false;
+          }
+        }
+
+        function markShown() {
+          state.drawn = true;
+          try {
+            sessionStorage.setItem(STORAGE_KEY, '1');
+          } catch (e) {}
+        }
+
+        function openDrawer() {
+          const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
+          if (btn) btn.click();
+        }
+
+        function canFire() {
+          return !state.drawn && !alreadyShown();
+        }
+
+        function fire(source) {
+          if (!canFire()) return;
+          markShown();
+          openDrawer();
+        }
+
+        function isMobile() {
+          return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768;
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
+        // TRIGGER 1 — HISTORY API (Back Button Hijack)
+        // Works for: Android back gesture, iOS swipe-back, hardware back button
+        // Most reliable mobile signal — catches the actual back navigation event
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function initHistoryHijack() {
+          // Push dummy state so first BACK = popstate (not navigation away)
+          history.pushState({ _exitIntent: true }, '');
+          state.historyPushed = true;
+
+          window.addEventListener('popstate', function onPop() {
+            if (!canFire()) {
+              // Already shown → remove listener, let browser navigate away
+              window.removeEventListener('popstate', onPop);
+              return;
+            }
+
+            // First back press → show drawer + re-arm the dummy state
+            fire('history-back');
+            history.pushState({ _exitIntent: true }, '');
+          });
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
+        // TRIGGER 2 — RAPID SCROLL UP (Gold Standard)
+        // Logic: User flicks up fast = reaching for browser address bar = exit intent
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function initRapidScrollUp() {
+          window.addEventListener(
+            'scroll',
+            function () {
+              const currentY = window.scrollY;
+              const now = Date.now();
+
+              // ARM: only care once user has scrolled down enough
+              if (currentY > CONFIG.SCROLL_ARM_DEPTH_PX) {
+                state.armed = true;
+              }
+
+              if (!state.armed) {
+                state.lastScrollY = currentY;
+                return;
+              }
+
+              const scrollingUp = currentY < state.lastScrollY;
+
+              if (scrollingUp) {
+                // Push sample into ring buffer
+                state.scrollSamples.push({ y: currentY, t: now });
+
+                // Keep only samples within the time window
+                state.scrollSamples = state.scrollSamples.filter(function (s) {
+                  return now - s.t <= CONFIG.RAPID_SCROLL_MS;
+                });
+
+                if (state.scrollSamples.length >= 2) {
+                  const oldest = state.scrollSamples[0];
+                  const newest = state.scrollSamples[state.scrollSamples.length - 1];
+                  const deltaPx = oldest.y - newest.y; // how many px scrolled up
+                  const deltaMs = newest.t - oldest.t; // over how many ms
+
+                  if (deltaPx >= CONFIG.RAPID_SCROLL_PX && deltaMs <= CONFIG.RAPID_SCROLL_MS) {
+                    if (canFire()) {
+                      fire('rapid-scroll-up');
+                    }
+                  }
+                }
+              } else {
+                // Scrolling down — clear samples, reset
+                state.scrollSamples = [];
+              }
+
+              state.lastScrollY = currentY;
+            },
+            { passive: true }
+          );
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
+        // TRIGGER 3 — TAB SWITCH / VISIBILITY CHANGE
+        // Logic: User switches to WhatsApp/Instagram/another app = possible exit
+        // Action: Mark intent when hidden, show drawer when they come back (within 8s)
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function initVisibilityChange() {
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'hidden') {
+              // User switched away — record time but DON'T mark session yet
+              // (we only want to trigger if they actually come back)
+              if (canFire()) {
+                state.hiddenAt = Date.now();
+              }
+            } else if (document.visibilityState === 'visible') {
+              if (state.hiddenAt !== null) {
+                const away = Date.now() - state.hiddenAt;
+
+                // Came back quickly = tab switch / brief app switch = still engaged
+                // Came back after long gap = new session mindset, don't interrupt
+                if (away <= CONFIG.VISIBILITY_RETURN_MS && canFire()) {
+                  setTimeout(function () {
+                    fire('visibility-return');
+                  }, 200);
+                }
+                state.hiddenAt = null;
+              }
+            }
+          });
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
+        // DESKTOP — Mouse Leave (kept lean, non-conflicting)
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function initDesktopMouseLeave() {
+          // Sample velocity every 100ms — passive, no impact on scroll/interaction perf
+          document.addEventListener(
+            'mousemove',
+            function (e) {
+              state.pendingMouseY = e.clientY;
+            },
+            { passive: true }
+          );
+
+          setInterval(function () {
+            if (state.pendingMouseY !== null) {
+              if (state.lastMouseY !== null) {
+                state.mouseVelY = state.pendingMouseY - state.lastMouseY;
+              }
+              state.lastMouseY = state.pendingMouseY;
+              state.pendingMouseY = null;
+            }
+          }, 100);
+
+          document.addEventListener('mouseleave', function (e) {
+            if (e.clientY > CONFIG.MOUSE_EXIT_MAX_Y) return; // Not exiting from top
+            if (state.mouseVelY >= 0) return; // Not moving upward
+            fire('desktop-mouseleave');
+          });
+        }
+
+        // ════════════════════════════════════════════════════════════════════════════
+        // INIT
+        // ════════════════════════════════════════════════════════════════════════════
+
+        function init() {
+          const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
+          if (!btn) return; // No similar products on this PDP — skip entirely
+          if (alreadyShown()) return; // Already shown in this session — skip entirely
+
+          if (isMobile()) {
+            initHistoryHijack(); // Back button (most reliable)
+            initRapidScrollUp(); // Fast upward flick (gold standard)
+            initVisibilityChange(); // Tab/app switch fallback
+          } else {
+            initDesktopMouseLeave(); // Desktop only
+          }
+        }
+
+        // Safe boot
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', init);
+        } else {
+          init();
+        }
+      })();
+    </script>
+  {% endif %}
+{% endcomment %}
+
 {% if product.metafields.custom.matching_product != blank %}
   <script>
     (function () {
       'use strict';
 
       const STORAGE_KEY = 'exit_intent_{{ product.id }}';
+      const PDP_COUNT_KEY = 'pdp_view_count';
+      const ATC_KEY = 'atc_clicked_{{ product.id }}';
 
-      // ─── Config ──────────────────────────────────────────────────────────────────
       const CONFIG = Object.freeze({
-        // Rapid scroll up (gold standard)
-        RAPID_SCROLL_PX: 120, // px scrolled upward
-        RAPID_SCROLL_MS: 300, // within this many ms
-        SCROLL_ARM_DEPTH_PX: 300, // must scroll down 300px first before trigger arms
+        // Rapid scroll up
+        RAPID_SCROLL_PX: 120,
+        RAPID_SCROLL_MS: 300,
+        SCROLL_ARM_DEPTH_PX: 300,
 
-        // Visibility return window
-        VISIBILITY_RETURN_MS: 8000, // if user returns within 8s, show drawer
+        // Visibility
+        VISIBILITY_RETURN_MS: 8000,
 
         // Desktop mouse
         MOUSE_EXIT_MAX_Y: 50,
+
+        // ── NEW conditions ──────────────────────────
+        MIN_PDP_VIEWS: 2, // Must have viewed ≥ 2 PDPs this session
+        MIN_TIME_ON_PDP_MS: 20000, // Must spend ≥ 20s on this PDP
       });
 
-      // ─── State ───────────────────────────────────────────────────────────────────
       const state = {
-        drawn: false, // drawer has been opened once
-        armed: false, // user scrolled deep enough to arm trigger
-        hiddenAt: null, // timestamp when tab went hidden
-        historyPushed: false, // have we pushed our dummy history state
-
-        // Rapid scroll tracking
-        scrollSamples: [], // ring buffer of { y, t }
+        drawn: false,
+        armed: false,
+        hiddenAt: null,
+        historyPushed: false,
+        scrollSamples: [],
         lastScrollY: window.scrollY,
-
-        // Mouse velocity (desktop)
         lastMouseY: null,
         mouseVelY: 0,
         pendingMouseY: null,
+
+        // NEW
+        atcClicked: false,
+        pageEnterTime: Date.now(),
       };
+
+      // ─── PDP View Counter ────────────────────────────────────────────────────────
+      // Increment on every PDP load — stored in sessionStorage so it persists
+      // across page navigations within the same browser session
+
+      function incrementPDPCount() {
+        try {
+          const current = parseInt(sessionStorage.getItem(PDP_COUNT_KEY) || '0', 10);
+          sessionStorage.setItem(PDP_COUNT_KEY, String(current + 1));
+        } catch (e) {}
+      }
+
+      function getPDPCount() {
+        try {
+          return parseInt(sessionStorage.getItem(PDP_COUNT_KEY) || '0', 10);
+        } catch (e) {
+          return 0;
+        }
+      }
+
+      // ─── ATC Detection ───────────────────────────────────────────────────────────
+      // Watches ANY add-to-cart button click on the page — covers default Shopify
+      // ATC buttons, quick-add, sticky bars, etc.
+
+      function initATCWatcher() {
+        // Covers all common Shopify ATC button patterns
+        const ATC_SELECTORS = [
+          '[name="add"]',
+          '.product-form__submit',
+          '[data-testid="Sticky-Add-To-Cart"]',
+          '.sticky-atc-btn',
+          '.product-form button[type="submit"]',
+        ].join(', ');
+
+        document.addEventListener(
+          'click',
+          function (e) {
+            if (e.target.closest(ATC_SELECTORS)) {
+              state.atcClicked = true;
+              try {
+                sessionStorage.setItem(ATC_KEY, '1');
+              } catch (e) {}
+            }
+          },
+          { passive: true }
+        );
+
+        // Also restore from sessionStorage if they clicked ATC then scrolled
+        try {
+          if (sessionStorage.getItem(ATC_KEY)) state.atcClicked = true;
+        } catch (e) {}
+      }
 
       // ─── Core Helpers ────────────────────────────────────────────────────────────
 
@@ -401,8 +705,14 @@
         if (btn) btn.click();
       }
 
+      // ── All 4 conditions must pass ───────────────────────────────────────────────
       function canFire() {
-        return !state.drawn && !alreadyShown();
+        if (state.drawn) return false; // Already fired this load
+        if (alreadyShown()) return false; // ✅ Not shown in session
+        if (state.atcClicked) return false; // ✅ No ATC clicked
+        if (getPDPCount() < CONFIG.MIN_PDP_VIEWS) return false; // ✅ ≥ 2 PDPs viewed
+        if (Date.now() - state.pageEnterTime < CONFIG.MIN_TIME_ON_PDP_MS) return false; // ✅ ≥ 20s on page
+        return true;
       }
 
       function fire(source) {
@@ -417,31 +727,24 @@
 
       // ════════════════════════════════════════════════════════════════════════════
       // TRIGGER 1 — HISTORY API (Back Button Hijack)
-      // Works for: Android back gesture, iOS swipe-back, hardware back button
-      // Most reliable mobile signal — catches the actual back navigation event
       // ════════════════════════════════════════════════════════════════════════════
 
       function initHistoryHijack() {
-        // Push dummy state so first BACK = popstate (not navigation away)
         history.pushState({ _exitIntent: true }, '');
         state.historyPushed = true;
 
         window.addEventListener('popstate', function onPop() {
           if (!canFire()) {
-            // Already shown → remove listener, let browser navigate away
             window.removeEventListener('popstate', onPop);
             return;
           }
-
-          // First back press → show drawer + re-arm the dummy state
           fire('history-back');
           history.pushState({ _exitIntent: true }, '');
         });
       }
 
       // ════════════════════════════════════════════════════════════════════════════
-      // TRIGGER 2 — RAPID SCROLL UP (Gold Standard)
-      // Logic: User flicks up fast = reaching for browser address bar = exit intent
+      // TRIGGER 2 — RAPID SCROLL UP
       // ════════════════════════════════════════════════════════════════════════════
 
       function initRapidScrollUp() {
@@ -451,11 +754,7 @@
             const currentY = window.scrollY;
             const now = Date.now();
 
-            // ARM: only care once user has scrolled down enough
-            if (currentY > CONFIG.SCROLL_ARM_DEPTH_PX) {
-              state.armed = true;
-            }
-
+            if (currentY > CONFIG.SCROLL_ARM_DEPTH_PX) state.armed = true;
             if (!state.armed) {
               state.lastScrollY = currentY;
               return;
@@ -464,10 +763,7 @@
             const scrollingUp = currentY < state.lastScrollY;
 
             if (scrollingUp) {
-              // Push sample into ring buffer
               state.scrollSamples.push({ y: currentY, t: now });
-
-              // Keep only samples within the time window
               state.scrollSamples = state.scrollSamples.filter(function (s) {
                 return now - s.t <= CONFIG.RAPID_SCROLL_MS;
               });
@@ -475,17 +771,14 @@
               if (state.scrollSamples.length >= 2) {
                 const oldest = state.scrollSamples[0];
                 const newest = state.scrollSamples[state.scrollSamples.length - 1];
-                const deltaPx = oldest.y - newest.y; // how many px scrolled up
-                const deltaMs = newest.t - oldest.t; // over how many ms
+                const deltaPx = oldest.y - newest.y;
+                const deltaMs = newest.t - oldest.t;
 
                 if (deltaPx >= CONFIG.RAPID_SCROLL_PX && deltaMs <= CONFIG.RAPID_SCROLL_MS) {
-                  if (canFire()) {
-                    fire('rapid-scroll-up');
-                  }
+                  fire('rapid-scroll-up');
                 }
               }
             } else {
-              // Scrolling down — clear samples, reset
               state.scrollSamples = [];
             }
 
@@ -497,24 +790,15 @@
 
       // ════════════════════════════════════════════════════════════════════════════
       // TRIGGER 3 — TAB SWITCH / VISIBILITY CHANGE
-      // Logic: User switches to WhatsApp/Instagram/another app = possible exit
-      // Action: Mark intent when hidden, show drawer when they come back (within 8s)
       // ════════════════════════════════════════════════════════════════════════════
 
       function initVisibilityChange() {
         document.addEventListener('visibilitychange', function () {
           if (document.visibilityState === 'hidden') {
-            // User switched away — record time but DON'T mark session yet
-            // (we only want to trigger if they actually come back)
-            if (canFire()) {
-              state.hiddenAt = Date.now();
-            }
+            if (canFire()) state.hiddenAt = Date.now();
           } else if (document.visibilityState === 'visible') {
             if (state.hiddenAt !== null) {
               const away = Date.now() - state.hiddenAt;
-
-              // Came back quickly = tab switch / brief app switch = still engaged
-              // Came back after long gap = new session mindset, don't interrupt
               if (away <= CONFIG.VISIBILITY_RETURN_MS && canFire()) {
                 setTimeout(function () {
                   fire('visibility-return');
@@ -527,11 +811,10 @@
       }
 
       // ════════════════════════════════════════════════════════════════════════════
-      // DESKTOP — Mouse Leave (kept lean, non-conflicting)
+      // DESKTOP — Mouse Leave
       // ════════════════════════════════════════════════════════════════════════════
 
       function initDesktopMouseLeave() {
-        // Sample velocity every 100ms — passive, no impact on scroll/interaction perf
         document.addEventListener(
           'mousemove',
           function (e) {
@@ -551,8 +834,8 @@
         }, 100);
 
         document.addEventListener('mouseleave', function (e) {
-          if (e.clientY > CONFIG.MOUSE_EXIT_MAX_Y) return; // Not exiting from top
-          if (state.mouseVelY >= 0) return; // Not moving upward
+          if (e.clientY > CONFIG.MOUSE_EXIT_MAX_Y) return;
+          if (state.mouseVelY >= 0) return;
           fire('desktop-mouseleave');
         });
       }
@@ -563,19 +846,26 @@
 
       function init() {
         const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
-        if (!btn) return; // No similar products on this PDP — skip entirely
-        if (alreadyShown()) return; // Already shown in this session — skip entirely
+        if (!btn) return;
+
+        // ✅ Count this PDP view
+        incrementPDPCount();
+
+        // ✅ Start watching ATC clicks
+        initATCWatcher();
+
+        // Already shown — no need to attach exit listeners
+        if (alreadyShown()) return;
 
         if (isMobile()) {
-          initHistoryHijack(); // Back button (most reliable)
-          initRapidScrollUp(); // Fast upward flick (gold standard)
-          initVisibilityChange(); // Tab/app switch fallback
+          initHistoryHijack();
+          initRapidScrollUp();
+          initVisibilityChange();
         } else {
-          initDesktopMouseLeave(); // Desktop only
+          initDesktopMouseLeave();
         }
       }
 
-      // Safe boot
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init);
       } else {
@@ -751,7 +1041,6 @@
 </script>
 
 <style>
-
   .pswp__button { background: rgba(0, 0, 0, 0.5) !important; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; transition: background 0.2s; }
   .pswp__button:hover { background: rgba(0, 0, 0, 0.7) !important; }
   .pswp__button svg { color: #fff; }
