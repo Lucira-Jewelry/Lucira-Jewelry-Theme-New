@@ -354,19 +354,30 @@ document.addEventListener("DOMContentLoaded", function () {
   const fabChat = document.getElementById("fabChat");
 
   let isOpen = false;
+  let chatOpen = false;
 
-  // Toggle FAB menu
+  // Toggle FAB
   fabMain.addEventListener("click", function () {
-  isOpen = !isOpen;
-  fabActions.style.display = isOpen ? "flex" : "none";
-  fabMain.textContent = isOpen ? "×" : "+";
+
+    // If chat is open → close it
+    if (chatOpen && window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible('hide');
+      chatOpen = false;
+    }
+
+    // Toggle menu
+    isOpen = !isOpen;
+    fabActions.style.display = isOpen ? "flex" : "none";
+    fabMain.textContent = isOpen ? "×" : "+";
   });
 
   // Open Zoho Chat
   fabChat.addEventListener("click", function (e) {
-  e.preventDefault();
-  if (window.$zoho && $zoho.salesiq) {
-    $zoho.salesiq.floatwindow.visible('show');
-  }
+    e.preventDefault();
+
+    if (window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible('show');
+      chatOpen = true;
+    }
   });
 });
