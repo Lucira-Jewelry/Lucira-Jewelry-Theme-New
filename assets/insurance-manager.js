@@ -871,16 +871,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
 (function() {
   'use strict';
   
