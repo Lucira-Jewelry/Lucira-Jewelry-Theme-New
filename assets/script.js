@@ -154,6 +154,36 @@ $(document).ready(function(){
   }
 })();
 
+// Custom Nitro WhatsApp event
+document.addEventListener("click", function (e) {
+  // Find the WhatsApp anchor
+  var whatsappAnchor = e.target.closest('a[href*="wa.me"]');
+  if (
+    !whatsappAnchor ||
+    !whatsappAnchor.closest(".fixed-cta-whatsapp, .custom-wp_btn-link")
+  ) {
+    return;
+  }
+
+  function getCookie(name) {
+    var match = document.cookie.match(
+      new RegExp("(^| )" + name + "=([^;]+)")
+    );
+    return match ? decodeURIComponent(match[2]) : null;
+  }
+
+  var fbclid = getCookie("_fbc");
+  var customerMobile = "{{ customer.phone | default: '' }}";
+
+  if (window.nitro && typeof window.nitro.track === "function") {
+    window.nitro.track("facebook_identify", {
+      page_url: window.location.href,
+      meta_id: fbclid,
+      customer_mobile: customerMobile
+    });
+  }
+});
+
 (function() {
   function getCookie(name) {
     const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -301,4 +331,19 @@ $(document).ready(function () {
 
   setupBradAccordion();
   $(window).on("resize", setupBradAccordion);
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  const video = document.getElementById('delayedLoopVideo');
+
+  if (!video) return;
+
+  video.addEventListener('ended', function () {
+    video.pause();
+
+    setTimeout(function () {
+      video.currentTime = 0;
+      video.play();
+    }, 15000); // 15 seconds delay
+  });
 });

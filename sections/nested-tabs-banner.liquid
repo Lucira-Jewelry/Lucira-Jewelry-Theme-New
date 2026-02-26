@@ -1,0 +1,138 @@
+{% comment %}
+  Section: Nested Tabs Banner - UPDATED
+{% endcomment %}
+
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+
+{% comment %} Same URL extraction as template {% endcomment %}
+{% assign url_search = request.search %}
+{% assign url_tab = '' %}
+
+{% if url_search contains 'tab=' %}
+  {% assign url_parts = url_search | remove: '?' | split: '&' %}
+  {% for part in url_parts %}
+    {% if part contains 'tab=' %}
+      {% assign url_tab = part | split: '=' | last %}
+      {% break %}
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+{% assign default_tab = current_category.default_tab_slug | default: 'style' %}
+{% assign tab_slug = url_tab | default: default_tab %}
+{% assign tab_slug_lower = tab_slug | downcase %}
+
+{% comment %} Find current tab {% endcomment %}
+{% assign all_tabs = metaobjects.tab_content.values %}
+{% assign current_tab = nil %}
+
+{% for tab in all_tabs %}
+  {% if tab.parent_category and tab.parent_category.system.handle == current_category.system.handle %}
+    {% assign tab_slug_lowercase = tab.tab_slug | downcase %}
+    {% if tab_slug_lowercase == tab_slug_lower %}
+      {% assign current_tab = tab %}
+      {% break %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+<style>
+  .nested-tabs-banner {
+    position: relative;
+    min-height: 400px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    overflow: hidden;
+  }
+  
+  .banner-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+  }
+  
+  .banner-background img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  
+  .banner-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 2;
+  }
+  
+  .banner-content {
+    position: relative;
+    z-index: 3;
+    text-align: center;
+    max-width: 800px;
+    padding: 2rem;
+  }
+  
+  .banner-title {
+    font-size: 3rem;
+    font-weight: bold;
+    margin-bottom: 1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+  }
+  
+  .banner-subtitle {
+    font-size: 1.25rem;
+    opacity: 0.9;
+    max-width: 600px;
+    margin: 0 auto;
+  }
+</style>
+
+<div class="nested-tabs-banner">
+  {% assign banner_image = current_tab.banner_image | default: current_category.banner_image %}
+  {% assign banner_title = current_tab.banner_title | default: current_tab.header | default: current_category.banner_title | default: current_category.title %}
+  {% assign banner_subtitle = current_tab.banner_subtitle | default: current_category.banner_subtitle %}
+  
+  {% if banner_image %}
+    <div class="banner-background">
+      <img 
+        src="{{ banner_image | image_url: width: 1920 }}" 
+        alt="{{ banner_title | escape }}"
+        loading="eager"
+        width="1920"
+        height="400"
+      >
+    </div>
+  {% endif %}
+  
+  <div class="banner-overlay"></div>
+  
+  <div class="banner-content">
+    <h1 class="banner-title">{{ banner_title }}</h1>
+    {% if banner_subtitle %}
+      <p class="banner-subtitle">{{ banner_subtitle }}</p>
+    {% endif %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Nested Tabs Banner",
+  "tag": "section",
+  "class": "section",
+  "settings": [],
+  "presets": [
+    {
+      "name": "Nested Tabs Banner"
+    }
+  ]
+}
+{% endschema %}

@@ -1,0 +1,874 @@
+{% assign is_product_available = product.available %}
+{% assign sku_tryon_pdp = product.variants.first.sku | remove: "/" %}
+{% assign product_name = product.title %}
+
+<script>
+    var productSKUTryOn = '{{ sku_tryon_pdp }}';
+    var productNameTryOn = '{{ product_name }}';
+
+  function onTryOnBuynowclick(skuReceived){
+    console.log("buynow clicked");
+     if (skuReceived === productSKUTryOn){
+        //buynow clicked for first product
+        document.querySelector('.button button--secondary main-product_atc-btn').click();   
+      }else{
+        //go to pdp
+          getProductUrlFromSearch(skuReceived).then(handle => {
+            if (!handle) return;
+            const url = `${window.location.origin}/products/${handle}`;
+            window.location.href = url;
+          });
+      }
+  }
+
+  async function getProductUrlFromSearch(sku) {
+      const res = await fetch(
+        `/search?type=product&q=${encodeURIComponent(sku)}&options[prefix]=last`
+      );
+
+      const html = await res.text();
+
+      // 1. Parse HTML
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      // 2. Find script containing `var meta`
+      const scripts = Array.from(doc.querySelectorAll("script"));
+      const metaScript = scripts.find(s => s.textContent.includes("var meta"));
+
+      if (!metaScript) return null;
+      
+      // 3. Extract object text
+      const match = metaScript.textContent.match(
+        /var\s+meta\s*=\s*({[\s\S]*?});/
+      );
+
+      if (!match) return null;
+
+      // 4. Parse JSON
+      const meta = JSON.parse(match[1]);
+
+      // 5. Extract first product handle
+      return meta?.products?.[0]?.handle || null;
+}
+
+  // DataLayer push function
+  function pushTryOnDataLayer(position) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: productSKUTryOn,
+        creative_name: "Virtual Try On",
+        promo_position: position,
+        promo_name: productNameTryOn,
+        location_id: "pdp"
+      }
+    });
+    console.log('📊 DataLayer pushed:', {
+      promo_id: productSKUTryOn,
+      promo_position: position,
+      promo_name: productNameTryOn
+    });
+  }
+
+</script>
+
+<style>
+    /* CRITICAL: DO NOT TOUCH SLIDER OVERFLOW - Let slider work naturally */
+    /* Instead, we'll use a wrapper that positions the button outside the slider flow */
+    
+    /* Wrapper for try-on button - positioned relative to media gallery - UPDATED TO 40x40 */
+    .tryon-absolute-wrapper {
+        position: absolute !important;
+        top: 10px !important;
+        left: 10px !important;
+        width: 40px !important;
+        height: 40px !important;
+        z-index: 9999 !important;
+        pointer-events: none !important;
+    }
+    
+    /* Make the button itself clickable */
+    .tryon-absolute-wrapper * {
+        pointer-events: auto !important;
+    }
+
+    /* CRITICAL: High specificity overrides for the button - UPDATED TO 40x40 */
+    button#tryonButton,
+    button[id="tryonButton"],
+    #tryonButton {
+        position: relative !important;
+        width: 40px !important;
+        height: 40px !important;
+        min-width: 40px !important;
+        min-height: 40px !important;
+        max-width: 40px !important;
+        max-height: 40px !important;
+        background: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        overflow: visible !important;
+        z-index: 9999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        left: 0 !important;
+        top: 0 !important;
+        cursor: pointer !important;
+        pointer-events: auto !important;
+        transform: translateZ(0) !important;
+        -webkit-transform: translateZ(0) !important;
+    }
+
+    /* Wrapper container - UPDATED TO 40x40 */
+    .tryon-button-wrapper {
+        position: relative !important;
+        width: 40px !important;
+        height: 40px !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        z-index: 9999 !important;
+        pointer-events: auto !important;
+    }
+
+    .try-at-home-section .grid-row .grid-column button{
+        color: white;
+        background: paleturquoise;
+    }
+    
+    .tryon-button-container {
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 40px !important;
+        height: 40px !important;
+        overflow: visible !important;
+        display: block !important;
+        z-index: 9999 !important;
+    }
+
+    /* Sliding panel - UPDATED FOR 40x40 ICON with SLOWER COLLAPSE */
+    .tryon-sliding-panel {
+        position: absolute !important;
+        left: 10px !important;
+        top: 0 !important;
+        height: 40px !important;
+        width: auto !important;
+        min-width: 40px !important;
+        background: #FFFFFF !important;
+        border-radius: 20px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        padding-left: 50px !important;
+        padding-right: 15px !important;
+        border: 0.5px solid #1a1a1a !important;
+        box-sizing: border-box !important;
+        clip-path: circle(20px at 20px 20px) !important;
+        /* Slower collapse transition */
+        transition: clip-path 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+        z-index: 9999 !important;
+        cursor: pointer !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+    }
+
+    .tryon-sliding-panel.expanded {
+        clip-path: circle(150% at 20px 20px) !important;
+        /* Faster expand transition */
+        transition: clip-path 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55) !important;
+    }
+
+    /* Icon circle - UPDATED TO 40x40 */
+    .tryon-icon-circle {
+        position: absolute !important;
+        left: 10 !important;
+        top: 0 !important;
+        width: 40px !important;
+        height: 40px !important;
+        cursor: pointer !important;
+        z-index: 10000 !important;
+        pointer-events: auto !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        background: transparent !important;
+        border-radius: 50% !important;
+    }
+
+    .tryon-icon-circle svg {
+        width: 100% !important;
+        height: 100% !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    /* Ensure SVG elements are visible */
+    .tryon-icon-circle svg * {
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    /* TEXT CONTENT - VERTICALLY CENTERED with SLOWER FADE OUT */
+    .tryon-text-content {
+        opacity: 0 !important;
+        transition: opacity 0.8s ease !important;
+        white-space: nowrap !important;
+        pointer-events: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        height: 100% !important;
+        visibility: visible !important;
+    }
+
+    .tryon-sliding-panel.expanded .tryon-text-content {
+        opacity: 1 !important;
+        transition: opacity 0.3s ease 0.25s !important;
+    }
+
+    .tryon-text-content span {
+        font-size: 12px !important;
+        font-weight: 500 !important;
+        color: #000 !important;
+        letter-spacing: 0.8px !important;
+        font-family: 'Futura Std', Arial, sans-serif !important;
+        display: inline-block !important;
+        line-height: 1 !important;
+    }
+
+    /* ========== SECOND BUTTON STYLES - COMMENTED OUT ========== */
+    /* Styles for second button - text only */
+    /* .tryon-text-only {
+        display: inline-block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+    }
+
+    .tryon-text-only span {
+        font-size: 15px !important;
+        font-weight: 500 !important;
+        color: #000 !important;
+        letter-spacing: 1px !important;
+        font-family: 'Futura Std', Arial, sans-serif !important;
+        display: inline-block !important;
+    } */
+
+    /* Specific styles for second button container to override default button styles */
+    /* #second-tryon-button-1 #tryonButton,
+    #virtual-try-on-content #tryonButton {
+        position: static !important;
+        width: auto !important;
+        height: auto !important;
+        min-width: auto !important;
+        min-height: auto !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 10px 20px !important;
+        display: inline-block !important;
+        z-index: 1 !important;
+    } */
+    /* ========== END SECOND BUTTON STYLES ========== */
+
+    /* Hide any default content */
+    #tryonButton > *:not(.tryon-button-wrapper):not(.tryon-text-only) {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+    }
+
+    /* Force hide any pseudo elements */
+    #tryonButton::before,
+    #tryonButton::after {
+        display: none !important;
+        content: none !important;
+    }
+
+    /* Mobile specific styles with higher specificity - UPDATED TO 40x40 */
+    @media (max-width: 768px) {
+        .tryon-absolute-wrapper {
+            top: 335px !important;
+            left: 6px !important;
+            width: 40px !important;
+            height: 40px !important;
+        }
+
+        button#tryonButton,
+        button[id="tryonButton"],
+        #tryonButton {
+            position: relative !important;
+            width: 40px !important;
+            height: 40px !important;
+            left: 0 !important;
+            top: 0 !important;
+            margin: 0 !important;
+            z-index: 9999 !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+        }
+
+        .tryon-button-wrapper {
+            width: 40px !important;
+            height: 40px !important;
+            display: block !important;
+            visibility: visible !important;
+            opacity: 1 !important;
+            z-index: 9999 !important;
+            position: relative !important;
+        }
+
+        .tryon-button-container {
+            z-index: 9999 !important;
+            position: absolute !important;
+            width: 40px !important;
+            height: 40px !important;
+        }
+
+        .tryon-sliding-panel {
+            min-width: 40px !important;
+            height: 40px !important;
+            visibility: visible !important;
+            z-index: 9999 !important;
+        }
+
+        .tryon-icon-circle {
+            visibility: visible !important;
+            display: block !important;
+            z-index: 10000 !important;
+            width: 40px !important;
+            height: 40px !important;
+        }
+
+        .tryon-text-content span {
+            font-size: 11px !important;
+        }
+
+        /* ========== SECOND BUTTON MOBILE STYLES - COMMENTED OUT ========== */
+        /* .tryon-text-only span {
+            font-size: 13px !important;
+        } */
+
+        /* Override for second button on mobile */
+        /* #second-tryon-button-1 #tryonButton,
+        #virtual-try-on-content #tryonButton {
+            position: static !important;
+            width: auto !important;
+            height: auto !important;
+            left: auto !important;
+            top: auto !important;
+            z-index: 1 !important;
+        } */
+        /* ========== END SECOND BUTTON MOBILE STYLES ========== */
+    }
+
+    /* Extra small mobile devices */
+    @media (max-width: 480px) {
+        .tryon-absolute-wrapper {
+            top: 335px !important;
+            left: 6px !important;
+        }
+    }
+
+    /* CUSTOM: Very small mobile devices (max-width: 370px) - CSS approach won't work due to inline !important */
+    /* These rules exist but won't override JavaScript inline styles with !important */
+    @media (max-width: 370px) {
+        .tryon-sliding-panel {
+            top: -45px !important;
+        }
+
+        .tryon-icon-circle {
+            top: -45px !important;
+        }
+    }
+
+    /* Prevent any framework overrides */
+    button#MB_tryonButton,
+    button[id*="tryon"],
+    button[id*="tryOn"] {
+        visibility: visible !important;
+        display: block !important;
+        opacity: 1 !important;
+    }
+
+    
+</style>
+
+<script src="{{ 'camweara-api.js' | asset_url }}" async></script>
+
+<script>
+  function initTryOnButton() {
+    if (typeof loadTryOnButton !== "function") {
+      setTimeout(initTryOnButton, 100);
+      return;
+    }
+
+    loadTryOnButton({
+      psku: "{{ sku_tryon_pdp }}",
+      page: "product",
+      regionId: "2",
+      company: "luciraonline",
+      prependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      MBprependButton: {
+        class: "product__media-list contains-media grid grid--peek list-unstyled"
+      },
+      styles: {
+        tryonbutton: {
+          backgroundColor: "transparent",
+          color: "transparent",
+          border: "none",
+          borderRadius: "20px",
+          margin: "0",
+          left: "0",
+          top: "0",
+          position: "relative",
+          zIndex: "9999",
+          width: "40px",
+          height: "40px",
+          padding: "0",
+          fontSize: "0",
+          lineHeight: "0",
+          visibility: "visible",
+          opacity: "1",
+          display: "block"
+        },
+        MBtryonbutton: {
+          width: "40px",
+          height: "40px",
+          margin: "0",
+          left: "0",
+          top: "0",
+          padding: "0",
+          backgroundColor: "transparent",
+          border: "none",
+          position: "relative",
+          color: "transparent",
+          fontSize: "0",
+          lineHeight: "0",
+          zIndex: "9999",
+          visibility: "visible",
+          opacity: "1",
+          display: "block"
+        }
+      },
+      prodRecommendation: "true",
+      buynowCallback: "onTryOnBuynowclick",
+      tryonButtonData: {
+        text: "",
+        faIcon: ""
+      },
+      buynow: {
+        enable: "{{ is_product_available }}"
+      }
+    });
+
+    // Track which buttons have been transformed
+    const transformedButtons = new WeakSet();
+
+    // Function to wrap button in absolute positioned container
+    function wrapButtonInAbsoluteContainer(buttonElement) {
+      // Don't wrap if already wrapped or if it's the second button
+      if (buttonElement.closest('.tryon-absolute-wrapper') 
+          /* ========== SECOND BUTTON CHECK - COMMENTED OUT ========== */
+          // || buttonElement.closest('#second-tryon-button-1') || 
+          // buttonElement.closest('#virtual-try-on-content')
+          /* ========== END SECOND BUTTON CHECK ========== */
+         ) {
+        return;
+      }
+
+      console.log('📦 Wrapping button in absolute container');
+
+      // Create wrapper - UPDATED TO 40x40, positioning handled by CSS
+      const wrapper = document.createElement('div');
+      wrapper.className = 'tryon-absolute-wrapper';
+      wrapper.style.cssText = 'position:absolute !important;width:40px !important;height:40px !important;z-index:9999 !important;pointer-events:none !important;';
+
+      // Insert wrapper before button
+      buttonElement.parentNode.insertBefore(wrapper, buttonElement);
+      
+      // Move button into wrapper
+      wrapper.appendChild(buttonElement);
+
+      console.log('✅ Button wrapped successfully');
+    }
+
+    // Function to completely clean and transform button (FIRST BUTTON - WITH ANIMATION)
+    function transformTryOnButton(buttonElement) {
+      if (!buttonElement) return false;
+
+      // Check if already transformed
+      if (transformedButtons.has(buttonElement) || 
+          buttonElement.querySelector('.tryon-button-wrapper') || 
+          buttonElement.querySelector('.tryon-text-only')) {
+        return true;
+      }
+
+      // CRITICAL: Check if this is the second button - if so, skip animation transform
+      /* ========== SECOND BUTTON CHECK - COMMENTED OUT ========== */
+      // const isSecondButton = buttonElement.closest('#second-tryon-button-1') || 
+      //                       buttonElement.closest('#virtual-try-on-content');
+      
+      // if (isSecondButton) {
+      //   console.log('⏭️ Skipping animation transform for second button');
+      //   return false;
+      // }
+      /* ========== END SECOND BUTTON CHECK ========== */
+
+      console.log('🔄 Transforming Try On button');
+
+      // Store click handler
+      const originalOnClick = buttonElement.onclick;
+      
+      // Nuclear option: Remove ALL content including text nodes
+      buttonElement.textContent = '';
+      buttonElement.innerHTML = '';
+      
+      // Apply critical inline styles - UPDATED TO 40x40
+      buttonElement.style.cssText = `
+        position: relative !important;
+        width: 40px !important;
+        height: 40px !important;
+        left: 0 !important;
+        top: 0 !important;
+        z-index: 9999 !important;
+        display: block !important;
+        visibility: visible !important;
+        opacity: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: none !important;
+        pointer-events: auto !important;
+        transform: translateZ(0) !important;
+      `;
+      
+      // Create structure - UPDATED TO 40x40
+      const buttonWrapper = document.createElement('div');
+      buttonWrapper.className = 'tryon-button-wrapper';
+      buttonWrapper.style.cssText = 'position:relative !important;width:40px !important;height:40px !important;display:block !important;visibility:visible !important;opacity:1 !important;z-index:9999 !important;pointer-events:auto !important;';
+      
+      const buttonContainer = document.createElement('div');
+      buttonContainer.className = 'tryon-button-container';
+      buttonContainer.style.cssText = 'position:absolute !important;left:0 !important;top:0 !important;width:40px !important;height:40px !important;display:block !important;z-index:9999 !important;overflow:visible !important;';
+      
+      const slidingPanel = document.createElement('div');
+      slidingPanel.className = 'tryon-sliding-panel';
+      slidingPanel.id = 'animatedTryOnPanel';
+      
+      // FIXED: Conditionally set top based on screen width (no !important on top)
+      const topValue = window.innerWidth <= 370 ? '-45px' : '0';
+      slidingPanel.style.cssText = `position:absolute !important;left:10px !important;top:${topValue};z-index:9999 !important;visibility:visible !important;opacity:1 !important;pointer-events:auto !important;`;
+      
+      const textContent = document.createElement('div');
+      textContent.className = 'tryon-text-content';
+      textContent.innerHTML = '<span>Try Them On</span>';
+      
+      const iconCircle = document.createElement('div');
+      iconCircle.className = 'tryon-icon-circle';
+      
+      // FIXED: Conditionally set top based on screen width (no !important on top)
+      iconCircle.style.cssText = `position:absolute !important;left:10px !important;top:${topValue};width:40px !important;height:40px !important;display:block !important;visibility:visible !important;opacity:1 !important;z-index:10000 !important;pointer-events:auto !important;`;
+      
+      // Inline SVG - UPDATED TO 40x40 with proportionally scaled paths
+      iconCircle.innerHTML = `
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block !important;width:100% !important;height:100% !important;visibility:visible !important;">
+            <rect x="0.333" y="0.333" width="39.333" height="39.333" rx="19.667" fill="white" stroke="black" stroke-width="0.667"/>
+            <path d="M11.9444 16.7396L14.3153 14.4116M11.9444 16.7396L19.8183 26.6667M11.9444 16.7396L16.4267 18.5367M14.3153 14.4116L16.963 13.3333H23.0197L26.0828 14.4116M14.3153 14.4116L17.3264 15.49M26.0828 14.4116L28.0556 16.7396M26.0828 14.4116L22.8813 15.49M28.0556 16.7396L19.8183 26.6667M28.0556 16.7396L23.6773 18.5367M19.8183 26.6667L23.6773 18.5367M19.8183 26.6667L16.4267 18.5367M23.6773 18.5367L22.8813 15.49M23.6773 18.5367H16.4267M22.8813 15.49H17.3264M17.3264 15.49L16.4267 18.5367" stroke="black" stroke-width="0.9196"/>
+            <rect x="8.8889" y="24.4444" width="0.5556" height="6.6667" fill="black"/>
+            <rect x="8.8889" y="31.1111" width="0.5556" height="6.6667" transform="rotate(-90 8.8889 31.1111)" fill="black"/>
+            <rect width="0.5556" height="6.6667" transform="matrix(1 0 0 -1 8.88881 15.5556)" fill="black"/>
+            <rect width="0.5556" height="6.6667" transform="matrix(0 1 1 0 8.88889 8.88889)" fill="black"/>
+            <rect x="31.1112" y="15.5556" width="0.5556" height="6.6667" transform="rotate(180 31.1112 15.5556)" fill="black"/>
+            <rect x="31.1111" y="8.88889" width="0.5556" height="6.6667" transform="rotate(90 31.1111 8.88889)" fill="black"/>
+            <rect width="0.5556" height="6.6667" transform="matrix(-1 0 0 1 31.1111 24.4444)" fill="black"/>
+            <rect width="0.5556" height="6.6667" transform="matrix(0 -1 -1 0 31.1111 31.1111)" fill="black"/>
+        </svg>
+      `;
+      
+      // Assemble
+      slidingPanel.appendChild(textContent);
+      buttonContainer.appendChild(slidingPanel);
+      buttonContainer.appendChild(iconCircle);
+      buttonWrapper.appendChild(buttonContainer);
+      buttonElement.appendChild(buttonWrapper);
+      
+      // Force visibility again after DOM manipulation
+      buttonElement.style.visibility = 'visible';
+      buttonElement.style.opacity = '1';
+      buttonElement.style.display = 'block';
+      buttonElement.style.zIndex = '9999';
+      
+      // Restore click functionality WITH DATALAYER - Position 1 (Media Gallery)
+      const clickHandler = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('👆 Try On button clicked (Media Gallery)');
+        
+        // Push to dataLayer - Position 1
+        pushTryOnDataLayer("1) Above Media Gallery");
+        
+        if (originalOnClick) {
+          originalOnClick.call(buttonElement, e);
+        }
+      };
+      
+      slidingPanel.addEventListener('click', clickHandler);
+      slidingPanel.addEventListener('touchstart', clickHandler, { passive: false });
+      iconCircle.addEventListener('click', clickHandler);
+      iconCircle.addEventListener('touchstart', clickHandler, { passive: false });
+      buttonElement.addEventListener('click', clickHandler);
+      buttonElement.addEventListener('touchstart', clickHandler, { passive: false });
+      
+      // Mark as transformed
+      transformedButtons.add(buttonElement);
+      
+      // Wrap in absolute container AFTER transformation
+      wrapButtonInAbsoluteContainer(buttonElement);
+      
+      // Setup hover-based animation
+      setTimeout(() => {
+        setupHoverAnimation(slidingPanel, buttonWrapper);
+      }, 500);
+      
+      return true;
+    }
+
+    /* ========== SECOND BUTTON TRANSFORMATION FUNCTION - COMMENTED OUT ========== */
+    // Function for second button - TEXT ONLY, NO ANIMATION
+    // function transformSecondButton(buttonElement) {
+    //   if (!buttonElement) return false;
+    //   
+    //   // Check if already transformed
+    //   if (transformedButtons.has(buttonElement) || 
+    //       buttonElement.querySelector('.tryon-text-only') || 
+    //       buttonElement.querySelector('.tryon-button-wrapper')) {
+    //     return true;
+    //   }
+
+    //   console.log('🔄 Transforming second Try On button (text only)');
+
+    //   // Store click handler
+    //   const originalOnClick = buttonElement.onclick;
+    //   
+    //   // Clear button content
+    //   buttonElement.textContent = '';
+    //   buttonElement.innerHTML = '';
+    //   buttonElement.style.cssText = '';
+    //   
+    //   // Create simple text wrapper
+    //   const textWrapper = document.createElement('div');
+    //   textWrapper.className = 'tryon-text-only';
+    //   textWrapper.innerHTML = '<span>Try Them On</span>';
+    //   textWrapper.style.cssText = 'font-size:15px;font-weight:500;color:#000;letter-spacing:1px;font-family:"Futura Std",Arial,sans-serif;white-space:nowrap;display:inline-block;';
+    //   
+    //   buttonElement.appendChild(textWrapper);
+    //   
+    //   // Force visibility
+    //   buttonElement.style.visibility = 'visible';
+    //   buttonElement.style.opacity = '1';
+    //   buttonElement.style.display = 'inline-block';
+    //   buttonElement.style.background = 'transparent';
+    //   buttonElement.style.border = 'none';
+    //   buttonElement.style.padding = '10px 20px';
+    //   buttonElement.style.cursor = 'pointer';
+    //   buttonElement.style.position = 'static';
+    //   
+    //   // Restore click functionality WITH DATALAYER - Position 2 (Below Add to Cart)
+    //   const clickHandler = function(e) {
+    //     e.preventDefault();
+    //     e.stopPropagation();
+    //     console.log('👆 Second Try On button clicked (Below Add to Cart)');
+    //     
+    //     // Push to dataLayer - Position 2
+    //     pushTryOnDataLayer("2) Below Add to Cart");
+    //     
+    //     if (originalOnClick) {
+    //       originalOnClick.call(buttonElement, e);
+    //     }
+    //   };
+    //   
+    //   buttonElement.addEventListener('click', clickHandler);
+    //   buttonElement.addEventListener('touchstart', clickHandler, { passive: false });
+    //   
+    //   // Mark as transformed
+    //   transformedButtons.add(buttonElement);
+    //   
+    //   return true;
+    // }
+    /* ========== END SECOND BUTTON TRANSFORMATION FUNCTION ========== */
+
+    // Animation function - plays once on load, then on hover with SLOWER COLLAPSE
+    function setupHoverAnimation(panel, wrapper) {
+      if (!panel || !wrapper) return;
+      
+      let hasPlayedInitial = false;
+      
+      function animateButton() {
+        panel.classList.add('expanded');
+        setTimeout(() => {
+          panel.classList.remove('expanded');
+        }, 2500); // Increased from 2000 to allow more time for viewing
+      }
+      
+      // Play once on initial load
+      setTimeout(() => {
+        animateButton();
+        hasPlayedInitial = true;
+      }, 500);
+      
+      // Setup hover listeners
+      const hoverHandler = () => {
+        if (hasPlayedInitial && !panel.classList.contains('expanded')) {
+          animateButton();
+        }
+      };
+      
+      wrapper.addEventListener('mouseenter', hoverHandler);
+      panel.addEventListener('mouseenter', hoverHandler);
+      
+      // For touch devices
+      wrapper.addEventListener('touchstart', (e) => {
+        if (hasPlayedInitial && !panel.classList.contains('expanded')) {
+          animateButton();
+        }
+      }, { passive: true });
+    }
+
+    // Aggressive transformation strategy for mobile (first button ONLY)
+    function findAndTransformButton() {
+      // Try multiple selectors but EXCLUDE second button containers
+      const selectors = [
+        '.product__media-list #tryonButton:not(#second-tryon-button-1 #tryonButton):not(#virtual-try-on-content #tryonButton)',
+        'button#tryonButton:not(#second-tryon-button-1 #tryonButton):not(#virtual-try-on-content #tryonButton)',
+        '#MB_tryonButton:not(#second-tryon-button-1 #MB_tryonButton):not(#virtual-try-on-content #MB_tryonButton)',
+        'button[id*="tryonButton"]:not(#second-tryon-button-1 button):not(#virtual-try-on-content button)'
+      ];
+      
+      for (const selector of selectors) {
+        const buttons = document.querySelectorAll(selector);
+        buttons.forEach(button => {
+          // Double check it's not in second button container
+          /* ========== SECOND BUTTON CHECK - COMMENTED OUT ========== */
+          // const isSecondButton = button.closest('#second-tryon-button-1') || 
+          //                       button.closest('#virtual-try-on-content');
+          
+          // if (!isSecondButton && 
+          if (
+              !transformedButtons.has(button) && 
+              !button.querySelector('.tryon-button-wrapper') && 
+              !button.querySelector('.tryon-text-only')) {
+            console.log('✅ Found first button with selector:', selector);
+            
+            const success = transformTryOnButton(button);
+            if (success) {
+              console.log('✅ First button transformed successfully');
+              return true;
+            }
+          }
+          /* ========== END SECOND BUTTON CHECK ========== */
+        });
+      }
+      return false;
+    }
+
+    // Multiple transformation attempts
+    let attempts = 0;
+    const maxAttempts = 25;
+    
+    function attemptTransform() {
+      attempts++;
+      console.log(`🔍 Attempt ${attempts}/${maxAttempts} to transform first button`);
+      
+      const success = findAndTransformButton();
+      
+      if (!success && attempts < maxAttempts) {
+        const delay = window.innerWidth <= 768 ? 500 : 300;
+        setTimeout(attemptTransform, delay);
+      } else if (success) {
+        console.log('🎉 First button transformation complete!');
+      } else {
+        console.warn('⚠️ Could not transform first button after all attempts');
+      }
+    }
+
+    // Start after initial delay
+    const initialDelay = window.innerWidth <= 768 ? 1000 : 500;
+    setTimeout(attemptTransform, initialDelay);
+
+    // Additional checks on various events
+    window.addEventListener('load', () => {
+      const delay = window.innerWidth <= 768 ? 500 : 300;
+      setTimeout(findAndTransformButton, delay);
+    });
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        setTimeout(findAndTransformButton, 200);
+      }
+    });
+
+    /* ========== SECOND BUTTON SETUP - COMMENTED OUT ========== */
+    // SECOND BUTTON HANDLING - TEXT ONLY, NO ANIMATION
+    // function setupSecondButton() {
+    //   getSkusListWithTryOn({companyName: 'luciraonline', regionId:'2'})
+    //     .then((skusList) => {
+    //       console.log("all skus", skusList);
+    //       if (skusList.includes(productSKUTryOn)){
+    //         // First make containers visible
+    //         const secondButtonContainer = document.getElementById("second-tryon-button-1");
+    //         const virtualTryOnContent = document.getElementById("virtual-try-on-content");
+    //         
+    //         if (secondButtonContainer) secondButtonContainer.style.display = "block";
+    //         if (virtualTryOnContent) virtualTryOnContent.style.display = "flex";
+
+    //         // Wait a bit for the button to be rendered, then transform
+    //         setTimeout(() => {
+    //           const secondButtons = document.querySelectorAll('#second-tryon-button-1 #tryonButton, #virtual-try-on-content #tryonButton');
+    //           
+    //           secondButtons.forEach(button => {
+    //             if (!transformedButtons.has(button) && 
+    //                 !button.querySelector('.tryon-text-only') && 
+    //                 !button.querySelector('.tryon-button-wrapper')) {
+    //               console.log('✅ Found second button, transforming to text-only');
+    //               transformSecondButton(button);
+    //             }
+    //           });
+    //         }, 200);
+    //       }
+    //     })
+    //     .catch(err => console.error('Error loading SKUs:', err));
+    // }
+
+    // Initialize second button
+    // setTimeout(setupSecondButton, 1500);
+    /* ========== END SECOND BUTTON SETUP ========== */
+
+  }
+
+  // Initialize on various events
+  if (document.readyState === 'loading') {
+    document.addEventListener("DOMContentLoaded", initTryOnButton);
+  } else {
+    setTimeout(initTryOnButton, 100);
+  }
+
+  window.addEventListener('load', () => {
+    const delay = window.innerWidth <= 768 ? 500 : 300;
+    setTimeout(initTryOnButton, delay);
+  });
+
+  // Fallback for mobile browsers
+  setTimeout(initTryOnButton, 1000);
+  if (window.innerWidth <= 768) {
+    setTimeout(initTryOnButton, 2000);
+  }
+</script>

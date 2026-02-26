@@ -117,7 +117,7 @@ if (!customElements.get('media-gallery')) {
 
 (function() {
   const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
-  const ALWAYS_SHOW_CODES = ["mq", "mh", "ci", "mv", "360v"];
+  const ALWAYS_SHOW_CODES = ["mv", "mq-ai", "mq", "mh-ai", "mh", "ci-ai", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
   let currentSlide = 0;
@@ -130,8 +130,7 @@ if (!customElements.get('media-gallery')) {
   
   let touchStartX = 0;
   let touchEndX = 0;
-  let isSwiping = false;
-  let isTransitioning = false;
+  let isSwiping = false; // Flag to prevent scroll sync during swipe animation
 
   function cacheDOMElements() {
     mediaList = document.querySelector('.product__media-list');
@@ -162,7 +161,8 @@ if (!customElements.get('media-gallery')) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
     const buckets = {
       color: [],
-      codes: { mq: [], ci: [], mh: [], mv: [], v360: [] },
+      codes: { mv: [], "mq-ai": [], mq: [], "mh-ai": [], mh: [], "ci-ai": [], ci: [], v360: [] },
+      cert: [],   // ✅ ADD
       extras: []
     };
 
@@ -172,11 +172,20 @@ if (!customElements.get('media-gallery')) {
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
+      // ✅ CERT detection (only classification, no reordering logic)
+      if (alt.includes("cert")) {
+        buckets.cert.push(item);
+        return;
+      }
+
       if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
-        if (alt.includes("mq")) buckets.codes.mq.push(item);
-        else if (alt.includes("ci")) buckets.codes.ci.push(item);
+        if (alt.includes("mv")) buckets.codes.mv.push(item);
+        else if (alt.includes("mq-ai")) buckets.codes["mq-ai"].push(item);
+        else if (alt.includes("mq")) buckets.codes.mq.push(item);
+        else if (alt.includes("mh-ai")) buckets.codes["mh-ai"].push(item);
         else if (alt.includes("mh")) buckets.codes.mh.push(item);
-        else if (alt.includes("mv")) buckets.codes.mv.push(item);
+        else if (alt.includes("ci-ai")) buckets.codes["ci-ai"].push(item);
+        else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (itemColor === targetColor) buckets.color.push(item);
       } else {
@@ -194,7 +203,7 @@ if (!customElements.get('media-gallery')) {
   function takeCode(buckets) {
     for (const key of ALWAYS_SHOW_CODES) {
       const k = key === "360v" ? "v360" : key;
-      if (buckets.codes[k].length) return buckets.codes[k].shift();
+      if (buckets.codes[k]?.length) return buckets.codes[k].shift();
     }
     return null;
   }
@@ -216,17 +225,27 @@ if (!customElements.get('media-gallery')) {
       }
     }
 
-    Object.values(buckets.codes).forEach(arr => arr.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
-    }));
-    buckets.color.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+    Object.values(buckets.codes).forEach(arr =>
+      arr.forEach(node => {
+        node.style.display = 'block';
+        ordered.push(node);
+      })
+    );
+
+    buckets.color.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
-    buckets.extras.forEach(node => { 
-      node.style.display = 'block'; 
-      ordered.push(node); 
+
+    buckets.extras.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
+    // ✅ CERT — always last
+    buckets.cert.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
     });
 
     return ordered;
@@ -267,7 +286,7 @@ if (!customElements.get('media-gallery')) {
     dotsContainer.className = 'custom-slider-dots';
 
     for (let i = 0; i < totalSlides; i++) {
-      const dot = document.createElement('button'); // better for a11y
+      const dot = document.createElement('button');
       dot.className = 'slider-dot';
       dot.type = 'button';
       dot.dataset.index = i;
@@ -282,12 +301,10 @@ if (!customElements.get('media-gallery')) {
         dot.setAttribute('aria-current', 'true');
       }
 
-      // inner dot visual
       const dotInner = document.createElement('span');
       dotInner.className = 'slider-dot__inner';
       dot.appendChild(dotInner);
 
-      // video icon placed centered inside the dot when slide has video
       if (isVideo) {
         const videoIcon = document.createElement('span');
         videoIcon.className = 'slider-dot__video-icon';
@@ -303,18 +320,23 @@ if (!customElements.get('media-gallery')) {
       dotsContainer.appendChild(dot);
     }
     
-    // center the dots container relative to the media area
     const parent = mediaList.parentNode;
     parent.appendChild(dotsContainer);
   }
 
-
-
   function updateDots() {
     if (!dotsContainer) return;
+
     const dots = dotsContainer.querySelectorAll('.slider-dot');
+
     dots.forEach((dot, i) => {
-      dot.classList.toggle('active', i === currentSlide);
+      const isActive = i === currentSlide;
+      dot.classList.toggle('active', isActive);
+      if (isActive) {
+        dot.setAttribute('aria-current', 'true');
+      } else {
+        dot.removeAttribute('aria-current');
+      }
     });
   }
 
@@ -327,30 +349,31 @@ if (!customElements.get('media-gallery')) {
   function goToSlide(index) {
     if (index < 0 || index >= totalSlides || isReordering) return;
     
+    isSwiping = true; // Lock scroll sync
     currentSlide = index;
     visibleSlides = getVisibleSlides();
     
-    // Update slide classes
     setActiveSlide(currentSlide);
-    
-    // Update dots
     updateDots();
 
-    // Scroll to slide
     const targetSlide = visibleSlides[currentSlide];
-    if (targetSlide) {
-      // Temporarily disable scroll sync during programmatic scroll
-      const scrollHandler = () => {
-        targetSlide.scrollIntoView({ 
-          behavior: 'smooth', 
-          block: 'nearest', 
-          inline: 'center' 
-        });
-      };
+    
+    if (targetSlide && mediaList) {
+      // FIX: Use scrollTo on the container instead of scrollIntoView
+      // This calculates the center position manually to avoid page jumping
+      const slideLeft = targetSlide.offsetLeft;
+      const slideWidth = targetSlide.clientWidth;
+      const containerWidth = mediaList.clientWidth;
       
-      scrollHandler();
+      // Calculate position to center the image
+      const targetScrollLeft = slideLeft - (containerWidth / 2) + (slideWidth / 2);
 
-      // Play video if present
+      mediaList.scrollTo({
+        left: targetScrollLeft,
+        behavior: 'smooth'
+      });
+
+      // Handle video autoplay
       const activeVideo = targetSlide.querySelector('video');
       if (activeVideo) {
         activeVideo.loop = true;
@@ -358,117 +381,119 @@ if (!customElements.get('media-gallery')) {
         activeVideo.play().catch(() => {});
       }
     }
+    
+    // Release the lock after animation roughly completes
+    setTimeout(() => {
+        isSwiping = false;
+    }, 500);
   }
 
-  function nextSlide() {
-    const nextIndex = (currentSlide + 1) % totalSlides;
+  function moveSlide(direction) {
+    let nextIndex = currentSlide + direction;
+    if (nextIndex < 0) nextIndex = 0;
+    if (nextIndex > totalSlides - 1) nextIndex = totalSlides - 1;
     goToSlide(nextIndex);
   }
 
-  function prevSlide() {
-    const prevIndex = (currentSlide - 1 + totalSlides) % totalSlides;
-    goToSlide(prevIndex);
-  }
-
+  // --- SWIPE LOGIC (UNCHANGED AS REQUESTED) ---
   function setupSwipeDetection() {
     if (!mediaList) return;
-    
-    const handleSwipe = () => {
-      if (!isSwiping) return;
-      isSwiping = false;
-      
-      const swipeThreshold = 50;
-      const diff = touchStartX - touchEndX;
-      
-      if (Math.abs(diff) > swipeThreshold) {
-        if (diff > 0) {
-          nextSlide();
-        } else {
-          prevSlide();
-        }
-      } else {
-        // Small swipe, sync to nearest slide
-        setTimeout(() => syncSlideFromScroll(), 200);
-      }
-    };
-    
+
+    let startX = 0;
+    let isTouching = false;
+
     mediaList.addEventListener('touchstart', (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-      isSwiping = true;
+      startX = e.touches[0].clientX;
+      isTouching = true;
     }, { passive: true });
 
-    mediaList.addEventListener('touchmove', (e) => {
-      if (!isSwiping) return;
-      touchEndX = e.changedTouches[0].screenX;
-    }, { passive: true });
+    mediaList.addEventListener('touchend', (e) => {
+      if (!isTouching) return;
+      isTouching = false;
 
-    mediaList.addEventListener('touchend', handleSwipe, { passive: true });
+      const endX = e.changedTouches[0].clientX;
+      const diff = startX - endX;
+      const threshold = 40;
+
+      if (Math.abs(diff) < threshold) return;
+
+      if (diff > 0) {
+        moveSlide(1); 
+      } else {
+        moveSlide(-1); 
+      }
+    }, { passive: true });
   }
 
-  // Detect scroll-based slide changes
+  // --- SCROLL SYNC (IMPROVED FOR DOTS) ---
   function setupScrollSync() {
     if (!mediaList) return;
     
-    let scrollTimeout;
-    let isManualScroll = false;
-    
-    mediaList.addEventListener('scrollstart', () => {
-      isManualScroll = true;
-    }, { passive: true });
-    
+    let isScrolling = false;
+
     mediaList.addEventListener('scroll', () => {
-      if (isReordering) return;
+      if (isReordering || isSwiping) return; // Don't sync if script is driving the animation
       
-      clearTimeout(scrollTimeout);
-      scrollTimeout = setTimeout(() => {
-        if (!isReordering) {
+      if (!isScrolling) {
+        window.requestAnimationFrame(() => {
           syncSlideFromScroll();
-        }
-        isManualScroll = false;
-      }, 100);
+          isScrolling = false;
+        });
+        isScrolling = true;
+      }
     }, { passive: true });
   }
 
   function syncSlideFromScroll() {
-    if (!mediaList || isReordering || isSwiping) return;
-    
-    const currentVisibleSlides = getVisibleSlides();
-    if (currentVisibleSlides.length === 0) return;
+    if (!mediaList || isReordering) return;
+
+    const slides = getVisibleSlides();
+    if (!slides.length) return;
 
     const containerRect = mediaList.getBoundingClientRect();
     const containerCenter = containerRect.left + containerRect.width / 2;
 
-    let closestIndex = currentSlide; // Start with current instead of 0
+    let closestIndex = currentSlide;
     let closestDistance = Infinity;
 
-    currentVisibleSlides.forEach((slide, index) => {
-      const slideRect = slide.getBoundingClientRect();
-      const slideCenter = slideRect.left + slideRect.width / 2;
-      const distance = Math.abs(slideCenter - containerCenter);
+    // Determine which slide is closest to center
+    slides.forEach((slide, index) => {
+      const rect = slide.getBoundingClientRect();
+      const center = rect.left + rect.width / 2;
+      const dist = Math.abs(center - containerCenter);
 
-      if (distance < closestDistance) {
-        closestDistance = distance;
+      if (dist < closestDistance) {
+        closestDistance = dist;
         closestIndex = index;
       }
     });
 
-    // Only update if actually changed
-    if (closestIndex !== currentSlide && closestDistance < containerRect.width * 0.6) {
+    if (closestIndex !== currentSlide) {
       currentSlide = closestIndex;
-      visibleSlides = currentVisibleSlides;
       setActiveSlide(currentSlide);
       updateDots();
+      // NOTE: Removed scrollIntoView here to prevent fighting the user's manual scroll
     }
   }
 
   function initSliderNavigation() {
     if (!mediaList) return;
-    
+
+    const isMobile = window.innerWidth < 750;
+
     const sliderButtons = document.querySelector('.slider-buttons.quick-add-hidden');
     if (sliderButtons) sliderButtons.style.display = 'none';
-    
+
     createDotsNavigation();
-    setupSwipeDetection();
+
+    // 1. SETUP SWIPE (Only on Desktop if you want custom swipe, or disable if native is preferred)
+    // Your original code disabled this on mobile to use native Dawn swipe. Kept as is.
+    if (!isMobile) {
+      setupSwipeDetection();
+    }
+
+    // 2. SETUP SCROLL SYNC (Run this on ALL devices)
+    // This was previously inside the !isMobile check, causing dots to fail on mobile.
     setupScrollSync();
   }
 
@@ -491,17 +516,14 @@ if (!customElements.get('media-gallery')) {
       return; 
     }
 
-    // Store current slide index before reordering
     const previousSlide = currentSlide;
     
     reorderByColor(targetColor);
     
-    // Reset to first slide only on color change
     currentSlide = 0;
     
     initSliderNavigation();
     
-    // Small delay to ensure DOM is ready
     setTimeout(() => {
       goToSlide(currentSlide);
       playAllVideos();

@@ -152,7 +152,7 @@
                 {% endif %}
                 {% if gross_weight != blank -%}
                   <span class="pdp-info-title" id="dimension-gross-weight" data-field="gross_weight">
-                    Gross Wt: {{ gross_weight }} g
+                    Gross Wt: {{ gross_weight | round: 2 }} g
                   </span>
                 {%- endif %}
               </div>
@@ -560,14 +560,27 @@
 {% assign subtotal = metal_cost | plus: diamond_final | plus: gemstone_final | plus: mc_cost_final %}
 {% assign tax_amount = subtotal | times: metal_rates.default_tax | divided_by: 100.0 %}
 {% assign grand_total = subtotal | plus: tax_amount %}
+{% assign mc_final_percent = mc_rate_original | minus: mc_rate_disc_amt | divided_by: mc_rate_original | times: 100 %}
+{% assign grand_total = subtotal | plus: tax_amount %}
+{% assign mc_percent = 0 %}
+{% if mc_cost_original > mc_cost_final and mc_cost_original > 0 %}
+  {% assign mc_percent = mc_cost_original 
+    | minus: mc_cost_final 
+    | times: 100 
+    | divided_by: mc_cost_original 
+    | round %}
+{% endif %}
+
 
 {% if template contains 'product' %}
   {% assign product_collection_handles = product.collections | map: 'handle' %}
+  {% assign grand_total_check = grand_total | plus: 0 %}
 
   {% unless product.metafields.custom.do_not_show_price_breakup
-    or product.price <= 1000000
-    or product_collection_handles contains 'nose-pins'
-  %}
+      or product.price <= 1500000
+      or product_collection_handles contains 'nose-pins'
+      or grand_total_check == 0
+    %}
     <section class="pdp-price-breakup-tabs">
       <div class="pdp-tab-wrapper pdp-price-breakup-tabs-wrapper">
         <div class="tab-switcher">
@@ -575,9 +588,11 @@
             <div tabindex="0" class="contained-switch active" data-tab="price-breakup">
               <span class="switch-item">Price Breakup</span>
             </div>
-            <div tabindex="0" class="contained-switch" data-tab="comparison">
-              <span class="switch-item">LGD vs Mined</span>
+            {% unless product.tags contains 'Gold Jewelry' %}
+              <div tabindex="0" class="contained-switch" data-tab="comparison">
+                <span class="switch-item">Your Savings</span>
             </div>
+            {% endunless %}
           </div>
 
           <div class="tab-content active" id="price-breakup">
@@ -603,19 +618,42 @@
                 </span>
               </div>
 
+              {% assign diamond_percent = 0 %}
+              {% if diamond_original > diamond_final and diamond_original > 0 %}
+                {% assign diamond_percent = diamond_original
+                  | minus: diamond_final
+                  | times: 100
+                  | divided_by: diamond_original
+                  | round %}
+              {% endif %}
+
               {% if diamond_final > 0 %}
                 <div class="price-breakdown-box-item">
-                  <span>{{ diamond_title }} ({{ diamond_pcs }} Pcs.)</span>
+                  <span>
+                    {{ diamond_title }} ({{ diamond_pcs }} Pcs.)
+                    {% if diamond_percent > 0 %}
+                      <small class="discount-text">{{ diamond_percent }}% OFF</small>
+                    {% endif %}
+                  </span>
+
                   <div>
                     {% if diamond_original > diamond_final %}
-                      <span class="price-breakdown-box-del-value">{{ diamond_original | money }}</span>
+                      <span class="price-breakdown-box-del-value">
+                        {{ diamond_original | money }}
+                      </span>
                     {% endif %}
-                    <span class="price-breakdown-box-value" id="source-diamond-cost" data-value="{{ diamond_final }}">
+
+                    <span
+                      class="price-breakdown-box-value"
+                      id="source-diamond-cost"
+                      data-value="{{ diamond_final }}"
+                    >
                       {{ diamond_final | money }}
                     </span>
                   </div>
                 </div>
               {% endif %}
+
 
               {% if gemstone_final > 0 %}
                 <div class="price-breakdown-box-item">
@@ -630,12 +668,23 @@
               {% endif %}
 
               <div class="price-breakdown-box-item">
-                <span>Making Charges</span>
+                <span>
+                  Making Charges
+                  {% if mc_percent > 0 %}
+                    <small class="discount-text">{{ mc_percent }}% OFF</small>
+                  {% endif %}
+                </span>
+
                 <div>
                   {% if mc_cost_original > mc_cost_final %}
-                    <span class="price-breakdown-box-del-value">{{ mc_cost_original | money }}</span>
+                    <span class="price-breakdown-box-del-value">
+                      {{ mc_cost_original | money }}
+                    </span>
                   {% endif %}
-                  <span class="price-breakdown-box-value" id="source-making-charges" data-value="{{ mc_cost_final }}">
+
+                  <span class="price-breakdown-box-value" 
+                    id="source-making-charges" 
+                    data-value="{{ mc_cost_final }}">
                     {{ mc_cost_final | money }}
                   </span>
                 </div>
@@ -658,157 +707,158 @@
               </div>
             </div>
           </div>
+          {% unless product.tags contains 'Gold Jewelry' %}
+            <div class="tab-content" id="comparison">
+              {% assign config = variant.metafields['DI-GoldPrice'].variant_config.value %}
+              {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
 
-          <div class="tab-content" id="comparison">
-            {% assign config = variant.metafields['DI-GoldPrice'].variant_config.value %}
-            {% assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value %}
+              {% assign diamond_final = 0.0 %}
+              {% assign total_diamond_weight = 0.0 %}
 
-            {% assign diamond_final = 0.0 %}
-            {% assign total_diamond_weight = 0.0 %}
+              {% for stone_item in config.advanced_stone_config %}
+                {% if stone_item.stone_type == 'diamond' %}
+                  {% assign slab_rate = 0 %}
+                  {% assign slab_discount = 0 %}
+                  {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
 
-            {% for stone_item in config.advanced_stone_config %}
-              {% if stone_item.stone_type == 'diamond' %}
-                {% assign slab_rate = 0 %}
-                {% assign slab_discount = 0 %}
-                {% assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
-
-                {% if pricing_ref %}
-                  {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
-                  {% for slab in pricing_ref.slabs %}
-                    {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
-                      {% assign slab_rate = slab.price | times: 100 %}
-                      {% assign slab_discount = slab.discount | default: 0 %}
-                      {% break %}
-                    {% endif %}
-                  {% endfor %}
+                  {% if pricing_ref %}
+                    {% assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
+                    {% for slab in pricing_ref.slabs %}
+                      {% if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight %}
+                        {% assign slab_rate = slab.price | times: 100 %}
+                        {% assign slab_discount = slab.discount | default: 0 %}
+                        {% break %}
+                      {% endif %}
+                    {% endfor %}
+                  {% endif %}
+                  {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
+                  {% assign applied_discount = config.diamond_discount | default: slab_discount %}
+                  {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
+                  {% assign item_final_cost = item_base_cost | minus: discount_amount %}
+                  {% assign diamond_final = diamond_final | plus: item_final_cost %}
+                  {% assign total_diamond_weight = total_diamond_weight | plus: stone_item.stone_weight %}
                 {% endif %}
-                {% assign item_base_cost = slab_rate | times: stone_item.stone_weight %}
-                {% assign applied_discount = config.diamond_discount | default: slab_discount %}
-                {% assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0 %}
-                {% assign item_final_cost = item_base_cost | minus: discount_amount %}
-                {% assign diamond_final = diamond_final | plus: item_final_cost %}
-                {% assign total_diamond_weight = total_diamond_weight | plus: stone_item.stone_weight %}
-              {% endif %}
-            {% endfor %}
-            {% assign mined_diamond_total = 0.0 %}
-            {% for stone in config.advanced_stone_config %}
-              {% if stone.stone_type == 'diamond' %}
-                {% assign avg_wt = stone.stone_weight | times: 1.0 | divided_by: stone.stone_quantity %}
-                {% assign mined_rate = 0 %}
-                {% if avg_wt <= 0.109 %}
-                  {% assign mined_rate = 86800 %}
-                {% elsif avg_wt <= 0.249 %}
-                  {% assign mined_rate = 97020 %}
-                {% elsif avg_wt <= 0.499 %}
-                  {% assign mined_rate = 114917 %}
-                {% elsif avg_wt <= 0.749 %}
-                  {% assign mined_rate = 74266 %}
-                {% elsif avg_wt <= 0.999 %}
-                  {% assign mined_rate = 89373 %}
-                {% elsif avg_wt <= 1.499 %}
-                  {% assign mined_rate = 126906 %}
-                {% elsif avg_wt <= 1.999 %}
-                  {% assign mined_rate = 179840 %}
-                {% elsif avg_wt <= 2.999 %}
-                  {% assign mined_rate = 301515 %}
-                {% else %}
-                  {% assign mined_rate = 395589 %}
+              {% endfor %}
+              {% assign mined_diamond_total = 0.0 %}
+              {% for stone in config.advanced_stone_config %}
+                {% if stone.stone_type == 'diamond' %}
+                  {% assign avg_wt = stone.stone_weight | times: 1.0 | divided_by: stone.stone_quantity %}
+                  {% assign mined_rate = 0 %}
+                  {% if avg_wt <= 0.109 %}
+                    {% assign mined_rate = 86800 %}
+                  {% elsif avg_wt <= 0.249 %}
+                    {% assign mined_rate = 97020 %}
+                  {% elsif avg_wt <= 0.499 %}
+                    {% assign mined_rate = 114917 %}
+                  {% elsif avg_wt <= 0.749 %}
+                    {% assign mined_rate = 74266 %}
+                  {% elsif avg_wt <= 0.999 %}
+                    {% assign mined_rate = 89373 %}
+                  {% elsif avg_wt <= 1.499 %}
+                    {% assign mined_rate = 126906 %}
+                  {% elsif avg_wt <= 1.999 %}
+                    {% assign mined_rate = 179840 %}
+                  {% elsif avg_wt <= 2.999 %}
+                    {% assign mined_rate = 301515 %}
+                  {% else %}
+                    {% assign mined_rate = 395589 %}
+                  {% endif %}
+                  {% assign batch_mined_cost = mined_rate | times: stone.stone_weight | times: 100 %}
+                  {% assign mined_diamond_total = mined_diamond_total | plus: batch_mined_cost %}
                 {% endif %}
-                {% assign batch_mined_cost = mined_rate | times: stone.stone_weight | times: 100 %}
-                {% assign mined_diamond_total = mined_diamond_total | plus: batch_mined_cost %}
-              {% endif %}
-            {% endfor %}
-            {% assign total_savings = mined_diamond_total | minus: diamond_final %}
-            <div class="comp-container">
-              <div class="comp-labels-col">
-                <div class="comp-title">
-                  Diamond<br>
-                  Comparison
-                </div>
-                <div class="cw-label-row">
-                  <span class="cw-icon">{{ 'icon-rupee.svg' | inline_asset_content }}</span> PRICE
-                </div>
-                <div class="cw-label-row">
-                  <span class="cw-icon">
-                    {{ 'icon-diamond-black.svg' | inline_asset_content }}
-                  </span>
-                  Carat
-                </div>
-                <div class="cw-label-row">
-                  <span class="cw-icon">
-                    {{ 'icon-clarity.svg' | inline_asset_content }}
-                  </span>
-                  Clarity
-                  <div class="cw-info-wrapper">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12" height="12" width="12">
-                      <g clip-path="url(#clip0_2871_3457)">
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 11C8.76142 11 11 8.76142 11 6C11 3.23858 8.76142 1 6 1C3.23858 1 1 3.23858 1 6C1 8.76142 3.23858 11 6 11Z"></path>
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 8V6"></path>
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 4H6.005"></path>
-                      </g>
-                      <defs>
-                      <clipPath id="clip0_2871_3457">
-                        <rect fill="white" height="12" width="12"></rect>
-                      </clipPath>
-                      </defs>
-                    </svg>
-                    <div class="tooltip-box">
-                      <div class="tooltip-row"><span class="tooltip-bold">VVS</span> : Top</div>
-                      <div class="tooltip-row"><span class="tooltip-bold">VS</span> : Very Good</div>
-                      <div class="tooltip-row"><span class="tooltip-bold">SI</span> : Good</div>
+              {% endfor %}
+              {% assign total_savings = mined_diamond_total | minus: diamond_final %}
+              <div class="comp-container">
+                <div class="comp-labels-col">
+                  <div class="comp-title">
+                    Diamond<br>
+                    Comparison
+                  </div>
+                  <div class="cw-label-row">
+                    <span class="cw-icon">{{ 'icon-rupee.svg' | inline_asset_content }}</span> Price
+                  </div>
+                  <div class="cw-label-row">
+                    <span class="cw-icon">
+                      {{ 'icon-diamond-black.svg' | inline_asset_content }}
+                    </span>
+                    Carat
+                  </div>
+                  <div class="cw-label-row">
+                    <span class="cw-icon">
+                      {{ 'icon-clarity.svg' | inline_asset_content }}
+                    </span>
+                    Clarity
+                    <div class="cw-info-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12" height="12" width="12">
+                        <g clip-path="url(#clip0_2871_3457)">
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 11C8.76142 11 11 8.76142 11 6C11 3.23858 8.76142 1 6 1C3.23858 1 1 3.23858 1 6C1 8.76142 3.23858 11 6 11Z"></path>
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 8V6"></path>
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 4H6.005"></path>
+                        </g>
+                        <defs>
+                        <clipPath id="clip0_2871_3457">
+                          <rect fill="white" height="12" width="12"></rect>
+                        </clipPath>
+                        </defs>
+                      </svg>
+                      <div class="tooltip-box">
+                        <div class="tooltip-row"><span class="tooltip-bold">VVS</span> : Top</div>
+                        <div class="tooltip-row"><span class="tooltip-bold">VS</span> : Very Good</div>
+                        <div class="tooltip-row"><span class="tooltip-bold">SI</span> : Good</div>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div class="cw-label-row">
-                  <span class="cw-icon">
-                    {{ 'icon-color.svg' | inline_asset_content }}
-                  </span>
-                  Color
-                  <div class="cw-info-wrapper">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12" height="12" width="12">
-                      <g clip-path="url(#clip0_2871_3457)">
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 11C8.76142 11 11 8.76142 11 6C11 3.23858 8.76142 1 6 1C3.23858 1 1 3.23858 1 6C1 8.76142 3.23858 11 6 11Z"></path>
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 8V6"></path>
-                        <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 4H6.005"></path>
-                      </g>
-                      <defs>
-                      <clipPath id="clip0_2871_3457">
-                        <rect fill="white" height="12" width="12"></rect>
-                      </clipPath>
-                      </defs>
-                    </svg>
+                  <div class="cw-label-row">
+                    <span class="cw-icon">
+                      {{ 'icon-color.svg' | inline_asset_content }}
+                    </span>
+                    Color
+                    <div class="cw-info-wrapper">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 12 12" height="12" width="12">
+                        <g clip-path="url(#clip0_2871_3457)">
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 11C8.76142 11 11 8.76142 11 6C11 3.23858 8.76142 1 6 1C3.23858 1 1 3.23858 1 6C1 8.76142 3.23858 11 6 11Z"></path>
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 8V6"></path>
+                          <path stroke-linejoin="round" stroke-linecap="round" stroke-width="0.75" stroke="#666666" d="M6 4H6.005"></path>
+                        </g>
+                        <defs>
+                        <clipPath id="clip0_2871_3457">
+                          <rect fill="white" height="12" width="12"></rect>
+                        </clipPath>
+                        </defs>
+                      </svg>
 
-                    <div class="tooltip-box">
-                      <div class="tooltip-row"><span class="tooltip-bold">EF</span> : White</div>
-                      <div class="tooltip-row"><span class="tooltip-bold">GH</span> : Near White</div>
-                      <div class="tooltip-row"><span class="tooltip-bold">IJ</span> : Faint Yellow</div>
+                      <div class="tooltip-box">
+                        <div class="tooltip-row"><span class="tooltip-bold">EF</span> : White</div>
+                        <div class="tooltip-row"><span class="tooltip-bold">GH</span> : Near White</div>
+                        <div class="tooltip-row"><span class="tooltip-bold">IJ</span> : Faint Yellow</div>
+                      </div>
                     </div>
                   </div>
+                  <div class="cw-label-row cw-savings-label mt-auto">Total Saving</div>
                 </div>
-                <div class="cw-label-row cw-savings-label mt-auto">Total Saving</div>
-              </div>
-              <div class="comp-data-card">
-                <div class="cw-col-head">
-                  Lucira Grown<br>
-                  Diamond
+                <div class="comp-data-card">
+                  <div class="cw-col-head">
+                    Lucira Grown<br>
+                    Diamond
+                  </div>
+                  <div class="cw-col-head">
+                    Mined<br>
+                    Diamond
+                  </div>
+                  <div class="cw-data-cell cw-price">{{ diamond_final | money }}</div>
+                  <div class="cw-data-cell cw-price">{{ mined_diamond_total | money }}</div>
+                  <div class="cw-data-cell">{{ total_diamond_weight | round: 2 }} CT</div>
+                  <div class="cw-data-cell">{{ total_diamond_weight | round: 2 }} CT</div>
+                  <div class="cw-data-cell">VVS</div>
+                  <div class="cw-data-cell">SI</div>
+                  <div class="cw-data-cell">EF</div>
+                  <div class="cw-data-cell">IJ</div>
+                  <div class="cw-data-cell cw-savings-val mt-auto">{{ total_savings | money }}</div>
+                  <div class="cw-data-cell cw-savings-zero mt-auto">₹ 0</div>
                 </div>
-                <div class="cw-col-head">
-                  Mined<br>
-                  Diamond
-                </div>
-                <div class="cw-data-cell cw-price">{{ diamond_final | money }}</div>
-                <div class="cw-data-cell cw-price">{{ mined_diamond_total | money }}</div>
-                <div class="cw-data-cell">{{ total_diamond_weight | round: 2 }} CT</div>
-                <div class="cw-data-cell">{{ total_diamond_weight | round: 2 }} CT</div>
-                <div class="cw-data-cell">VVS</div>
-                <div class="cw-data-cell">SI</div>
-                <div class="cw-data-cell">EF</div>
-                <div class="cw-data-cell">IJ</div>
-                <div class="cw-data-cell cw-savings-val mt-auto">{{ total_savings | money }}</div>
-                <div class="cw-data-cell cw-savings-zero mt-auto">₹ 0</div>
               </div>
             </div>
-          </div>
+          {% endunless %}
         </div>
       </div>
     </section>
@@ -849,62 +899,138 @@
     </script>
 
     <script>
-      document.addEventListener('DOMContentLoaded', function () {
-        const productName = '{{ product.title }}';
-        const sku = '{{ product.selected_or_first_available_variant.sku }}';
+    document.addEventListener('DOMContentLoaded', function () {
 
-        function pushTabClick(tabName) {
-          const promoData = {
-            event: 'promoClick',
-            promoClick: {
-              promo_id: sku,
-              creative_name: tabName,
-              promo_position: 'Product Details Section',
-              promo_name: productName,
-            },
-          };
+      const productData = {{ product | json }};
+      const variantData = {{ product.selected_or_first_available_variant | json }};
+      const totalSavings = {{ total_savings | default: 0 | money_without_currency | replace: ',', '' }};
 
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push(promoData);
+      // Price Breakup Values
+      const priceBreakup = {
+        metal_cost:           {{ metal_cost | divided_by: 100.0 | round: 2 }},
+        diamond_original:     {{ diamond_original | divided_by: 100.0 | round: 2 }},
+        diamond_final:        {{ diamond_final | divided_by: 100.0 | round: 2 }},
+        diamond_discount_pct: {{ diamond_percent | default: 0 }},
+        diamond_pcs:          {{ diamond_pcs | default: 0 }},
+        making_original:      {{ mc_cost_original | divided_by: 100.0 | round: 2 }},
+        making_final:         {{ mc_cost_final | divided_by: 100.0 | round: 2 }},
+        making_discount_pct:  {{ mc_percent | default: 0 }},
+        gst_percent:          {{ metal_rates.default_tax | default: 0 }},
+        gst_amount:           {{ tax_amount | divided_by: 100.0 | round: 2 }},
+        grand_total:          {{ grand_total | divided_by: 100.0 | round: 2 }},
+        gold_rate_per_g:      {{ display_rate_per_g | round: 2 }},
+        metal_color:          '{{ metal_color }}',
+        metal_purity:         '{{ config.purity }}',
+        gemstone_original:    {{ gemstone_original | divided_by: 100.0 | round: 2 }},
+        gemstone_final:       {{ gemstone_final | divided_by: 100.0 | round: 2 }},
+        gemstone_pcs:         {{ gemstone_pcs | default: 0 }}
+      };
+
+      function pushTabClick(tabName, savingsAmount = null) {
+
+        let promoPosition = 'Product Details Section';
+        if (tabName === 'Your Savings' && savingsAmount) {
+          promoPosition = savingsAmount;
         }
 
-        function onTabClick(event) {
-          const switchItem = event.target.closest('.contained-switch');
-          if (!switchItem) return;
-          const wrapper = switchItem.closest('.pdp-tab-wrapper');
-          if (!wrapper) return;
-          const tabId = switchItem.getAttribute('data-tab');
-          if (tabId === 'price-breakup') {
-            pushTabClick('Price Breakup');
-          } else if (tabId === 'comparison') {
-            pushTabClick('LGD vs Mined');
+        const promoData = {
+          event: 'promoClick',
+          promoClick: {
+
+            // Promotion Info
+            creative_name: tabName === 'Price Breakup' ? 'priceBreakup' : 'yourSavings',
+            promo_id: variantData.sku || '',
+            promo_name: productData.title,
+            promo_position: promoPosition,
+            position: '-',
+
+            // Product Info
+            product_id: productData.id,
+            product_name: productData.title,
+            sku: variantData.sku,
+            variant_id: variantData.id,
+            location_id: variantData.id,
+
+            // URL & Image
+            product_url: window.location.href,
+            product_image: productData.featured_image ? productData.featured_image : '',
+
+            // Pricing
+            price: variantData.price / 100,
+            offer_price: variantData.price / 100,
+
+            // ✅ Price Breakup Values (from image)
+            metal_label:          priceBreakup.metal_purity + ' ' + priceBreakup.metal_color + ' Gold',
+            gold_rate_per_g:      priceBreakup.gold_rate_per_g,
+            metal_price:          priceBreakup.metal_cost,
+
+            diamond_price_original:     priceBreakup.diamond_original,
+            diamond_price_final:        priceBreakup.diamond_final,
+            diamond_discount_percent:   priceBreakup.diamond_discount_pct,
+            diamond_pcs:                priceBreakup.diamond_pcs,
+
+            making_charges_original:    priceBreakup.making_original,
+            making_charges_final:       priceBreakup.making_final,
+            making_charges_discount_pct: priceBreakup.making_discount_pct,
+
+            gst_percent:          priceBreakup.gst_percent,
+            gst_amount:           priceBreakup.gst_amount,
+
+            gemstone_price_original:    priceBreakup.gemstone_original,
+            gemstone_price_final:       priceBreakup.gemstone_final,
+            gemstone_pcs:               priceBreakup.gemstone_pcs,
+
+            grand_total:          priceBreakup.grand_total,
+
+            // Savings (only for savings tab)
+            savings_amount: savingsAmount || 0,
+
+            // Optional
+            email: '',
+            phone: ''
           }
-          const allSwitches = wrapper.querySelectorAll('.contained-switch');
-          allSwitches.forEach((s) => s.classList.remove('active'));
-          switchItem.classList.add('active');
-          const index = Array.from(allSwitches).indexOf(switchItem);
-          if (switchItem.parentElement) {
-            switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
-          }
-          const allContents = wrapper.querySelectorAll('.tab-content');
-          allContents.forEach((content) => content.classList.remove('active'));
-          const activeContent = wrapper.querySelector(`#${tabId}`);
-          if (activeContent) {
-            activeContent.classList.add('active');
-          }
+        };
+
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push(promoData);
+      }
+
+      function onTabClick(event) {
+        const switchItem = event.target.closest('.contained-switch');
+        if (!switchItem) return;
+
+        const wrapper = switchItem.closest('.pdp-tab-wrapper');
+        if (!wrapper) return;
+
+        const tabId = switchItem.getAttribute('data-tab');
+
+        if (tabId === 'price-breakup') {
+          pushTabClick('Price Breakup');
+        } else if (tabId === 'comparison') {
+          pushTabClick('Your Savings', totalSavings);
         }
 
-        document.addEventListener('click', onTabClick);
-        document.addEventListener('keypress', (e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            const switchItem = e.target.closest('.contained-switch');
-            if (switchItem) {
-              e.preventDefault();
-              switchItem.click();
-            }
-          }
-        });
-      });
+        const allSwitches = wrapper.querySelectorAll('.contained-switch');
+        allSwitches.forEach((s) => s.classList.remove('active'));
+        switchItem.classList.add('active');
+
+        const index = Array.from(allSwitches).indexOf(switchItem);
+        if (switchItem.parentElement) {
+          switchItem.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
+        }
+
+        const allContents = wrapper.querySelectorAll('.tab-content');
+        allContents.forEach((content) => content.classList.remove('active'));
+
+        const activeContent = wrapper.querySelector(`#${tabId}`);
+        if (activeContent) activeContent.classList.add('active');
+      }
+
+      document.addEventListener('click', onTabClick);
+
+    });
     </script>
+
+
   {% endunless %}
 {% endif %}

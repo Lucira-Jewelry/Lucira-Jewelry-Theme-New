@@ -25,24 +25,38 @@
             SIZE & CUSTOMIZATION
           </h4>
         </div>
-        <span
-          id="size_drawer"
-          class="size-guide-button"
-          onclick="
-          window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: 'promoClick',
-            promoClick: {
-              promo_id: '{{ product.selected_or_first_available_variant.sku }}',
-              promo_name: '{{ product.title }}',
-              creative_name: 'Size Guide Clicked'
-            }
-          });
-        "
-          >Size Guide</span
-        >
+
+        {% assign show_size_guide = false %}
+
+        {% for c in product.collections %}
+          {% if c.handle == 'all-rings' %}
+            {% assign show_size_guide = true %}
+            {% break %}
+          {% endif %}
+        {% endfor %}
+
+        {% if show_size_guide %}
+          <span
+            id="size_drawer"
+            class="size-guide-button"
+            onclick="
+              window.dataLayer = window.dataLayer || [];
+              window.dataLayer.push({
+                event: 'promoClick',
+                promoClick: {
+                  promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+                  promo_name: '{{ product.title }}',
+                  creative_name: 'Size Guide Clicked'
+                }
+              });
+            "
+          >
+            Size Guide
+          </span>
+        {% endif %}
+
       </div>
-      <div class="size-and-customization-wrapper">
+      <div class="size-and-customization-wrapper" id="product_variant_drawer">
         <div class="customization-wrapper">
             <div class="customization-item">
               {% assign metal = variant_parts[0] | downcase %}
@@ -80,14 +94,53 @@
             <div class="customization-item">
               <div class="label">Size :</div>
               <div class="customization-item-div size-customization-item">
-                <span id="customization-size">{{ variant_parts[1] }}</span> IND
+                <span id="customization-size">{{ variant_parts[1] }}</span> {% unless product.tags contains 'Bracelets' %}IND{% endunless %}
               </div>
             </div>
             {% endif %}
           </div>
-          <span class="customize-button" id="product_variant_drawer">CUSTOMIZE</span>
+          <span class="customize-button" id="product_variant_drawer"z>CUSTOMIZE</span>
       </div>
     </variant-selects>
   {%- endunless -%}
 </div>
 
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.dataLayer = window.dataLayer || [];
+
+  const drawer = document.getElementById('variant-drawer');
+  if (!drawer) return;
+
+  const variants = {{ product.variants | json }};
+  let lastFiredVariantId = null;
+
+  const idInput = document.querySelector('form[action*="/cart/add"] input[name="id"]');
+  if (!idInput) return;
+
+  const observer = new MutationObserver(function() {
+    const variantId = Number(idInput.value);
+    const variant = variants.find(v => v.id === variantId);
+    
+    if (!variant || variant.id === lastFiredVariantId) return;
+    
+    lastFiredVariantId = variant.id;
+
+    window.dataLayer.push({
+      event: "pdp_customize",
+      pageType: {
+        shopify_product_id: {{ product.id }},
+        shopify_variant_id: variant.id,
+        shopify_sku: variant.sku
+      }
+    });
+  });
+
+  observer.observe(idInput, { 
+    attributes: true, 
+    attributeFilter: ['value'] 
+  });
+});
+</script>

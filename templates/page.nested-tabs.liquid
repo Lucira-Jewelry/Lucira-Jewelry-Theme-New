@@ -1,0 +1,192 @@
+{% layout 'theme' %}
+
+{% assign category_handle = page.handle %}
+{% assign current_category = metaobjects.category_page[category_handle] %}
+
+{% if current_category == blank %}
+  <div class="container" style="padding: 40px; text-align: center;">
+    <h1>Category not found</h1>
+    <p>Please check the page configuration.</p>
+  </div>
+{% else %}
+  {% comment %} Get all tabs for this category {% endcomment %}
+  {% assign all_tabs = metaobjects.tab_content.values %}
+  {% assign category_tabs = "" | split: "" %}
+  
+  {% comment %} Filter tabs by parent category {% endcomment %}
+  {% for tab in all_tabs %}
+    {% if tab.parent_category %}
+      {% assign parent = tab.parent_category %}
+      {% if parent.system.handle == current_category.system.handle 
+          or parent.title == current_category.title 
+          or parent.system.id == current_category.system.id %}
+        {% assign category_tabs = category_tabs | push: tab %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  
+  {% comment %} If no filtered tabs, show all tabs {% endcomment %}
+  {% if category_tabs.size == 0 %}
+    {% assign category_tabs = all_tabs %}
+  {% endif %}
+  
+  {% comment %} Get active tab from URL {% endcomment %}
+  {% assign url_search = request.search %}
+  {% assign url_tab = '' %}
+  
+  {% if url_search contains 'tab=' %}
+    {% assign url_parts = url_search | remove: '?' | split: '&' %}
+    {% for part in url_parts %}
+      {% if part contains 'tab=' %}
+        {% assign url_tab = part | split: '=' | last %}
+        {% break %}
+      {% endif %}
+    {% endfor %}
+  {% endif %}
+  
+  {% assign default_tab = current_category.default_tab_slug | default: category_tabs.first.tab_slug %}
+  {% assign active_tab_slug = url_tab | default: default_tab %}
+  {% assign active_tab_slug_lower = active_tab_slug | downcase %}
+  
+  {% comment %} Store data for JavaScript {% endcomment %}
+  {% comment %} <script type="application/json" id="tabs-data">
+    {
+      "category": {
+        "title": "{{ current_category.title | escape }}",
+        "handle": "{{ current_category.system.handle | escape }}"
+      },
+      "tabs": [
+        {% for tab in category_tabs %}
+          {
+            "id": "tab-{{ forloop.index0 }}",
+            "title": "{{ tab.title | escape }}",
+            "slug": "{{ tab.tab_slug | escape }}",
+            "header": "{{ tab.header | default: tab.title | escape }}",
+            "description": "{{ tab.description | escape | newline_to_br }}",
+            "content_image": "{% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | escape }}{% endif %}",
+            "cta_text": "{{ tab.cta_text | escape }}",
+            "cta_link": "{{ tab.cta_link | escape }}",
+            "banner_image": "{% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | escape }}{% endif %}",
+            "banner_title": "{{ tab.banner_title | default: tab.header | default: tab.title | escape }}",
+            "related_blogs": [
+              {% for article_ref in tab.related_blogs %}
+                {% assign article = article_ref %}
+                {% if article %}
+                  {
+                    "title": "{{ article.title | escape }}",
+                    "url": "{{ article.url | escape }}"
+                  }{% unless forloop.last %},{% endunless %}
+                {% endif %}
+              {% endfor %}
+            ]
+          }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ],
+      "activeTabSlug": "{{ active_tab_slug | escape }}"
+    }
+  </script> {% endcomment %}
+  {% comment %} In the JSON data section, only include filtered tabs {% endcomment %}
+
+<script type="application/json" id="tabs-data">
+{
+  "category": {
+    "title": "{{ current_category.title | escape }}",
+    "handle": "{{ current_category.system.handle | escape }}"
+  },
+  "tabs": [
+    {% comment %} Only include tabs for this category {% endcomment %}
+    {% for tab in category_tabs %}
+      {
+        "id": "tab-{{ forloop.index0 }}",
+        "title": "{{ tab.title | escape }}",
+        "slug": "{{ tab.tab_slug | escape }}",
+        "header": "{{ tab.header | default: tab.title | escape }}",
+        "description": "{{ tab.description | escape | newline_to_br }}",
+        "content_image": "{% if tab.content_image %}{{ tab.content_image | image_url: width: 800 | escape }}{% endif %}",
+        "cta_text": "{{ tab.cta_text | escape }}",
+        "cta_link": "{{ tab.cta_link | escape }}",
+        "banner_image": "{% if tab.banner_image %}{{ tab.banner_image | image_url: width: 1920 | escape }}{% endif %}",
+        "banner_title": "{{ tab.banner_title | default: tab.header | default: tab.title | escape }}",
+        "parentCategoryHandle": "{{ tab.parent_category.system.handle | escape }}",
+        "related_blogs": [
+          {% for article_ref in tab.related_blogs %}
+            {% assign article = article_ref %}
+            {% if article %}
+              {
+                "title": "{{ article.title | escape }}",
+                "url": "{{ article.url | escape }}"
+              }{% unless forloop.last %},{% endunless %}
+            {% endif %}
+          {% endfor %}
+        ]
+      }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ],
+  "activeTabSlug": "{{ active_tab_slug | escape }}"
+}
+</script>
+  
+  <main class="nested-tabs-page" id="nested-tabs-page">
+    {% section 'main-tabs-navigation' %}
+    <div id="dynamic-banner">
+      {% comment %} Banner will be loaded by JavaScript {% endcomment %}
+    </div>
+    <div id="dynamic-content">
+      {% comment %} Content will be loaded by JavaScript {% endcomment %}
+    </div>
+  </main>
+  
+  {% comment %} Initial load template {% endcomment %}
+  <template id="tab-banner-template">
+    <section class="nested-tabs-banner">
+      <div class="banner-background">
+        <img id="banner-image" src="" alt="" loading="eager" width="1920" height="400">
+      </div>
+      <div class="banner-overlay"></div>
+      <div class="banner-content">
+        <h1 class="banner-title" id="banner-title"></h1>
+        <p class="banner-subtitle" id="banner-subtitle"></p>
+      </div>
+    </section>
+  </template>
+  
+  <template id="tab-content-template">
+    <div class="nested-tabs-container">
+      <nav class="tabs-navigation" id="tabs-navigation"></nav>
+      <div class="tab-content" id="tab-content-area"></div>
+    </div>
+  </template>
+  
+  <template id="single-tab-template">
+    <div class="tab-content-area" data-tab-slug="{slug}">
+      <div class="tab-content-text">
+        <h2 class="tab-content-header">{header}</h2>
+        <div class="tab-content-description">{description}</div>
+        {cta_button}
+      </div>
+      {content_image}
+      {related_topics}
+    </div>
+  </template>
+  
+  <template id="cta-button-template">
+    <a href="{link}" class="tab-cta-button">{text}</a>
+  </template>
+  
+  <template id="content-image-template">
+    <div class="tab-content-image">
+      <img src="{src}" alt="{alt}" loading="lazy" width="800" height="600">
+    </div>
+  </template>
+  
+  <template id="related-topics-template">
+    <div class="related-topics">
+      <h3>Related Topics</h3>
+      <div class="blog-links">{blog_links}</div>
+    </div>
+  </template>
+  
+  <template id="blog-link-template">
+    <a href="{url}" class="blog-link">{title}</a>
+  </template>
+{% endif %}

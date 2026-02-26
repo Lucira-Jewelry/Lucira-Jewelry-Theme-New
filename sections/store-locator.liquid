@@ -1,0 +1,166 @@
+<section class="store-locator section-{{ section.id }}">
+  <div class="page-width">
+
+    <!-- PIN CODE SEARCH -->
+    <div class="pincode-search">
+      <input
+        type="text"
+        id="user-pincode"
+        placeholder="Search by PIN code"
+        maxlength="6"
+      />
+      <button id="search-stores">Search</button>
+      <p class="pincode-error" style="display:none;">Please enter a valid PIN code</p>
+    </div>
+
+    <!-- STORE CARDS -->
+    <div class="store-grid" id="store-grid">
+      {% for block in section.blocks %}
+        <div
+          class="store-card"
+          data-pincode="{{ block.settings.store_pincode }}"
+          data-lat="{{ block.settings.latitude }}"
+          data-lng="{{ block.settings.longitude }}"
+          {{ block.shopify_attributes }}
+        >
+          <img
+            src="{{ block.settings.image | image_url: width: 600 }}"
+            alt="{{ block.settings.store_name }}"
+            loading="lazy"
+          >
+
+          <h3>{{ block.settings.store_name }}</h3>
+          <p>{{ block.settings.address }}</p>
+
+          <div class="store-actions">
+            <a href="{{ block.settings.store_link }}" class="btn">Visit Store</a>
+            <a href="{{ block.settings.design_link }}" class="btn outline">View Designs</a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</section>
+
+
+<script>
+  function getDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
+  async function getLatLngFromPincode(pincode) {
+    const res = await fetch(`https://api.postalpincode.in/pincode/${pincode}`);
+    const data = await res.json();
+
+    if (data[0].Status !== "Success") return null;
+
+    const location = data[0].PostOffice[0];
+    return {
+      lat: parseFloat(location.Latitude),
+      lng: parseFloat(location.Longitude)
+    };
+  }
+
+  document.getElementById("search-stores").addEventListener("click", async () => {
+    const pincode = document.getElementById("user-pincode").value.trim();
+    const error = document.querySelector(".pincode-error");
+
+    if (!/^\d{6}$/.test(pincode)) {
+      error.style.display = "block";
+      return;
+    }
+    error.style.display = "none";
+
+    const userLocation = await getLatLngFromPincode(pincode);
+    if (!userLocation) return;
+
+    document.querySelectorAll(".store-card").forEach(card => {
+      const lat = parseFloat(card.dataset.lat);
+      const lng = parseFloat(card.dataset.lng);
+
+      const distance = getDistanceKm(
+        userLocation.lat,
+        userLocation.lng,
+        lat,
+        lng
+      );
+
+      card.style.display = distance <= 25 ? "block" : "none";
+    });
+  });
+</script>
+
+
+{% schema %}
+{
+  "name": "Store Locator",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "store",
+      "name": "Store Card",
+      "settings": [
+        {
+          "type": "text",
+          "id": "store_name",
+          "label": "Store Name"
+        },
+        {
+          "type": "textarea",
+          "id": "address",
+          "label": "Store Address"
+        },
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Store Image"
+        },
+        {
+          "type": "text",
+          "id": "store_pincode",
+          "label": "Store PIN Code",
+          "info": "Used for reference only"
+        },
+        {
+          "type": "text",
+          "id": "latitude",
+          "label": "Latitude",
+          "info": "Required for 25km radius calculation"
+        },
+        {
+          "type": "text",
+          "id": "longitude",
+          "label": "Longitude",
+          "info": "Required for 25km radius calculation"
+        },
+        {
+          "type": "url",
+          "id": "store_link",
+          "label": "Visit Store Link"
+        },
+        {
+          "type": "url",
+          "id": "design_link",
+          "label": "View Designs Link"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Store Locator"
+    }
+  ]
+}
+{% endschema %}

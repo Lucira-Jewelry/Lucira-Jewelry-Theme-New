@@ -1,4 +1,4 @@
-<div class="custom-collection-grid-section">
+{% comment %} <div class="custom-collection-grid-section">
   <div class="custom-collection-scroll-container">
     <div class="custom-collection-grid-wrapper">
       {% for block in section.blocks %}
@@ -379,5 +379,356 @@
       ]
     }
   ]
+}
+{% endschema %} {% endcomment %}
+
+
+{% comment %} Preload first 2 collection images for mobile LCP {% endcomment %}
+{% if section.blocks.size > 0 %}
+  {% for block in section.blocks limit: 2 %}
+    {% if block.settings.collection_image != blank %}
+      <link rel="preload" 
+            as="image" 
+            href="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }}"
+            media="(max-width: 768px)"
+            {% if forloop.first %}fetchpriority="high"{% endif %}>
+    {% endif %}
+  {% endfor %}
+{% endif %}
+
+<div class="custom-collection-grid-section">
+  <div class="custom-collection-scroll-container">
+    <div class="custom-collection-grid-wrapper" role="list">
+      {% for block in section.blocks %}
+        {% liquid
+          assign is_priority = false
+          if forloop.index <= 4
+            assign is_priority = true
+          endif
+        %}
+        
+        <div class="custom-slider-item" 
+             role="listitem"
+             data-collection-name="{{ block.settings.collection_name | escape }}"
+             data-collection-url="{{ block.settings.collection_link }}"
+             {{ block.shopify_attributes }}>
+          {% if block.settings.collection_link != blank %}
+            <a href="{{ block.settings.collection_link }}" 
+               class="custom-collection-link"
+               aria-label="Shop {{ block.settings.collection_name }}">
+          {% endif %}
+
+          <div class="custom-collection-image-wrapper">
+            {% if block.settings.collection_image != blank %}
+              <img
+                srcset="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }} 200w,
+                        {{ block.settings.collection_image | img_url: '100x100', crop: 'center' }} 100w"
+                sizes="100px"
+                src="{{ block.settings.collection_image | img_url: '200x200', crop: 'center' }}"
+                alt="{{ block.settings.collection_name | escape }}"
+                loading="{% if is_priority %}eager{% else %}lazy{% endif %}"
+                decoding="async"
+                class="custom-collection-image"
+                width="100"
+                height="100"
+                {% if is_priority %}fetchpriority="high"{% endif %}
+              >
+            {% else %}
+              <div class="custom-collection-placeholder" role="img" aria-label="Collection placeholder">
+                {{ 'image' | placeholder_svg_tag: 'custom-placeholder-svg' }}
+              </div>
+            {% endif %}
+          </div>
+
+          <p class="custom-collection-name">{{ block.settings.collection_name }}</p>
+
+          {% if block.settings.collection_link != blank %}
+            </a>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+
+<style>
+  .custom-collection-grid-section {
+    display: none;
+  }
+
+  @media (max-width: 768px) {
+    .custom-collection-grid-section {
+      display: block;
+      padding: 0px 1px 8px 10px;
+      margin: 0 auto;
+      position: relative;
+      contain: layout style;
+    }
+
+    .custom-collection-scroll-container {
+      width: 100%;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .custom-slider-item:last-child {
+      margin-right: 12px;
+    }
+
+    .custom-collection-grid-wrapper {
+      display: flex;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-behavior: smooth;
+      gap: 14px;
+      align-items: center;
+      padding: 10px 5px;
+      
+      /* Hide scrollbar */
+      scrollbar-width: none; /* Firefox */
+      -ms-overflow-style: none; /* IE/Edge */
+      
+      /* Performance optimization */
+      contain: layout style paint;
+      will-change: scroll-position;
+      
+      /* Momentum scrolling for iOS */
+      -webkit-overflow-scrolling: touch;
+    }
+
+    /* Hide scrollbar for Chrome/Safari */
+    .custom-collection-grid-wrapper::-webkit-scrollbar {
+      display: none;
+    }
+
+    .custom-slider-item {
+      text-align: center;
+      width: 100px;
+      min-width: 100px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .custom-collection-link {
+      text-decoration: none;
+      color: inherit;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      transition: opacity 0.2s ease;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    .custom-collection-link:active {
+      opacity: 0.7;
+    }
+
+    .custom-collection-link:focus-visible {
+      outline: 2px solid #333;
+      outline-offset: 2px;
+      border-radius: 50%;
+    }
+
+    /* Image wrapper with aspect ratio for CLS prevention */
+    .custom-collection-image-wrapper {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      overflow: hidden;
+      margin: 0 auto;
+      background-color: #f5f5f5;
+      position: relative;
+      aspect-ratio: 1 / 1;
+    }
+
+    .custom-collection-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .custom-collection-placeholder {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #e0e0e0;
+    }
+
+    .custom-placeholder-svg {
+      width: 50%;
+      height: 50%;
+      fill: #999;
+    }
+
+    .custom-collection-name {
+      font-size: 12px;
+      font-weight: 400;
+      text-transform: uppercase;
+      color: #333333;
+      margin: 0;
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+      word-break: break-word;
+    }
+
+    /* Navigation Buttons */
+   
+
+    /* Optimize for smaller screens */
+    @media (max-width: 480px) {
+      .custom-collection-name {
+        font-size: 10px;
+      }
+    }
+  }
+</style>
+
+<script>
+  (function() {
+    // Initialize on DOM ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initCollectionCarousel);
+    } else {
+      initCollectionCarousel();
+    }
+    
+    function initCollectionCarousel() {
+      const section = document.querySelector('.custom-collection-grid-section');
+      if (!section) return;
+      
+      const wrapper = section.querySelector('.custom-collection-grid-wrapper');
+      
+      // GTM Click Tracking
+      section.addEventListener('click', function(e) {
+        const item = e.target.closest('.custom-slider-item');
+        if (!item) return;
+        
+        const collectionName = item.dataset.collectionName;
+        const collectionUrl = item.dataset.collectionUrl;
+        
+        if (!collectionName) return;
+        
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'promoClick',
+          promoClick: {
+            creative_name: 'Homepage Mobile Collection Grid',
+            promo_name: collectionName,
+            location_id: collectionUrl || '',
+          }
+        });
+      }, { capture: true });
+      
+
+    }
+  })();
+</script>
+
+{% schema %}
+{
+  "name": "Collection Grid Carousel",
+  "settings": [
+    {
+      "type": "range",
+      "id": "max_width",
+      "min": 800,
+      "max": 1600,
+      "step": 50,
+      "unit": "px",
+      "label": "Maximum width",
+      "default": 1200,
+      "info": "Only affects desktop view"
+    },
+    {
+      "type": "range",
+      "id": "grid_gap",
+      "min": 10,
+      "max": 60,
+      "step": 5,
+      "unit": "px",
+      "label": "Grid gap",
+      "default": 20,
+      "info": "Only affects desktop view"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection_item",
+      "name": "Collection Item",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "collection_image",
+          "label": "Collection Image",
+          "info": "Recommended: 200x200px (1:1 aspect ratio)"
+        },
+        {
+          "type": "text",
+          "id": "collection_name",
+          "label": "Collection Name",
+          "default": "Collection"
+        },
+        {
+          "type": "url",
+          "id": "collection_link",
+          "label": "Collection Link"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Collection Grid Carousel",
+      "blocks": [
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "RINGS"
+          }
+        },
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "EARRINGS"
+          }
+        },
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "BRACELET"
+          }
+        },
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "NECKLACE"
+          }
+        },
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "PENDANTS"
+          }
+        },
+        {
+          "type": "collection_item",
+          "settings": {
+            "collection_name": "BANGLES"
+          }
+        }
+      ]
+    }
+  ],
+  "max_blocks": 20
 }
 {% endschema %}

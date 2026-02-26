@@ -40,6 +40,28 @@
         <input type="email" id="email" value="{{ customer.email }}" disabled>
         <div class="email-error" style="color: red; display: none;"></div>
       </div>
+
+      <div class="customer-form-row">
+        <div class="customer-form-group">
+          <label>Date of Birth</label>
+          <input
+            type="date"
+            id="dob"
+            value="{{ customer.metafields.custom.date_of_birth.value | default: '' }}"
+            disabled
+          >
+        </div>
+
+        <div class="customer-form-group">
+          <label>Date of Anniversary</label>
+          <input
+            type="date"
+            id="doa"
+            value="{{ customer.metafields.custom.date_of_anniversary.value | default: '' }}"
+            disabled
+          >
+        </div>
+      </div>
     
       <button class="save-button" id="save-button" type="submit" disabled>SAVE</button>
     </form>
@@ -131,23 +153,25 @@
         {%- form 'customer_address', customer.new_address, return_to: routes.account_url -%}
           <div class="address-form-row">
             <div class="address-form-group">
-              <label for="AddressFirstNameNew">First Name</label>
+              <label for="AddressFirstNameNew">First Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="AddressFirstNameNew"
                 name="address[first_name]"
                 placeholder="First name"
                 autocomplete="given-name"
+                required
               >
             </div>
             <div class="address-form-group">
-              <label for="AddressLastNameNew">Last Name</label>
+              <label for="AddressLastNameNew">Last Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="AddressLastNameNew"
                 name="address[last_name]"
                 placeholder="Last name"
                 autocomplete="family-name"
+                required
               >
             </div>
           </div>
@@ -181,14 +205,15 @@
                 type="text"
                 id="AddressCityNew"
                 name="address[city]"
-                placeholder="Enter your Locality"
+                placeholder="Enter your City"
                 autocomplete="address-level2"
+                required
               >
             </div>
           </div>
 
           <div class="address-form-group">
-            <label for="AddressAddress1New">Address</label>
+            <label for="AddressAddress1New">Address <span style="color: red;">*</span></label>
             <input
               type="text"
               id="AddressAddress1New"
@@ -291,19 +316,21 @@
           
           <div class="address-form-row">
             <div class="address-form-group">
-              <label for="EditAddressFirstName">First Name</label>
+              <label for="EditAddressFirstName">First Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="EditAddressFirstName"
                 placeholder="First name"
+                required
               >
             </div>
             <div class="address-form-group">
-              <label for="EditAddressLastName">Last Name</label>
+              <label for="EditAddressLastName">Last Name <span style="color: red;">*</span></label>
               <input
                 type="text"
                 id="EditAddressLastName"
                 placeholder="Last name"
+                required
               >
             </div>
           </div>
@@ -332,12 +359,13 @@
                 type="text"
                 id="EditAddressCity"
                 placeholder="Enter your Locality"
+                required
               >
             </div>
           </div>
 
           <div class="address-form-group">
-            <label for="EditAddressAddress1">Address</label>
+            <label for="EditAddressAddress1">Address <span style="color: red;">*</span></label>
             <input
               type="text"
               id="EditAddressAddress1"
@@ -471,37 +499,47 @@
     }
   });
 
-  // Handle Edit Address Form Submission
   document.getElementById('editAddressForm').addEventListener('submit', async function(e) {
     e.preventDefault();
 
-    // 🔹 6-digit validation for Edit modal
     const editPin = document.getElementById('EditAddressZip').value.trim();
     if (!/^\d{6}$/.test(editPin)) {
       alert('Please enter a valid 6-digit pincode.');
       return;
     }
 
-    const customerId = document.getElementById('customer_id').value;
     const addressId = document.getElementById('EditAddressId').value;
 
-    const data = {
-      customer_id: customerId,
-      address_id: addressId,
-      first_name: document.getElementById('EditAddressFirstName').value,
-      last_name: document.getElementById('EditAddressLastName').value,
-      phone: document.getElementById('EditAddressPhone').value,
-      address1: document.getElementById('EditAddressAddress1').value,
-      address2: document.getElementById('EditAddressAddress2').value,
-      city: document.getElementById('EditAddressCity').value,
-      province: document.getElementById('EditAddressProvince').value,
-      country: document.getElementById('EditAddressCountry').value,
-      zip: editPin
-    };
+    const formData = new FormData();
+    formData.append('_method', 'put');
+    formData.append('address[first_name]', document.getElementById('EditAddressFirstName').value);
+    formData.append('address[last_name]', document.getElementById('EditAddressLastName').value);
+    formData.append('address[phone]', document.getElementById('EditAddressPhone').value);
+    formData.append('address[address1]', document.getElementById('EditAddressAddress1').value);
+    formData.append('address[address2]', document.getElementById('EditAddressAddress2').value);
+    formData.append('address[city]', document.getElementById('EditAddressCity').value);
+    formData.append('address[province]', document.getElementById('EditAddressProvince').value);
+    formData.append('address[country]', 'India');
+    formData.append('address[zip]', editPin);
 
-    // ... rest of your existing code here (fetch PUT etc.)
+    try {
+      const res = await fetch(`/account/addresses/${addressId}`, {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        alert('✅ Address updated successfully');
+        window.location.reload(); // refresh to show updated address
+      } else {
+        alert('❌ Failed to update address');
+        console.error(await res.text());
+      }
+    } catch (err) {
+      console.error(err);
+      alert('⚠️ Network error');
+    }
   });
-
 
   window.addEventListener('load', () => {
     typeof CustomerAddresses !== 'undefined' && new CustomerAddresses();
@@ -522,24 +560,30 @@
     const editBtn = document.getElementById("edit-btn");
     const cancelBtn = document.getElementById("cancel-btn");
     const saveBtn = document.getElementById("save-button");
-    const inputs = document.querySelectorAll("#first_name, #last_name, #email, #phone");
+
+    /* 🔹 ADDED dob & doa here */
+    const inputs = document.querySelectorAll(
+      "#first_name, #last_name, #email, #dob, #doa"
+    );
+
+    const phoneInput = document.getElementById("phone");
     const emailError = document.querySelector(".email-error");
     const originalValues = {};
-  
-    // Store original values
+
+    phoneInput.setAttribute("disabled", "true");
+
     inputs.forEach(input => {
       originalValues[input.id] = input.value;
     });
-  
+
     editBtn.addEventListener("click", () => {
       inputs.forEach((input) => input.removeAttribute("disabled"));
       saveBtn.removeAttribute("disabled");
       cancelBtn.style.display = "inline-flex";
       editBtn.style.display = "none";
     });
-  
+
     cancelBtn.addEventListener("click", () => {
-      // Reset to original values
       inputs.forEach(input => {
         input.value = originalValues[input.id];
         input.setAttribute("disabled", "true");
@@ -549,41 +593,41 @@
       editBtn.style.display = "inline-flex";
       emailError.style.display = "none";
     });
-  
+
     document.getElementById("customer-info-form").addEventListener("submit", async (e) => {
       e.preventDefault();
       emailError.style.display = "none";
-  
-      // Validate email format
+
       const email = document.getElementById("email").value;
       if (!validateEmail(email)) {
         emailError.textContent = "Please enter a valid email address";
         emailError.style.display = "block";
         return;
       }
-  
+
       const data = {
         id: document.getElementById("customer_id").value,
         first_name: document.getElementById("first_name").value,
         last_name: document.getElementById("last_name").value,
         email: email,
-        phone: document.getElementById("phone").value
+        phone: document.getElementById("phone").value,
+
+        note: `dob:${document.getElementById("dob").value || ''};doa:${document.getElementById("doa").value || ''}`
       };
-  
+
       try {
-        const res = await fetch("https://user-edit-385594025448.asia-south1.run.app/", {
+        const res = await fetch("https://personal-information-api-385594025448.asia-south1.run.app/", {
           method: "PUT",
           headers: {
             "Content-Type": "application/json"
           },
           body: JSON.stringify(data)
         });
-  
+
         const result = await res.json();
-  
+
         if (res.ok) {
           alert("✅ Customer information updated successfully.");
-          // Update original values with new ones
           inputs.forEach(input => {
             originalValues[input.id] = input.value;
             input.setAttribute("disabled", "true");
@@ -592,7 +636,6 @@
           cancelBtn.style.display = "none";
           editBtn.style.display = "inline-block";
         } else {
-          // Handle Shopify-specific email errors
           if (result.errors && result.errors.email) {
             emailError.textContent = result.errors.email.join(', ');
             emailError.style.display = "block";
@@ -606,7 +649,7 @@
         console.error("Network error:", err);
       }
     });
-  
+
     function validateEmail(email) {
       const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return re.test(email);
@@ -614,13 +657,13 @@
   });
 </script>
 
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const addAddressForm = document.querySelector('#addAddressModal form');
     const addPinInput = document.getElementById('AddressZipNew');
 
     if (addAddressForm && addPinInput) {
-      // Only numbers and max 6 chars while typing
       addPinInput.addEventListener('input', function (e) {
         let v = e.target.value.replace(/\D/g, '');
         if (v.length > 6) v = v.slice(0, 6);
@@ -628,7 +671,24 @@
       });
 
       addAddressForm.addEventListener('submit', function (e) {
+        const first = document.getElementById('AddressFirstNameNew').value.trim();
+        const last = document.getElementById('AddressLastNameNew').value.trim();
+        const address = document.getElementById('AddressAddress1New').value.trim();
+        const phone = document.getElementById('AddressPhoneNew').value.trim();
         const pin = addPinInput.value.trim();
+
+        if (!first || !last || !address) {
+          e.preventDefault();
+          alert('* Indicated Fields are Required.');
+          return;
+        }
+
+        if (phone && !/^[6-9]\d{9}$/.test(phone)) {
+          e.preventDefault();
+          alert('Please enter a valid 10-digit mobile number.');
+          return;
+        }
+
         if (!/^\d{6}$/.test(pin)) {
           e.preventDefault();
           alert('Please enter a valid 6-digit pincode.');
@@ -655,8 +715,27 @@
     const addStateSelect = document.getElementById('AddressProvinceNew');
 
     const editPinInput = document.getElementById('EditAddressZip');
-    const editCityDisplayInput = document.getElementById('EditAddressAddress2'); // City/ District/ Town
+    const editCityDisplayInput = document.getElementById('EditAddressAddress2');
     const editStateSelect = document.getElementById('EditAddressProvince');
+
+    ['AddressPhoneNew', 'EditAddressPhone'].forEach(id => {
+      const input = document.getElementById(id);
+      if (!input) return;
+
+      input.addEventListener('input', function () {
+        let value = this.value;
+
+        // remove non-digits
+        value = value.replace(/\D/g, '');
+
+        // limit to 10 digits
+        if (value.length > 10) {
+          value = value.slice(0, 10);
+        }
+
+        this.value = value;
+      });
+    });
 
     async function fetchLocationFromPincode(pin) {
       if (!/^\d{6}$/.test(pin)) return null;
@@ -683,8 +762,6 @@
 
     function setupPincodeAutoFill(pinInput, cityInput, stateSelect) {
       if (!pinInput) return;
-
-      // already added input mask in previous script, but safe to keep here if you prefer it here instead
       pinInput.addEventListener('blur', async function (e) {
         const pin = e.target.value.trim();
         if (!/^\d{6}$/.test(pin)) return;
@@ -696,8 +773,6 @@
         if (cityInput && !cityInput.value) {
           cityInput.value = loc.city;
         }
-
-        // Auto-select state option if it matches
         if (stateSelect && loc.state) {
           const stateOption = Array.from(stateSelect.options).find(function (opt) {
             return opt.value.toLowerCase() === loc.state.toLowerCase();
@@ -708,11 +783,7 @@
         }
       });
     }
-
-    // Add address modal: auto-fill City + State
     setupPincodeAutoFill(addPinInput, addCityInput, addStateSelect);
-
-    // Edit address modal: auto-fill City/ District/ Town + State
     setupPincodeAutoFill(editPinInput, editCityDisplayInput, editStateSelect);
   });
 </script>

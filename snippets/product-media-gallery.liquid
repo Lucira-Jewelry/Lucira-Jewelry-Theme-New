@@ -36,7 +36,7 @@
 
 <div class="media-gallery-tabs-section product__column-sticky">
   <div class="media-gallery-wrapper" id="MediaGalleryWrapper-{{ section.id }}">
-    {%- if product.metafields.custom.products_audio -%}
+    {% comment %} {%- if product.metafields.custom.products_audio -%}
       <div class="product-audio-player mobile-show">
         <button class="audio-play-button" id="audioPlayButton-{{ section.id }}" aria-label="Play product audio">
           <!-- Play Icon -->
@@ -67,7 +67,7 @@
           <source src="{{ product.metafields.custom.products_audio | file_url }}" type="audio/mpeg">
         </audio>
       </div>
-    {%- endif -%}
+    {%- endif -%} {% endcomment %}
 
     {%- if product.metafields.reviews.rating.value != blank -%}
       <a href="#nector-reviews" class="mobile-rating-wrapper mobile-show" style="text-decoration: none;">
@@ -81,12 +81,15 @@
               assign rating_decimal = 1
             endif
           %}
+          
+      
 
           <span class="pdp-rating">
             <svg class="rating-summary-custom" width="16" height="16">
               <use href ="#plp-rating-1"></use>
             </svg>
           </span>
+
           <p class="rating-summary-custom">
             <span class="rating-value">{{ product.metafields.reviews.rating.value.rating | round: 1 }}</span>
             <span class="rating-divider">|</span>
@@ -95,6 +98,8 @@
         </div>
       </a>
     {%- endif -%}
+
+    
 
     <media-gallery
       id="MediaGallery-{{ section.id }}"
@@ -129,7 +134,7 @@
                   href="{{ featured_media | image_url: width: 2000 }}"
                   data-pswp-width="{{ featured_media.width }}"
                   data-pswp-height="{{ featured_media.height }}"
-                  target="_blank"
+                  class="pswp-gallery-item"
                 >
                   {% render 'product-thumbnail',
                     media: featured_media,
@@ -143,7 +148,8 @@
                     media_width: media_width,
                     media_fit: section.settings.media_fit,
                     constrain_to_viewport: section.settings.constrain_to_viewport,
-                    lazy_load: false
+                    lazy_load: false,
+                    fetchpriority: 'high'
                   %}
                 </a>
               {% else %}
@@ -192,7 +198,7 @@
                     href="{{ media | image_url: width: 2000 }}"
                     data-pswp-width="{{ media.width }}"
                     data-pswp-height="{{ media.height }}"
-                    target="_blank"
+                    class="pswp-gallery-item"
                   >
                     {% render 'product-thumbnail',
                       media: media,
@@ -268,7 +274,42 @@
         data-pTitle="{{ product.title | escape }}"
       ></a>
     </div>
+    
   </div>
+
+
+{% if product.metafields.custom.matching_product != blank %}
+  {% assign has_matching_products = false %}
+  {% for matching_product in product.metafields.custom.matching_product.value limit: 1 %}
+    {% assign has_matching_products = true %}
+  {% endfor %}
+  
+  {% if has_matching_products %}
+    <button 
+      type="button"
+      class="view-similar-btn"
+      data-product-id="{{ product.id }}"
+      data-product-handle="{{ product.handle }}"
+      aria-label="View similar items for {{ product.title }}"
+    >
+
+      <span class="view-similar-btn__text">View Similar</span>
+      <span class="view-similar-btn__icon">
+        
+       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <mask id="mask0_13509_13149" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+        <rect width="24" height="24" fill="#D9D9D9"/>
+        </mask>
+        <g mask="url(#mask0_13509_13149)">
+        <path d="M7.50084 19.5V4.5H16.5008V19.5H7.50084ZM3.80859 17.5V6.5H5.30859V17.5H3.80859ZM18.6931 17.5V6.5H20.1931V17.5H18.6931ZM9.00084 18H15.0008V6H9.00084V18Z" fill="#333333"/>
+        </g>
+        </svg>
+      </span>
+
+    </button>
+  {% endif %}
+{% endif %}
+
   <div class="inside_the_packages desktop-show" id="inside_the_packages">
     <div class="inside-the-Package">
       <div class="inside-the-Package-title">WHAT'S IN THE PACKAGE</div>
@@ -308,7 +349,7 @@
   </div>
 </div>
 
-{{ 'photoswipe.min.css' | asset_url | stylesheet_tag: preload: true }}
+{{ 'photoswipe.min.css' | asset_url | stylesheet_tag }}
 <script src="{{ 'photoswipe.umd.min.js' | asset_url }}" defer="defer"></script>
 <script src="{{ 'photoswipe-lightbox.umd.min.js' | asset_url }}" defer="defer"></script>
 
@@ -371,11 +412,9 @@
 </script>
 
 <script>
-  // Initialize gallery loaded state immediately
   (function () {
     const wrapper = document.getElementById('MediaGalleryWrapper-{{ section.id }}');
     if (wrapper) {
-      // Check if first image is already loaded
       const firstImg = wrapper.querySelector('.product__media-item img');
       if (firstImg && firstImg.complete) {
         wrapper.classList.add('loaded');
@@ -388,18 +427,125 @@
           { once: true }
         );
       } else {
-        // Fallback: mark as loaded after short delay
         setTimeout(() => wrapper.classList.add('loaded'), 100);
       }
     }
   })();
 
   document.addEventListener('DOMContentLoaded', function () {
+    if (typeof PhotoSwipeLightbox === 'undefined') {
+      console.error('PhotoSwipeLightbox not loaded');
+      return;
+    }
+
     const lightbox = new PhotoSwipeLightbox({
       gallery: '#Slider-Gallery-{{ section.id }}',
-      children: 'a',
+      children: 'a.pswp-gallery-item',
       pswpModule: PhotoSwipe,
+      
+      bgOpacity: 0.9,
+      showHideAnimationType: 'fade',
+      
+      initialZoomLevel: 'fit',
+      secondaryZoomLevel: 1.5,
+      maxZoomLevel: 3,
+      
+      pinchToClose: true,
+      closeOnVerticalDrag: true,
+      
+      paddingFn: (viewportSize) => {
+        return {
+          top: 30,
+          bottom: 30,
+          left: 30,
+          right: 30
+        }
+      }
+    });
+    lightbox.on('uiRegister', function() {
+      lightbox.pswp.ui.registerElement({
+        name: 'fullscreen-button',
+        order: 8,
+        isButton: true,
+        html: `
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 3H5C3.89543 3 3 3.89543 3 5V8M16 3H19C20.1046 3 21 3.89543 21 5V8M8 21H5C3.89543 21 3 20.1046 3 19V16M16 21H19C20.1046 21 21 20.1046 21 19V16" 
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `,
+        onClick: (event, el) => {
+          if (!document.fullscreenElement) {
+            lightbox.pswp.element.requestFullscreen();
+          } else {
+            document.exitFullscreen();
+          }
+        }
+      });
+      lightbox.pswp.ui.registerElement({
+        name: 'share-button',
+        order: 9,
+        isButton: true,
+        html: `
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8.59 13.51L15.42 17.49M15.41 6.51L8.59 10.49M21 5C21 6.65685 19.6569 8 18 8C16.3431 8 15 6.65685 15 5C15 3.34315 16.3431 2 18 2C19.6569 2 21 3.34315 21 5ZM9 12C9 13.6569 7.65685 15 6 15C4.34315 15 3 13.6569 3 12C3 10.3431 4.34315 9 6 9C7.65685 9 9 10.3431 9 12ZM21 19C21 20.6569 19.6569 22 18 22C16.3431 22 15 20.6569 15 19C15 17.3431 16.3431 16 18 16C19.6569 16 21 17.3431 21 19Z" 
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        `,
+        onClick: (event, el, pswp) => {
+          const currentSlide = pswp.currSlide;
+          const shareData = {
+            title: '{{ product.title | escape }}',
+            text: 'Check out this product image',
+            url: window.location.href
+          };
+          
+          if (navigator.share) {
+            navigator.share(shareData).catch(err => console.log('Error sharing:', err));
+          } else {
+            navigator.clipboard.writeText(window.location.href).then(() => {
+              alert('Link copied to clipboard!');
+            });
+          }
+        }
+      });
     });
     lightbox.init();
+    console.log('PhotoSwipe initialized successfully');
   });
 </script>
+
+
+<style>
+  
+  .pswp__button { background: rgba(0, 0, 0, 0.5) !important; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; margin: 0 4px; cursor: pointer; transition: background 0.2s; }
+  .pswp__button:hover { background: rgba(0, 0, 0, 0.7) !important; }
+  .pswp__button svg { color: #fff; }
+  .pswp__top-bar { display: flex; justify-content: flex-end; align-items: center; padding: 16px; background: transparent; }
+  .pswp-gallery-item { cursor: pointer; }
+  .pswp-gallery-item:focus { outline: 2px solid #fff; outline-offset: 2px; }
+  .pswp__button--close::before, .pswp__button--zoom::before, .pswp__button--arrow--left::before, .pswp__button--arrow--right::before { display: none; }
+  .pswp__button--close::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M18 6L6 18M6 6L18 18' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--zoom::after { content: ''; position: absolute; width: 24px; height: 24px; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='11' cy='11' r='7' stroke='white' stroke-width='2'/%3E%3Cpath d='M16 16L21 21' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M11 8V14M8 11H14' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; display: block; }
+  .pswp__button--arrow--left { left: 20px; top: 50%; transform: translateY(-50%); position: absolute; }
+  .pswp__button--arrow--prev::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M15 18L9 12L15 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--arrow--right { right: 20px; top: 50%; transform: translateY(-50%); position: absolute; }
+  .pswp__button--arrow--next::after { content: ''; width: 24px; height: 24px; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M9 18L15 12L9 6' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; background-size: contain; }
+  .pswp__button--arrow--left, .pswp__button--arrow--right { width: 50px; height: 50px; }
+  .pswp__counter { position: absolute; left: 0; top: 0; font-size: 16px; color: #fff; font-weight: 500; text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.5); }
+  .pswp__button--close svg {display: none;}
+  .pswp__button--zoom svg {display: none;}
+  .pswp__button--arrow--prev svg {display: none;}
+  .pswp__button--arrow--next svg {display: none;}
+  .pswp__button--arrow--next { right: 12px; top: 47%;}
+  .pswp__button--arrow--prev { right: 12px; top: 47%;}
+  .pswp--touch .pswp__button--arrow { visibility: visible; }
+
+  @media screen and (max-width:750px){
+    .pswp__button--arrow--prev::after {width: 20px; height: 20px;}
+    .pswp__button--arrow--next::after {width: 20px; height: 20px;}
+    .pswp__button--arrow--next {width: 30px; height: 30px;}
+    .pswp__button--arrow--prev {width: 30px; height: 30px;}
+    .pswp__button--arrow--next { right: 12px; top: 48%; }
+    .pswp__button--arrow--prev { right: 12px; top: 48%;}
+  }
+</style>

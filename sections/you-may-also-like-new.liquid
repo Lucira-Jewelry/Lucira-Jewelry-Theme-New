@@ -1,218 +1,109 @@
-{% render 'product-collection-card' %}
-{% if request.page_type == 'product' and product %}
-
-  {% assign max_products = 16 %}
-  {% assign current_product_handle = product.handle %}
-
-  {%- comment -%}
-    1. Detect current product gender (simple + reliable)
+{% if product.metafields.custom.matching_product != blank %}
+  
+  {%- comment -%} 
+    1. LOGIC: Count valid products (excluding the current one) 
+    and calculate how many to show so we always have full rows of 4.
   {%- endcomment -%}
+  {% assign raw_count = 0 %}
+  {% for item in product.metafields.custom.matching_product.value %}
+    {% unless item.id == product.id %}
+      {% assign raw_count = raw_count | plus: 1 %}
+    {% endunless %}
+  {% endfor %}
 
-  {% assign current_gender = '' %}
-  {% assign gmf = product.metafields.shopify['target-gender'] %}
-
-  {% if gmf and gmf.value != blank %}
-    {% assign g = gmf.value | first %}
-    {% assign current_gender = g.handle | default: g.base_target_gender | default: g.label | downcase %}
-  {% endif %}
-
-  {%- comment -%}
-    Fallback gender from category
-  {%- endcomment -%}
-  {% if current_gender == '' and product.category %}
-    {% assign catglist = product.category.metafields.shopify.target_gender %}
-    {% if catglist != blank %}
-      {% assign cg = catglist.first %}
-      {% assign current_gender = cg.base_target_gender.value | downcase %}
-    {% endif %}
-  {% endif %}
-
-  {%- comment -%}
-    Normalize values: ensure only male / female / unisex
-  {%- endcomment -%}
-  {% assign allowed = 'male,female,unisex' | split: ',' %}
-  {% unless allowed contains current_gender %}
-    {% assign current_gender = 'unisex' %}
-  {% endunless %}
-
-  {%- comment -%}
-    2. Determine correct target collection (with special rule for Men's Rings)
-  {%- endcomment -%}
-
-  {% assign type_handle = product.type | handleize %}
-
-  {% if type_handle == 'rings' and current_gender == 'male' %}
-    
-    {%- comment -%}
-      Special rule: Men's Rings should browse jewelry-mens-collection
-    {%- endcomment -%}
-    {% assign target_collection_handle = 'jewelry-mens-collection' %}
-
+  {% if raw_count < 4 %}
+    {% assign products_to_display = raw_count %}
   {% else %}
-  {% if type_handle == 'earrings' and current_gender == 'male' %}
-        {% assign target_collection_handle = 'mens-studs' %}
-
-  {% else %}
-
-    {% case type_handle %}
-      {% when 'charms-and-pendants' %}
-        {% assign target_collection_handle = 'all-charmspendants' %}
-      {% when 'nose-pin' %}
-        {% assign target_collection_handle = 'all-nosepins' %}
-      {% else %}
-        {% assign target_collection_handle = 'all-' | append: type_handle %}
-    {% endcase %}
-  {% endif %}
+    {% assign products_to_display = raw_count | divided_by: 4 | times: 4 %}
   {% endif %}
 
-  {% assign coll = collections[target_collection_handle] %}
+  {% if products_to_display > 0 %}
+    <div class="ymal-section page-width" data-ymal-section>
+      <h2 class="ymal-h2">You May Also Like</h2>
+      <p class="ymal-p">Other picks based on your interest</p>
 
-  {% if coll and coll.products.size > 0 %}
-
-    {% assign same_gender = '' %}
-    {% assign others = '' %}
-
-    {% for p in coll.products %}
-      {% unless p.handle == current_product_handle %}
-
-        {%- comment -%} Get product gender {%- endcomment -%}
-        {% assign pg = '' %}
-        {% assign pgmf = p.metafields.shopify['target-gender'] %}
-
-        {% if pgmf and pgmf.value != blank %}
-          {% assign pg_obj = pgmf.value | first %}
-          {% assign pg = pg_obj.handle | default: pg_obj.base_target_gender | default: pg_obj.label | downcase %}
-        {% endif %}
-
-        {% if pg == '' and p.category %}
-          {% assign pcglist = p.category.metafields.shopify.target_gender %}
-          {% if pcglist != blank %}
-            {% assign pcg = pcglist.first %}
-            {% assign pg = pcg.base_target_gender.value | downcase %}
-          {% endif %}
-        {% endif %}
-
-        {% unless allowed contains pg %}
-          {% assign pg = 'unisex' %}
-        {% endunless %}
-
-        {%- comment -%} Sort into correct bucket {%- endcomment -%}
-        {% if pg == current_gender %}
-          {% assign same_gender = same_gender | append: p.handle | append: ',' %}
-        {% else %}
-          {% assign others = others | append: p.handle | append: ',' %}
-        {% endif %}
-
-      {% endunless %}
-    {% endfor %}
-
-    {%- comment -%}
-      3. Merge lists → same gender first → then others → guarantee up to 16
-    {%- endcomment -%}
-    {% assign combined = same_gender | append: others %}
-    {% assign final_list = combined | split: ',' | compact | slice: 0, max_products %}
-
-  {% endif %}
-
-  {%- comment -%}
-    4. Render products
-  {%- endcomment -%}
-  {% if final_list and final_list.size > 0 %}
-<style>
-        p.section-sub-heading{color: #535361; font-weight: 400; font-size: 14px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
-        .card__information{padding:10px !important;}
-        .card__inner.color-scheme-2.gradient.ratio{border: 1px solid #ffffff !important;}
-        .you-may-also-like-section{padding: 0 1rem; padding-top: 0; padding-bottom: 5rem; margin-bottom: 20px; margin: 0 auto; }
-        .you-may-also-like-section h2{text-align:center;font-size:20px;margin-bottom:0px}
-        .you-may-also-like-section .media.media--transparent {background: #f5f5f5;}
-        .you-may-also-like-section img.primary-image{ mix-blend-mode: multiply; display: block; max-width: 100%; height: auto;}
-        
-        .product-grid{display:grid;gap:1.5rem;grid-template-columns:repeat(2,1fr) !important}
-        
-        @media (max-width:768px){
-          .product-grid{ gap:12px !important; }
-          .you-may-also-like-section{padding:3rem 0rem}
-          .you-may-also-like-section h2{ margin-top:0px}
-        }
-        
-        @media (min-width:768px){
-            .you-may-also-like-section{padding-left:1.5rem;padding-right:1.5rem}
-            .you-may-also-like-section h2{text-align:center;font-size:24px;margin-bottom:0px}
-            p.section-sub-heading{color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
-            .product-grid{grid-template-columns:repeat(3,1fr) !important;gap:2rem}
-        }
-        
-        @media (min-width:1024px){
-            .you-may-also-like-section{padding-left:2rem;padding-right:2rem; margin-bottom:30px;}
-            .product-grid{grid-template-columns:repeat(4,1fr) !important}
-        }
-      </style>
-  <div class="you-may-also-like-section">
-    <div class="page-width">
-      <h2 class="section-heading">You May Also Like</h2>
-      <p class="section-sub-heading">Other picks based on your interest</p>
-
-      <div class="product-grid">
-        {% for h in final_list %}
-          {% assign p = collections[target_collection_handle].products | where: "handle", h | first %}
-          {% if p %}
+      <div class="ymal-grid">
+        {% assign displayed_count = 0 %}
+        {% for ymal_product in product.metafields.custom.matching_product.value %}
+          
+          {%- comment -%} Render only if it's not the current product AND we haven't hit the limit {%- endcomment -%}
+          {% if ymal_product.id != product.id and displayed_count < products_to_display %}
+            
             <div class="related-product-card"
-                            data-handle="{{ p.handle }}"
-                data-name="{{ p.title | escape }}"
-                data-id="{{ p.id }}"
-                data-price="{{ p.price | divided_by: 100.0 }}"
-                data-category="{{ p.type | escape }}"
-                data-sku="{{ p.selected_or_first_available_variant.sku }}"
-                data-url="{{ p.url }}"
-
+              data-handle="{{ ymal_product.handle }}"
+              data-name="{{ ymal_product.title | escape }}"
+              data-id="{{ ymal_product.id }}"
+              data-sku="{{ ymal_product.selected_or_first_available_variant.sku }}"
+              data-url="{{ ymal_product.url }}"
             >
-              {% render 'card-product', card_product: p %}
+              {% capture di_values %}
+                {% render 'di-discount-calc', product: ymal_product %}
+              {% endcapture %}
+
+              {% assign di_parts = di_values | strip | split: '|' %}
+              
+              {% render 'card-product',
+                card_product: ymal_product,
+                diamond_percent: di_parts[0] | plus: 0,
+                mc_percent: di_parts[1] | plus: 0
+              %}
             </div>
+            
+            {% assign displayed_count = displayed_count | plus: 1 %}
           {% endif %}
         {% endfor %}
       </div>
     </div>
-  </div>
 
-  <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        // Target only actual product links within the related product cards
-        const productCards = document.querySelectorAll('.related-product-card');
-        
-        productCards.forEach(function(card) {
-          // Find the main product link (adjust selector based on your card-product snippet structure)
-          const productLink = card.querySelector('a[href*="/products/"]');
-          
-          if (productLink) {
-            productLink.addEventListener('click', function(e) {
-              e.preventDefault();
-              
-              const cardData = card.dataset;
-              const productUrl = cardData.url;
-              
-              window.dataLayer = window.dataLayer || [];
-              window.dataLayer.push({
-                'event': 'promoClick',
-                'promoClick': {
-                  'promo_id': cardData.id,
-                  'creative_name': 'You May Also Like',
-                  'promo_name': cardData.name
-                },
-                'event_callback': function() {
-                  window.location.href = productUrl;
-                },
-                'event_timeout': 2000 // Fallback timeout
-              });
-              
-              // Fallback navigation in case callback doesn't fire
-              setTimeout(function() {
-                window.location.href = productUrl;
-              }, 2000);
+    <script>
+      (function(){
+        // PERFORMANCE FIX: Scope the listener to this section only
+        const section = document.querySelector('[data-ymal-section]');
+        if(!section) return;
+
+        section.addEventListener('click', function (e) {
+          // Check if the click happened on a link inside a product card
+          const link = e.target.closest('a');
+          const card = e.target.closest('.related-product-card');
+
+          if (link && card) {
+            const d = card.dataset;
+
+            // UX FIX: Fire GTM event asynchronously without blocking navigation
+            window.dataLayer = window.dataLayer || [];
+            window.dataLayer.push({
+              event: "promoClick",
+              promoClick: {
+                promo_id: d.id,
+                promo_name: d.name,
+                creative_name: "You May Also Like",
+                promo_position: "product_page_ymal"
+              }
             });
+            
+            // The browser will now follow the link instantly.
+            // No setTimeout needed.
           }
         });
-      });
+      })();
     </script>
-  {% endif %}
 
+    <style>
+      .ymal-section.page-width {padding-top: 40px;}
+      .ymal-grid{display:grid;grid-template-columns: repeat(4,1fr);gap:15px;}
+      h2.ymal-h2{text-align: center; font-size: 24px; margin-bottom: 0px; margin-top: 0px;}
+      p.ymal-p{text-align:center;color: #535361; font-weight: 400; font-size: 18px; line-height: 2; text-align: center; margin: 0 auto 30px !important; display: block;}
+      
+      @media (max-width: 1080px) {
+        .ymal-grid{gap:10px;}
+        h2.ymal-h2{font-size: 22px;}
+      }
+      @media (max-width: 768px) {
+        .ymal-grid{grid-template-columns: repeat(2,1fr);gap:10px;}
+        h2.ymal-h2{font-size: 20px;}
+        p.ymal-p {font-size: 14px;}
+        .ymal-section.page-width { padding-top: 12px; }
+      }
+    </style>
+  {% endif %}
 {% endif %}
