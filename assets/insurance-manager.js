@@ -880,16 +880,15 @@
 
 
 
+
 (function() {
   'use strict';
   
-  console.log('🎯 Insurance Manager v7.2 Starting...');
+  console.log('🎯 Insurance Manager v7.1 Starting...');
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
-    // BUG FIX #1: Store as NUMBER, not string — Shopify /cart/add.js items[] requires integer id
-    VARIANT_ID: 47220042989786,
-    VARIANT_ID_STR: '47220042989786', // keep string version for comparisons
+    VARIANT_ID: '47220042989786',
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
@@ -918,9 +917,6 @@
     loader: document.getElementById(CONFIG.LOADER_ID),
     box: document.getElementById(CONFIG.BOX_ID)
   });
-
-  // Helper: match variant id regardless of type (string or number)
-  const isInsuranceVariant = (id) => String(id) === CONFIG.VARIANT_ID_STR;
   
   // ==================== PRICE FETCHING ====================
   
@@ -929,36 +925,34 @@
     
     try {
       log('💰', 'Fetching insurance price...');
-      // BUG FIX: Correct endpoint — /products/{handle}.js not /products/{variantId}.js
-      // Fetch via cart or use a direct variant lookup via storefront
-      const cart = await fetch('/cart.js', { cache: 'no-store' }).then(r => r.json());
-      const insuranceItem = cart.items.find(item => isInsuranceVariant(item.variant_id));
+      const response = await fetch(`/products/${CONFIG.VARIANT_ID}.js`);
       
-      if (insuranceItem) {
-        state.insurancePrice = insuranceItem.price;
-        log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
-        return state.insurancePrice;
+      if (!response.ok) {
+        const cart = await fetch('/cart.js').then(r => r.json());
+        const insuranceItem = cart.items.find(item => 
+          String(item.variant_id) === CONFIG.VARIANT_ID
+        );
+        
+        if (insuranceItem) {
+          state.insurancePrice = insuranceItem.price;
+          log('✅', 'Price from cart:', formatMoney(state.insurancePrice));
+          return state.insurancePrice;
+        }
+        throw new Error('Unable to fetch price');
       }
-
-      // Fallback: fetch via /products.json filtered by variant (works without handle)
-      const variantRes = await fetch(`/variants/${CONFIG.VARIANT_ID}.json`);
-      if (variantRes.ok) {
-        const variantData = await variantRes.json();
-        state.insurancePrice = variantData.variant?.price_in_subunits || variantData.variant?.price * 100 || 100;
-        log('✅', 'Price from variant JSON:', formatMoney(state.insurancePrice));
-        return state.insurancePrice;
-      }
-
-      throw new Error('Unable to fetch price');
+      
+      const data = await response.json();
+      state.insurancePrice = data.price;
+      log('✅', 'Price from variant:', formatMoney(state.insurancePrice));
+      return state.insurancePrice;
     } catch (error) {
-      log('⚠️', 'Price fetch fallback to 100 paise:', error.message);
-      // Price is ₹1 = 100 paise based on your Shopify product screenshot
+      log('❌', 'Price fetch error:', error);
       state.insurancePrice = 100;
       return state.insurancePrice;
     }
   }
 
-  // ==================== OVERLAY SYSTEM ====================
+ // ==================== OVERLAY SYSTEM ====================
 
   function createOverlay() {
     let overlay = document.getElementById('insurance-removal-overlay');
@@ -980,8 +974,10 @@
       style.textContent = `
         #insurance-removal-overlay {
           position: absolute;
-          top: 0; left: 0;
-          width: 100%; height: 100%;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
           background: rgba(255, 255, 255, 0.98);
           backdrop-filter: blur(8px);
           z-index: 10000;
@@ -989,36 +985,67 @@
           align-items: center;
           justify-content: center;
         }
-        .insurance-overlay-content { text-align: center; padding: 0; }
-        .insurance-loader-animation {
-          display: flex; align-items: center; justify-content: center;
-          gap: 8px; margin-bottom: 20px;
+        
+        .insurance-overlay-content {
+          text-align: center;
+          padding: 0;
         }
+        
+        .insurance-loader-animation {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          margin-bottom: 20px;
+        }
+        
         .insurance-dot {
-          width: 12px; height: 12px;
-          background: #1a1a1a; border-radius: 50%;
+          width: 12px;
+          height: 12px;
+          background: #1a1a1a;
+          border-radius: 50%;
           animation: insurance-bounce 1.4s infinite ease-in-out both;
         }
-        .insurance-dot:nth-child(1) { animation-delay: -0.32s; }
-        .insurance-dot:nth-child(2) { animation-delay: -0.16s; }
-        .insurance-overlay-text {
-          margin: 0; font-size: 18px; font-weight: 500;
-          color: #1a1a1a; letter-spacing: 0.3px;
+        
+        .insurance-dot:nth-child(1) {
+          animation-delay: -0.32s;
         }
+        
+        .insurance-dot:nth-child(2) {
+          animation-delay: -0.16s;
+        }
+        
+        .insurance-overlay-text {
+          margin: 0;
+          font-size: 18px;
+          font-weight: 500;
+          color: #1a1a1a;
+          letter-spacing: 0.3px;
+        }
+        
         @keyframes insurance-bounce {
-          0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
-          40% { transform: scale(1.2); opacity: 1; }
+          0%, 80%, 100% { 
+            transform: scale(0.8);
+            opacity: 0.5;
+          }
+          40% { 
+            transform: scale(1.2);
+            opacity: 1;
+          }
         }
       `;
       document.head.appendChild(style);
       
+      // Append to drawer__inner instead of body
       const drawerInner = document.querySelector('.drawer__inner');
       if (drawerInner) {
+        // Make sure drawer__inner has position relative
         if (getComputedStyle(drawerInner).position === 'static') {
           drawerInner.style.position = 'relative';
         }
         drawerInner.appendChild(overlay);
       } else {
+        // Fallback to body if drawer__inner not found
         document.body.appendChild(overlay);
       }
     }
@@ -1028,6 +1055,8 @@
   function showOverlay() {
     const overlay = createOverlay();
     overlay.style.display = 'flex';
+    
+    // Prevent interactions with drawer content
     const drawerInner = document.querySelector('.drawer__inner');
     if (drawerInner) {
       drawerInner.style.pointerEvents = 'none';
@@ -1037,9 +1066,15 @@
 
   function hideOverlay() {
     const overlay = document.getElementById('insurance-removal-overlay');
-    if (overlay) overlay.style.display = 'none';
+    if (overlay) {
+      overlay.style.display = 'none';
+    }
+    
+    // Re-enable interactions
     const drawerInner = document.querySelector('.drawer__inner');
-    if (drawerInner) drawerInner.style.pointerEvents = '';
+    if (drawerInner) {
+      drawerInner.style.pointerEvents = '';
+    }
   }
 
   function showLoader(show) {
@@ -1080,20 +1115,20 @@
   }
   
   const hasInsurance = (cartData) => 
-    cartData?.items?.some(item => isInsuranceVariant(item.variant_id)) || false;
+    cartData?.items?.some(item => String(item.variant_id) === CONFIG.VARIANT_ID) || false;
   
   const getInsuranceQuantity = (cartData) => 
-    cartData?.items?.find(item => isInsuranceVariant(item.variant_id))?.quantity || 0;
+    cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID)?.quantity || 0;
   
   const getInsurancePrice = (cartData) => 
-    cartData?.items?.find(item => isInsuranceVariant(item.variant_id))?.price 
-    || state.insurancePrice || 100;
+    cartData?.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID)?.price 
+    || state.insurancePrice || 10000;
   
   const getNonInsuranceCount = (cartData) => 
     cartData?.items?.reduce((count, item) => 
-      !isInsuranceVariant(item.variant_id) ? count + item.quantity : count, 0) || 0;
+      String(item.variant_id) !== CONFIG.VARIANT_ID ? count + item.quantity : count, 0) || 0;
   
-  const getTotalNonInsuranceQuantity = getNonInsuranceCount;
+  const getTotalNonInsuranceQuantity = (cartData) => getNonInsuranceCount(cartData);
   
   async function addInsuranceToCart(quantity) {
     log('➕', `Adding ${quantity} insurance item(s)...`);
@@ -1106,22 +1141,19 @@
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          // BUG FIX #1: id must be an INTEGER for the items[] format
-          // Using CONFIG.VARIANT_ID which is now stored as a number
-          items: [{ id: CONFIG.VARIANT_ID, quantity: quantity }]
+          items: [{ id: CONFIG.VARIANT_ID, quantity }]
         })
       });
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        log('❌', 'Add response error:', errorData);
-        throw new Error(errorData.description || errorData.message || `HTTP ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.description || errorData.message || 'Failed to add insurance');
       }
       
       const result = await response.json();
-      log('✅', 'Insurance added successfully', result);
+      log('✅', 'Insurance added');
       
-      const insuranceItem = result.items?.find(item => isInsuranceVariant(item.variant_id));
+      const insuranceItem = result.items?.find(item => String(item.variant_id) === CONFIG.VARIANT_ID);
       if (insuranceItem?.price) state.insurancePrice = insuranceItem.price;
       
       return result;
@@ -1142,8 +1174,7 @@
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          // /cart/change.js accepts variant id as string or number — both work here
-          id: CONFIG.VARIANT_ID_STR,
+          id: CONFIG.VARIANT_ID,
           quantity
         })
       });
@@ -1171,7 +1202,7 @@
           'Accept': 'application/json'
         },
         body: JSON.stringify({
-          id: CONFIG.VARIANT_ID_STR,
+          id: CONFIG.VARIANT_ID,
           quantity: 0
         })
       });
@@ -1195,7 +1226,7 @@
             await fetch('/cart/change.js', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: CONFIG.VARIANT_ID_STR, quantity: 0 })
+              body: JSON.stringify({ id: CONFIG.VARIANT_ID, quantity: 0 })
             });
           }
         }
@@ -1210,6 +1241,47 @@
     }
   }
 
+  // Add this function to update price display in cart unnecessary function
+    function updateInsurancePriceDisplay() {
+      const cartItems = document.querySelectorAll('.cart-item');
+      
+      cartItems.forEach(item => {
+        const variantIdElement = item.querySelector('[name="id"]') || item.querySelector('[data-variant-id]');
+        if (!variantIdElement) return;
+        
+        const variantId = variantIdElement.value || variantIdElement.dataset.variantId;
+        
+        if (variantId === CONFIG.VARIANT_ID) {
+          const quantityElement = item.querySelector('.quantity__input');
+          const priceElement = item.querySelector('.cart-item__price');
+          
+          if (quantityElement && priceElement) {
+            const quantity = parseInt(quantityElement.value);
+            const unitPrice = state.insurancePrice || 10000;
+            const totalPrice = unitPrice * quantity;
+            
+            // Update price display
+            priceElement.innerHTML = `<div class="cart-item__price-wrapper">
+              <span class="visually-hidden">Regular price</span>
+              <span class="cart-item__price">${formatMoney(totalPrice)}</span>
+            </div>`;
+          }
+        }
+      });
+    }
+
+    // Then call this in your updateGrandTotalUI function:
+    async function updateGrandTotalUI(cartData) {
+      if (!cartData) return;
+      
+      // ... existing code ...
+      
+      // Add this line:
+      setTimeout(updateInsurancePriceDisplay, 100);
+      
+      await updateInsuranceDisplay(cartData);
+    }
+  
   // ==================== UI UPDATES ====================
   
   async function updateInsuranceDisplay(cartData) {
@@ -1323,70 +1395,22 @@
     
     await updateInsuranceDisplay(cartData);
   }
-
-  // ==================== CART REFRESH (BUG FIX #2) ====================
-  // BUG FIX #2: Dawn theme does NOT have cartItems.onCartUpdate() method.
-  // Use the correct approach: dispatch a custom event OR use Shopify's pub/sub.
   
   function triggerCartUpdate() {
     log('🔄', 'Triggering cart refresh...');
-
-    // Method 1: Shopify Dawn theme pub/sub (preferred)
-    if (typeof publish === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
-      publish(PUB_SUB_EVENTS.cartUpdate, { source: 'insurance-manager' });
-      log('✅', 'Triggered via pub/sub');
-      return;
-    }
-
-    // Method 2: Dispatch native custom event that Dawn cart-drawer listens to
-    document.dispatchEvent(new CustomEvent('cart:refresh', { bubbles: true }));
-
-    // Method 3: Force re-render cart-drawer-items via fetch (most reliable fallback)
-    const cartDrawerItems = document.querySelector('cart-drawer-items');
-    if (cartDrawerItems) {
-      // Dawn's cart-drawer-items web component refreshes on this event
-      cartDrawerItems.dispatchEvent(new CustomEvent('cart-update', { bubbles: true }));
-    }
-
-    // Method 4: Re-fetch sections the way Dawn does it internally
-    fetch(`${window.Shopify?.routes?.root || '/'}?sections=cart-drawer`, {
-      headers: { 'Accept': 'application/json' }
-    })
-    .then(r => r.json())
-    .then(data => {
-      if (data['cart-drawer']) {
-        // Parse and inject the updated cart-drawer HTML
-        const parser = new DOMParser();
-        const newDoc = parser.parseFromString(data['cart-drawer'], 'text/html');
-
-        // Update cart items wrapper
-        const newItems = newDoc.querySelector('#CartDrawer-CartItems');
-        const currentItems = document.querySelector('#CartDrawer-CartItems');
-        if (newItems && currentItems) {
-          currentItems.innerHTML = newItems.innerHTML;
-        }
-
-        // Re-attach listeners after DOM update
-        setTimeout(() => {
-          attachEventListeners();
-          getCart().then(freshCart => {
-            if (freshCart) updateGrandTotalUI(freshCart);
-          });
-        }, 50);
-
-        log('✅', 'Cart section refreshed via Sections API');
-      }
-    })
-    .catch(err => {
-      log('⚠️', 'Section refresh failed, syncing state only:', err);
-      // Final fallback: just sync checkbox and totals
-      getCart().then(freshCart => {
-        if (freshCart) {
-          updateGrandTotalUI(freshCart);
-          syncCheckboxState();
-        }
+    
+    const cartItems = document.querySelector('cart-drawer-items') || document.querySelector('cart-items');
+    
+    if (cartItems?.onCartUpdate) {
+      cartItems.onCartUpdate().then(() => {
+        getCart().then(freshCart => {
+          if (freshCart) {
+            updateGrandTotalUI(freshCart);
+            syncCheckboxState();
+          }
+        });
       });
-    });
+    }
   }
   
   // ==================== MAIN LOGIC ====================
@@ -1417,12 +1441,9 @@
         await addInsuranceToCart(totalNonInsuranceQuantity);
       }
       
-      await wait(300);
+      await wait(200);
       const freshCart = await getCart();
-      if (freshCart) {
-        updateGrandTotalUI(freshCart);
-        syncCheckboxState();
-      }
+      if (freshCart) updateGrandTotalUI(freshCart);
       
       triggerCartUpdate();
       
@@ -1444,12 +1465,9 @@
     try {
       await removeInsuranceFromCart();
       
-      await wait(300);
+      await wait(200);
       const freshCart = await getCart();
-      if (freshCart) {
-        updateGrandTotalUI(freshCart);
-        syncCheckboxState();
-      }
+      if (freshCart) updateGrandTotalUI(freshCart);
       
       triggerCartUpdate();
       
@@ -1480,6 +1498,7 @@
       event.preventDefault();
       return;
     }
+    
     event.target.checked ? handleAdd() : handleRemove();
   }
   
@@ -1525,10 +1544,10 @@
     }
   }
   
-  // ==================== MINUS BUTTON INTERCEPTOR ====================
+  // additional function for removing the product from - sign
 
   function interceptMinusWhenLastItem() {
-    document.addEventListener('click', async function(event) {
+    document.addEventListener('click', async function (event) {
       const minusBtn = event.target.closest('button[name="minus"]');
       if (!minusBtn) return;
 
@@ -1539,10 +1558,10 @@
       if (!quantityInput) return;
 
       const currentQty = parseInt(quantityInput.value, 10);
-      if (currentQty !== 1) return;
+      if (currentQty !== 1) return; // Only care about 1 → 0
 
       const variantId = quantityInput.dataset.quantityVariantId;
-      if (isInsuranceVariant(variantId)) return;
+      if (variantId === CONFIG.VARIANT_ID) return;
 
       const cartData = await getCart();
       if (!cartData) return;
@@ -1550,12 +1569,13 @@
       const nonInsuranceCount = getNonInsuranceCount(cartData);
       const hasInsuranceInCart = hasInsurance(cartData);
 
+      // If this is the LAST product + insurance exists → intercept
       if (nonInsuranceCount === 1 && hasInsuranceInCart) {
         event.preventDefault();
         event.stopPropagation();
         event.stopImmediatePropagation();
 
-        log('🚨', 'Minus on last item — routing via insurance-safe removal');
+        log('🚨', 'Minus on last item detected — routing via insurance-safe removal');
 
         state.handlingLastProductRemoval = true;
         showOverlay();
@@ -1564,6 +1584,7 @@
           await removeInsuranceFromCart(true);
           await wait(600);
 
+          // Now remove product safely
           const lineIndex = quantityInput.dataset.index;
           const cartItems =
             quantityInput.closest('cart-items') ||
@@ -1585,6 +1606,7 @@
     }, true);
   }
 
+
   // ==================== CART REMOVAL INTERCEPTOR ====================
   
   function interceptCartItemRemoval() {
@@ -1595,7 +1617,7 @@
       const lineIndex = removeButton.dataset.index;
       const variantId = removeButton.querySelector('button')?.dataset?.variantId;
       
-      if (isInsuranceVariant(variantId)) return;
+      if (variantId === CONFIG.VARIANT_ID) return;
       
       const cartData = await getCart();
       if (!cartData) return;
@@ -1626,7 +1648,7 @@
             await fetch('/cart/change.js', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ id: CONFIG.VARIANT_ID_STR, quantity: 0 })
+              body: JSON.stringify({ id: CONFIG.VARIANT_ID, quantity: 0 })
             });
             await wait(500);
           }
@@ -1709,7 +1731,6 @@
   }
   
   function listenToCartEvents() {
-    // Shopify Dawn pub/sub
     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
       subscribe(PUB_SUB_EVENTS.cartUpdate, () => {
         setTimeout(() => {
@@ -1718,18 +1739,10 @@
         }, 100);
       });
     }
-
-    // Also listen to native cart:refresh events
-    document.addEventListener('cart:refresh', () => {
-      setTimeout(() => {
-        attachEventListeners();
-        syncCheckboxState();
-      }, 150);
-    });
   }
   
   async function init() {
-    log('🚀', 'Initializing v7.2...');
+    log('🚀', 'Initializing v7.1...');
     
     await fetchInsurancePrice();
     interceptCartItemRemoval();
@@ -1740,7 +1753,7 @@
     listenToCartEvents();
     
     state.initialized = true;
-    log('✅', 'Initialized! Variant ID:', CONFIG.VARIANT_ID, '(type:', typeof CONFIG.VARIANT_ID, ')');
+    log('✅', 'Initialized!');
   }
   
   // ==================== START ====================
@@ -1759,8 +1772,7 @@
     syncInsuranceWithProducts,
     removeInsuranceFromCart,
     fetchInsurancePrice,
-    state,
-    CONFIG
+    state
   };
   
 })();
