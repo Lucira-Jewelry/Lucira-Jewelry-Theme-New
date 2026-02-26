@@ -393,7 +393,8 @@ document.addEventListener("DOMContentLoaded", function () {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
       $zoho.salesiq.floatwindow.visible("show");
-      closeFab();
+      closeFab(); // collapse FAB after opening chat
+    }
   });
 
   function observeZohoChat() {
@@ -420,6 +421,7 @@ document.addEventListener("DOMContentLoaded", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
+  // Zoho loads async — wait for it to be ready before observing
   const zohoReadyInterval = setInterval(function () {
     if (document.getElementById("zsiq_chat_wrap")) {
       observeZohoChat();
