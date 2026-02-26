@@ -349,23 +349,33 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-  const fabContainer = document.querySelector(".fab-container");
-  const fabMain = document.getElementById("fabMain");
+  const zohoFab = document.getElementById("zohoFab");
+  let chatOpen = false;
 
-  fabMain.addEventListener("click", () => {
+  function toggleZoho() {
+    const interval = setInterval(() => {
+      const zohoBtn = document.getElementById("zs_fl_chat");
+
+      if (zohoBtn) {
+        zohoBtn.click(); // native Zoho toggle
+        clearInterval(interval);
+
+        chatOpen = !chatOpen;
+        zohoFab.classList.toggle("zoho-open", chatOpen);
+      }
+    }, 150);
+  }
+
+  // FAB click → open/close chat
+  zohoFab.addEventListener("click", toggleZoho);
+
+  // Sync icon if user closes chat manually
+  setInterval(() => {
     const float = document.getElementById("zsiq_float");
-    const chatOpen = float && float.classList.contains("zsiq-toggle");
+    if (!float) return;
 
-    // If chat is open → close chat
-    if (chatOpen) {
-      const closeBtn = document.getElementById("zs_fl_close");
-      if (closeBtn) closeBtn.click();
-
-      fabContainer.classList.remove("active");
-      return;
-    }
-
-    // Otherwise toggle menu
-    fabContainer.classList.toggle("active");
-  });
+    const visible = float.offsetParent !== null;
+    chatOpen = visible;
+    zohoFab.classList.toggle("zoho-open", visible);
+  }, 1000);
 });
