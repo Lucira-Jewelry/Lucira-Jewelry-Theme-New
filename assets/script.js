@@ -350,55 +350,27 @@ document.addEventListener('DOMContentLoaded', function () {
 
 document.addEventListener("DOMContentLoaded", () => {
   const fabContainer = document.querySelector(".fab-container");
-  const fabMain = document.getElementById("fabMain");
-  const zohoOption = document.getElementById("zohoOption");
+  const mainBtn = document.querySelector(".fab-main");
+  const openZohoBtn = document.getElementById("openZoho");
 
-  /* ---------------------------
-     Toggle FAB menu
-  --------------------------- */
-  fabMain.addEventListener("click", () => {
+  // Toggle FAB menu
+  mainBtn.addEventListener("click", () => {
     fabContainer.classList.toggle("active");
   });
 
-  /* ---------------------------
-     Toggle Zoho chat (OPEN/CLOSE)
-  --------------------------- */
-  function toggleZohoChat() {
-    const float = document.getElementById("zsiq_float");
-    if (!float) return;
-
-    const isOpen = float.classList.contains("zsiq-toggle");
-
-    const btn = isOpen
-      ? document.getElementById("zs_fl_close") // close
-      : document.getElementById("zs_fl_chat"); // open
-
-    if (btn) btn.click();
-  }
-
-  zohoOption.addEventListener("click", () => {
-    const interval = setInterval(() => {
-      const float = document.getElementById("zsiq_float");
-      if (float) {
-        toggleZohoChat();
-        fabContainer.classList.remove("active");
-        clearInterval(interval);
+  // Open Zoho chat safely
+  openZohoBtn.addEventListener("click", () => {
+    const tryOpenZoho = setInterval(() => {
+      const zohoBtn = document.getElementById("zs_fl_chat");
+      if (zohoBtn) {
+        zohoBtn.click();
+        clearInterval(tryOpenZoho);
+        fabContainer.classList.remove("active"); // close menu
       }
-    }, 150);
+    }, 200);
   });
 
-  /* ---------------------------
-     Sync icon with Zoho state
-  --------------------------- */
-  setInterval(() => {
-    const float = document.getElementById("zsiq_float");
-    const isOpen = float && float.classList.contains("zsiq-toggle");
-    zohoOption.classList.toggle("zoho-open", isOpen);
-  }, 600);
-
-  /* ---------------------------
-     Close menu when clicking outside
-  --------------------------- */
+  // Close FAB when clicking outside
   document.addEventListener("click", (e) => {
     if (!fabContainer.contains(e.target)) {
       fabContainer.classList.remove("active");
