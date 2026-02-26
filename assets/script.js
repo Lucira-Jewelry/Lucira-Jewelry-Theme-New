@@ -348,61 +348,24 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
-<script>
 document.addEventListener("DOMContentLoaded", () => {
   const fabContainer = document.querySelector(".fab-container");
   const fabMain = document.getElementById("fabMain");
-  const zohoOption = document.getElementById("zohoOption");
 
-  /* ---------------------------
-     Toggle FAB menu
-  --------------------------- */
   fabMain.addEventListener("click", () => {
-    fabContainer.classList.toggle("active");
-  });
-
-  /* ---------------------------
-     Toggle Zoho chat (OPEN/CLOSE)
-  --------------------------- */
-  function toggleZohoChat() {
     const float = document.getElementById("zsiq_float");
-    if (!float) return;
+    const chatOpen = float && float.classList.contains("zsiq-toggle");
 
-    const isOpen = float.classList.contains("zsiq-toggle");
+    // If chat is open → close chat
+    if (chatOpen) {
+      const closeBtn = document.getElementById("zs_fl_close");
+      if (closeBtn) closeBtn.click();
 
-    const btn = isOpen
-      ? document.getElementById("zs_fl_close") // close
-      : document.getElementById("zs_fl_chat"); // open
-
-    if (btn) btn.click();
-  }
-
-  zohoOption.addEventListener("click", () => {
-    const interval = setInterval(() => {
-      const float = document.getElementById("zsiq_float");
-      if (float) {
-        toggleZohoChat();
-        fabContainer.classList.remove("active");
-        clearInterval(interval);
-      }
-    }, 150);
-  });
-
-  /* ---------------------------
-     Sync icon with Zoho state
-  --------------------------- */
-  setInterval(() => {
-    const float = document.getElementById("zsiq_float");
-    const isOpen = float && float.classList.contains("zsiq-toggle");
-    zohoOption.classList.toggle("zoho-open", isOpen);
-  }, 600);
-
-  /* ---------------------------
-     Close menu when clicking outside
-  --------------------------- */
-  document.addEventListener("click", (e) => {
-    if (!fabContainer.contains(e.target)) {
       fabContainer.classList.remove("active");
+      return;
     }
+
+    // Otherwise toggle menu
+    fabContainer.classList.toggle("active");
   });
 });
