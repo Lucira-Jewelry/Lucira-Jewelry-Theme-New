@@ -353,16 +353,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const fabMain = document.getElementById("fabMain");
   const zohoOption = document.getElementById("zohoOption");
 
-  /* ---------------------------
-     Toggle FAB menu
-  --------------------------- */
   fabMain.addEventListener("click", () => {
     fabContainer.classList.toggle("active");
   });
 
-  /* ---------------------------
-     Toggle Zoho chat (OPEN/CLOSE)
-  --------------------------- */
   function toggleZohoChat() {
     const float = document.getElementById("zsiq_float");
     if (!float) return;
@@ -387,18 +381,12 @@ document.addEventListener("DOMContentLoaded", () => {
     }, 150);
   });
 
-  /* ---------------------------
-     Sync icon with Zoho state
-  --------------------------- */
   setInterval(() => {
     const float = document.getElementById("zsiq_float");
     const isOpen = float && float.classList.contains("zsiq-toggle");
     zohoOption.classList.toggle("zoho-open", isOpen);
   }, 600);
 
-  /* ---------------------------
-     Close menu when clicking outside
-  --------------------------- */
   document.addEventListener("click", (e) => {
     if (!fabContainer.contains(e.target)) {
       fabContainer.classList.remove("active");
