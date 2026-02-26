@@ -353,41 +353,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const fabMain = document.getElementById("fabMain");
   const zohoOption = document.getElementById("zohoOption");
 
-  /* ------------------------------
-     Toggle FAB menu
-  ------------------------------ */
   fabMain.addEventListener("click", () => {
     fabContainer.classList.toggle("active");
   });
 
-  /* ------------------------------
-     Toggle Zoho chat (native)
-  ------------------------------ */
-  zohoOption.addEventListener("click", () => {
-    const tryToggle = setInterval(() => {
-      const toggleBtn =
-        document.getElementById("zs_fl_chat") ||
-        document.getElementById("zs_fl_close");
+  function toggleZohoChat() {
+    const float = document.getElementById("zsiq_float");
+    if (!float) return;
 
-      if (toggleBtn) {
-        toggleBtn.click(); // native Zoho open/close
-        clearInterval(tryToggle);
-        fabContainer.classList.remove("active"); // close menu
+    const isOpen = float.classList.contains("zsiq-toggle");
+
+    const btn = isOpen
+      ? document.getElementById("zs_fl_close") // close
+      : document.getElementById("zs_fl_chat"); // open
+
+    if (btn) btn.click();
+  }
+
+  zohoOption.addEventListener("click", () => {
+    const interval = setInterval(() => {
+      const float = document.getElementById("zsiq_float");
+      if (float) {
+        toggleZohoChat();
+        fabContainer.classList.remove("active");
+        clearInterval(interval);
       }
     }, 150);
   });
 
-  /* ------------------------------
-     Sync icon with Zoho state
-  ------------------------------ */
   setInterval(() => {
-    const isOpen = !!document.getElementById("zs_fl_close");
+    const float = document.getElementById("zsiq_float");
+    const isOpen = float && float.classList.contains("zsiq-toggle");
     zohoOption.classList.toggle("zoho-open", isOpen);
-  }, 800);
+  }, 600);
 
-  /* ------------------------------
-     Close menu when clicking outside
-  ------------------------------ */
   document.addEventListener("click", (e) => {
     if (!fabContainer.contains(e.target)) {
       fabContainer.classList.remove("active");
