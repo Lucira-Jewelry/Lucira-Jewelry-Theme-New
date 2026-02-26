@@ -347,3 +347,19 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 15000); // 15 seconds delay
   });
 });
+
+document.addEventListener("DOMContentLoaded", () => {
+  const mainBtn = document.querySelector(".fab-main");
+  const options = document.querySelector(".fab-options");
+
+  mainBtn.addEventListener("click", () => {
+    options.style.display = options.style.display === "flex" ? "none" : "flex";
+  });
+
+  // Open Zoho chat programmatically
+  document.getElementById("openZoho").addEventListener("click", () => {
+    if (window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible("show");
+    }
+  });
+});
