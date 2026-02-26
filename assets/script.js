@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () {
       video.currentTime = 0;
       video.play();
-    }, 15000); // 15 seconds delay
+    }, 15000);
   });
 });
 
@@ -368,7 +368,6 @@ document.addEventListener("DOMContentLoaded", function () {
 
   fabMain.addEventListener("click", function () {
     if (isOpen) {
-      // Also close Zoho chat if it's currently open
       const chatWrap = document.getElementById("zsiq_chat_wrap");
       const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
 
@@ -382,20 +381,17 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Close FAB when clicking outside
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".fab-container") && isOpen) {
       closeFab();
     }
   });
 
-  // Open Zoho Chat
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
       $zoho.salesiq.floatwindow.visible("show");
-      closeFab(); // collapse FAB after opening chat
-    }
+      closeFab();
   });
 
   function observeZohoChat() {
@@ -422,7 +418,6 @@ document.addEventListener("DOMContentLoaded", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
-  // Zoho loads async — wait for it to be ready before observing
   const zohoReadyInterval = setInterval(function () {
     if (document.getElementById("zsiq_chat_wrap")) {
       observeZohoChat();
