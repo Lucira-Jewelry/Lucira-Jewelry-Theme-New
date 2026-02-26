@@ -406,8 +406,13 @@ document.addEventListener("DOMContentLoaded", function () {
       mutations.forEach(function (mutation) {
         if (mutation.attributeName === "class") {
           const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-          // If Zoho chat was closed, also make sure FAB is clean
-          if (!isChatOpen) {
+
+          if (isChatOpen) {
+            // Show × on FAB but keep action buttons hidden
+            isOpen = true;
+            fabActions.style.display = "none"; // don't re-show action buttons
+            fabMain.textContent = "×";
+          } else {
             closeFab();
           }
         }
