@@ -366,9 +366,20 @@ document.addEventListener("DOMContentLoaded", function () {
     fabMain.textContent = "×";
   }
 
-  // Toggle FAB menu
   fabMain.addEventListener("click", function () {
-    isOpen ? closeFab() : openFab();
+    if (isOpen) {
+      // Also close Zoho chat if it's currently open
+      const chatWrap = document.getElementById("zsiq_chat_wrap");
+      const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
+      if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("hide");
+      }
+
+      closeFab();
+    } else {
+      openFab();
+    }
   });
 
   // Close FAB when clicking outside
@@ -387,8 +398,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Watch Zoho's DOM for chat window close
-  // Zoho adds/removes "chat-iframe-open" on #zsiq_chat_wrap
   function observeZohoChat() {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
     if (!chatWrap) return;
