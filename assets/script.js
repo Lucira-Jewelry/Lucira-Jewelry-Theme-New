@@ -350,27 +350,44 @@ document.addEventListener('DOMContentLoaded', function () {
 
 document.addEventListener("DOMContentLoaded", () => {
   const fabContainer = document.querySelector(".fab-container");
-  const mainBtn = document.querySelector(".fab-main");
-  const openZohoBtn = document.getElementById("openZoho");
+  const fabMain = document.getElementById("fabMain");
+  const zohoOption = document.getElementById("zohoOption");
 
-  // Toggle FAB menu
-  mainBtn.addEventListener("click", () => {
+  /* ------------------------------
+     Toggle FAB menu
+  ------------------------------ */
+  fabMain.addEventListener("click", () => {
     fabContainer.classList.toggle("active");
   });
 
-  // Open Zoho chat safely
-  openZohoBtn.addEventListener("click", () => {
-    const tryOpenZoho = setInterval(() => {
-      const zohoBtn = document.getElementById("zs_fl_chat");
-      if (zohoBtn) {
-        zohoBtn.click();
-        clearInterval(tryOpenZoho);
+  /* ------------------------------
+     Toggle Zoho chat (native)
+  ------------------------------ */
+  zohoOption.addEventListener("click", () => {
+    const tryToggle = setInterval(() => {
+      const toggleBtn =
+        document.getElementById("zs_fl_chat") ||
+        document.getElementById("zs_fl_close");
+
+      if (toggleBtn) {
+        toggleBtn.click(); // native Zoho open/close
+        clearInterval(tryToggle);
         fabContainer.classList.remove("active"); // close menu
       }
-    }, 200);
+    }, 150);
   });
 
-  // Close FAB when clicking outside
+  /* ------------------------------
+     Sync icon with Zoho state
+  ------------------------------ */
+  setInterval(() => {
+    const isOpen = !!document.getElementById("zs_fl_close");
+    zohoOption.classList.toggle("zoho-open", isOpen);
+  }, 800);
+
+  /* ------------------------------
+     Close menu when clicking outside
+  ------------------------------ */
   document.addEventListener("click", (e) => {
     if (!fabContainer.contains(e.target)) {
       fabContainer.classList.remove("active");
