@@ -357,13 +357,13 @@ document.addEventListener("DOMContentLoaded", function () {
   function closeFab() {
     isOpen = false;
     fabActions.style.display = "none";
-    fabMain.textContent = "+";
+    fabMain.classList.remove("is-open");
   }
 
   function openFab() {
     isOpen = true;
     fabActions.style.display = "flex";
-    fabMain.textContent = "×";
+    fabMain.classList.add("is-open");
   }
 
   fabMain.addEventListener("click", function () {
@@ -407,10 +407,9 @@ document.addEventListener("DOMContentLoaded", function () {
           const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
 
           if (isChatOpen) {
-            // Show × on FAB but keep action buttons hidden
             isOpen = true;
-            fabActions.style.display = "none"; // don't re-show action buttons
-            fabMain.textContent = "×";
+            fabActions.style.display = "none";
+            fabMain.classList.add("is-open");   // ← was: fabMain.textContent = "×"
           } else {
             closeFab();
           }
