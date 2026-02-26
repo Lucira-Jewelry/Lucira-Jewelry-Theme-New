@@ -349,19 +349,31 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
+  const fabContainer = document.querySelector(".fab-container");
   const mainBtn = document.querySelector(".fab-main");
-  const options = document.querySelector(".fab-options");
+  const openZohoBtn = document.getElementById("openZoho");
 
+  // Toggle FAB menu
   mainBtn.addEventListener("click", () => {
-    options.style.display = options.style.display === "flex" ? "none" : "flex";
+    fabContainer.classList.toggle("active");
   });
 
-  document.getElementById("openZoho").addEventListener("click", () => {
-    const zohoBtn = document.getElementById("zs_fl_chat");
-    if (zohoBtn) {
-      zohoBtn.click(); // triggers native Zoho open
-    } else {
-      console.warn("Zoho chat button not found");
+  // Open Zoho chat safely
+  openZohoBtn.addEventListener("click", () => {
+    const tryOpenZoho = setInterval(() => {
+      const zohoBtn = document.getElementById("zs_fl_chat");
+      if (zohoBtn) {
+        zohoBtn.click();
+        clearInterval(tryOpenZoho);
+        fabContainer.classList.remove("active"); // close menu
+      }
+    }, 200);
+  });
+
+  // Close FAB when clicking outside
+  document.addEventListener("click", (e) => {
+    if (!fabContainer.contains(e.target)) {
+      fabContainer.classList.remove("active");
     }
   });
 });
