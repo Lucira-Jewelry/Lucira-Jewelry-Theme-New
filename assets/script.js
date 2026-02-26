@@ -352,21 +352,67 @@ document.addEventListener("DOMContentLoaded", function () {
   const fabMain = document.getElementById("fabMain");
   const fabActions = document.getElementById("fabActions");
   const fabChat = document.getElementById("fabChat");
-
   let isOpen = false;
+
+  function closeFab() {
+    isOpen = false;
+    fabActions.style.display = "none";
+    fabMain.textContent = "+";
+  }
+
+  function openFab() {
+    isOpen = true;
+    fabActions.style.display = "flex";
+    fabMain.textContent = "×";
+  }
 
   // Toggle FAB menu
   fabMain.addEventListener("click", function () {
-  isOpen = !isOpen;
-  fabActions.style.display = isOpen ? "flex" : "none";
-  fabMain.textContent = isOpen ? "×" : "+";
+    isOpen ? closeFab() : openFab();
+  });
+
+  // Close FAB when clicking outside
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".fab-container") && isOpen) {
+      closeFab();
+    }
   });
 
   // Open Zoho Chat
   fabChat.addEventListener("click", function (e) {
-  e.preventDefault();
-  if (window.$zoho && $zoho.salesiq) {
-    $zoho.salesiq.floatwindow.visible('show');
-  }
+    e.preventDefault();
+    if (window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible("show");
+      closeFab(); // collapse FAB after opening chat
+    }
   });
+
+  // Watch Zoho's DOM for chat window close
+  // Zoho adds/removes "chat-iframe-open" on #zsiq_chat_wrap
+  function observeZohoChat() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    if (!chatWrap) return;
+
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        if (mutation.attributeName === "class") {
+          const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+          // If Zoho chat was closed, also make sure FAB is clean
+          if (!isChatOpen) {
+            closeFab();
+          }
+        }
+      });
+    });
+
+    observer.observe(chatWrap, { attributes: true });
+  }
+
+  // Zoho loads async — wait for it to be ready before observing
+  const zohoReadyInterval = setInterval(function () {
+    if (document.getElementById("zsiq_chat_wrap")) {
+      observeZohoChat();
+      clearInterval(zohoReadyInterval);
+    }
+  }, 500);
 });
