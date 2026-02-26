@@ -349,47 +349,17 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", () => {
-  const fabContainer = document.querySelector(".fab-container");
-  const fabMain = document.getElementById("fabMain");
-  const zohoOption = document.getElementById("zohoOption");
+  const mainBtn = document.querySelector(".fab-main");
+  const options = document.querySelector(".fab-options");
 
-  fabMain.addEventListener("click", () => {
-    fabContainer.classList.toggle("active");
+  mainBtn.addEventListener("click", () => {
+    options.style.display = options.style.display === "flex" ? "none" : "flex";
   });
 
-  function toggleZohoChat() {
-    const float = document.getElementById("zsiq_float");
-    if (!float) return;
-
-    const isOpen = float.classList.contains("zsiq-toggle");
-
-    const btn = isOpen
-      ? document.getElementById("zs_fl_close") // close
-      : document.getElementById("zs_fl_chat"); // open
-
-    if (btn) btn.click();
-  }
-
-  zohoOption.addEventListener("click", () => {
-    const interval = setInterval(() => {
-      const float = document.getElementById("zsiq_float");
-      if (float) {
-        toggleZohoChat();
-        fabContainer.classList.remove("active");
-        clearInterval(interval);
-      }
-    }, 150);
-  });
-
-  setInterval(() => {
-    const float = document.getElementById("zsiq_float");
-    const isOpen = float && float.classList.contains("zsiq-toggle");
-    zohoOption.classList.toggle("zoho-open", isOpen);
-  }, 600);
-
-  document.addEventListener("click", (e) => {
-    if (!fabContainer.contains(e.target)) {
-      fabContainer.classList.remove("active");
+  // Open Zoho chat programmatically
+  document.getElementById("openZoho").addEventListener("click", () => {
+    if (window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible("show");
     }
   });
 });
