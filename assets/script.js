@@ -356,10 +356,12 @@ document.addEventListener("DOMContentLoaded", () => {
     options.style.display = options.style.display === "flex" ? "none" : "flex";
   });
 
-  // Open Zoho chat programmatically
   document.getElementById("openZoho").addEventListener("click", () => {
-    if (window.$zoho && $zoho.salesiq) {
-      $zoho.salesiq.floatwindow.visible("show");
+    const zohoBtn = document.getElementById("zs_fl_chat");
+    if (zohoBtn) {
+      zohoBtn.click(); // triggers native Zoho open
+    } else {
+      console.warn("Zoho chat button not found");
     }
   });
 });
