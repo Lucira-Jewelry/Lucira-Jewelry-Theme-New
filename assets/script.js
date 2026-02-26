@@ -344,7 +344,7 @@ document.addEventListener('DOMContentLoaded', function () {
     setTimeout(function () {
       video.currentTime = 0;
       video.play();
-    }, 15000);
+    }, 15000); // 15 seconds delay
   });
 });
 
@@ -366,32 +366,37 @@ document.addEventListener("DOMContentLoaded", function () {
     fabMain.textContent = "×";
   }
 
-  fabMain.addEventListener("click", function () {
-    if (isOpen) {
-      const chatWrap = document.getElementById("zsiq_chat_wrap");
-      const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+  // Toggle FAB menu
+fabMain.addEventListener("click", function () {
+  if (isOpen) {
+    // Also close Zoho chat if it's currently open
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
 
-      if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
-        $zoho.salesiq.floatwindow.visible("hide");
-      }
-
-      closeFab();
-    } else {
-      openFab();
+    if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible("hide");
     }
-  });
 
+    closeFab();
+  } else {
+    openFab();
+  }
+});
+
+  // Close FAB when clicking outside
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".fab-container") && isOpen) {
       closeFab();
     }
   });
 
+  // Open Zoho Chat
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
       $zoho.salesiq.floatwindow.visible("show");
-      closeFab();
+      closeFab(); // collapse FAB after opening chat
+    }
   });
 
   function observeZohoChat() {
@@ -402,13 +407,8 @@ document.addEventListener("DOMContentLoaded", function () {
       mutations.forEach(function (mutation) {
         if (mutation.attributeName === "class") {
           const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-
-          if (isChatOpen) {
-            // Show × on FAB but keep action buttons hidden
-            isOpen = true;
-            fabActions.style.display = "none"; // don't re-show action buttons
-            fabMain.textContent = "×";
-          } else {
+          // If Zoho chat was closed, also make sure FAB is clean
+          if (!isChatOpen) {
             closeFab();
           }
         }
@@ -418,6 +418,7 @@ document.addEventListener("DOMContentLoaded", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
+  // Zoho loads async — wait for it to be ready before observing
   const zohoReadyInterval = setInterval(function () {
     if (document.getElementById("zsiq_chat_wrap")) {
       observeZohoChat();
