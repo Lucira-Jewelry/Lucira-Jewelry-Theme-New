@@ -366,22 +366,21 @@ document.addEventListener("DOMContentLoaded", function () {
     fabMain.textContent = "×";
   }
 
-  // Toggle FAB menu
-fabMain.addEventListener("click", function () {
-  if (isOpen) {
-    // Also close Zoho chat if it's currently open
-    const chatWrap = document.getElementById("zsiq_chat_wrap");
-    const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+  fabMain.addEventListener("click", function () {
+    if (isOpen) {
+      // Also close Zoho chat if it's currently open
+      const chatWrap = document.getElementById("zsiq_chat_wrap");
+      const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
 
-    if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
-      $zoho.salesiq.floatwindow.visible("hide");
+      if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("hide");
+      }
+
+      closeFab();
+    } else {
+      openFab();
     }
-
-    closeFab();
-  } else {
-    openFab();
-  }
-});
+  });
 
   // Close FAB when clicking outside
   document.addEventListener("click", function (e) {
@@ -390,13 +389,11 @@ fabMain.addEventListener("click", function () {
     }
   });
 
-  // Open Zoho Chat
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
       $zoho.salesiq.floatwindow.visible("show");
-      closeFab(); // collapse FAB after opening chat
-    }
+      closeFab();
   });
 
   function observeZohoChat() {
@@ -407,8 +404,13 @@ fabMain.addEventListener("click", function () {
       mutations.forEach(function (mutation) {
         if (mutation.attributeName === "class") {
           const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-          // If Zoho chat was closed, also make sure FAB is clean
-          if (!isChatOpen) {
+
+          if (isChatOpen) {
+            // Show × on FAB but keep action buttons hidden
+            isOpen = true;
+            fabActions.style.display = "none"; // don't re-show action buttons
+            fabMain.textContent = "×";
+          } else {
             closeFab();
           }
         }
@@ -418,7 +420,6 @@ fabMain.addEventListener("click", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
-  // Zoho loads async — wait for it to be ready before observing
   const zohoReadyInterval = setInterval(function () {
     if (document.getElementById("zsiq_chat_wrap")) {
       observeZohoChat();
