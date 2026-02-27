@@ -52,13 +52,6 @@
           "id": "card_subtitle",
           "label": "Card Subtitle",
           "default": "Feature subtitle"
-        },
-        {
-          "type": "checkbox",
-          "id": "enable_sso_link",
-          "label": "Enable SSO Link (Scheme Enrollment)",
-          "default": false,
-          "info": "When enabled: logged-in users go to SSO enrollment URL, logged-out users go to https://schemes.lucirajewelry.com/"
         }
       ]
     }
@@ -72,27 +65,6 @@
 }
 {% endschema %}
 
-
-{% comment %} ── Pre-process phone in Liquid ── {% endcomment %}
-{% assign _raw = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
-{% if _raw.size == 12 %}
-  {% assign _prefix = _raw | slice: 0, 2 %}
-  {% if _prefix == "91" %}
-    {% assign _clean_phone = _raw | slice: 2, 10 %}
-  {% else %}
-    {% assign _clean_phone = _raw %}
-  {% endif %}
-{% else %}
-  {% assign _clean_phone = _raw %}
-{% endif %}
-
-{% comment %} ── HMAC signature on "phone|timestamp" ── {% endcomment %}
-{% assign _ts = 'now' | date: '%s' %}
-{% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
-{% assign _sig = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
-
-
-
 <section class="lucira-wc-section">
   <div class="page-width">
     <div class="page-width-wc-section">
@@ -100,7 +72,7 @@
         <h2 class="lucira-wc-header">{{ section.settings.header }}</h2>
         <p class="lucira-wc-subheader">{{ section.settings.subheader }}</p>
         <div class="lucira-wc-grid swiper">
-          {% comment %} <div class="swiper-wrapper">
+          <div class="swiper-wrapper">
             {% for block in section.blocks %}
               <div class="lucira-wc-column swiper-slide" {{ block.shopify_attributes }}>
                 <a 
@@ -119,42 +91,7 @@
                 </a>
               </div>
             {% endfor %}
-          </div> {% endcomment %}
-           <div class="swiper-wrapper">
-          {% for block in section.blocks %}
-
-            {%- comment -%} Build the href for this block {%- endcomment -%}
-            {% if block.settings.enable_sso_link %}
-              {% if customer %}
-                {%- assign _clean_phone = customer.phone | remove: '+91' | remove: '+' | remove: '-' | remove: ' ' | strip -%}
-                {%- assign _card_href = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p=' | append: _clean_phone | append: '&ts=' | append: _ts | append: '&sig=' | append: _sig -%}
-              {% else %}
-                {%- assign _card_href = 'https://schemes.lucirajewelry.com/' -%}
-              {% endif %}
-            {% else %}
-              {%- assign _card_href = block.settings.card_link -%}
-            {% endif %}
-
-            <div class="lucira-wc-column swiper-slide" {{ block.shopify_attributes }}>
-              <a 
-                href="{{ _card_href }}"
-                class="lucira-wc-card why-choose-tile"
-                data-info="tile-{{ forloop.index }}"
-                data-desktop-img="{{ block.settings.card_image | img_url: '800x' }}"
-                aria-label="{{ block.settings.card_title }}: {{ block.settings.card_subtitle }}" 
-                data-mobile-img="{{ block.settings.card_image_mobile | img_url: '800x' }}"
-                {% if block.settings.enable_sso_link and customer %}
-                  target="_blank" rel="noopener noreferrer"
-                {% endif %}
-              >
-                <div class="lucira-wc-card-content">
-                  <h3 class="lucira-wc-card-title">{{ block.settings.card_title }}</h3>
-                  <p class="lucira-wc-card-subtitle">{{ block.settings.card_subtitle }}</p>
-                </div>
-              </a>
-            </div>
-          {% endfor %}
-        </div>
+          </div>
           <div class="swiper-pagination"></div>
         </div>
       </div>
