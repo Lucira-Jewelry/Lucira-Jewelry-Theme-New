@@ -468,31 +468,21 @@
       } {% endcomment %}
 
       function openDrawer() {
-        const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
-        if (!btn) return;
+  const btn = document.querySelector('.view-similar-btn[data-product-id="{{ product.id }}"]');
+  if (!btn) return;
 
-        // Watch for the drawer title to appear after AJAX injection
-        const observer = new MutationObserver(function (mutations, obs) {
-          const titleEl = document.getElementById('similar-items-title');
-          if (!titleEl) return;
+  const observer = new MutationObserver(function (mutations, obs) {
+    const titleEl = document.getElementById('similar-items-title');
+    if (!titleEl) return;
+    titleEl.textContent = 'Compare Similar Designs side-by-side before you decide';
+    obs.disconnect();
+  });
 
-          // Title element found — swap text and stop observing
-          titleEl.textContent = 'Still deciding? Explore More';
-          obs.disconnect();
-        });
+  observer.observe(document.body, { childList: true, subtree: true });
+  setTimeout(function () { observer.disconnect(); }, 3000);
 
-        observer.observe(document.body, {
-          childList: true,
-          subtree: true,
-        });
-
-        // Safety: auto-disconnect after 3s if drawer never opens
-        setTimeout(function () {
-          observer.disconnect();
-        }, 3000);
-
-        btn.click();
-      }
+  btn.click(); // This will call trackPromoClick via your existing click handler
+}
 
       // ── All 4 conditions must pass ───────────────────────────────────────────────
       function canFire() {
@@ -504,11 +494,17 @@
         return true;
       }
 
-      function fire(source) {
-        if (!canFire()) return;
-        markShown();
-        openDrawer();
-      }
+function fire(source) {
+  if (!canFire()) return;
+  markShown();
+
+  // Store which trigger fired (scroll/mouse/back/tab) for datalayer
+  window.__exitIntentSource = source;
+  window.__drawerTriggerSource = 'exit-intent';
+
+  openDrawer();
+}
+
 
       function isMobile() {
         return 'ontouchstart' in window || navigator.maxTouchPoints > 0 || window.innerWidth <= 768;
