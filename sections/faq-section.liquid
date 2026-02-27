@@ -1,5 +1,6 @@
-<div class="lucira-section faq-section">
+<div class="lucira-section faq-section" id="faq-section-{{ section.id }}">
   <div itemscope itemtype="https://schema.org/FAQPage" class="page-width">
+    
     {% if section.settings.faq_heading != blank or section.settings.faq_description != blank %}
       <div class="heading-wrapper">
         {% if section.settings.faq_heading != blank %}
@@ -12,7 +13,19 @@
     {% endif %}
 
     {% if section.blocks.size > 0 %}
-      <div id="accordion_block" class="accordion">
+      
+      {%- comment -%} Cache variables & handle non-product pages safely {%- endcomment -%}
+      {%- assign track_id = 'N/A' -%}
+      {%- assign track_name = page_title | escape -%}
+      
+      {%- if product -%}
+        {%- assign current_variant = product.selected_or_first_available_variant -%}
+        {%- assign track_sku = current_variant.sku | escape | default: 'N/A' -%}
+        {%- assign track_name = product.title | escape -%}
+        {%- assign track_id = current_variant.id | default: 'N/A' -%}
+      {%- endif -%}
+
+      <div id="accordion_block_{{ section.id }}" class="accordion">
         {% for block in section.blocks %}
           {% case block.type %}
             {% when 'faq_item' %}
@@ -26,24 +39,16 @@
                 {% if block.settings.faq_question != blank %}
                   <h3
                     itemprop="name"
-                    class="accordion-title"
-                    onclick="
-                      window.dataLayer = window.dataLayer || [];
-                      window.dataLayer.push({
-                        event: 'promoClick',
-                        promoClick: {
-                          promo_id: '{{ product.selected_or_first_available_variant.sku }}',
-                          promo_name: '{{ product.title }}',
-                          creative_name: 'FAQ Clicked',
-                          promo_position: '{{ block.settings.faq_question }}',
-                          location_id: '{{ product.selected_or_first_available_variant.id }}'
-                        }
-                      });
-                    "
+                    class="accordion-title js-faq-track"
+                    data-sku="{{ track_sku }}"
+                    data-title="{{ track_name }}"
+                    data-question="{{ block.settings.faq_question | escape }}"
+                    data-id="{{ track_id }}"
                   >
                     {{ block.settings.faq_question }}
                   </h3>
                 {% endif %}
+                
                 {% if block.settings.faq_answer != blank %}
                   <div
                     itemscope
@@ -61,6 +66,30 @@
     {% endif %}
   </div>
 </div>
+
+<script>
+  // Scoped to this specific section to prevent conflicts if used multiple times
+  document.querySelector('#faq-section-{{ section.id }}').addEventListener('click', function(event) {
+    const faqTitle = event.target.closest('.js-faq-track');
+    
+    if (faqTitle) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'promoClick',
+        promoClick: {
+          promo_id: faqTitle.getAttribute('data-sku') || 'N/A',
+          promo_name: faqTitle.getAttribute('data-title'),
+          creative_name: 'FAQ Clicked',
+          promo_position: faqTitle.getAttribute('data-question'),
+          location_id: faqTitle.getAttribute('data-id') || 'N/A'
+        }
+      });
+
+      // NOTE: You will need to add your logic here (or in a separate CSS/JS file) 
+      // to actually toggle the accordion-content open and closed visually.
+    }
+  });
+</script>
 
 {% schema %}
 {
