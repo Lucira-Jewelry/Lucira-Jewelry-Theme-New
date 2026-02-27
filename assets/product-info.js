@@ -170,7 +170,6 @@ if (!customElements.get('product-info')) {
           this.updateURL(productUrl, variant?.id);
           this.updateVariantInputs(variant?.id);
           this.updateMetafields(html);
-          this.updateTryAtHome(html);
           this.updateSku(html);
           this.updatePriceBreakup(html);
           this.updateComparison?.(html);
@@ -229,35 +228,6 @@ if (!customElements.get('product-info')) {
             },
           });
         };
-      }
-
-      updateTryAtHome(html) {
-        try {
-          const source =
-            html.querySelector('#try-at-home-wrapper');
-
-          const destination =
-            this.querySelector('#try-at-home-wrapper');
-
-          if (!destination) return;
-
-          if (source) {
-            // Replace content (important if snippet changes per variant)
-            destination.innerHTML = source.innerHTML;
-
-            // Sync visibility
-            destination.classList.toggle(
-              'hidden',
-              source.classList.contains('hidden')
-            );
-          } else {
-            // If not present in new HTML → hide it
-            destination.classList.add('hidden');
-          }
-
-        } catch (e) {
-          console.error('updateTryAtHome error', e);
-        }
       }
 
       updateVariantInputs(variantId) {
