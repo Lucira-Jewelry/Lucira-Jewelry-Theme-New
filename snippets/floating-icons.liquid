@@ -56,25 +56,56 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const fabWhatsapp = document.getElementById('fabWhatsapp');
 
-  if (!fabWhatsapp) return;
+  // ── SalesIQ Badge Sync ──────────────────────────────────────────────
+  const fabMainBadge  = document.getElementById('fabMainBadge');
+  const fabChatBadge  = document.getElementById('fabChatBadge');
 
-  fabWhatsapp.addEventListener('click', function () {
-    const chatData = {
-      promo_id: '{{ product.selected_or_first_available_variant.sku | default: "N/A" }}',
-      promo_name: '{{ product.title | default: "General Inquiry" }}',
-      creative_name: 'fabWhatsapp',
-      location_id: '{{ request.path }}'
-    };
-
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'promoClick',
-      promoClick: chatData,
+  function syncBadge(count) {
+    const show = count && parseInt(count) > 0;
+    [fabMainBadge, fabChatBadge].forEach(function (el) {
+      if (!el) return;
+      el.textContent   = show ? count : '';
+      el.style.display = show ? 'flex' : 'none';
     });
+  }
 
-    console.log('✅ FAB WhatsApp dataLayer pushed:', chatData);
-  });
+  // Poll for zsiq-indicator (SalesIQ loads async, so we wait for it)
+  function watchZsiqIndicator() {
+    const zsiqEl = document.getElementById('zsiq-indicator');
+    if (!zsiqEl) {
+      setTimeout(watchZsiqIndicator, 800); // retry until SalesIQ loads
+      return;
+    }
+
+    // Sync immediately with current value
+    syncBadge(zsiqEl.textContent.trim());
+
+    // Watch for future count changes via MutationObserver
+    const observer = new MutationObserver(function () {
+      syncBadge(zsiqEl.textContent.trim());
+    });
+    observer.observe(zsiqEl, { childList: true, characterData: true, subtree: true });
+  }
+
+  watchZsiqIndicator();
+
+
+  // ── WhatsApp dataLayer ──────────────────────────────────────────────
+  const fabWhatsapp = document.getElementById('fabWhatsapp');
+  if (fabWhatsapp) {
+    fabWhatsapp.addEventListener('click', function () {
+      const chatData = {
+        promo_id:      '{{ product.selected_or_first_available_variant.sku | default: "N/A" }}',
+        promo_name:    '{{ product.title | default: "General Inquiry" }}',
+        creative_name: 'fabWhatsapp',
+        location_id:   '{{ request.path }}'
+      };
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: 'promoClick', promoClick: chatData });
+      console.log('✅ FAB WhatsApp dataLayer pushed:', chatData);
+    });
+  }
+
 });
 </script>
