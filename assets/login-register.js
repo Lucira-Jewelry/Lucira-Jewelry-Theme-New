@@ -173,17 +173,17 @@ sendBtn.addEventListener('click', async () => {
             document.getElementById('otpSection').style.display = 'none';
             return;
         }
-        else{
-            window.dataLayer = window.dataLayer || [];
-            window.dataLayer.push({
-            event: "promoClick",
-            promoClick: {
-                promo_id: cleanMobile,
-                creative_name: "signup",
-                promo_name: cleanMobile
-            }
-            });
-        }
+        // else{
+        //     window.dataLayer = window.dataLayer || [];
+        //     window.dataLayer.push({
+        //     event: "promoClick",
+        //     promoClick: {
+        //         promo_id: cleanMobile,
+        //         creative_name: "signup",
+        //         promo_name: cleanMobile
+        //     }
+        //     });
+        // }
     } catch (e) {
         console.error('OTP Send Error:', e);
         showError('mobileError', 'Failed to send OTP. Please try again.');
