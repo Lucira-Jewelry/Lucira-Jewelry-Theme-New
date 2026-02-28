@@ -129,6 +129,15 @@ if (sendBtn) {
 sendBtn.addEventListener('click', async () => {
     const rawInput = document.getElementById('loginMobile').value;
     let cleanMobile = rawInput.replace(/\D/g, ''); 
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+    event: "promoClick",
+    promoClick: {
+        promo_id: cleanMobile,
+        creative_name: "signup",
+        promo_name: cleanMobile
+    }
+    });
 
     if (cleanMobile.length === 10) {
     cleanMobile = '91' + cleanMobile;
@@ -151,15 +160,6 @@ sendBtn.addEventListener('click', async () => {
     focusOtp();
     startTimer();
     
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-    event: "promoClick",
-    promoClick: {
-        promo_id: cleanMobile,
-        creative_name: "signup",
-        promo_name: cleanMobile
-    }
-    });
 
     try {
         const response = await fetch('https://api.lucirajewelry.com/send-otp.php', {
