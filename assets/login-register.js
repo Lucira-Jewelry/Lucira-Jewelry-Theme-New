@@ -133,7 +133,6 @@ sendBtn.addEventListener('click', async () => {
     window.dataLayer.push({
     event: "promoClick",
     promoClick: {
-        promo_id: cleanMobile,
         creative_name: "signup",
         promo_name: cleanMobile
     }
