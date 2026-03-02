@@ -1,4 +1,4 @@
-  {%- if card_product and card_product != empty -%}
+{%- if card_product and card_product != empty -%}
   {%- liquid
     assign ratio = 1.4
     if card_product.featured_media and media_aspect_ratio == 'portrait'
@@ -11,72 +11,71 @@
     endif
   -%}
 
+  {%- liquid
+    assign first_instock_variant = null
+    assign show_fast_shipping = false
+    assign calculated_discount_percent = 0
 
-{%- liquid
-  assign first_instock_variant = nil
-  assign show_fast_shipping = false
-  assign calculated_discount_percent = 0
-  
-  assign variant_yellow = nil
-  assign variant_rose = nil
-  assign variant_white = nil
-  assign variant_platinum = nil
-  
-  assign current_collection_handle = collection.handle | default: ''
-  assign skip_first_instock = false
+    assign variant_yellow = null
+    assign variant_rose = null
+    assign variant_white = null
+    assign variant_platinum = null
 
-  # Instantly checks the page URL context without querying product collections
-  if current_collection_handle == '9kt-collection'
-    assign skip_first_instock = true
-  endif
+    assign current_collection_handle = collection.handle | default: ''
+    assign skip_first_instock = false
 
-  # --- THE SINGLE MASTER LOOP ---
-  for v in card_product.variants
-    assign v_title_down = v.title | downcase
-
-    # 1. First In-Stock Variant Logic (Preserves your 9kt exception)
-    if skip_first_instock == false and first_instock_variant == nil
-      if v.inventory_quantity > 0
-        assign first_instock_variant = v
-      endif
+    # Instantly checks the page URL context without querying product collections
+    if current_collection_handle == '9kt-collection'
+      assign skip_first_instock = true
     endif
 
-    # 2. Fast Shipping Logic (Preserves your exact availability rules)
-    if show_fast_shipping == false and v.available
-      if current_collection_handle == '9kt-collection'
-        if v_title_down contains '9kt' or v_title_down contains '9 kt'
+    # --- THE SINGLE MASTER LOOP ---
+    for v in card_product.variants
+      assign v_title_down = v.title | downcase
+
+      # 1. First In-Stock Variant Logic (Preserves your 9kt exception)
+      if skip_first_instock == false and first_instock_variant == null
+        if v.inventory_quantity > 0
+          assign first_instock_variant = v
+        endif
+      endif
+
+      # 2. Fast Shipping Logic (Preserves your exact availability rules)
+      if show_fast_shipping == false and v.available
+        if current_collection_handle == '9kt-collection'
+          if v_title_down contains '9kt' or v_title_down contains '9 kt'
+            if v.inventory_management == false or v.inventory_quantity > 0
+              assign show_fast_shipping = true
+            endif
+          endif
+        else
           if v.inventory_management == false or v.inventory_quantity > 0
             assign show_fast_shipping = true
           endif
         endif
-      else
-        if v.inventory_management == false or v.inventory_quantity > 0
-          assign show_fast_shipping = true
-        endif
       endif
-    endif
 
-    # 3. Discount Logic (Captures the first available discount)
-    if calculated_discount_percent == 0 and v.compare_at_price > v.price
-      assign calc_discount = v.compare_at_price | minus: v.price
-      assign calculated_discount_percent = calc_discount | times: 100.0 | divided_by: v.compare_at_price | round
-    endif
+      # 3. Discount Logic (Captures the first available discount)
+      if calculated_discount_percent == 0 and v.compare_at_price > v.price
+        assign calc_discount = v.compare_at_price | minus: v.price
+        assign calculated_discount_percent = calc_discount | times: 100.0 | divided_by: v.compare_at_price | round
+      endif
 
-    # 4. Pre-fetch Color Variants (Eliminates the downstream nested loop)
-    if variant_yellow == nil and v_title_down contains 'yellow gold'
-      assign variant_yellow = v
-    endif
-    if variant_rose == nil and v_title_down contains 'rose gold'
-      assign variant_rose = v
-    endif
-    if variant_white == nil and v_title_down contains 'white gold'
-      assign variant_white = v
-    endif
-    if variant_platinum == nil and v_title_down contains 'platinum'
-      assign variant_platinum = v
-    endif
-  endfor
--%}
+      # 4. Pre-fetch Color Variants (Eliminates the downstream nested loop)
+      if variant_yellow == null and v_title_down contains 'yellow gold'
+        assign variant_yellow = v
+      endif
+      if variant_rose == null and v_title_down contains 'rose gold'
+        assign variant_rose = v
+      endif
+      if variant_white == null and v_title_down contains 'white gold'
+        assign variant_white = v
+      endif
+      if variant_platinum == null and v_title_down contains 'platinum'
+        assign variant_platinum = v
+      endif
+    endfor
+  -%}
 
   {%- assign base_url = card_product.url | split: '?' | first -%}
   {%- assign final_product_url = base_url -%}
@@ -86,7 +85,7 @@
 
   {% assign target_variant = card_product.selected_or_first_available_variant %}
   {% if forced_variant %}
-    {% assign target_variant = forced_variant %} 
+    {% assign target_variant = forced_variant %}
   {% endif %}
 
   <div
@@ -113,14 +112,13 @@
         data-desktop-ratio="{{ section.settings.image_ratio }}"
       >
         {%- if card_product.featured_media -%}
-
           {%- assign primary_media = card_product.featured_media -%}
           {%- if first_instock_variant and first_instock_variant.featured_media -%}
             {%- assign primary_media = first_instock_variant.featured_media -%}
           {%- endif -%}
 
-          {%- assign secondary_media = nil -%}
-          {%- assign fallback_media = nil -%}
+          {%- assign secondary_media = null -%}
+          {%- assign fallback_media = null -%}
 
           {%- assign primary_alt_down = primary_media.alt | default: '' | downcase -%}
           {%- assign color_label = primary_alt_down | split: '-' | last | strip -%}
@@ -142,17 +140,17 @@
             {%- endif -%}
 
             {%- comment -%} Priority 2: Color match from primary image {%- endcomment -%}
-            {%- if secondary_media == nil and color_label != blank and current_alt contains color_label -%}
+            {%- if secondary_media == null and color_label != blank and current_alt contains color_label -%}
               {%- assign secondary_media = media -%}
             {%- endif -%}
 
             {%- comment -%} Priority 3: Save first valid fallback {%- endcomment -%}
-            {%- if fallback_media == nil -%}
+            {%- if fallback_media == null -%}
               {%- assign fallback_media = media -%}
             {%- endif -%}
           {%- endfor -%}
 
-          {%- if secondary_media == nil -%}
+          {%- if secondary_media == null -%}
             {%- assign secondary_media = fallback_media -%}
           {%- endif -%}
 
@@ -162,65 +160,70 @@
             aria-label="{{ card_product.title | escape }}"
             data-product-url="{{ card_product.url }}"
             data-product-id="{{ card_product.id }}"
-            data-product-sku= "{{ card_product.selected_or_first_available_variant.sku  }}"
+            data-product-sku="{{ card_product.selected_or_first_available_variant.sku  }}"
             data-variant-id="{% if first_instock_variant %}{{ first_instock_variant.id }}{% else %}{{ card_product.variants.first.id }}{% endif %}"
             data-thumbnail-image="{% if primary_media %}{{ primary_media | image_url: '300x' }}{% else %}{{ card_product.featured_image | img_url: '300x' }}{% endif %}"
           >
             <div class="card__media{% if image_shape and image_shape != 'default' %} shape--{{ image_shape }} color-{{ settings.card_color_scheme }} gradient{% endif %}">
               <div class="media media--transparent media--hover-effect">
-
-              {%- if primary_media -%}
-                {%- liquid
-                  assign primary_image_id = 'product-image-' | append: card_product.id
-                  assign primary_alt = card_product.title | append: ' - ' | append: primary_media.alt | escape
-                  assign sizes = '(min-width: 1200px) 267px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)'
-                -%}
-
-                {%- if lazy_load_image -%}
-                  {{ primary_media | image_url: width: 533 | image_tag: 
-                    id: primary_image_id,
-                    class: 'motion-reduce primary-image',
-                    loading: 'lazy',
-                    widths: '165, 360, 533, 720, 940',
-                    sizes: sizes,
-                    alt: primary_alt
-                  }}
-                {%- else -%}
-                  {{ primary_media | image_url: width: 533 | image_tag: 
-                    id: primary_image_id,
-                    class: 'motion-reduce primary-image',
-                    fetchpriority: 'high',
-                    widths: '165, 360, 533, 720, 940',
-                    sizes: sizes,
-                    alt: primary_alt
-                  }}
-                {%- endif -%}
-
-                {%- if show_secondary_image and secondary_media -%}
-                  {%- liquid 
-                    assign secondary_image_id = 'product-image-secondary-' | append: card_product.id
-                    assign secondary_alt = card_product.title | append: ' - ' | append: secondary_media.alt | escape 
+                {%- if primary_media -%}
+                  {%- liquid
+                    assign primary_image_id = 'product-image-' | append: card_product.id
+                    assign primary_alt = card_product.title | append: ' - ' | append: primary_media.alt | escape
+                    assign sizes = '(min-width: 1200px) 267px, (min-width: 990px) calc((100vw - 130px) / 4), (min-width: 750px) calc((100vw - 120px) / 3), calc((100vw - 35px) / 2)'
                   -%}
-                  {{ secondary_media | image_url: width: 533 | image_tag: 
-                    id: secondary_image_id,
-                    class: 'motion-reduce secondary-image',
-                    loading: 'lazy',
-                    widths: '165, 360, 533, 720, 940',
-                    sizes: sizes,
-                    alt: secondary_alt
-                  }}
-                {%- endif -%}
+
+                  {%- if lazy_load_image -%}
+                    {{
+                      primary_media
+                      | image_url: width: 533
+                      | image_tag:
+                        id: primary_image_id,
+                        class: 'motion-reduce primary-image',
+                        loading: 'lazy',
+                        widths: '165, 360, 533, 720, 940',
+                        sizes: sizes,
+                        alt: primary_alt
+                    }}
+                  {%- else -%}
+                    {{
+                      primary_media
+                      | image_url: width: 533
+                      | image_tag:
+                        id: primary_image_id,
+                        class: 'motion-reduce primary-image',
+                        fetchpriority: 'high',
+                        widths: '165, 360, 533, 720, 940',
+                        sizes: sizes,
+                        alt: primary_alt
+                    }}
+                  {%- endif -%}
+
+                  {%- if show_secondary_image and secondary_media -%}
+                    {%- liquid
+                      assign secondary_image_id = 'product-image-secondary-' | append: card_product.id
+                      assign secondary_alt = card_product.title | append: ' - ' | append: secondary_media.alt | escape
+                    -%}
+                    {{
+                      secondary_media
+                      | image_url: width: 533
+                      | image_tag:
+                        id: secondary_image_id,
+                        class: 'motion-reduce secondary-image',
+                        loading: 'lazy',
+                        widths: '165, 360, 533, 720, 940',
+                        sizes: sizes,
+                        alt: secondary_alt
+                    }}
+                  {%- endif -%}
 
                 {%- else -%}
                   {{ 'product-apparel-2' | placeholder_svg_tag: 'placeholder-svg' }}
                 {%- endif -%}
-
               </div>
             </div>
           </a>
         {%- endif -%}
-
-
 
         <div class="card__content">
           <div class="card__information">
@@ -260,29 +263,37 @@
           </div>
         </div>
       </div>
-      
+
       <div class="card-content-wrapper">
         <div class="color-variants-options">
           {% assign color_mapping = 'Yellow Gold,Rose Gold,White Gold,Platinum' | split: ',' %}
           {% assign active_assigned = false %}
 
           {% for color in color_mapping %}
-            {% assign variant_for_color = nil %}
-            
+            {% assign variant_for_color = null %}
+
             {% case color %}
-              {% when 'Yellow Gold' %}{% assign variant_for_color = variant_yellow %}
-              {% when 'Rose Gold' %}{% assign variant_for_color = variant_rose %}
-              {% when 'White Gold' %}{% assign variant_for_color = variant_white %}
-              {% when 'Platinum' %}{% assign variant_for_color = variant_platinum %}
+              {% when 'Yellow Gold' -%}
+                {%- assign variant_for_color = variant_yellow %}
+              {% when 'Rose Gold' -%}
+                {%- assign variant_for_color = variant_rose %}
+              {% when 'White Gold' -%}
+                {%- assign variant_for_color = variant_white %}
+              {% when 'Platinum' -%}
+                {%- assign variant_for_color = variant_platinum %}
             {% endcase %}
 
             {% if variant_for_color %}
               {% assign color_icon = '' %}
               {% case color %}
-                {% when 'Yellow Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
-                {% when 'Rose Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
-                {% when 'White Gold' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
-                {% when 'Platinum' %}{% assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Platinum.svg?v=1752822068' %}
+                {% when 'Yellow Gold' -%}
+                  {%- assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Yellow_Gold.svg?v=1752822068' %}
+                {% when 'Rose Gold' -%}
+                  {%- assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Rose_Gold.svg?v=1752822068' %}
+                {% when 'White Gold' -%}
+                  {%- assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/White_Gold.svg?v=1752822068' %}
+                {% when 'Platinum' -%}
+                  {%- assign color_icon = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Platinum.svg?v=1752822068' %}
               {% endcase %}
 
               <button
@@ -300,7 +311,14 @@
                 title="{{ color }}"
               >
                 {% if color_icon != '' %}
-                  <img src="{{ color_icon }}" alt="{{ color }}" width="20" height="20" title="{{ color }}" loading="lazy">
+                  <img
+                    src="{{ color_icon }}"
+                    alt="{{ color }}"
+                    width="20"
+                    height="20"
+                    title="{{ color }}"
+                    loading="lazy"
+                  >
                 {% else %}
                   <span class="color-swatch color-{{ color | handleize }}"></span>
                 {% endif %}
@@ -363,7 +381,15 @@
 
                 {% for tag_icon in card_product.metafields.custom.product_card_tags.value %}
                   {% if tag_icon.product_tags_enable and tag_icon.product_tags_image %}
-                    <img src="{{ tag_icon.product_tags_image | img_url: '16x16' }}" class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}" width="16" height="16" style="width:16px;height:16px;object-fit:contain;" alt="{{ tag_icon.product_tags_label | escape }}" loading="lazy">
+                    <img
+                      src="{{ tag_icon.product_tags_image | img_url: '16x16' }}"
+                      class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                      width="16"
+                      height="16"
+                      style="width:16px;height:16px;object-fit:contain;"
+                      alt="{{ tag_icon.product_tags_label | escape }}"
+                      loading="lazy"
+                    >
                     {% if primary_card_label == blank %}
                       {% assign primary_card_label = tag_icon.product_tags_label %}
                     {% endif %}
@@ -373,7 +399,15 @@
                 {% endfor %}
 
                 {% if show_fast_shipping %}
-                  <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539" class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}" width="16" height="16" style="width:16px;height:16px;object-fit:contain;" alt="Fast Shipping" loading="lazy">
+                  <img
+                    src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Fast_Box.svg?v=1752218539"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Fast Shipping"
+                    loading="lazy"
+                  >
                   {% if primary_card_label == blank %}
                     {% assign primary_card_label = 'Fast Shipping' %}
                   {% endif %}
@@ -382,7 +416,15 @@
                 {% endif %}
 
                 {% if card_product.tags contains 'Engraving Available' %}
-                  <img src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108" class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}" width="16" height="16" style="width:16px;height:16px;object-fit:contain;" alt="Engraving" loading="lazy">
+                  <img
+                    src="https://www.lucirajewelry.com/cdn/shop/files/draw_1_50x.png?v=1751278108"
+                    class="icon tag-icon-{{ icon_index }}{% if first_tag %} active{% endif %}"
+                    width="16"
+                    height="16"
+                    style="width:16px;height:16px;object-fit:contain;"
+                    alt="Engraving"
+                    loading="lazy"
+                  >
                   {% if primary_card_label == blank %}
                     {% assign primary_card_label = 'Engraving' %}
                   {% endif %}
@@ -420,28 +462,27 @@
           </div>
         {% endif %}
 
-       {% if card_product.metafields.custom.matching_product != blank %}
-        <button 
-          type="button" 
-          class="view-similar-btn first-load" 
-          data-product-handle="{{ card_product.handle }}"
-          data-product-title="{{ card_product.title | escape }}"
-          aria-label="View similar items for {{ card_product.title }}"
-        >
-          <span class="view-similar-btn__text">View Similar</span>
-          <span class="view-similar-btn__icon">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <mask id="mask0_13509_13149" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
-                <rect width="24" height="24" fill="#D9D9D9"/>
-              </mask>
-              <g mask="url(#mask0_13509_13149)">
-                <path d="M7.50084 19.5V4.5H16.5008V19.5H7.50084ZM3.80859 17.5V6.5H5.30859V17.5H3.80859ZM18.6931 17.5V6.5H20.1931V17.5H18.6931ZM9.00084 18H15.0008V6H9.00084V18Z" fill="#333333"/>
-              </g>
-            </svg>
-          </span>
-        </button>
+        {% if card_product.metafields.custom.matching_product != blank %}
+          <button
+            type="button"
+            class="view-similar-btn first-load"
+            data-product-handle="{{ card_product.handle }}"
+            data-product-title="{{ card_product.title | escape }}"
+            aria-label="View similar items for {{ card_product.title }}"
+          >
+            <span class="view-similar-btn__text">View Similar</span>
+            <span class="view-similar-btn__icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <mask id="mask0_13509_13149" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+                  <rect width="24" height="24" fill="#D9D9D9"/>
+                </mask>
+                <g mask="url(#mask0_13509_13149)">
+                  <path d="M7.50084 19.5V4.5H16.5008V19.5H7.50084ZM3.80859 17.5V6.5H5.30859V17.5H3.80859ZM18.6931 17.5V6.5H20.1931V17.5H18.6931ZM9.00084 18H15.0008V6H9.00084V18Z" fill="#333333"/>
+                </g>
+              </svg>
+            </span>
+          </button>
         {% endif %}
-        
 
         <div class="card__information">
           <h3
@@ -474,7 +515,7 @@
               <span class="visually-hidden">{{ 'accessibility.vendor' | t }}</span>
               <div class="caption-with-letter-spacing light">{{ card_product.vendor }}</div>
             {%- endif -%}
-            
+
             {% render 'price',
               product: card_product,
               use_variant: true,
@@ -505,8 +546,7 @@
               {% endif %}
             </div>
           </div>
-
-        </div>  
+        </div>
 
         <div class="card__badge {{ settings.badge_position }}">
           {%- if card_product.available == false -%}
