@@ -161,35 +161,6 @@ if (!customElements.get('product-info')) {
         }
       }
 
-      updateTryAtHome(variant, html) {
-        try {
-          const container = this.querySelector(`#TryAtHome-${this.dataset.section}`);
-          if (!container) return;
-
-          // Always hide if variant is missing, unavailable, or inventory is 0 or less
-          if (!variant || !variant.available || !(variant.inventory_quantity > 0)) {
-            container.classList.add('hidden');
-            return;
-          }
-
-          // Use server-rendered HTML to respect the in_store_available metafield check
-          if (html) {
-            const sourceContainer =
-              html.querySelector(`#TryAtHome-${this.sectionId}`) ||
-              html.querySelector(`[id^="TryAtHome-"]`);
-            if (sourceContainer) {
-              container.classList.toggle('hidden', sourceContainer.classList.contains('hidden'));
-              return;
-            }
-          }
-
-          // Fallback: show if variant passed the stock check above
-          container.classList.remove('hidden');
-        } catch (e) {
-          console.error('updateTryAtHome error', e);
-        }
-      }
-
       handleUpdateProductInfo(productUrl) {
         return (html) => {
           const variant = this.getSelectedVariant(html);
@@ -204,7 +175,6 @@ if (!customElements.get('product-info')) {
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
           this.updateDeliveryWidget(variant);
-          this.updateTryAtHome(variant, html);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);
