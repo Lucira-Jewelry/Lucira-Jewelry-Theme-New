@@ -161,6 +161,21 @@ if (!customElements.get('product-info')) {
         }
       }
 
+      updateTryAtHome(html) {
+        try {
+          const dest = this.querySelector(`#TryAtHome-${this.dataset.section}`);
+          if (!dest) return;
+
+          const source = html.getElementById(`TryAtHome-${this.sectionId}`) 
+            || html.querySelector('[id^="TryAtHome-"]');
+          if (!source) return;
+
+          dest.classList.toggle('hidden', source.classList.contains('hidden'));
+        } catch (e) {
+          console.error('updateTryAtHome error', e);
+        }
+      }
+
       handleUpdateProductInfo(productUrl) {
         return (html) => {
           const variant = this.getSelectedVariant(html);
@@ -175,6 +190,7 @@ if (!customElements.get('product-info')) {
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
           this.updateDeliveryWidget(variant);
+          this.updateTryAtHome(html);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);
@@ -466,16 +482,11 @@ if (!customElements.get('product-info')) {
           const dateSpan = container.querySelector('.lucira-delivery-time .delivry_txt');
           if (dateSpan) dateSpan.textContent = data.date;
 
-          // Update the label text (in-stock vs out-of-stock messaging)
-          const timeSpan = container.querySelector('.lucira-delivery-time');
-          if (timeSpan) {
-            const isInStock = data.available && data.inventory > 0;
-            const label = isInStock ? 'Estimated Free Dispatch by ' : 'Available & Dispatched by ';
-            // Replace only the text node, keep the dateSpan intact
-            timeSpan.childNodes.forEach((node) => {
-              if (node.nodeType === Node.TEXT_NODE) node.remove();
-            });
-            timeSpan.insertBefore(document.createTextNode(label), timeSpan.firstChild);
+          const statusText = container.querySelector('#delivery-status-text');
+          if (statusText) {
+            statusText.textContent = data.days === 2
+              ? 'Estimated Free Dispatch by'
+              : 'Available & Dispatched by';
           }
 
         } catch (e) {
@@ -516,7 +527,6 @@ if (!customElements.get('product-info')) {
           stickyImg.srcset = sourceImg.srcset || sourceImg.src;
         }
       }
-
 
       setQuantityBoundries() {
         const data = {
