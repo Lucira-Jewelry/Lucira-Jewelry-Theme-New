@@ -161,6 +161,24 @@ if (!customElements.get('product-info')) {
         }
       }
 
+      updateTryAtHome(variant) {
+        try {
+          if (!variant) return;
+
+          const container = this.querySelector(`#TryAtHome-${this.dataset.section}`);
+          if (!container) return;
+
+          const showTryAtHome =
+            variant.available &&
+            variant.inventory_quantity > 0 &&
+            variant.in_store_available;
+
+          container.classList.toggle('hidden', !showTryAtHome);
+        } catch (e) {
+          console.error('updateTryAtHome error', e);
+        }
+      }
+
       handleUpdateProductInfo(productUrl) {
         return (html) => {
           const variant = this.getSelectedVariant(html);
@@ -175,6 +193,7 @@ if (!customElements.get('product-info')) {
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
           this.updateDeliveryWidget(variant);
+          this.updateTryAtHome(variant);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);
@@ -516,7 +535,6 @@ if (!customElements.get('product-info')) {
           stickyImg.srcset = sourceImg.srcset || sourceImg.src;
         }
       }
-
 
       setQuantityBoundries() {
         const data = {
