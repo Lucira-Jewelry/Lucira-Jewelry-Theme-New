@@ -161,19 +161,16 @@ if (!customElements.get('product-info')) {
         }
       }
 
-      updateTryAtHome(variant) {
+      updateTryAtHome(html) {
         try {
-          if (!variant) return;
+          const source = html.querySelector(`#TryAtHome-${this.sectionId}`);
+          const destination = this.querySelector(`#TryAtHome-${this.dataset.section}`);
 
-          const container = this.querySelector(`#TryAtHome-${this.dataset.section}`);
-          if (!container) return;
+          if (!source || !destination) return;
 
-          const showTryAtHome =
-            variant.available &&
-            variant.inventory_quantity > 0 &&
-            variant.in_store_available;
+          // Copy visibility state from fresh HTML
+          destination.classList.toggle('hidden', source.classList.contains('hidden'));
 
-          container.classList.toggle('hidden', !showTryAtHome);
         } catch (e) {
           console.error('updateTryAtHome error', e);
         }
