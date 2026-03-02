@@ -485,16 +485,11 @@ if (!customElements.get('product-info')) {
           const dateSpan = container.querySelector('.lucira-delivery-time .delivry_txt');
           if (dateSpan) dateSpan.textContent = data.date;
 
-          // Update the label text (in-stock vs out-of-stock messaging)
-          const timeSpan = container.querySelector('.lucira-delivery-time');
-          if (timeSpan) {
-            const isInStock = data.available && data.inventory > 0;
-            const label = isInStock ? 'Estimated Free Dispatch by ' : 'Available & Dispatched by ';
-            // Replace only the text node, keep the dateSpan intact
-            timeSpan.childNodes.forEach((node) => {
-              if (node.nodeType === Node.TEXT_NODE) node.remove();
-            });
-            timeSpan.insertBefore(document.createTextNode(label), timeSpan.firstChild);
+          const statusText = container.querySelector('#delivery-status-text');
+          if (statusText) {
+            statusText.textContent = data.days === 2
+              ? 'Estimated Free Dispatch by'
+              : 'Available & Dispatched by';
           }
 
         } catch (e) {
