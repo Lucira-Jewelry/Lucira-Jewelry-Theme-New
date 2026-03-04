@@ -598,6 +598,7 @@ function closeTimelineDrawer() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+
   const meta = document.querySelector('.order-status-meta');
   if (!meta) return;
 
@@ -610,34 +611,40 @@ document.addEventListener('DOMContentLoaded', function () {
 
   const marketplaceOrderId = meta.dataset.marketplaceOrderId;
   const marketplaceItemId  = meta.dataset.marketplaceItemId;
-  
+
   const labelSpan = meta.querySelector('.order-status-label-js');
   const chip = meta.querySelector('.order-status-chip');
+  const invoiceBtn = document.getElementById('downloadInvoiceBtn');
 
   if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
 
   const STATUS_STYLES = {
-    1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
+    1: { label: 'Order Confirmed', className: 'status-chip--confirmed' },
     2: { label: 'Processing', className: 'status-chip--processing' },
-    3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
-    13:{ label: 'Quality Control',  className: 'status-chip--qc' },
-    4: { label: 'Certification',    className: 'status-chip--certification' },
-    5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
-    6: { label: 'In Transit',       className: 'status-chip--in-transit' }
+    3: { label: 'Manufacturing', className: 'status-chip--manufacturing' },
+    13:{ label: 'Quality Control', className: 'status-chip--qc' },
+    4: { label: 'Certification', className: 'status-chip--certification' },
+    5: { label: 'Dispatch', className: 'status-chip--dispatch' },
+    6: { label: 'In Transit', className: 'status-chip--in-transit' }
   };
 
   labelSpan.textContent = 'Fetching live status…';
 
   fetch('https://order-fullfillment-status-385594025448.asia-south1.run.app', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json'
+    },
     body: JSON.stringify({
       marketplace_order_id: Number(marketplaceOrderId),
       marketplace_item_id: Number(marketplaceItemId)
     })
   })
-  .then(function(r) { return r.json(); })
+  .then(function(res) {
+    return res.json();
+  })
   .then(function(data) {
+
     console.log('Ornaverse Live Status (order page):', data);
 
     if (!data || !data.success || !data.data || !data.data.Entities || !data.data.Entities.length) {
@@ -648,6 +655,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const entity = data.data.Entities[0];
     const statusId = Number(entity.status_id);
     const documentNo = entity.document_no;
+
+    /* -------- STATUS UPDATE -------- */
 
     const info = STATUS_STYLES[statusId];
 
@@ -666,23 +675,31 @@ document.addEventListener('DOMContentLoaded', function () {
       labelSpan.textContent = info.label;
     }
 
-    /* ---------------- PDF API CALL ---------------- */
-
-    const invoiceBtn = document.getElementById('downloadInvoiceBtn');
+    /* -------- INVOICE BUTTON -------- */
 
     if (documentNo && invoiceBtn) {
+
       invoiceBtn.style.display = 'inline-flex';
 
       invoiceBtn.onclick = function () {
-        const url = "https://lucira.live.ornaverse.in/Services/POS/Invoice/GeneratePDF?document_no=" + documentNo;
-        window.open(url, "_blank");
+
+        const invoiceURL =
+          "https://lucira.live.ornaverse.in/Services/POS/Invoice/GeneratePDF?document_no=" +
+          documentNo;
+
+        window.open(invoiceURL, "_blank");
+
       };
     }
+
   })
   .catch(function(err) {
+
     console.error('Ornaverse error (order page)', err);
     labelSpan.textContent = 'Status unavailable';
+
   });
+
 });
 </script>
 
