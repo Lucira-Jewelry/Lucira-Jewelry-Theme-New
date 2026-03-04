@@ -636,30 +636,52 @@ document.addEventListener('DOMContentLoaded', function () {
   .then(function(data) {
     console.log('Ornaverse Live Status (order page):', data);
 
-    if (!data || !data.success || !data.data || data.data.Error) {
+    if (!data || !data.success || !data.data || !data.data.Entities || !data.data.Entities.length) {
       labelSpan.textContent = 'Status unavailable';
       return;
     }
 
-    const statusId = Number(data.data.order_status_id);
+    const entity = data.data.Entities[0];
+    const statusId = Number(entity.status_id);
+    const documentNo = entity.document_no;
+
     const info = STATUS_STYLES[statusId];
 
-    if (!info) {
-      labelSpan.textContent = 'Unknown Status';
-      return;
+    if (info) {
+      chip.classList.remove(
+        'status-chip--confirmed',
+        'status-chip--processing',
+        'status-chip--manufacturing',
+        'status-chip--qc',
+        'status-chip--certification',
+        'status-chip--dispatch',
+        'status-chip--in-transit'
+      );
+
+      chip.classList.add(info.className);
+      labelSpan.textContent = info.label;
     }
 
-    chip.classList.remove(
-      'status-chip--confirmed',
-      'status-chip--processing',
-      'status-chip--manufacturing',
-      'status-chip--qc',
-      'status-chip--certification',
-      'status-chip--dispatch',
-      'status-chip--in-transit'
-    );
-    chip.classList.add(info.className);
-    labelSpan.textContent = info.label;
+    /* ---------------- PDF API CALL ---------------- */
+
+    if (documentNo) {
+      fetch('https://lucira.live.ornaverse.in/Services/POS/Invoice/GeneratePDF', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          document_no: documentNo
+        })
+      })
+      .then(res => res.json())
+      .then(pdfData => {
+        console.log('Invoice PDF Response:', pdfData);
+      })
+      .catch(err => {
+        console.error('PDF API Error:', err);
+      });
+    }
   })
   .catch(function(err) {
     console.error('Ornaverse error (order page)', err);
