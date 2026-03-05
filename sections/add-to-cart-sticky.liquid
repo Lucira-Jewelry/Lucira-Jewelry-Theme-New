@@ -6,6 +6,29 @@
     assign img_size = section.settings.img_width | append: 'x' | append: section.settings.img_height
   %}
 
+  {% comment %}
+    ── Scheme price calculation (same logic as scheme-button.liquid) ──
+    product.price is in paise → divide by 100 → rupees
+    CEIL to next ₹500 (monthly × 10 must always >= product price)
+    scheme_price = price_rupees - monthly
+    Multiply × 100 before money_without_currency to avoid double-division
+  {% endcomment %}
+  {% assign _sticky_raw_price   = current_variant.price %}
+  {% assign _sticky_price_rupees = _sticky_raw_price | divided_by: 100 %}
+  {% assign _sticky_raw_monthly  = _sticky_price_rupees | divided_by: 10 %}
+  {% assign _sticky_remainder    = _sticky_raw_monthly  | modulo: 500 %}
+  {% if _sticky_remainder == 0 %}
+    {% assign _sticky_monthly = _sticky_raw_monthly %}
+  {% else %}
+    {% assign _sticky_monthly = _sticky_raw_monthly | minus: _sticky_remainder | plus: 500 %}
+  {% endif %}
+  {% assign _sticky_scheme_price       = _sticky_price_rupees | minus: _sticky_monthly %}
+  {% assign _sticky_scheme_price_paise = _sticky_scheme_price | times: 100 %}
+
+  {% unless scheme_url %}
+    {% assign scheme_url = '/pages/scheme' %}
+  {% endunless %}
+
   <style>
     #md-sticky-atc{
       position:fixed;
@@ -48,6 +71,40 @@
     #md-sticky-atc .try-at-home-button:hover::after, #md-sticky-atc .try-at-home-button:hover::before,#md-sticky-atc .visit-store-home-button:hover::after, #md-sticky-atc .visit-store-home-button:hover::before{opacity:1}
     #md-sticky-atc .visit-store-home-button svg {display: block;}
 
+    /* ── Sticky Scheme Button overrides ─────────────────────────────── */
+    /* Reset the full-width block style from scheme-button.liquid        */
+    #md-sticky-atc .scheme-btn-wrapper {
+      margin-top: 0;
+      width: auto;
+      flex-shrink: 0;
+    }
+
+    #md-sticky-atc .scheme-btn {
+      width: auto;
+      white-space: nowrap;
+      padding: 10px 18px;
+      font-size: 11px;
+    }
+
+    /* product-form action row: scheme btn + atc + icons in one flex row */
+    #md-sticky-atc product-form.product-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+
+    #md-sticky-atc .product-form__error-message-wrapper {
+      display: none; /* hide error wrapper in sticky — doesn't fit */
+    }
+
+    #md-sticky-atc .product-form form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 0;
+    }
+
     @media(max-width:749px){
       #md-sticky-atc{
         display:none !important;
@@ -70,7 +127,6 @@
       
       const updateThreshold = () => {
         const offset = Number(stickyATC.dataset.offset) || 0;
-        
         if (mainAtcBtn) {
           const rect = mainAtcBtn.getBoundingClientRect();
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
@@ -102,21 +158,18 @@
         observer.observe(stickyATC, { attributes: true, attributeFilter: ['data-offset'] });
       }
 
-      // Sync variant selection from main form to sticky form
+      // ── Variant sync (existing logic) ─────────────────────────────────
       const mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
       if (mainForm && stickyForm) {
         const mainVariantInput = mainForm.querySelector('input[name="id"], select[name="id"]');
         const stickyVariantInput = stickyForm.querySelector('input[name="id"]');
         
         if (mainVariantInput && stickyVariantInput) {
-          // Listen for changes on main form
           mainForm.addEventListener('change', (e) => {
             if (e.target.name === 'id') {
               stickyVariantInput.value = e.target.value;
             }
           });
-          
-          // Listen for variant:change event (Shopify theme specific)
           document.addEventListener('variant:change', (e) => {
             if (e.detail?.variant?.id) {
               stickyVariantInput.value = e.detail.variant.id;
@@ -150,6 +203,60 @@
           attributes: true,
           characterData: true,
         });
+      }
+
+      // ── Scheme button: dynamic price update on variant change ──────────
+      // Recalculates the scheme price in JS using the same logic as Liquid:
+      //   1. price (paise) / 100 → rupees
+      //   2. ceil to next ₹500 → monthly
+      //   3. scheme_price = price_rupees - monthly
+      //
+      // Fires on: variant:change (custom themes) + variant:changed (Dawn etc.)
+      // Also hooks into the existing mainForm 'change' listener.
+
+      function calcSchemePrice(variantPricePaise) {
+        const priceRupees  = Math.floor(variantPricePaise / 100);
+        const rawMonthly   = Math.floor(priceRupees / 10);
+        const remainder    = rawMonthly % 500;
+        const monthly      = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+        const schemePrice  = priceRupees - monthly;
+        return schemePrice;
+      }
+
+      function formatINR(amount) {
+        return amount.toLocaleString('en-IN');
+      }
+
+      function updateStickySchemeBtn(variantPricePaise) {
+        const schemePrice = calcSchemePrice(variantPricePaise);
+        const stickySchemePrice = stickyATC.querySelector('.sticky-scheme-price');
+        if (stickySchemePrice) {
+          stickySchemePrice.textContent = '₹' + formatINR(schemePrice);
+        }
+      }
+
+      // Listen for variant changes via custom events
+      document.addEventListener('variant:change', (e) => {
+        const price = e.detail?.variant?.price;
+        if (price !== undefined) updateStickySchemeBtn(price);
+      });
+
+      // Dawn / Debut style event
+      document.addEventListener('variant:changed', (e) => {
+        const price = e.detail?.variant?.price;
+        if (price !== undefined) updateStickySchemeBtn(price);
+      });
+
+      // Fallback: watch the main scheme button (scheme-button.liquid on PDP)
+      // If the PDP scheme button updates, mirror its text into sticky
+      const pdpSchemePriceEl = document.querySelector('.scheme-btn .scheme-btn__text strong');
+      if (pdpSchemePriceEl) {
+        new MutationObserver(() => {
+          const stickySchemePrice = stickyATC.querySelector('.sticky-scheme-price');
+          if (stickySchemePrice) {
+            stickySchemePrice.textContent = pdpSchemePriceEl.textContent;
+          }
+        }).observe(pdpSchemePriceEl, { childList: true, characterData: true, subtree: true });
       }
     });
   </script>
@@ -189,6 +296,7 @@
             </svg>
             <span class="product-form__error-message"></span>
           </div>
+
           {%- form 'product',
             product,
             id: product_form_id,
@@ -290,7 +398,6 @@
             <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
             <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
             <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
-
             <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="{{ val_gold_rate }}">
             <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
             <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
@@ -301,22 +408,42 @@
             <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs" value="{{ diamond_pcs }}">
 
             <input
-            type="hidden"
-            name="id"
-            value="{{ product.selected_or_first_available_variant.id }}"
-            {% if product.selected_or_first_available_variant.available == false
-                or quantity_rule_soldout
-                or product.selected_or_first_available_variant == null
-            %}
+              type="hidden"
+              name="id"
+              value="{{ product.selected_or_first_available_variant.id }}"
+              {% if product.selected_or_first_available_variant.available == false
+                  or quantity_rule_soldout
+                  or product.selected_or_first_available_variant == null
+              %}
                 disabled
-            {% endif %}
-            
+              {% endif %}
             >
+
+            {% comment %} ── SCHEME BUTTON (inline in sticky bar) ── {% endcomment %}
+            {% if _sticky_price_rupees > 0 %}
+              <div class="scheme-btn-wrapper">
+                <a href="{{ scheme_url }}" class="scheme-btn">
+                  <span class="scheme-btn__text">
+                    BUY AT
+                    <strong class="sticky-scheme-price">
+                      &#8377;{{ _sticky_scheme_price_paise | money_without_currency | replace: '.00', '' }}
+                    </strong>
+                    WITH SCHEME
+                  </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" stroke-width="2.5"
+                       aria-hidden="true">
+                    <polyline points="9 18 15 12 9 6"/>
+                  </svg>
+                </a>
+              </div>
+            {% endif %}
+
             <button
               type="submit"
               name="add"
               class="product-form__submit button button--{{ section.settings.btn_style }} product-variant-id"
-              {% unless current_variant.available %}disabled{% endunless %} 
+              {% unless current_variant.available %}disabled{% endunless %}
             >
               <span>
                 {% if current_variant.available %}
@@ -332,7 +459,7 @@
               </div>
             </button>
           {% endform %}
-          
+
           {% assign has_instock_variant = false %}
           {% for v in product.variants %}
             {% if v.inventory_management and v.inventory_quantity > 0 %}
