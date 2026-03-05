@@ -169,12 +169,12 @@
 
 
            
-           <a
+           {% comment %} <a
             href="{{ scheme_url }}"
             class="lucira-mobile-scheme-btn"
           >
             BUY WITH SCHEME
-          </a> 
+          </a>  {% endcomment %}
 
           <button
             id="ProductSubmitButton-{{ section_id }}"
@@ -511,59 +511,63 @@
 
   /* ── Build the sticky bar by CLONING the real button row ── */
   function buildBar() {
-    var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
-    if (!originalButtons) return null;
+  var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+  if (!originalButtons) return null;
 
-    var bar = document.createElement('div');
-    bar.id = 'lucira-sticky-bar';
-    bar.setAttribute('aria-hidden', 'true');
+  var bar = document.createElement('div');
+  bar.id = 'lucira-sticky-bar';
+  bar.setAttribute('aria-hidden', 'true');
 
-    /* Deep-clone the entire buttons row */
-    var cloned = originalButtons.cloneNode(true);
+  /* Deep-clone the entire buttons row */
+  var cloned = originalButtons.cloneNode(true);
 
-    /* Reset scheme button to plain label — strip any price injected earlier */
-    var stickySchemeBtn = cloned.querySelector('.lucira-mobile-scheme-btn');
-    if (stickySchemeBtn) {
-      stickySchemeBtn.textContent = 'BUY WITH SCHEME';
-    }
+  /* Remove any accidentally cloned scheme buttons (safety net) */
+  var existingScheme = cloned.querySelector('.lucira-mobile-scheme-btn');
+  if (existingScheme) existingScheme.remove();
 
-    /* Wire ATC clone → original submit (fires GTM handler on original form) */
-    var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
-    if (clonedSubmit) {
-      clonedSubmit.id = 'lucira-sticky-atc-btn';
-      clonedSubmit.addEventListener('click', function (e) {
-        e.preventDefault();
-        var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
-        if (origBtn && !origBtn.disabled) origBtn.click();
-      });
-    }
-
-    /* ── Manually build & prepend WhatsApp icon (not part of cloned buttons) ── */
-    var waLink = document.createElement('a');
-    waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
-    waLink.target = '_blank';
-    waLink.rel = 'noopener noreferrer';
-    waLink.className = 'lucira-sticky-wa-btn chat-with-experts-mobile';
-    waLink.setAttribute('aria-label', 'Chat on WhatsApp');
-    waLink.style.cssText = 'padding:0!important;border:0!important;';
-
-    var waImg = document.createElement('img');
-    waImg.src = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022';
-    waImg.width = 46;
-    waImg.height = 46;
-    waImg.alt = 'whatsapp icon';
-    waImg.title = 'whatsapp';
-    waImg.className = 'chat-with-experts';
-
-    waLink.appendChild(waImg);
-
-    /* Prepend WA icon as first child of the cloned buttons row */
-    cloned.insertBefore(waLink, cloned.firstChild);
-
-    bar.appendChild(cloned);
-    document.body.appendChild(bar);
-    return bar;
+  /* Wire ATC clone → original submit */
+  var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
+  if (clonedSubmit) {
+    clonedSubmit.id = 'lucira-sticky-atc-btn';
+    clonedSubmit.addEventListener('click', function (e) {
+      e.preventDefault();
+      var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+      if (origBtn && !origBtn.disabled) origBtn.click();
+    });
   }
+
+  /* ── Build WhatsApp icon ── */
+  var waLink = document.createElement('a');
+  waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
+  waLink.target = '_blank';
+  waLink.rel = 'noopener noreferrer';
+  waLink.className = 'lucira-sticky-wa-btn chat-with-experts-mobile';
+  waLink.setAttribute('aria-label', 'Chat on WhatsApp');
+  waLink.style.cssText = 'padding:0!important;border:0!important;';
+
+  var waImg = document.createElement('img');
+  waImg.src = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022';
+  waImg.width = 46;
+  waImg.height = 46;
+  waImg.alt = 'whatsapp icon';
+  waImg.title = 'whatsapp';
+  waImg.className = 'chat-with-experts';
+  waLink.appendChild(waImg);
+
+  /* ── Build Scheme button (sticky-only) ── */
+  var schemeBtn = document.createElement('a');
+  schemeBtn.href = '{{ scheme_url }}';
+  schemeBtn.className = 'lucira-mobile-scheme-btn';
+  schemeBtn.textContent = 'BUY WITH SCHEME';
+
+  /* Order: [WA icon] [SCHEME btn] [ATC btn] */
+  cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
+  cloned.insertBefore(waLink, cloned.firstChild);    // WA before scheme
+
+  bar.appendChild(cloned);
+  document.body.appendChild(bar);
+  return bar;
+}
 
   /* ── Sync disabled state + button text from original → clone ── */
   function syncATC() {
