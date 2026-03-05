@@ -11,6 +11,37 @@
         assign show_dynamic_checkout = true
       endif
     -%}
+
+    {% comment %}
+      ── Scheme price calculation ──────────────────────────────────────
+      Same logic as scheme-button.liquid and sticky-atc.liquid.
+      current_variant.price is in paise → ÷ 100 → rupees
+      CEIL to next ₹500 so monthly × 10 always >= product price
+      Multiply × 100 before money_without_currency (avoid double-division)
+    {% endcomment %}
+    {% assign _bb_raw_price       = product.selected_or_first_available_variant.price %}
+    {% assign _bb_price_rupees    = _bb_raw_price  | divided_by: 100 %}
+    {% assign _bb_raw_monthly     = _bb_price_rupees | divided_by: 10 %}
+    {% assign _bb_remainder       = _bb_raw_monthly  | modulo: 500 %}
+    {% if _bb_remainder == 0 %}
+      {% assign _bb_monthly = _bb_raw_monthly %}
+    {% else %}
+      {% assign _bb_monthly = _bb_raw_monthly | minus: _bb_remainder | plus: 500 %}
+    {% endif %}
+    {% assign _bb_scheme_price       = _bb_price_rupees | minus: _bb_monthly %}
+    {% assign _bb_scheme_price_paise = _bb_scheme_price | times: 100 %}
+
+    {% comment %} Variant prices JSON map for JS recalc on variant switch {% endcomment %}
+    {% capture _bb_variant_prices_json %}{
+      {% for v in product.variants %}
+        "{{ v.id }}": {{ v.price }}{% unless forloop.last %},{% endunless %}
+      {% endfor %}
+    }{% endcapture %}
+
+    {% unless scheme_url %}
+      {% assign scheme_url = 'https://schemes.lucirajewelry.com/' %}
+    {% endunless %}
+
 {% unless product.tags contains 'hide_ATC' %}
     <product-form
       class="product-form"
@@ -162,6 +193,40 @@
             endif
           -%}
 
+          {% comment %}
+            ── Mobile Scheme Button ───────────────────────────────────────
+            Placed BEFORE the ATC button inside .product-form__buttons.
+            Uses lucira-* classes (same as scheme-button.liquid) so all
+            shared CSS + JS variant-update logic applies automatically.
+            The BB (buy-buttons) wrapper carries the variant prices map
+            and data-scheme-wrapper so the existing __luciraSchemeInit
+            JS in scheme-button.liquid updates this price on variant switch.
+          {% endcomment %}
+          {% if _bb_price_rupees > 0 %}
+            <div
+              class="lucira-scheme-wrapper lucira-scheme-wrapper--mobile-bb"
+              data-scheme-wrapper
+              data-variant-prices='{{ _bb_variant_prices_json }}'
+              data-scheme-url="{{ scheme_url }}"
+            >
+              <a
+                href="{{ scheme_url }}"
+                class="lucira-scheme-btn lucira-scheme-btn--mobile"
+                data-scheme-link
+              >
+                <span class="lucira-scheme-btn__text">
+                  BUY WITH SCHEME
+                </span>
+                <span class="lucira-scheme-btn__price-line">
+                  &#8377;<span
+                    class="lucira-scheme-btn__price"
+                    data-scheme-price
+                  >{{ _bb_scheme_price_paise | money_without_currency | replace: '.00', '' }}</span>
+                </span>
+              </a>
+            </div>
+          {% endif %}
+
           <button
             id="ProductSubmitButton-{{ section_id }}"
             type="submit"
@@ -208,6 +273,7 @@
           {%- endif -%}
         </div>
       {%- endform -%}
+
       <div class="desktop-show inline-flex">
         <div class="iwish-app-block-product">
           <a
@@ -226,7 +292,7 @@
             href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
             style="padding: 0 !important; border: 0 !important;"
             target="_blank"
-            class= "chat-with-experts-mobile"
+            class="chat-with-experts-mobile"
           >
             <img
               class="chat-with-experts"
@@ -247,7 +313,7 @@
           </div>
         </div>
       </div>
-      
+
     </product-form>
 {% endunless %}
   {%- else -%}
@@ -301,6 +367,75 @@
   {%- endif -%}
 </div>
 
+{% comment %}
+  ── Mobile scheme button styles ───────────────────────────────────
+  Scoped to .lucira-scheme-wrapper--mobile-bb so zero risk of
+  bleeding into the PDP scheme-button.liquid or sticky-atc styles.
+{% endcomment %}
+<style>
+  /* Make .product-form__buttons a flex row so scheme btn + ATC sit side by side */
+  .buy-buttons-wrapper .product-form__buttons {
+    display: flex;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  /* Scheme wrapper: shrink to content, don't grow */
+  .lucira-scheme-wrapper--mobile-bb {
+    margin-top: 0 !important;       /* override block-level margin from base style */
+    width: auto !important;
+    flex: 0 0 auto;
+  }
+
+  /* Scheme button itself */
+  .lucira-scheme-wrapper--mobile-bb .lucira-scheme-btn--mobile {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    height: 100%;               /* match ATC button height */
+    padding: 10px 16px;
+    background: transparent;
+    border: 1.5px solid #A68380;
+    border-radius: 12px;
+    text-decoration: none;
+    white-space: nowrap;
+    box-sizing: border-box;
+    transition: background 0.2s ease, border-color 0.2s ease;
+  }
+
+  .lucira-scheme-wrapper--mobile-bb .lucira-scheme-btn--mobile:hover {
+    background: #f7f0ee;
+    border-color: #8c6b62;
+    text-decoration: none;
+  }
+
+  /* "BUY WITH SCHEME" label */
+  .lucira-scheme-wrapper--mobile-bb .lucira-scheme-btn__text {
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #5a4a44;
+    line-height: 1.2;
+  }
+
+  /* Price line below the label */
+  .lucira-scheme-wrapper--mobile-bb .lucira-scheme-btn__price-line {
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    color: #5a4a44;
+    line-height: 1.2;
+  }
+
+  /* ATC button: take remaining width */
+  .buy-buttons-wrapper .product-form__buttons .product-form__submit {
+    flex: 1 1 auto;
+  }
+</style>
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const chatLink = document.querySelector('.chat-with-experts-mobile');
@@ -309,7 +444,7 @@
 
     chatLink.addEventListener('click', function () {
       const chatData = {
-        promo_id: '{{ product.selected_or_first_available_variant.sku }}', // Shopify Liquid
+        promo_id: '{{ product.selected_or_first_available_variant.sku }}',
         promo_name: '{{ product.title }}',
         creative_name: 'chatWithExperts',
         location_id: '{{ request.path }}'
