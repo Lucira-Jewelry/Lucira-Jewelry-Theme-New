@@ -401,58 +401,14 @@
 
 
 
-{% comment %} ── Sticky Mobile Bar ── {% endcomment %}
-
-{% unless product.tags contains 'hide_ATC' %}
-<div id="lucira-sticky-bar" aria-hidden="true">
-  <div class="product-form__buttons">
-
-    
-      href="{{ scheme_url | default: 'https://schemes.lucirajewelry.com/' }}"
-      class="lucira-mobile-scheme-btn"
-    >
-      BUY WITH SCHEME
-    </a>
-
-    <button
-      id="lucira-sticky-atc-btn"
-      type="button"
-      class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %} animated-cart-btn"
-    >
-      <span class="btn-text-wrapper">
-        <span class="add-to-cart-text" id="lucira-sticky-atc-text">
-          {%- if product.selected_or_first_available_variant == null -%}
-            {{ 'products.product.unavailable' | t }}
-          {%- elsif product.selected_or_first_available_variant.available == false -%}
-            {{ 'products.product.sold_out' | t }}
-          {%- else -%}
-            {{ 'products.product.add_to_cart' | t }}
-          {%- endif -%}
-        </span>
-      </span>
-      <svg class="cart-icon" width="24" height="24">
-        <use href="#icon-cart"></use>
-      </svg>
-      <svg class="custom-cart-icon" width="24" height="24">
-        <use href="#icon-cart-check"></use>
-      </svg>
-      <svg width="100" height="100" class="fas fa-box box-icon">
-        <use href="#icon-custom-large"></use>
-      </svg>
-    </button>
-
-  </div>
-</div>
-{% endunless %}
+{% comment %} ── Sticky Mobile Bar — pure JS clone approach ── {% endcomment %}
 
 <style>
-  /* ── Desktop: never show sticky bar ── */
   @media (min-width: 750px) {
     #lucira-sticky-bar { display: none !important; }
   }
 
   @media (max-width: 749px) {
-    /* ── Sticky bar container ── */
     #lucira-sticky-bar {
       position: fixed;
       bottom: 0;
@@ -463,13 +419,12 @@
       border-top: 1px solid #e8e0de;
       padding: 10px 16px;
       padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.10);
-      box-sizing: border-box;
-      /* Hidden: slides up on .is-visible */
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.10);
       transform: translateY(100%);
       transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
       will-change: transform;
       pointer-events: none;
+      box-sizing: border-box;
     }
 
     #lucira-sticky-bar.is-visible {
@@ -478,34 +433,19 @@
     }
 
     /*
-      ── THIS is the key fix ──
-      The original rule is `.buy-buttons-wrapper .product-form__buttons`
-      We replicate it scoped to #lucira-sticky-bar instead.
+      The cloned .product-form__buttons already has all your theme classes.
+      We only need to ensure the wrapper fills correctly.
     */
     #lucira-sticky-bar .product-form__buttons {
-      display: flex !important;
-      align-items: stretch;
-      gap: 10px;
-      margin: 0;
-      padding: 0;
+      margin: 0 !important;
     }
 
-    /* Scheme btn: .lucira-mobile-scheme-btn already has all styles globally,
-       just ensure flex: 0 0 auto is enforced inside sticky too */
+    /*
+      Cloned scheme price <strong> — update only this node's text via JS.
+      The <a> tag already carries .lucira-mobile-scheme-btn styles.
+    */
     #lucira-sticky-bar .lucira-mobile-scheme-btn {
-      flex: 0 0 auto !important;
-      display: flex !important;
-    }
-
-    /* ATC btn fills remaining space */
-    #lucira-sticky-bar .product-form__submit {
-      flex: 1 1 auto !important;
-      width: auto !important; /* override button--full-width: 100% */
-    }
-
-    #lucira-sticky-bar .product-form__submit:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
+      display: flex !important; /* override any display:none from clone */
     }
   }
 </style>
@@ -514,96 +454,163 @@
 (function () {
   'use strict';
 
-  if (window.__luciraStickyInit) return;
-  window.__luciraStickyInit = true;
+  if (window.__luciraStickyBarInit) return;
+  window.__luciraStickyBarInit = true;
 
-  var BAR        = 'lucira-sticky-bar';
-  var STICKY_BTN = 'lucira-sticky-atc-btn';
-  var STICKY_TXT = 'lucira-sticky-atc-text';
-  /* Original submit button — section_id is Liquid-rendered at build time */
-  var ORIG_BTN_SEL = '#ProductSubmitButton-{{ section_id }}';
+  /* ── Scheme price calculation — mirrors scheme-button.liquid JS ── */
+  function calcSchemePrice(pricePaise) {
+    var priceRupees = Math.floor(pricePaise / 100);
+    var rawMonthly  = Math.floor(priceRupees / 10);
+    var remainder   = rawMonthly % 500;
+    var monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+    return priceRupees - monthly;
+  }
 
-  /* ── Sync disabled state + label from original ATC button ── */
+  function formatINR(n) {
+    return n.toLocaleString('en-IN');
+  }
+
+  /* ── Build the sticky bar by CLONING the real button row ── */
+  function buildBar() {
+    /* The real button row */
+    var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+    if (!originalButtons) return null;
+
+    /* Create bar wrapper */
+    var bar = document.createElement('div');
+    bar.id = 'lucira-sticky-bar';
+    bar.setAttribute('aria-hidden', 'true');
+
+    /* Deep-clone the entire buttons row — inherits ALL classes + styles */
+    var cloned = originalButtons.cloneNode(true);
+
+    /* Give the cloned submit button a distinct ID so we can target it */
+    var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
+    if (clonedSubmit) {
+      clonedSubmit.id = 'lucira-sticky-atc-btn';
+      /* Wire click → original button click (fires GTM handler on original form) */
+      clonedSubmit.addEventListener('click', function (e) {
+        e.preventDefault();
+        var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+        if (origBtn && !origBtn.disabled) origBtn.click();
+      });
+    }
+
+    bar.appendChild(cloned);
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  /* ── Sync disabled state + button text from original → clone ── */
   function syncATC() {
-    var orig      = document.querySelector(ORIG_BTN_SEL);
-    var stickyBtn = document.getElementById(STICKY_BTN);
-    var stickyTxt = document.getElementById(STICKY_TXT);
-    if (!orig || !stickyBtn) return;
+    var origBtn   = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+    var stickyBtn = document.getElementById('lucira-sticky-atc-btn');
+    if (!origBtn || !stickyBtn) return;
 
-    stickyBtn.disabled = orig.disabled;
+    stickyBtn.disabled = origBtn.disabled;
 
-    var origTxt = orig.querySelector('.add-to-cart-text');
+    var origTxt   = origBtn.querySelector('.add-to-cart-text');
+    var stickyTxt = stickyBtn.querySelector('.add-to-cart-text');
     if (origTxt && stickyTxt) {
       stickyTxt.textContent = origTxt.textContent.trim();
     }
   }
 
-  /* ── Wire sticky ATC → click original submit (fires GTM handler) ── */
-  function wireATC() {
-    var stickyBtn = document.getElementById(STICKY_BTN);
-    if (!stickyBtn || stickyBtn._wired) return;
-    stickyBtn._wired = true;
-    stickyBtn.addEventListener('click', function () {
-      var orig = document.querySelector(ORIG_BTN_SEL);
-      if (orig && !orig.disabled) orig.click();
-    });
+  /* ── Sync scheme price text in sticky bar ── */
+  function syncSchemePrice(variantId) {
+    var sourceWrapper = document.querySelector('[data-scheme-wrapper][data-variant-prices]');
+    /* The cloned scheme <a> inside sticky bar */
+    var stickySchemeBtn = document.querySelector('#lucira-sticky-bar .lucira-mobile-scheme-btn');
+    if (!stickySchemeBtn) return;
+
+    if (!sourceWrapper) return;
+
+    var prices     = JSON.parse(sourceWrapper.dataset.variantPrices || '{}');
+    var pricePaise = prices[String(variantId)];
+    if (pricePaise === undefined) return;
+
+    var schemeRupees = calcSchemePrice(pricePaise);
+
+    /*
+      The cloned button text is "BUY WITH SCHEME" (plain text, no price).
+      We update it to show the price inline.
+    */
+    stickySchemeBtn.innerHTML =
+      'BUY AT <strong style="font-weight:700;margin:0 3px;">&#8377;' +
+      formatINR(schemeRupees) +
+      '</strong> WITH SCHEME';
   }
 
-  /* ── Show/hide sticky bar ── */
-  function setVisible(show) {
-    var bar = document.getElementById(BAR);
+  /* ── Show / hide ── */
+  function setBarVisible(visible) {
+    var bar = document.getElementById('lucira-sticky-bar');
     if (!bar) return;
-    bar.classList.toggle('is-visible', show);
-    bar.setAttribute('aria-hidden', String(!show));
+    bar.classList.toggle('is-visible', visible);
+    bar.setAttribute('aria-hidden', String(!visible));
   }
 
-  /* ── IntersectionObserver: watch the inline button row ──
-     Only show sticky when user has scrolled DOWN past the inline buttons.
-     boundingClientRect.top < 0 guards against showing on page load
-     when buttons are below the fold.                                    */
+  /* ── IntersectionObserver on the real button row ── */
   function initObserver() {
     var sentinel = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
     if (!sentinel) sentinel = document.querySelector('.buy-buttons-wrapper');
     if (!sentinel) return;
 
-    var io = new IntersectionObserver(function (entries) {
-      var e = entries[0];
-      var scrolledPast = !e.isIntersecting && e.boundingClientRect.top < 0;
-      setVisible(scrolledPast);
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        /*
+          Only show when scrolled BELOW the buttons (top < 0).
+          Prevents showing on page load when buttons are below fold.
+        */
+        var scrolledPast = !entry.isIntersecting && entry.boundingClientRect.top < 0;
+        setBarVisible(scrolledPast);
+      });
     }, { threshold: 0, rootMargin: '0px' });
 
-    io.observe(sentinel);
+    observer.observe(sentinel);
   }
 
-  /* ── Variant change: re-sync ATC state ── */
-  function onVariantChange() {
+  /* ── Variant change handler ── */
+  function onVariantChange(variantId) {
+    syncSchemePrice(variantId);
     requestAnimationFrame(syncATC);
   }
 
-  document.addEventListener('variant:change',  onVariantChange);
-  document.addEventListener('variant:changed', onVariantChange);
+  /* Covers Dawn, Prestige, Symmetry etc. */
+  document.addEventListener('variant:change',   function (e) { var v = e.detail && e.detail.variant; if (v) onVariantChange(String(v.id)); });
+  document.addEventListener('variant:changed',  function (e) { var v = e.detail && e.detail.variant; if (v) onVariantChange(String(v.id)); });
 
   /* MutationObserver fallback on hidden input[name="id"] */
   function watchVariantInput() {
-    var form  = document.querySelector('.product-form form[action*="/cart/add"]');
-    var input = form && form.querySelector('input[name="id"]');
-    if (!input) return;
+    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
 
-    new MutationObserver(onVariantChange)
-      .observe(input, { attributes: true, attributeFilter: ['value'] });
+    new MutationObserver(function () {
+      if (variantInput.value) onVariantChange(variantInput.value);
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
 
-    input.addEventListener('change', onVariantChange);
-    form.addEventListener('change', function (e) {
-      if (e.target.name === 'id') onVariantChange();
+    variantInput.addEventListener('change', function () {
+      if (this.value) onVariantChange(this.value);
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) onVariantChange(e.target.value);
     });
   }
 
   /* ── Boot ── */
   document.addEventListener('DOMContentLoaded', function () {
-    wireATC();
+    buildBar();      /* clone first */
     syncATC();
     initObserver();
     watchVariantInput();
+
+    /* Seed initial variant */
+    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+    if (variantInput && variantInput.value) {
+      syncSchemePrice(variantInput.value);
+    }
   });
 
 })();
