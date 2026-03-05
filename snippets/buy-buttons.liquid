@@ -1,4 +1,4 @@
-<div {{ block.shopify_attributes }} class="buy-buttons-wrapper">
+{% comment %} <div {{ block.shopify_attributes }} class="buy-buttons-wrapper">
   {%- if product != blank -%}
     {%- liquid
       assign gift_card_recipient_feature_active = false
@@ -167,13 +167,8 @@
             endif
           -%}
 
-          {% comment %}
-            ── Mobile-only Scheme Button ──────────────────────────────────
-            Hidden on desktop via CSS (display:none above 750px).
-            No price shown — just "BUY WITH SCHEME" label + redirect.
-            No JS needed here — this button does not update on variant
-            change since there is no price to display.
-          {% endcomment %}
+
+
           {% comment %} <a
             href="{{ scheme_url }}"
             class="lucira-mobile-scheme-btn"
@@ -393,6 +388,466 @@
         promoClick: chatData,
       });
 
+      console.log('✅ Chat with Experts dataLayer pushed:', chatData);
+    });
+  });
+</script> {% endcomment %}
+
+
+<div {{ block.shopify_attributes }} class="buy-buttons-wrapper">
+  {%- if product != blank -%}
+    {%- liquid
+      assign gift_card_recipient_feature_active = false
+      if block.settings.show_gift_card_recipient and product.gift_card?
+        assign gift_card_recipient_feature_active = true
+      endif
+
+      assign show_dynamic_checkout = false
+      if block.settings.show_dynamic_checkout and gift_card_recipient_feature_active == false
+        assign show_dynamic_checkout = true
+      endif
+    -%}
+
+    {% unless scheme_url %}
+      {% assign scheme_url = 'https://schemes.lucirajewelry.com/' %}
+    {% endunless %}
+
+{% unless product.tags contains 'hide_ATC' %}
+    <product-form
+      class="product-form"
+      data-hide-errors="{{ gift_card_recipient_feature_active }}"
+      data-section-id="{{ section.id }}"
+    >
+      <div class="product-form__error-message-wrapper" role="alert" hidden>
+        <span class="svg-wrapper">
+          {{- 'icon-error.svg' | inline_asset_content -}}
+        </span>
+        <span class="product-form__error-message"></span>
+      </div>
+
+      {%- liquid
+        assign current_variant = product.selected_or_first_available_variant
+        assign config = current_variant.metafields['DI-GoldPrice'].variant_config.value
+        assign metal_rates = shop.metafields['DI-GoldPrice'].metal_prices.value
+        assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value
+        assign metal_color = 'Yellow'
+        assign variant_title_down = current_variant.title | downcase
+        if variant_title_down contains 'rose'
+          assign metal_color = 'Rose'
+        elsif variant_title_down contains 'white'
+          assign metal_color = 'White'
+        endif
+        assign purity_key = config.purity | downcase | prepend: 'gold_price_'
+        assign gold_rate = metal_rates[purity_key] | times: 100 
+        assign metal_cost = gold_rate | times: config.metal_weight
+        assign diamond_final = 0.0
+        assign diamond_pcs = 0
+        assign gemstone_final = 0.0
+
+        for stone_item in config.advanced_stone_config
+          assign slab_rate = 0
+          assign slab_discount = 0
+          assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first
+
+          if pricing_ref
+            assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity
+            for slab in pricing_ref.slabs
+              if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight
+                assign slab_rate = slab.price | times: 100
+                assign slab_discount = slab.discount | default: 0
+                break
+              endif
+            endfor
+          endif
+
+          assign item_base_cost = slab_rate | times: stone_item.stone_weight
+          assign applied_discount = 0
+          if stone_item.stone_type == 'diamond'
+            assign applied_discount = config.diamond_discount | default: slab_discount
+          else
+            assign applied_discount = slab_discount
+          endif
+          assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0
+          assign item_final_cost = item_base_cost | minus: discount_amount
+
+          if stone_item.stone_type == 'diamond'
+            assign diamond_final = diamond_final | plus: item_final_cost
+            assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity
+          else
+            assign gemstone_final = gemstone_final | plus: item_final_cost
+          endif
+        endfor
+        assign mc_rate_original = config.making_charges | default: 0 | times: 100
+        assign mc_discount_percent = config.making_charges_discount | default: 0
+        assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0
+        assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt
+        assign mc_cost_final = mc_rate_final | times: config.metal_weight
+        assign subtotal = metal_cost | plus: diamond_final | plus: gemstone_final | plus: mc_cost_final
+        assign tax_amount = subtotal | times: metal_rates.default_tax | divided_by: 100.0
+        assign grand_total = subtotal | plus: tax_amount
+        assign val_gold_rate = gold_rate | divided_by: 100.0
+        assign val_metal_cost = metal_cost | divided_by: 100.0
+        assign val_mc_cost = mc_cost_final | divided_by: 100.0
+        assign val_diamond_cost = diamond_final | divided_by: 100.0
+        assign val_tax = tax_amount | divided_by: 100.0
+        assign val_total = grand_total | divided_by: 100.0
+        assign seconds_in_day = 86400
+        if current_variant.inventory_quantity > 0
+          assign days_to_add = 2
+        else
+          assign days_to_add = 15
+        endif
+        assign shipping_seconds = days_to_add | times: seconds_in_day
+        assign shipping_date = 'now' | date: '%s' | plus: shipping_seconds | date: '%d/%m/%Y'
+      -%}
+
+      {%- liquid
+        assign current_variant = product.selected_or_first_available_variant
+        if current_variant.available and current_variant.inventory_quantity > 0
+          assign days_to_add = 2
+        else
+          assign days_to_add = 15
+        endif
+        assign seconds_in_day = 86400
+        assign added_seconds = days_to_add | times: seconds_in_day
+        assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
+      -%}
+
+      {%- form 'product',
+        product,
+        id: product_form_id,
+        class: 'form',
+        novalidate: 'novalidate',
+        data-type: 'add-to-cart-form',
+        onsubmit: 'handleGTMAddToCartSubmit(event)'
+      -%}
+        <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date" value="{{ shipping_date }}">
+        <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
+        <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
+        <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
+
+        <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="{{ val_gold_rate }}">
+        <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
+        <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
+        <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="{{ val_mc_cost }}">
+        <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges" value="{{ val_diamond_cost }}">
+        <input type="hidden" name="properties[_GST]" id="prop-gst" value="{{ val_tax }}">
+        <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="{{ val_total }}">
+        <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs" value="{{ diamond_pcs }}">
+
+        <input
+          type="hidden"
+          name="id"
+          value="{{ product.selected_or_first_available_variant.id }}"
+          {% if product.selected_or_first_available_variant.available == false
+            or quantity_rule_soldout
+            or product.selected_or_first_available_variant == null
+          %}
+            disabled
+          {% endif %}
+          class="product-variant-id"
+        >
+
+        {%- if gift_card_recipient_feature_active -%}
+          {%- render 'gift-card-recipient-form', product: product, form: form, section: section -%}
+        {%- endif -%}
+
+        <div class="product-form__buttons" id="mobile-atc-buttons">
+          {%- liquid
+            assign check_against_inventory = true
+            if product.selected_or_first_available_variant.inventory_management != 'shopify' or product.selected_or_first_available_variant.inventory_policy == 'continue'
+              assign check_against_inventory = false
+            endif
+            if product.selected_or_first_available_variant.quantity_rule.min > product.selected_or_first_available_variant.inventory_quantity and check_against_inventory
+              assign quantity_rule_soldout = true
+            endif
+          -%}
+
+          {% comment %}
+            Scheme button — hidden by default.
+            JS adds .is-sticky to #mobile-atc-buttons when the wrapper
+            scrolls out of view, which makes this button visible.
+          {% endcomment %}
+          <a href="{{ scheme_url }}" class="lucira-mobile-scheme-btn">
+            BUY WITH SCHEME
+          </a>
+
+          <button
+            id="ProductSubmitButton-{{ section_id }}"
+            type="submit"
+            name="add"
+            class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %} animated-cart-btn"
+            {% if product.selected_or_first_available_variant.available == false
+              or quantity_rule_soldout
+              or product.selected_or_first_available_variant == null
+            %}
+              disabled
+            {% endif %}
+          >
+            <span class="btn-text-wrapper">
+              <span class="add-to-cart-text">
+                {%- if product.selected_or_first_available_variant == null -%}
+                  {{ 'products.product.unavailable' | t }}
+                {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
+                  {{ 'products.product.sold_out' | t }}
+                {%- else -%}
+                  {{ 'products.product.add_to_cart' | t }}
+                {%- endif -%}
+              </span>
+            </span>
+
+            <svg class="cart-icon" width="24" height="24">
+              <use href="#icon-cart"></use>
+            </svg>
+            <svg class="custom-cart-icon" width="24" height="24">
+              <use href="#icon-cart-check"></use>
+            </svg>
+            <svg width="100" height="100" class="fas fa-box box-icon" class="filled-cart">
+              <use href="#icon-custom-large"></use>
+            </svg>
+            <span
+              class="loading__spinner hidden"
+              style="display: none !important; visibility: hidden !important; position: absolute; width: 0; height: 0; overflow: hidden;"
+            >
+              {%- render 'loading-spinner' -%}
+            </span>
+          </button>
+
+          {%- if show_dynamic_checkout -%}
+            {{ form | payment_button }}
+          {%- endif -%}
+        </div>
+      {%- endform -%}
+
+      <div class="desktop-show inline-flex">
+        <div class="iwish-app-block-product">
+          <a
+            class="iWishAdd st-1"
+            href="#"
+            data-variant="{{ product.variants.first.id }}"
+            data-product="{{ product.id }}"
+            data-pTitle="{{ product.title | escape }}"
+          ></a>
+        </div>
+      </div>
+
+      <div class="mobile-show">
+        <div class="custom-wp_btn-link">
+          <a
+            href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
+            style="padding: 0 !important; border: 0 !important;"
+            target="_blank"
+            class="chat-with-experts-mobile"
+          >
+            <img
+              class="chat-with-experts"
+              src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022"
+              height="46"
+              width="46"
+              alt="whatsapp icon"
+              title="whatsapp"
+            >
+          </a>
+        </div>
+      </div>
+
+      <div class="custom-share-icon desktop-show">
+        <div>
+          <div class="product-share product_share" onclick="share()" id="product_share">
+            {{ 'icon-share-product.svg' | inline_asset_content }}
+          </div>
+        </div>
+      </div>
+
+    </product-form>
+{% endunless %}
+  {%- else -%}
+    <div class="product-form">
+      <div class="product-form__buttons form">
+        <button
+          type="submit"
+          name="add"
+          class="product-form__submit button button--full-width button--primary"
+          disabled
+        >
+          {{ 'products.product.sold_out' | t }}
+        </button>
+      </div>
+    </div>
+  {%- endif -%}
+
+  {%- if show_pickup_availability -%}
+    {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag: preload: true }}
+
+    {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
+      | where: 'pick_up_enabled', true
+    -%}
+
+    <pickup-availability
+      class="product__pickup-availabilities quick-add-hidden"
+      {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
+        available
+      {% endif %}
+      data-root-url="{{ routes.root_url }}"
+      data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+      data-has-only-default-variant="{{ product.has_only_default_variant }}"
+      data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
+    >
+      <template>
+        <pickup-availability-preview class="pickup-availability-preview">
+          <span class="svg-wrapper">
+            {{- 'icon-unavailable.svg' | inline_asset_content -}}
+          </span>
+          <div class="pickup-availability-info">
+            <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
+            <button class="pickup-availability-button link link--text underlined-link">
+              {{ 'products.product.pickup_availability.refresh' | t }}
+            </button>
+          </div>
+        </pickup-availability-preview>
+      </template>
+    </pickup-availability>
+
+    <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
+  {%- endif -%}
+</div>
+
+{% comment %} ── Styles: mobile only, scoped, no desktop impact ── {% endcomment %}
+<style>
+  @media (max-width: 749px) {
+
+    /* ── Normal state (in viewport) ─────────────────────────────────── */
+    #mobile-atc-buttons {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+      /* no position fixed — renders naturally in the page flow */
+    }
+
+    /* Scheme btn hidden when bar is in normal position */
+    #mobile-atc-buttons .lucira-mobile-scheme-btn {
+      display: none;
+    }
+
+    /* ATC takes full width when scheme btn is hidden */
+    #mobile-atc-buttons .product-form__submit {
+      flex: 1 1 auto;
+    }
+
+    /* ── Sticky state (scrolled past — JS adds .is-sticky) ──────────── */
+    #mobile-atc-buttons.is-sticky {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 99;
+      padding: 10px 16px;
+      background: rgb(var(--color-background));
+      box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.08);
+      border-top: 1px solid rgba(var(--color-foreground), 0.08);
+      /* flex already set above — carries over */
+    }
+
+    /* Show scheme btn only when sticky */
+    #mobile-atc-buttons.is-sticky .lucira-mobile-scheme-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      padding: 0 16px;
+      height: 44px;
+      background: transparent;
+      border: 1.5px solid #A68380;
+      border-radius: 12px;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #5a4a44;
+      white-space: nowrap;
+      box-sizing: border-box;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    #mobile-atc-buttons.is-sticky .lucira-mobile-scheme-btn:hover {
+      background: #f7f0ee;
+      border-color: #8c6b62;
+      color: #3d2e28;
+      text-decoration: none;
+    }
+
+    /* When sticky, give the page bottom padding so content isn't hidden behind bar */
+    body.mobile-atc-is-sticky {
+      padding-bottom: 70px;
+    }
+  }
+</style>
+
+<script>
+  (function () {
+    // Only run on mobile
+    if (window.innerWidth > 749) return;
+
+    const atcButtons = document.getElementById('mobile-atc-buttons');
+    if (!atcButtons) return;
+
+    // ── IntersectionObserver ─────────────────────────────────────────
+    // Watches the buy-buttons-wrapper (the natural in-page position).
+    // When it leaves the viewport → add .is-sticky → bar goes fixed.
+    // When it re-enters → remove .is-sticky → bar goes back to normal.
+
+    const wrapper = atcButtons.closest('.buy-buttons-wrapper');
+    if (!wrapper) return;
+
+    const observer = new IntersectionObserver(
+      function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) {
+            // Wrapper has scrolled out of view → make bar sticky
+            atcButtons.classList.add('is-sticky');
+            document.body.classList.add('mobile-atc-is-sticky');
+          } else {
+            // Wrapper back in view → restore normal flow
+            atcButtons.classList.remove('is-sticky');
+            document.body.classList.remove('mobile-atc-is-sticky');
+          }
+        });
+      },
+      {
+        // Fire as soon as the wrapper is fully out of viewport bottom
+        threshold: 0,
+        rootMargin: '0px 0px 0px 0px'
+      }
+    );
+
+    observer.observe(wrapper);
+
+    // ── Resize guard ─────────────────────────────────────────────────
+    // If user rotates phone to landscape (>749px), remove sticky state
+    window.addEventListener('resize', function () {
+      if (window.innerWidth > 749) {
+        atcButtons.classList.remove('is-sticky');
+        document.body.classList.remove('mobile-atc-is-sticky');
+      }
+    });
+  })();
+
+  // ── Chat with Experts dataLayer ──────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    const chatLink = document.querySelector('.chat-with-experts-mobile');
+    if (!chatLink) return;
+
+    chatLink.addEventListener('click', function () {
+      const chatData = {
+        promo_id: '{{ product.selected_or_first_available_variant.sku }}',
+        promo_name: '{{ product.title }}',
+        creative_name: 'chatWithExperts',
+        location_id: '{{ request.path }}'
+      };
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({ event: 'promoClick', promoClick: chatData });
       console.log('✅ Chat with Experts dataLayer pushed:', chatData);
     });
   });
