@@ -6,37 +6,12 @@
   Usage in main-product.liquid (below Add to Cart):
     {% render 'scheme-button', product: product %}
 
-  To pass a custom redirect URL:
+  With custom redirect:
     {% render 'scheme-button', product: product, scheme_url: '/pages/scheme' %}
-
-  ── ROUNDING FIX EXPLAINED ─────────────────────────────────
-  Rule: monthly × 10 must ALWAYS be >= product price
-  So we ALWAYS CEIL to the next ₹500 (never round down/nearest)
-
-  Example A — ₹69,788:
-    raw_monthly = 69788 / 10 = 6978  (Liquid integer division)
-    remainder   = 6978 % 500 = 478
-    remainder > 0 → ceil → 6978 - 478 + 500 = 7000
-    7000 × 10 = 70,000 >= 69,788 ✓
-    scheme_price = 69,788 - 7,000 = 62,788 ✓
-
-  Example B — ₹70,551:
-    raw_monthly = 70551 / 10 = 7055  (Liquid integer division)
-    remainder   = 7055 % 500 = 55
-    remainder > 0 → ceil → 7055 - 55 + 500 = 7500
-    7500 × 10 = 75,000 >= 70,551 ✓
-    scheme_price = 70,551 - 7,500 = 63,051 ✓
-
-    (Old "nearest" rounding gave 7000 → 70,000 < 70,551 ❌)
-
-  ── DOUBLE-DIVISION FIX ─────────────────────────────────────
-  product.price is in PAISE. After dividing by 100 to get rupees,
-  multiply × 100 before money_without_currency so the filter
-  receives paise and formats correctly. (See Step 4)
   ============================================================
 {% endcomment %}
 
-{% comment %} ── Set redirect URL (change to your scheme page) ── {% endcomment %}
+{% comment %} ── Redirect URL ── {% endcomment %}
 {% unless scheme_url %}
   {% assign scheme_url = 'https://schemes.lucirajewelry.com/' %}
 {% endunless %}
@@ -49,20 +24,12 @@
 {% endif %}
 
 {% comment %}
-  STEP 1 — Convert paise → rupees (integer)
-  e.g. 7,055,100 / 100 = 70,551
+  STEP 1 — Convert paise → rupees
 {% endcomment %}
 {% assign _price_rupees = _raw_price | divided_by: 100 %}
 
 {% comment %}
-  STEP 2 — CEIL to next ₹500 for monthly installment
-  monthly × 10 must always >= product price
-
-  Logic:
-    raw_monthly = price / 10   (integer division in Liquid)
-    remainder   = raw_monthly % 500
-    if remainder == 0 → already exact ₹500 multiple, use as-is
-    else              → always round UP: raw - remainder + 500
+  STEP 2 — CEIL to next ₹500 (monthly × 10 must always >= product price)
 {% endcomment %}
 {% assign _raw_monthly = _price_rupees | divided_by: 10 %}
 {% assign _remainder   = _raw_monthly  | modulo: 500 %}
@@ -74,27 +41,45 @@
 {% endif %}
 
 {% comment %}
-  STEP 3 — Effective scheme price (10th month is free — we pay it)
-  scheme_price = product_price - monthly_installment
-  e.g. 70,551 - 7,500 = 63,051
+  STEP 3 — Effective scheme price = product price − free 10th month
 {% endcomment %}
 {% assign _scheme_price = _price_rupees | minus: _monthly %}
 
 {% comment %}
-  STEP 4 — Convert back to paise for money_without_currency filter
-  63,051 × 100 = 6,305,100 → filter formats as 63,051 ✓
+  STEP 4 — Multiply × 100 before money_without_currency to avoid double-division
 {% endcomment %}
 {% assign _scheme_price_paise = _scheme_price | times: 100 %}
 
 {% if _price_rupees > 0 %}
-<div class="scheme-btn-wrapper">
+
+{% comment %}
+  Pass ALL variant prices as a JSON map so JS can recalculate
+  without any extra API calls when the user switches variants.
+  Format: { "variant_id": price_in_paise, ... }
+{% endcomment %}
+{% capture _variant_prices_json %}{
+  {% for v in product.variants %}
+    "{{ v.id }}": {{ v.price }}{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}{% endcapture %}
+
+<div
+  class="lucira-scheme-wrapper"
+  data-scheme-wrapper
+  data-variant-prices='{{ _variant_prices_json }}'
+  data-scheme-url="{{ scheme_url }}"
+>
   <a
     href="{{ scheme_url }}"
-    class="scheme-btn"
+    class="lucira-scheme-btn"
+    data-scheme-link
   >
-    <span class="scheme-btn__text">
+    <span class="lucira-scheme-btn__text">
       BUY AT
-      <strong>&#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}</strong>
+      <strong
+        class="lucira-scheme-btn__price"
+        data-scheme-price
+      >&#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}</strong>
       WITH SCHEME
     </span>
     <svg width="14" height="14" viewBox="0 0 24 24"
@@ -105,13 +90,16 @@
   </a>
 </div>
 
+{% comment %} ── Scoped CSS — all rules prefixed with .lucira-scheme-wrapper ── {% endcomment %}
 <style>
-  .scheme-btn-wrapper {
+  /* Wrapper */
+  .lucira-scheme-wrapper {
     margin-top: 12px;
     width: 100%;
   }
 
-  .scheme-btn {
+  /* Button / link */
+  .lucira-scheme-wrapper .lucira-scheme-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -128,26 +116,136 @@
     letter-spacing: 0.13em;
     text-transform: uppercase;
     color: #5a4a44;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
     box-sizing: border-box;
   }
 
-  .scheme-btn:hover {
+  .lucira-scheme-wrapper .lucira-scheme-btn:hover {
     background: #f7f0ee;
     border-color: #8c6b62;
     color: #3d2e28;
     text-decoration: none;
   }
 
-  .scheme-btn__text {
+  .lucira-scheme-wrapper .lucira-scheme-btn__text {
     display: flex;
     align-items: center;
     gap: 5px;
   }
 
-  .scheme-btn strong {
+  .lucira-scheme-wrapper .lucira-scheme-btn__price {
     font-weight: 700;
     font-size: 13px;
   }
+
+  /* ── Sticky ATC overrides — scoped, won't bleed ── */
+  #md-sticky-atc .lucira-scheme-wrapper {
+    margin-top: 0;
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  #md-sticky-atc .lucira-scheme-wrapper .lucira-scheme-btn {
+    width: auto;
+    white-space: nowrap;
+    padding: 10px 18px;
+    font-size: 11px;
+    border-radius: 50px;
+  }
 </style>
+
+<script>
+(function () {
+  // ── Avoid registering multiple listeners if snippet renders twice ──
+  if (window.__luciraSchemeInit) return;
+  window.__luciraSchemeInit = true;
+
+  // ── Core calculation (mirrors Liquid logic exactly) ───────────────
+  // pricePaise : number  — variant.price in paise (Shopify native unit)
+  // returns    : number  — scheme price in RUPEES
+  function calcSchemePrice(pricePaise) {
+    var priceRupees = Math.floor(pricePaise / 100);
+    var rawMonthly  = Math.floor(priceRupees / 10);
+    var remainder   = rawMonthly % 500;
+    var monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+    return priceRupees - monthly;
+  }
+
+  // Format as en-IN  e.g. 62788 → "62,788"
+  function formatINR(amount) {
+    return amount.toLocaleString('en-IN');
+  }
+
+  // Update every scheme wrapper on the page
+  function updateAllWrappers(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      var prices     = JSON.parse(wrapper.dataset.variantPrices || '{}');
+      var pricePaise = prices[variantId];
+      if (pricePaise === undefined) return;
+
+      var schemePrice = calcSchemePrice(pricePaise);
+
+      // Update displayed price
+      var priceEl = wrapper.querySelector('[data-scheme-price]');
+      if (priceEl) {
+        priceEl.textContent = '₹' + formatINR(schemePrice);
+      }
+
+      // Keep href in sync (optional — appends price as query param for landing page)
+      // var link = wrapper.querySelector('[data-scheme-link]');
+      // if (link) {
+      //   var base = wrapper.dataset.schemeUrl || link.href.split('?')[0];
+      //   link.href = base + '?scheme_price=' + schemePrice + '&variant=' + variantId;
+      // }
+    });
+  }
+
+  // ── Event listeners for variant change ────────────────────────────
+  // Covers: Dawn, Debut, custom themes, Prestige, Symmetry etc.
+
+  // 1. Shopify native variant:change (most custom themes)
+  document.addEventListener('variant:change', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 2. Dawn / Prestige style
+  document.addEventListener('variant:changed', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 3. Fallback — watch the hidden variant ID input in the main product form
+  //    Fires when any JS (including theme's native variant picker) changes the value.
+  document.addEventListener('DOMContentLoaded', function () {
+    var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
+    if (!mainForm) return;
+
+    var variantInput = mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
+
+    // Use MutationObserver to catch programmatic value changes
+    new MutationObserver(function () {
+      if (variantInput.value) updateAllWrappers(variantInput.value);
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+    // Also catch direct change events (select[name="id"] fallback)
+    variantInput.addEventListener('change', function () {
+      if (this.value) updateAllWrappers(this.value);
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) {
+        updateAllWrappers(e.target.value);
+      }
+    });
+  });
+})();
+</script>
+
 {% endif %}
+{% comment %} End scheme-button.liquid {% endcomment %}
