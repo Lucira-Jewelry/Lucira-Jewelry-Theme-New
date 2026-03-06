@@ -112,6 +112,12 @@
       Logged-out → base URL with scheme_amount only
     {% endcomment %}
 
+    {% comment %} ── Scheme visibility gate: only show for products >= ₹18,000 ── {% endcomment %}
+    {% assign _show_scheme_btn = false %}
+    {% if val_total >= 18000 %}
+      {% assign _show_scheme_btn = true %}
+    {% endif %}
+
     {% comment %} ── Step 1: Compute scheme_amount (mirrors scheme-button.liquid logic) ── {% endcomment %}
     {% assign _monthly_raw   = val_total | divided_by: 10 | floor %}
     {% assign _remainder     = _monthly_raw | modulo: 500 %}
@@ -539,7 +545,8 @@
   window.__luciraStickyBarInit = true;
 
   /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
-  var SCHEME_URL = {{ scheme_url | json }};
+  var SCHEME_URL      = {{ scheme_url | json }};
+  var SHOW_SCHEME_BTN = {{ _show_scheme_btn }};
 
   /* ── Build the sticky bar by CLONING the real button row ── */
   function buildBar() {
@@ -595,8 +602,10 @@
     schemeBtn.textContent = 'BUY WITH SCHEME';
 
     /* Order: [WA icon] [SCHEME btn] [ATC btn] */
-    cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
-    cloned.insertBefore(waLink, cloned.firstChild);    // WA before scheme
+    if (SHOW_SCHEME_BTN) {
+      cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
+    }
+    cloned.insertBefore(waLink, cloned.firstChild);    // WA always shown
 
     bar.appendChild(cloned);
     document.body.appendChild(bar);
