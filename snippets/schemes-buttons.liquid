@@ -1,8 +1,3 @@
-{% comment %} ── Redirect URL ── {% endcomment %}
-{% unless scheme_url %}
-  {% assign scheme_url = 'https://schemes.lucirajewelry.com/' %}
-{% endunless %}
-
 {% comment %} ── Resolve price from selected variant ── {% endcomment %}
 {% if variant %}
   {% assign _raw_price = variant.price %}
@@ -37,6 +32,45 @@
 {% endcomment %}
 {% assign _scheme_price_paise = _scheme_price | times: 100 %}
 
+{% comment %}
+  ── Scheme URL builder ────────────────────────────────────────────────
+  _monthly is now resolved above (e.g. ₹4,000 = the free 10th month saving).
+  Logged-in  → full SSO URL with phone, HMAC signature + &amount=_monthly
+  Logged-out → base URL with &amount=_monthly only
+{% endcomment %}
+
+{% comment %} ── Step A: Clean & normalise customer phone ── {% endcomment %}
+{% assign _raw_phone    = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+{% if _raw_phone.size == 12 %}
+  {% assign _phone_prefix = _raw_phone | slice: 0, 2 %}
+  {% if _phone_prefix == "91" %}
+    {% assign _clean_phone = _raw_phone | slice: 2, 10 %}
+  {% else %}
+    {% assign _clean_phone = _raw_phone %}
+  {% endif %}
+{% else %}
+  {% assign _clean_phone = _raw_phone %}
+{% endif %}
+
+{% comment %} ── Step B: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
+{% assign _ts        = 'now' | date: '%s' %}
+{% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+{% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+{% comment %} ── Step C: Compose scheme_url with _monthly as amount ── {% endcomment %}
+{% if customer %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
+    | append: _clean_phone
+    | append: '&ts='
+    | append: _ts
+    | append: '&sig='
+    | append: _sig
+    | append: '&amount='
+    | append: _monthly %}
+{% else %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _monthly %}
+{% endif %}
+
 {% if _price_rupees > 0 %}
 
 {% comment %}
@@ -69,7 +103,6 @@
       >&#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}</strong>
       WITH SCHEME
     </span>
-
   </a>
 </div>
 
@@ -147,8 +180,7 @@
   .lucira-scheme-wrapper .lucira-scheme-btn{
   border-radius:8px;
   padding: 11px 24px;
-
-}
+  }
 }
 </style>
 
@@ -160,13 +192,16 @@
 
   // ── Core calculation (mirrors Liquid logic exactly) ───────────────
   // pricePaise : number  — variant.price in paise (Shopify native unit)
-  // returns    : number  — scheme price in RUPEES
-  function calcSchemePrice(pricePaise) {
+  // returns    : { schemePrice, monthly } both in rupees
+  function calcScheme(pricePaise) {
     var priceRupees = Math.floor(pricePaise / 100);
     var rawMonthly  = Math.floor(priceRupees / 10);
     var remainder   = rawMonthly % 500;
     var monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
-    return priceRupees - monthly;
+    return {
+      schemePrice: priceRupees - monthly,
+      monthly: monthly
+    };
   }
 
   // Format as en-IN  e.g. 62788 → "62,788"
@@ -181,25 +216,27 @@
       var pricePaise = prices[variantId];
       if (pricePaise === undefined) return;
 
-      var schemePrice = calcSchemePrice(pricePaise);
+      var result = calcScheme(pricePaise);
 
-      // Update displayed price
+      // Update displayed scheme price on button
       var priceEl = wrapper.querySelector('[data-scheme-price]');
       if (priceEl) {
-        priceEl.textContent = '₹' + formatINR(schemePrice);
+        priceEl.textContent = '₹' + formatINR(result.schemePrice);
       }
 
-      // Keep href in sync (optional — appends price as query param for landing page)
-      // var link = wrapper.querySelector('[data-scheme-link]');
-      // if (link) {
-      //   var base = wrapper.dataset.schemeUrl || link.href.split('?')[0];
-      //   link.href = base + '?scheme_price=' + schemePrice + '&variant=' + variantId;
-      // }
+      // ── Keep href in sync with updated _monthly amount ──
+      var link = wrapper.querySelector('[data-scheme-link]');
+      if (link) {
+        // Rebuild the URL: preserve base SSO path, only replace/add &amount=
+        var currentHref = link.getAttribute('href') || '';
+        var baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+        var separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+        link.href       = baseUrl + separator + 'amount=' + result.monthly;
+      }
     });
   }
 
   // ── Event listeners for variant change ────────────────────────────
-  // Covers: Dawn, Debut, custom themes, Prestige, Symmetry etc.
 
   // 1. Shopify native variant:change (most custom themes)
   document.addEventListener('variant:change', function (e) {
@@ -218,7 +255,6 @@
   });
 
   // 3. Fallback — watch the hidden variant ID input in the main product form
-  //    Fires when any JS (including theme's native variant picker) changes the value.
   document.addEventListener('DOMContentLoaded', function () {
     var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
     if (!mainForm) return;
@@ -226,12 +262,10 @@
     var variantInput = mainForm.querySelector('input[name="id"]');
     if (!variantInput) return;
 
-    // Use MutationObserver to catch programmatic value changes
     new MutationObserver(function () {
       if (variantInput.value) updateAllWrappers(variantInput.value);
     }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
 
-    // Also catch direct change events (select[name="id"] fallback)
     variantInput.addEventListener('change', function () {
       if (this.value) updateAllWrappers(this.value);
     });
