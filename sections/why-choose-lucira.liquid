@@ -96,8 +96,9 @@
       <div class="lucira-wc-container">
         <h2 class="lucira-wc-header">{{ section.settings.header }}</h2>
         <p class="lucira-wc-subheader">{{ section.settings.subheader }}</p>
-        <div class="lucira-wc-grid swiper">
-          <div class="swiper-wrapper">
+
+        <slider-component class="slider-mobile-gutter">
+          <div id="Slider-{{ section.id }}" class="lucira-wc-grid grid grid--1-col slider slider--tablet">
             {% for block in section.blocks %}
 
               {%- comment -%} Build the href for this block {%- endcomment -%}
@@ -111,16 +112,15 @@
                 {%- assign _card_href = block.settings.card_link -%}
               {% endif %}
 
-              <div class="lucira-wc-column swiper-slide" {{ block.shopify_attributes }}>
-                <a 
-                  href="{{ _card_href }}" 
+              <div id="Slide-{{ section.id }}-{{ forloop.index }}" class="lucira-wc-column grid__item slider__slide" {{ block.shopify_attributes }}>
+                <a
+                  href="{{ _card_href }}"
                   class="lucira-wc-card why-choose-tile"
                   data-info="tile-{{ forloop.index }}"
                   data-desktop-img="{{ block.settings.card_image | img_url: '800x' }}"
-                  aria-label="{{ block.settings.card_title }}: {{ block.settings.card_subtitle }}" 
+                  aria-label="{{ block.settings.card_title }}: {{ block.settings.card_subtitle }}"
                   data-mobile-img="{{ block.settings.card_image_mobile | img_url: '800x' }}"
                   target="_blank" rel="noopener noreferrer"
-
                 >
                   <div class="lucira-wc-card-content">
                     <h3 class="lucira-wc-card-title">{{ block.settings.card_title }}</h3>
@@ -131,8 +131,22 @@
               </div>
             {% endfor %}
           </div>
-          <div class="swiper-pagination"></div>
-        </div>
+
+          <div class="slider-buttons no-js-hidden small-hide">
+            <button type="button" class="slider-button slider-button--prev" name="previous" aria-label="{{ 'general.slider.previous_slide' | t }}">
+              <span class="svg-wrapper">{{- 'icon-caret.svg' | inline_asset_content -}}</span>
+            </button>
+            <div class="slider-counter caption">
+              <span class="slider-counter--current">1</span>
+              <span aria-hidden="true"> / </span>
+              <span class="visually-hidden">{{ 'general.slider.of' | t }}</span>
+              <span class="slider-counter--total">{{ section.blocks.size }}</span>
+            </div>
+            <button type="button" class="slider-button slider-button--next" name="next" aria-label="{{ 'general.slider.next_slide' | t }}">
+              <span class="svg-wrapper">{{- 'icon-caret.svg' | inline_asset_content -}}</span>
+            </button>
+          </div>
+        </slider-component>
       </div>
     </div>
   </div>
@@ -141,15 +155,15 @@
 <script>
   (function(){
     const prefix = '{{ section.settings.gtm-prefix }}';
-    let s=null,desktopListenersAttached=false,imgObserver=null;
-    
+    let listenersAttached=false,imgObserver=null;
+
     // Lazy load images with Intersection Observer
     function lazyLoadImages(){
       const cards=document.querySelectorAll('.lucira-wc-card:not([data-loaded])');
       if(!cards.length)return;
-      
+
       if(imgObserver)imgObserver.disconnect();
-      
+
       imgObserver=new IntersectionObserver((entries)=>{
         entries.forEach(entry=>{
           if(entry.isIntersecting){
@@ -158,7 +172,7 @@
             const d=c.getAttribute('data-desktop-img');
             const i=c.getAttribute('data-mobile-img');
             const url=m&&i?i:d;
-            
+
             if(url){
               const img=new Image();
               img.onload=()=>{
@@ -174,10 +188,10 @@
           }
         });
       },{rootMargin:'50px'});
-      
+
       cards.forEach(c=>imgObserver.observe(c));
     }
-    
+
     function trackGTM(tile){
       const tileIndex=tile.getAttribute('data-info');
       const title=tile.querySelector('.lucira-wc-card-title')?.textContent.trim()||'Unknown Feature';
@@ -192,59 +206,26 @@
         }
       });
     }
-    
-    function attachDesktopListeners(){
-      if(desktopListenersAttached)return;
+
+    function attachListeners(){
+      if(listenersAttached)return;
       document.querySelectorAll('.why-choose-tile').forEach(tile=>{
         tile.addEventListener('click',function(){trackGTM(this)},{passive:true});
       });
-      desktopListenersAttached=true;
+      listenersAttached=true;
     }
-    
+
     function init(){
-      if(window.innerWidth<=768){
-        if(!s){
-          s=new Swiper('.lucira-wc-section .swiper',{
-            slidesPerView:'auto',
-            spaceBetween:15,
-            loop:true,
-            centeredSlides:false,
-            pagination:{el:'.swiper-pagination',clickable:true},
-            speed:300,
-            touchRatio:1,
-            threshold:5,
-            lazy:{loadPrevNext:true},
-            on:{
-              tap:function(swiper,event){
-                const tile=event.target.closest('.why-choose-tile');
-                if(tile){
-                  event.preventDefault();
-                  trackGTM(tile);
-                  const link=tile.getAttribute('href');
-                  if(link&&link!=='#'){
-                    setTimeout(()=>window.location.href=link,100);
-                  }
-                }
-              }
-            }
-          });
-        }
-      }else{
-        if(s){
-          s.destroy(true,true);
-          s=null;
-        }
-        attachDesktopListeners();
-      }
+      attachListeners();
       lazyLoadImages();
     }
-    
+
     if(document.readyState==='loading'){
       document.addEventListener('DOMContentLoaded',init);
     }else{
       init();
     }
-    
+
     let t;
     window.addEventListener('resize',()=>{
       clearTimeout(t);
@@ -277,5 +258,13 @@
 
   @media(min-width:769px){
   .lucira-wc-card{height:300px!important}
+  }
+
+  .lucira-wc-section .slider--tablet {
+    display: flex;
+    flex-wrap: inherit;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-behavior: smooth;
   }
 </style>

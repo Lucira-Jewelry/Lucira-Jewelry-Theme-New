@@ -231,91 +231,26 @@
 
 {% render 'product-collection-card' %}
 
+<script src="{{ 'collection-custom.js' | asset_url }}" defer="defer"></script>
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    sessionStorage.setItem('lastCollectionUrl', '{{ collection.url }}');
-    sessionStorage.setItem('lastCollectionTitle', '{{ collection.title | escape }}');
+  window.addEventListener('load', function() {
+    if (window.initCollectionImpressions) {
+        window.initCollectionImpressions([
+          {% for product in collection.products limit: section.settings.products_per_page %}
+            {
+              item_id: '{{ product.id }}',
+              item_name: {{ product.title | json }},
+              item_sku: '{{ product.variants.first.sku | escape }}',
+              category: {{ collection.title | json }},
+              item_url: '{{ shop.url }}{{ product.url }}',
+              price: {{ product.compare_at_price_max | default: product.price | money_without_currency | remove: ',' }},
+              offer_price: {{ product.price | money_without_currency | remove: ',' }},
+              index: {{ forloop.index }}
+            }{% unless forloop.last %},{% endunless %}
+          {% endfor %}
+        ]);
+    }
   });
-</script>
-
-<script>
-  window.dataLayer = window.dataLayer || [];
-  (function() {
-    var products = [
-      {% for product in collection.products limit: section.settings.products_per_page %}
-        {
-          item_id: '{{ product.id }}',
-          item_name: '{{ product.title | escape }}',
-          item_sku: '{{ product.variants.first.sku | escape }}',
-          category: '{{ collection.title | escape }}',
-          item_url: '{{ shop.url }}{{ product.url }}',
-          price: {{ product.compare_at_price_max | default: product.price | money_without_currency | remove: ',' }},
-          offer_price: {{ product.price | money_without_currency | remove: ',' }},
-          index: {{ forloop.index }}
-        }{% unless forloop.last %},{% endunless %}
-      {% endfor %}
-    ];
-
-    // Filter out any products with missing essential details (optional safety)
-    products = products.filter(function(p) {
-      return p.item_id && p.item_name && p.price != null;
-    });
-
-    // Push to dataLayer asynchronously to avoid blocking rendering
-    setTimeout(function() {
-      window.dataLayer.push({
-        event: 'productImpression',
-        products: products
-      });
-    }, 0);
-  })();
-</script>
-
-<script>
-  (function () {
-    if (window.__gtmProductClickBound) return;
-    window.__gtmProductClickBound = true;
-
-    document.addEventListener('click', function (event) {
-      const link = event.target.closest('.product-image-link.custom-image-link');
-      if (!link) return;
-
-      event.preventDefault();
-
-      const productData = {
-        event: 'productClick',
-        products: {
-          productId: link.dataset.productId,
-          variantId: link.dataset.variantId,
-          sku: link.dataset.sku,
-          productName: link.dataset.productName,
-          productType: link.dataset.productType,
-          productCategory: link.dataset.productCategory,
-          category: link.dataset.category,
-          subCategory: link.dataset.subCategory,
-          productUrl: link.dataset.productUrl || link.href,
-          thumbnailImage: link.dataset.thumbnailImage,
-          purity: link.dataset.purity,
-          price: link.dataset.price,
-          offerPrice: link.dataset.offerPrice,
-          expectedDeliveryDate: link.dataset.expectedDeliveryDate,
-          couponCode: link.dataset.couponCode,
-          makingCharges: link.dataset.makingCharges,
-          numberOfReview: link.dataset.numberOfReview,
-          rating: link.dataset.rating,
-          indexPosition: link.dataset.indexPosition,
-        },
-      };
-
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push(productData);
-
-      // navigate after GTM registers
-      setTimeout(() => {
-        window.location.href = link.href;
-      }, 250);
-    });
-  })();
 </script>
 
 <script type="application/ld+json">
