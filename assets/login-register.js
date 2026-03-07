@@ -721,3 +721,6 @@ document.addEventListener('DOMContentLoaded', () => {
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
 });
 
+document.getElementById('loginMobile').addEventListener('input', function () {
+  this.value = this.value.replace(/\D/g, '').slice(0, 10);
+});
