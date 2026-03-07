@@ -70,11 +70,6 @@ function closeloginPopup(e, id) {
   if (p) p.innerText = ORIGINAL_POPUP_SUBTEXT;
 }
 
-
-document.querySelectorAll('.otp-login-form-wrapper').forEach((el) => {
-el.addEventListener('click', (e) => e.stopPropagation());
-});
-
 function showError(elementId, message) {
 const errorElement = document.getElementById(elementId);
 errorElement.textContent = message;
@@ -731,5 +726,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (heading) ORIGINAL_POPUP_HEADING = heading.innerText;
   if (subtext) ORIGINAL_POPUP_SUBTEXT = subtext.innerText;
+});
+
+document.addEventListener('DOMContentLoaded', function () {
+  const overlay = document.getElementById('login-popup');
+  if (!overlay) return;
+
+  const path = window.location.pathname.toLowerCase();
+  if (path === '/account/login' || path === '/account/register') return;
+
+  overlay.addEventListener('click', function () {
+    closeloginPopup('login-popup');
+  });
 });
 

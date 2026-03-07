@@ -161,19 +161,16 @@ if (!customElements.get('product-info')) {
         }
       }
 
-      updateTryAtHome(variant) {
+      updateTryAtHome(html) {
         try {
-          if (!variant) return;
+          const dest = this.querySelector(`#TryAtHome-${this.dataset.section}`);
+          if (!dest) return;
 
-          const container = this.querySelector(`#TryAtHome-${this.dataset.section}`);
-          if (!container) return;
+          const source = html.getElementById(`TryAtHome-${this.sectionId}`) 
+            || html.querySelector('[id^="TryAtHome-"]');
+          if (!source) return;
 
-          const showTryAtHome =
-            variant.available &&
-            variant.inventory_quantity > 0 &&
-            variant.in_store_available;
-
-          container.classList.toggle('hidden', !showTryAtHome);
+          dest.classList.toggle('hidden', source.classList.contains('hidden'));
         } catch (e) {
           console.error('updateTryAtHome error', e);
         }
@@ -193,7 +190,7 @@ if (!customElements.get('product-info')) {
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
           this.updateDeliveryWidget(variant);
-          this.updateTryAtHome(variant);
+          this.updateTryAtHome(html);
           const propInputs = html.querySelectorAll('input[id^="prop-"]');
           propInputs.forEach((src) => {
             const dest = document.getElementById(src.id);

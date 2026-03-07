@@ -1,4 +1,4 @@
-<div class="trust-icons-wrapper">
+{% comment %} <div class="trust-icons-wrapper">
   <div class="grid-row">
     <div class="grid-column">
       <img
@@ -57,7 +57,7 @@
       </div>
     </div>
   </div>
-</div>
+</div> {% endcomment %}
 
 {%- assign variant = product.selected_or_first_available_variant -%}
 <variant-selects id="VariantSelect-{{ unique }}" data-product-json-id="product-json-{{ unique }}">
@@ -590,7 +590,7 @@
             </div>
             {% unless product.tags contains 'Gold Jewelry' %}
               <div tabindex="0" class="contained-switch" data-tab="comparison">
-                <span class="switch-item">Your Savings</span>
+                <span class="switch-item">Price Comparison</span>
             </div>
             {% endunless %}
           </div>
@@ -685,17 +685,30 @@
                   <span class="price-breakdown-box-value" 
                     id="source-making-charges" 
                     data-value="{{ mc_cost_final }}">
-                    {{ mc_cost_final | money }}
+                    {% if mc_cost_final == 0 and mc_percent == 100 %}
+                      <strong class="free-highlight">FREE</strong>
+                    {% else %}
+                      {{ mc_cost_final | money }}
+                    {% endif %}
                   </span>
                 </div>
               </div>
 
-              <div class="price-breakdown-box-item">
-                <span>GST ({{ metal_rates.default_tax }}%)</span>
+             <div class="price-breakdown-box-item">
+              <span>GST ({{ metal_rates.default_tax }}%)</span>
+
+              <div>
+                {% if original_tax > tax_amount %}
+                  <span class="price-breakdown-box-del-value">
+                    {{ original_tax | money }}
+                  </span>
+                {% endif %}
+
                 <span class="price-breakdown-box-value" id="source-gst" data-value="{{ tax_amount }}">
                   {{ tax_amount | money }}
                 </span>
               </div>
+            </div>
 
               <hr style="border: 0; margin: 15px 0; background: #e6e6e6; height: 0.5px;">
 
@@ -706,6 +719,25 @@
                 </span>
               </div>
             </div>
+            {% assign original_subtotal = metal_cost 
+                | plus: diamond_original 
+                | plus: gemstone_original 
+                | plus: mc_cost_original %}
+
+              {% assign original_tax = original_subtotal 
+                | times: metal_rates.default_tax 
+                | divided_by: 100.0 %}
+
+              {% assign original_total = original_subtotal | plus: original_tax %}
+
+              {% assign total_savings = original_total | minus: grand_total %}
+
+              {% if total_savings > 0 %}
+              <div class="jewelry-saving-box">
+                <span>Save on this jewelry</span>
+                <span class="saving-amount">{{ total_savings | money }}</span>
+              </div>
+              {% endif %}
           </div>
           {% unless product.tags contains 'Gold Jewelry' %}
             <div class="tab-content" id="comparison">
@@ -929,7 +961,7 @@
       function pushTabClick(tabName, savingsAmount = null) {
 
         let promoPosition = 'Product Details Section';
-        if (tabName === 'Your Savings' && savingsAmount) {
+        if (tabName === 'Price Comparison' && savingsAmount) {
           promoPosition = savingsAmount;
         }
 
@@ -1007,7 +1039,7 @@
         if (tabId === 'price-breakup') {
           pushTabClick('Price Breakup');
         } else if (tabId === 'comparison') {
-          pushTabClick('Your Savings', totalSavings);
+          pushTabClick('Price Comparison', totalSavings);
         }
 
         const allSwitches = wrapper.querySelectorAll('.contained-switch');
