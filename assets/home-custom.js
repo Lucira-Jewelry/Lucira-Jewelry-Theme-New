@@ -1,7 +1,3 @@
-/**
- * Homepage Custom Logic & Tracking
- */
-
 (function() {
     // 1. Home Image Banner Tracking
     window.handleGTMPromoBannerClick = function(event) {
