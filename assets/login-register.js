@@ -130,18 +130,6 @@ sendBtn.addEventListener('click', async () => {
     const rawInput = document.getElementById('loginMobile').value;
     let cleanMobile = rawInput.replace(/\D/g, ''); 
 
-
-    window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-        event: "promoClick",
-        promoClick: {
-            promo_id: cleanMobile,
-            creative_name: "signup",
-            promo_name: cleanMobile
-        }
-    });
-
-
     if (cleanMobile.length === 10) {
     cleanMobile = '91' + cleanMobile;
     }
@@ -675,7 +663,7 @@ sessionStorage.setItem('lucira_login_popup_seen', 'true');
 }
 document.addEventListener('DOMContentLoaded', function () {
 const POPUP_ID = 'login-popup';
-const SHOW_DELAY = 10000;
+const SHOW_DELAY = 11000;
 
 const popup = document.getElementById(POPUP_ID);
 if (!popup) return;
