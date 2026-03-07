@@ -86,117 +86,97 @@
 
       <div class="{% if section.settings.full_width %}slider-component-full-width{% endif %} page-width{% if use_slider == false %} page-width{% endif %}{% if show_desktop_slider == false and section.settings.full_width == false %} page-width-desktop{% endif %}{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}">
         
-        {%- if use_slider -%}
-          <!-- Swiper Container -->
-          <div class="swiper you-may-also-like-swiper-{{ section.id }}" id="Swiper-{{ section.id }}">
-            <div class="swiper-wrapper">
-        {%- else -%}
-          <!-- Grid Container -->
+        <slider-component class="slider-mobile-gutter">
           <ul
-            id="Grid-{{ section.id }}"
-            data-id="{{ section.id }}"
-            class="grid product-grid contains-card contains-card--product{% if settings.card_style == 'standard' %} contains-card--standard{% endif %} grid--{{ section.settings.columns_desktop }}-col-desktop grid--{{ section.settings.columns_mobile }}-col-tablet-down"
+            id="Slider-{{ section.id }}"
+            class="grid product-grid contains-card contains-card--product{% if settings.card_style == 'standard' %} contains-card--standard{% endif %} grid--{{ section.settings.columns_desktop }}-col-desktop grid--{{ section.settings.columns_mobile }}-col-tablet-down slider slider--everywhere"
             role="list"
             aria-label="You may also like products"
           >
-        {%- endif -%}
+            {% assign skip_card_product_styles = false %}
+            {% assign displayed_count = 0 %}
+            
+            {%- for related_product in selected_collection.products -%}
+              {% assign tag_match_found = false %}
+              {% for tag in related_product.tags %}
+                {% assign clean_tag = tag | strip | downcase %}
+                {% assign clean_matched_tag = matched_tag | strip | downcase %}
+                  {% if clean_tag == clean_matched_tag %}
+                    {% assign tag_match_found = true %}
+                    {% break %}
+                  {% endif %}
+                {% endfor %}
+              {% if tag_match_found and related_product.id != product.id and displayed_count < products_to_display %}
+                <li id="Slide-{{ section.id }}-{{ forloop.index }}" class="grid__item slider__slide{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
+                    {% if settings.animations_reveal_on_scroll %}
+                      data-cascade
+                      style="--animation-order: {{ displayed_count | plus: 1 }};"
+                    {% endif %}>
 
-        {% assign skip_card_product_styles = false %}
-        {% assign displayed_count = 0 %}
-        
-        {%- for related_product in selected_collection.products -%}
-          {% assign tag_match_found = false %}
-          {% for tag in related_product.tags %}
-            {% assign clean_tag = tag | strip | downcase %}
-            {% assign clean_matched_tag = matched_tag | strip | downcase %}
-              {% if clean_tag == clean_matched_tag %}
-                {% assign tag_match_found = true %}
-                {% break %}
+                  {% render 'card-product',
+                    card_product: related_product,
+                    media_aspect_ratio: section.settings.image_ratio,
+                    image_shape: section.settings.image_shape,
+                    show_secondary_image: section.settings.show_secondary_image,
+                    show_vendor: section.settings.show_vendor,
+                    show_rating: section.settings.show_rating,
+                    skip_styles: skip_card_product_styles,
+                    section_id: section.id,
+                    quick_add: section.settings.quick_add
+                  %}
+
+                </li>
+
+                {% assign skip_card_product_styles = true %}
+                {% assign displayed_count = displayed_count | plus: 1 %}
               {% endif %}
-            {% endfor %}
-          {% if tag_match_found and related_product.id != product.id and displayed_count < products_to_display %}
-            {%- if use_slider -%}
-              <div class="swiper-slide">
-            {%- else -%}
-              <li class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
-                  {% if settings.animations_reveal_on_scroll %}
-                    data-cascade
-                    style="--animation-order: {{ displayed_count | plus: 1 }};"
-                  {% endif %}>
-            {%- endif -%}
-            
-              {% render 'card-product',
-                card_product: related_product,
-                media_aspect_ratio: section.settings.image_ratio,
-                image_shape: section.settings.image_shape,
-                show_secondary_image: section.settings.show_secondary_image,
-                show_vendor: section.settings.show_vendor,
-                show_rating: section.settings.show_rating,
-                skip_styles: skip_card_product_styles,
-                section_id: section.id,
-                quick_add: section.settings.quick_add
-              %}
-            
-            {%- if use_slider -%}
-              </div>
-            {%- else -%}
-              </li>
-            {%- endif -%}
-            
-            {% assign skip_card_product_styles = true %}
-            {% assign displayed_count = displayed_count | plus: 1 %}
-          {% endif %}
-        {%- endfor -%}
+            {%- endfor -%}
 
-        {%- if displayed_count == 0 -%}
-          {%- for i in (1..section.settings.columns_desktop) -%}
-            {%- if use_slider -%}
-              <div class="swiper-slide">
-            {%- else -%}
-              <li class="grid__item{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
-                  {% if settings.animations_reveal_on_scroll %}
-                    data-cascade
-                    style="--animation-order: {{ forloop.index }};"
-                  {% endif %}>
-            {%- endif -%}
-            
-              {% liquid
-                assign ridx = forloop.rindex
-                case ridx
-                  when 5
-                    assign ridx = 1
-                  when 6
-                    assign ridx = 2
-                endcase
-              %}
-              {%- assign placeholder_image = 'product-apparel-' | append: ridx -%}
-              {% render 'card-product',
-                show_vendor: section.settings.show_vendor,
-                media_aspect_ratio: section.settings.image_ratio,
-                image_shape: section.settings.image_shape,
-                placeholder_image: placeholder_image
-              %}
-            
-            {%- if use_slider -%}
-              </div>
-            {%- else -%}
-              </li>
-            {%- endif -%}
-          {%- endfor -%}
-        {%- endif -%}
+            {%- if displayed_count == 0 -%}
+              {%- for i in (1..section.settings.columns_desktop) -%}
+                <li id="Slide-{{ section.id }}-{{ forloop.index }}" class="grid__item slider__slide{% if settings.animations_reveal_on_scroll %} scroll-trigger animate--slide-in{% endif %}"
+                    {% if settings.animations_reveal_on_scroll %}
+                      data-cascade
+                      style="--animation-order: {{ forloop.index }};"
+                    {% endif %}>
 
-        {%- if use_slider -%}
-            </div>
-            <!-- Swiper Navigation -->
-            <div class="swiper-button-next swiper-button-next-{{ section.id }}"></div>
-            <div class="swiper-button-prev swiper-button-prev-{{ section.id }}"></div>
-            
-            <!-- Swiper Pagination -->
-            <div class="swiper-pagination swiper-pagination-{{ section.id }}"></div>
-          </div>
-        {%- else -%}
+                  {% liquid
+                    assign ridx = forloop.rindex
+                    case ridx
+                      when 5
+                        assign ridx = 1
+                      when 6
+                        assign ridx = 2
+                    endcase
+                  %}
+                  {%- assign placeholder_image = 'product-apparel-' | append: ridx -%}
+                  {% render 'card-product',
+                    show_vendor: section.settings.show_vendor,
+                    media_aspect_ratio: section.settings.image_ratio,
+                    image_shape: section.settings.image_shape,
+                    placeholder_image: placeholder_image
+                  %}
+
+                </li>
+              {%- endfor -%}
+            {%- endif -%}
           </ul>
-        {%- endif -%}
+
+          <div class="slider-buttons no-js-hidden">
+            <button type="button" class="slider-button slider-button--prev" name="previous" aria-label="{{ 'general.slider.previous_slide' | t }}">
+              <span class="svg-wrapper">{{- 'icon-caret.svg' | inline_asset_content -}}</span>
+            </button>
+            <div class="slider-counter caption">
+              <span class="slider-counter--current">1</span>
+              <span aria-hidden="true"> / </span>
+              <span class="visually-hidden">{{ 'general.slider.of' | t }}</span>
+              <span class="slider-counter--total">{{ displayed_count | default: section.settings.columns_desktop }}</span>
+            </div>
+            <button type="button" class="slider-button slider-button--next" name="next" aria-label="{{ 'general.slider.next_slide' | t }}">
+              <span class="svg-wrapper">{{- 'icon-caret.svg' | inline_asset_content -}}</span>
+            </button>
+          </div>
+        </slider-component>
       </div>
 
       {% if section.settings.image_shape == 'arch' %}
@@ -260,82 +240,21 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 
   function bindPromoClickDelegation() {
-    // Try multiple possible containers
-    const containers = [
-      '.you-may-also-like-swiper-{{ section.id }}',
-      '#you-may-also-like-{{ section.id }}',
-      '.you-may-also-like-collection'
-    ];
-    
-    let container = null;
-    for (const selector of containers) {
-      container = document.querySelector(selector);
-      if (container) break;
-    }
+    const container = document.querySelector('#you-may-also-like-{{ section.id }}');
     
     if (!container) {
       console.log('Container not found for promo click tracking');
       return;
     }
 
-    console.log('Binding promo click to container:', container);
-    
     container.addEventListener('click', function(e) {
-      // Find the closest card-wrapper
       const card = e.target.closest('.card-wrapper');
       if (!card) return;
-      
-      console.log('Card clicked, firing promo click');
       firePromoClick(card);
-    }, { capture: true }); // Use capture to ensure we get the event
+    }, { capture: true });
   }
 
-  const swiperElement = document.querySelector('.you-may-also-like-swiper-{{ section.id }}');
-  
-  if (swiperElement) {
-    const observer = new IntersectionObserver((entries, obs) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          if (!swiperElement.classList.contains('swiper-initialized')) {
-            const swiper{{section.id|replace:'-','_'}} = new Swiper('.you-may-also-like-swiper-{{ section.id }}', {
-              breakpoints: {
-                320: { slidesPerView: {{section.settings.columns_mobile}}, spaceBetween: 15 },
-                750: { slidesPerView: {% if section.settings.columns_desktop>3%}3{%else%}{{section.settings.columns_desktop}}{%endif%}, spaceBetween: 20 },
-                990: { slidesPerView: {{section.settings.columns_desktop}}, spaceBetween: 20 }
-              },
-              navigation: {
-                nextEl: '.swiper-button-next-{{ section.id }}',
-                prevEl: '.swiper-button-prev-{{ section.id }}'
-              },
-              pagination: {
-                el: '.swiper-pagination-{{ section.id }}',
-                clickable: true
-              },
-              loop: true,
-              grabCursor: true,
-              slidesPerGroup: 1,
-              lazy: { loadPrevNext: true },
-              watchSlidesProgress: true,
-              watchSlidesVisibility: true,
-              on: {
-                init: function() {
-                  // Bind promo click AFTER Swiper is initialized
-                  setTimeout(bindPromoClickDelegation, 100);
-                }
-              }
-            });
-            swiperElement.classList.add('swiper-initialized');
-          }
-          obs.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1 });
-    
-    observer.observe(swiperElement);
-  } else {
-    // No swiper - bind immediately
-    setTimeout(bindPromoClickDelegation, 500);
-  }
+  setTimeout(bindPromoClickDelegation, 500);
 
   // Rest of your video modal code remains the same...
   let modal = document.getElementById('VideoModal');
