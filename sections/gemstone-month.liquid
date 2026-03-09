@@ -204,18 +204,40 @@
 .sumit_birthstone_{{ section.id }} .birthstone-panel.active { display: block; opacity: 1; }
 
 @keyframes bstone_slide_from_right {
-  from { transform: translateX(100vw); opacity: 0; }
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+@keyframes bstone_slide_from_left {
+  from { transform: translateX(-100%); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
-
-@keyframes bstone_slide_from_left {
-  from { transform: translateX(-100vw); opacity: 0; }
-  to   { transform: translateX(0);     opacity: 1; }
+@keyframes bstone_slide_to_left {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(-100%); opacity: 0; }
+}
+@keyframes bstone_slide_to_right {
+  from { transform: translateX(0);   opacity: 1; }
+  to   { transform: translateX(100%); opacity: 0; }
 }
 
-.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-from-right { animation: bstone_slide_from_right 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-from-right {
+  animation: bstone_slide_from_right 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-from-left {
+  animation: bstone_slide_from_left 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-to-left {
+  animation: bstone_slide_to_left 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-to-right {
+  animation: bstone_slide_to_right 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
 
-.sumit_birthstone_{{ section.id }} .birthstone-panel.slide-from-left { animation: bstone_slide_from_left 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+/* Needed so outgoing panel can overlap incoming during transition */
+.sumit_birthstone_{{ section.id }} .birthstone-panels-wrapper {
+  position: relative;
+  overflow: hidden;
+}
 
 .sumit_birthstone_{{ section.id }} .panel-inner { display: grid; grid-template-columns: 1fr 1.4fr; gap: 50px; align-items: start; padding: 10px 0; }
 
@@ -304,52 +326,56 @@
 
 <script>
 (function () {
-  const SECTION_ID = "{{ section.id }}";
+  const SECTION_ID   = "{{ section.id }}";
   const PARENT_CLASS = ".sumit_birthstone_" + SECTION_ID;
 
   document.addEventListener("DOMContentLoaded", function () {
     const parent = document.querySelector(PARENT_CLASS);
     if (!parent) return;
 
-    const buttons  = parent.querySelectorAll(".month-btn");
-    const panels   = parent.querySelectorAll(".birthstone-panel");
-    let currentIndex = 0;
-    let isAnimating  = false;
+    const buttons      = parent.querySelectorAll(".month-btn");
+    const panels       = parent.querySelectorAll(".birthstone-panel");
+    const wrapper      = parent.querySelector(".birthstone-panels-wrapper");
+    let   currentIndex = 0;
+    let   isAnimating  = false;
 
-    // Helper: strip animation classes after they finish
-    function clearAnimClasses(panel) {
-      panel.classList.remove("slide-from-right", "slide-from-left");
-    }
+    const ANIM_DURATION = 450; // ms — keep in sync with CSS animation duration
 
     function activateMonth(newIndex) {
       if (newIndex === currentIndex || isAnimating) return;
       isAnimating = true;
 
-      const direction = newIndex > currentIndex ? "slide-from-right" : "slide-from-left";
+      const goingRight = newIndex > currentIndex;
+      const inClass    = goingRight ? "slide-from-right" : "slide-from-left";
+      const outClass   = goingRight ? "slide-to-left"    : "slide-to-right";
 
-      // Deactivate current button
+      const oldPanel = panels[currentIndex];
+      const newPanel = panels[newIndex];
+
+      /* ── Buttons ── */
       buttons[currentIndex].classList.remove("active");
       buttons[currentIndex].setAttribute("aria-selected", "false");
-
-      // Hide current panel (instant)
-      const oldPanel = panels[currentIndex];
-      oldPanel.classList.remove("active", "slide-from-right", "slide-from-left");
-      oldPanel.style.display = "none";
-
-      // Activate new button
       buttons[newIndex].classList.add("active");
       buttons[newIndex].setAttribute("aria-selected", "true");
 
-      // Show + animate new panel
-      const newPanel = panels[newIndex];
-      newPanel.style.display = "block";
+      /* ── Freeze wrapper height so it doesn't jump ── */
+      wrapper.style.height = wrapper.offsetHeight + "px";
 
-      // Force reflow so the animation triggers
+      /* ── Position outgoing panel absolutely so both can coexist ── */
+      oldPanel.style.cssText = "position:absolute;top:0;left:0;width:100%;z-index:1;display:block;";
+
+      /* ── Prepare incoming panel ── */
+      newPanel.style.cssText = "position:relative;z-index:2;display:block;";
+      newPanel.classList.add("active");
+
+      /* Force reflow so CSS picks up the start state before animation classes fire */
       void newPanel.offsetWidth;
 
-      newPanel.classList.add("active", direction);
+      /* ── Trigger both animations simultaneously ── */
+      oldPanel.classList.add(outClass);
+      newPanel.classList.add(inClass);
 
-      // GA4 tracking
+      /* ── GA4 ── */
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({
         event: "birthstoneMonthClick",
@@ -359,25 +385,49 @@
         }
       });
 
-      // Clean up after animation ends
-      function onAnimEnd(e) {
-        if (e.target !== newPanel) return;
-        clearAnimClasses(newPanel);
-        isAnimating = false;
-        newPanel.removeEventListener("animationend", onAnimEnd);
+      /* ── Cleanup after animation completes ── */
+      let done = false;
+
+      function cleanup() {
+        if (done) return;
+        done = true;
+
+        /* Reset old panel */
+        oldPanel.classList.remove("active", outClass, "slide-from-right", "slide-from-left");
+        oldPanel.style.cssText = "";
+
+        /* Reset new panel */
+        newPanel.classList.remove(inClass);
+        newPanel.style.cssText = "";
+
+        /* Release wrapper height lock */
+        wrapper.style.height = "";
+
+        currentIndex = newIndex;
+        isAnimating  = false;
       }
+
+      /* Listen on BOTH panels — whichever fires last triggers cleanup */
+      let fired = 0;
+      function onAnimEnd(e) {
+        if (e.target !== oldPanel && e.target !== newPanel) return;
+        fired++;
+        // Wait for both (or just run after the longer one — incoming panel ends last)
+        if (e.target === newPanel) {
+          cleanup();
+          oldPanel.removeEventListener("animationend", onAnimEnd);
+          newPanel.removeEventListener("animationend", onAnimEnd);
+        }
+      }
+
+      oldPanel.addEventListener("animationend", onAnimEnd);
       newPanel.addEventListener("animationend", onAnimEnd);
 
-      // Fallback release if animationend never fires
-      setTimeout(function () {
-        isAnimating = false;
-        clearAnimClasses(newPanel);
-      }, 600);
-
-      currentIndex = newIndex;
+      /* Fallback: if animationend never fires (e.g. reduced-motion) */
+      setTimeout(function () { cleanup(); }, ANIM_DURATION + 100);
     }
 
-    // Bind click events
+    /* ── Click binding ── */
     buttons.forEach(function (btn) {
       btn.addEventListener("click", function () {
         const idx = parseInt(this.getAttribute("data-index"), 10);
@@ -385,7 +435,7 @@
       });
     });
 
-    // Keyboard nav (arrow keys)
+    /* ── Keyboard nav ── */
     parent.querySelector(".month-selector").addEventListener("keydown", function (e) {
       if (e.key === "ArrowRight") {
         const next = Math.min(currentIndex + 1, buttons.length - 1);
@@ -398,17 +448,15 @@
       }
     });
 
-    // Intersection Observer for lazy reveal
-    const observer = new IntersectionObserver(function (entries, obs) {
+    /* ── Intersection Observer for lazy reveal ── */
+    new IntersectionObserver(function (entries, obs) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
           entry.target.classList.add("section-visible");
           obs.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.15 });
-
-    observer.observe(parent);
+    }, { threshold: 0.15 }).observe(parent);
   });
 })();
 </script>
