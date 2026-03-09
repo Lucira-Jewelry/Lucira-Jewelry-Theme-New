@@ -263,16 +263,16 @@ function switchMenu(newMenu) {
 //   });
 // });
 
-// document.addEventListener("DOMContentLoaded", function () {
-//   const stickyHeader = document.querySelector("sticky-header");
+document.addEventListener("DOMContentLoaded", function () {
+  const stickyHeader = document.querySelector("sticky-header");
 
-//   if (stickyHeader) {
-//     window.addEventListener("scroll", function () {
-//       if (window.scrollY > 50) { 
-//         stickyHeader.classList.add("sticky-header");
-//       } else {
-//         stickyHeader.classList.remove("sticky-header");
-//       }
-//     });
-//   }
-// });
+  if (stickyHeader) {
+    window.addEventListener("scroll", function () {
+      if (window.scrollY > 50) { 
+        stickyHeader.classList.add("sticky-header");
+      } else {
+        stickyHeader.classList.remove("sticky-header");
+      }
+    });
+  }
+});
