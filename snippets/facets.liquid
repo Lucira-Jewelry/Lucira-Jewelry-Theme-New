@@ -644,6 +644,12 @@
                         </option>
                       {%- endunless -%}
                     {%- endfor -%}
+                    <option
+                      value="discount-high-to-low"
+                      {% if sort_by == 'discount-high-to-low' %}selected="selected"{% endif %}
+                    >
+                      Discount High to Low
+                    </option>
                   </select>
                   <span class="svg-wrapper">
                     {{- 'icon-caret.svg' | inline_asset_content -}}
@@ -701,6 +707,17 @@
             </div>
           {%- endunless -%}
         {%- endfor -%}
+        {%- comment -%} Custom: Discount High to Low option for mobile drawer {%- endcomment -%}
+        <div
+          class="mobile-sort-option{% if sort_by == 'discount-high-to-low' %} active{% endif %}"
+          data-value="discount-high-to-low"
+          onclick="selectSortOption('discount-high-to-low', 'Discount High to Low')"
+        >
+          <span>Discount High to Low</span>
+          {%- if sort_by == 'discount-high-to-low' -%}
+            <span class="mobile-sort-option__check">✓</span>
+          {%- endif -%}
+        </div>
       {%- endif -%}
     </div>
   </div>
@@ -1099,6 +1116,13 @@
                     </option>
                   {%- endunless -%}
                 {%- endfor -%}
+                {%- comment -%} Custom: Discount High to Low for mobile select {%- endcomment -%}
+                <option
+                  value="discount-high-to-low"
+                  {% if sort_by == 'discount-high-to-low' %}selected="selected"{% endif %}
+                >
+                  Discount High to Low
+                </option>
               </select>
               <span class="svg-wrapper">
                 {{- 'icon-caret.svg' | inline_asset_content -}}
@@ -1178,6 +1202,13 @@
                     </option>
                   {%- endunless -%}
                 {%- endfor -%}
+                {%- comment -%} Custom: Discount High to Low for drawer form {%- endcomment -%}
+                <option
+                  value="discount-high-to-low"
+                  {% if sort_by == 'discount-high-to-low' %}selected="selected"{% endif %}
+                >
+                  Discount High to Low
+                </option>
               </select>
               <span class="svg-wrapper">
                 {{- 'icon-caret.svg' | inline_asset_content -}}
@@ -1268,16 +1299,19 @@
 <script>
   // Function to open mobile filters (uses existing Shopify drawer)
   function openMobileFilters() {
+    // Store current scroll position
     const scrollY = window.scrollY || window.pageYOffset;
 
     const filterButton = document.querySelector('.mobile-facets__open');
     if (filterButton) {
       filterButton.click();
 
+      // Restore scroll position after a brief delay
       setTimeout(() => {
         window.scrollTo(0, scrollY);
       }, 0);
 
+      // Also restore after any transitions
       setTimeout(() => {
         window.scrollTo(0, scrollY);
       }, 100);
@@ -1308,31 +1342,37 @@
 
   // Function to select sort option - integrated with FacetFiltersForm
   function selectSortOption(value, name) {
+    // Find all sort forms
     const sortForms = [
       document.querySelector('#FacetSortDrawerForm'),
       document.querySelector('#FacetFiltersForm'),
       document.querySelector('#FacetFiltersFormMobile'),
     ].filter((form) => form);
 
+    // Update all sort selects
     sortForms.forEach((form) => {
       const sortSelect = form.querySelector('select[name="sort_by"]');
       if (sortSelect) {
         sortSelect.value = value;
 
+        // Create and dispatch change event
         const event = new Event('change', { bubbles: true });
         sortSelect.dispatchEvent(event);
       }
     });
 
+    // Submit the main form to apply sorting
     const mainForm =
       document.querySelector('#FacetFiltersForm') ||
       document.querySelector('#FacetFiltersFormMobile') ||
       document.querySelector('#FacetSortDrawerForm');
 
     if (mainForm) {
+      // Create a submit event
       const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
       mainForm.dispatchEvent(submitEvent);
 
+      // Also trigger the input event for FacetFiltersForm
       const inputEvent = new Event('input', { bubbles: true });
       mainForm.dispatchEvent(inputEvent);
     }
@@ -1352,6 +1392,7 @@
         savedScrollPosition = window.scrollY || window.pageYOffset;
         isOpening = true;
 
+        // Prevent default scroll behavior on open
         setTimeout(() => {
           if (isOpening && savedScrollPosition !== null) {
             window.scrollTo(0, savedScrollPosition);
@@ -1366,6 +1407,7 @@
       });
     }
 
+    // Handle close button clicks - prevent scroll
     const handleCloseButton = function () {
       const closeButtons = document.querySelectorAll(
         '.mobile-facets__close, .mobile-facets__close-button, [data-close-drawer], .drawer__close'
@@ -1376,8 +1418,10 @@
           btn.setAttribute('data-scroll-handled', 'true');
 
           btn.addEventListener('click', function (e) {
+            // Save current scroll position before closing
             currentScrollPosition = window.scrollY || window.pageYOffset;
 
+            // Prevent scroll after close
             setTimeout(() => {
               if (currentScrollPosition !== null) {
                 window.scrollTo(0, currentScrollPosition);
@@ -1401,8 +1445,10 @@
       });
     };
 
+    // Initial call
     handleCloseButton();
 
+    // Watch for dynamically added close buttons
     const observer = new MutationObserver(function () {
       handleCloseButton();
     });
@@ -1412,6 +1458,7 @@
       observer.observe(bodyObserver, { childList: true, subtree: true });
     }
 
+    // Also prevent scroll on drawer wrapper if it exists
     const drawerWrapper = document.querySelector('.mobile-facets__wrapper');
     if (drawerWrapper) {
       const drawerObserver = new MutationObserver(function (mutations) {
@@ -1420,8 +1467,10 @@
             const isNowOpen = drawerWrapper.classList.contains('is-open');
 
             if (isNowOpen && isOpening && savedScrollPosition !== null) {
+              // Only restore scroll when opening
               window.scrollTo(0, savedScrollPosition);
             } else if (!isNowOpen) {
+              // Reset flags when closed
               isOpening = false;
               savedScrollPosition = null;
             }
@@ -1456,18 +1505,22 @@
 
   // Initialize when DOM is loaded
   document.addEventListener('DOMContentLoaded', function () {
+    // Initialize scroll prevention
     preventFilterScrollBehavior();
 
+    // Ensure filter count updates
     const updateFilterCount = function () {
       const filterCount = document.querySelector('.mobile-sticky-bar__count');
       if (filterCount) {
+        // Count active facets
         const activeFacets = document.querySelectorAll('.active-facets__button').length;
 
+        // Also count price range filters if active
         let priceRangeCount = 0;
         const priceInputs = document.querySelectorAll('input[data-min], input[data-max]');
         priceInputs.forEach((input) => {
           if (input.value && input.value !== '0') {
-            priceRangeCount = 1;
+            priceRangeCount = 1; // Only count once for price range
           }
         });
 
@@ -1482,8 +1535,10 @@
       }
     };
 
+    // Update filter count on initial load
     updateFilterCount();
 
+    // Update filter count when filters change
     const observer = new MutationObserver(function (mutations) {
       mutations.forEach(function (mutation) {
         if (mutation.type === 'childList' || mutation.type === 'attributes') {
@@ -1492,6 +1547,7 @@
       });
     });
 
+    // Observe active facets containers
     const activeFacetsContainers = [
       document.querySelector('.active-facets-mobile'),
       document.querySelector('.active-facets-desktop'),
@@ -1506,6 +1562,7 @@
       });
     });
 
+    // Also observe price range inputs
     const priceInputs = document.querySelectorAll('input[type="range"], input[data-min], input[data-max]');
     priceInputs.forEach((input) => {
       observer.observe(input, { attributes: true, attributeFilter: ['value'] });
@@ -1519,35 +1576,45 @@
 (function() {
   'use strict';
 
+  // Helper function to get collection URL
   function getCollectionUrl() {
+    // Get current URL path
     const pathname = window.location.pathname;
+    
+    // Return full collection URL
     return window.location.origin + pathname;
   }
 
+  // Helper function to get collection ID
   function getCollectionId() {
+    // Try to get from meta tag
     const metaCollection = document.querySelector('meta[property="og:url"]');
     if (metaCollection) {
       const url = metaCollection.content;
       const match = url.match(/collections\/([^\/\?]+)/);
       if (match) return match[1];
     }
-
+    
+    // Try to get from URL
     const pathname = window.location.pathname;
     const match = pathname.match(/collections\/([^\/\?]+)/);
     if (match) return match[1];
-
+    
+    // Try to get from Shopify object if available
     if (typeof Shopify !== 'undefined' && Shopify.collection && Shopify.collection.id) {
       return Shopify.collection.id.toString();
     }
-
+    
+    // Fallback: try to get from body data attributes
     const body = document.querySelector('body');
     if (body && body.dataset.collectionId) {
       return body.dataset.collectionId;
     }
-
+    
     return 'unknown';
   }
 
+  // Helper function to push to dataLayer
   function pushPromoClick(creativeName, locationId) {
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
@@ -1561,8 +1628,14 @@
     });
   }
 
+  // Initialize tracking after DOM is ready
   function initializeTracking() {
-
+    
+    // ============================================
+    // MOBILE STICKY BAR TRACKING
+    // ============================================
+    
+    // Track mobile sticky bar FILTER button click
     const stickyFilterBtn = document.querySelector('.mobile-sticky-bar__item--filter');
     if (stickyFilterBtn) {
       stickyFilterBtn.addEventListener('click', function() {
@@ -1570,6 +1643,7 @@
       });
     }
 
+    // Track mobile sticky bar SORT BY button click
     const stickySortBtn = document.querySelector('.mobile-sticky-bar__item--sort');
     if (stickySortBtn) {
       stickySortBtn.addEventListener('click', function() {
@@ -1577,8 +1651,14 @@
       });
     }
 
+    // ============================================
+    // DESKTOP FILTER BUTTON TRACKING
+    // ============================================
+    
+    // Track desktop filter button clicks (if you have any filter open buttons on desktop)
     const desktopFilterButtons = document.querySelectorAll('.facets__disclosure summary, .mobile-facets__open');
     desktopFilterButtons.forEach(btn => {
+      // Only track non-mobile buttons for desktop
       if (!btn.closest('.mobile-facets__wrapper')) {
         btn.addEventListener('click', function() {
           pushPromoClick('Filter', 'desktop-plp');
@@ -1586,6 +1666,11 @@
       }
     });
 
+    // ============================================
+    // MOBILE DRAWER FILTER BUTTON TRACKING
+    // ============================================
+    
+    // Track mobile drawer filter button click
     const mobileFilterOpen = document.querySelector('.mobile-facets__open');
     if (mobileFilterOpen) {
       mobileFilterOpen.addEventListener('click', function() {
@@ -1593,6 +1678,11 @@
       });
     }
 
+    // ============================================
+    // DESKTOP SORT DROPDOWN CLICK
+    // ============================================
+    
+    // Track desktop sort dropdown click (when user opens it)
     const desktopSortSelect = document.querySelector('#SortBy');
     if (desktopSortSelect) {
       desktopSortSelect.addEventListener('click', function() {
@@ -1600,6 +1690,7 @@
       }, { once: false });
     }
 
+    // Track sort select in drawer form
     const drawerSortSelect = document.querySelector('#FacetSortDrawerForm #SortBy');
     if (drawerSortSelect) {
       drawerSortSelect.addEventListener('click', function() {
@@ -1607,6 +1698,11 @@
       }, { once: false });
     }
 
+    // ============================================
+    // MOBILE SORT SELECT CLICK
+    // ============================================
+    
+    // Track mobile sort select click
     const mobileSortSelect = document.querySelector('#SortBy-mobile');
     if (mobileSortSelect) {
       mobileSortSelect.addEventListener('click', function() {
@@ -1615,6 +1711,7 @@
     }
   }
 
+  // Initialize when DOM is ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeTracking);
   } else {
