@@ -1283,61 +1283,145 @@ class FacetRemove extends HTMLElement {
 }
 
 customElements.define('facet-remove', FacetRemove);
+// ============================================
+// SORT FUNCTIONALITY — OPTIMIZED
+// ============================================
 
-// ============================================
-// SORT FUNCTIONALITY
-// ============================================
+// Sort-only fetch: skips re-rendering filters, only updates product grid + count
+async function renderSortOnly(searchParams) {
+  const signal = FacetFiltersForm.requestManagerInstance.cancelPending();
+
+  const scrollY = window.pageYOffset || 0;
+  window.lastScrollPosition = scrollY;
+
+  FacetFiltersForm.showPreloader();
+  FacetFiltersForm.setLoadingStates(true);
+
+  const sectionId = document.getElementById('product-grid')?.dataset.id;
+  if (!sectionId) {
+    // Fallback to full render if section ID missing
+    FacetFiltersForm.renderPage(searchParams, null, true);
+    return;
+  }
+
+  const cacheKey = `${window.location.pathname}?${searchParams}`;
+  const cached = FacetFiltersForm.getFromCache(cacheKey);
+
+  if (cached) {
+    _applySortUpdate(cached);
+    FacetFiltersForm.updateURLHash(searchParams);
+    return;
+  }
+
+  try {
+    const url = `${window.location.pathname}?section_id=${sectionId}&${searchParams}`;
+    const response = await fetch(url, {
+      signal,
+      headers: { 'X-Requested-With': 'XMLHttpRequest' },
+    });
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const html = await response.text();
+    FacetFiltersForm.addToCache(cacheKey, html);
+
+    _applySortUpdate(html);
+    FacetFiltersForm.updateURLHash(searchParams);
+  } catch (err) {
+    if (err.name === 'AbortError') return;
+    console.error('Sort fetch error:', err);
+    FacetFiltersForm.hidePreloader();
+    FacetFiltersForm.setLoadingStates(false);
+  }
+}
+
+function _applySortUpdate(html) {
+  const parser = new DOMParser();
+  const parsedHTML = parser.parseFromString(html, 'text/html');
+
+  requestAnimationFrame(() => {
+    // Only update product grid and count — skip filters entirely
+    FacetFiltersForm.renderProductGridContainer(parsedHTML);
+    FacetFiltersForm.renderProductCount(parsedHTML);
+
+    requestAnimationFrame(() => {
+      window.scrollTo(0, window.lastScrollPosition || 0);
+      FacetFiltersForm.hidePreloader();
+      FacetFiltersForm.setLoadingStates(false);
+      FacetFiltersForm.requestManagerInstance.reset();
+    });
+  });
+}
+
+// Prefetch a sort option URL into cache before user confirms selection
+function prefetchSortOption(sortValue) {
+  const currentParams = new URLSearchParams(window.location.search);
+  currentParams.set('sort_by', sortValue);
+  const searchParams = currentParams.toString();
+  const cacheKey = `${window.location.pathname}?${searchParams}`;
+
+  // Skip if already cached
+  if (FacetFiltersForm.getFromCache(cacheKey)) return;
+
+  const sectionId = document.getElementById('product-grid')?.dataset.id;
+  if (!sectionId) return;
+
+  // Fire-and-forget background fetch
+  fetch(`${window.location.pathname}?section_id=${sectionId}&${searchParams}`, {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  })
+    .then((r) => r.ok && r.text())
+    .then((html) => {
+      if (html) FacetFiltersForm.addToCache(cacheKey, html);
+    })
+    .catch(() => {});
+}
+
 function updateSortUI(value) {
-  document.querySelectorAll('select[name="sort_by"]').forEach(select => {
+  document.querySelectorAll('select[name="sort_by"]').forEach((select) => {
     select.value = value;
   });
-  
-  document.querySelectorAll('.mobile-sort-option').forEach(option => {
-    const optionValue = option.getAttribute('data-value');
-    if (optionValue === value) {
-      option.classList.add('active');
-      if (!option.querySelector('.mobile-sort-option__check')) {
-        const check = document.createElement('span');
-        check.className = 'mobile-sort-option__check';
-        check.textContent = '✓';
-        option.appendChild(check);
-      }
-    } else {
-      option.classList.remove('active');
-      const check = option.querySelector('.mobile-sort-option__check');
-      if (check) check.remove();
+
+  document.querySelectorAll('.mobile-sort-option').forEach((option) => {
+    const isActive = option.getAttribute('data-value') === value;
+    option.classList.toggle('active', isActive);
+
+    const existingCheck = option.querySelector('.mobile-sort-option__check');
+    if (isActive && !existingCheck) {
+      const check = document.createElement('span');
+      check.className = 'mobile-sort-option__check';
+      check.textContent = '✓';
+      option.appendChild(check);
+    } else if (!isActive && existingCheck) {
+      existingCheck.remove();
     }
   });
 }
 
 function triggerSortSubmit(sortValue) {
-  const forms = document.querySelectorAll('facet-filters-form form');
-  
-  forms.forEach(form => {
-    let sortInput = form.querySelector('[name="sort_by"]');
-    if (!sortInput) {
-      sortInput = document.createElement('input');
-      sortInput.type = 'hidden';
-      sortInput.name = 'sort_by';
-      form.appendChild(sortInput);
-    }
-    sortInput.value = sortValue;
-  });
-  
-  const facetForm = document.querySelector('facet-filters-form');
+  // Build search params from the main filter form + new sort value
+  const facetForm =
+    document.querySelector('#FacetFiltersForm') ||
+    document.querySelector('#FacetSortDrawerForm') ||
+    document.querySelector('#FacetFiltersFormMobile');
+
+  let searchParams;
+
   if (facetForm) {
-    const mainForm = facetForm.querySelector('form');
-    if (mainForm) {
-      const formData = new FormData(mainForm);
-      formData.set('sort_by', sortValue);
-      const searchParams = new URLSearchParams(formData).toString();
-      FacetFiltersForm.renderPage(searchParams, null, true);
-    }
+    const formData = new FormData(facetForm);
+    formData.set('sort_by', sortValue);
+    searchParams = new URLSearchParams(formData).toString();
+  } else {
+    const currentParams = new URLSearchParams(window.location.search);
+    currentParams.set('sort_by', sortValue);
+    searchParams = currentParams.toString();
   }
+
+  renderSortOnly(searchParams);
 }
 
-// Desktop sort handler
-document.addEventListener('change', function(event) {
+// Desktop sort: change event
+document.addEventListener('change', function (event) {
   if (event.target.matches('#SortBy, #SortBy-mobile')) {
     event.preventDefault();
     const sortValue = event.target.value;
@@ -1346,42 +1430,65 @@ document.addEventListener('change', function(event) {
   }
 });
 
-// Mobile sort drawer click handler
-document.addEventListener('click', function(event) {
+// Desktop sort: prefetch on mouseenter (hover over each <option> not reliable cross-browser,
+// so we prefetch all options on dropdown open — only fires once per open)
+document.addEventListener('mousedown', function (event) {
+  if (event.target.matches('#SortBy, #SortBy-mobile')) {
+    // Prefetch all sort options on dropdown open
+    const select = event.target;
+    Array.from(select.options).forEach((opt) => {
+      if (opt.value && opt.value !== select.value) {
+        prefetchSortOption(opt.value);
+      }
+    });
+  }
+});
+
+// Mobile sort drawer: prefetch all options when drawer opens
+const _originalOpenSortDrawer = window.openSortDrawer;
+window.openSortDrawer = function () {
+  if (typeof _originalOpenSortDrawer === 'function') _originalOpenSortDrawer();
+  else {
+    const sortDrawer = document.getElementById('mobileSortDrawer');
+    const overlay = document.querySelector('.mobile-sort-overlay');
+    if (sortDrawer) {
+      sortDrawer.classList.add('active');
+      overlay?.classList.add('active');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  // Prefetch all mobile sort options on drawer open
+  document.querySelectorAll('.mobile-sort-option').forEach((opt) => {
+    const val = opt.getAttribute('data-value');
+    if (val) prefetchSortOption(val);
+  });
+};
+
+// Mobile sort drawer click
+document.addEventListener('click', function (event) {
   const sortOption = event.target.closest('.mobile-sort-option');
   if (sortOption) {
     event.preventDefault();
     const sortValue = sortOption.getAttribute('data-value');
-    
     if (sortValue) {
       updateSortUI(sortValue);
       triggerSortSubmit(sortValue);
-      
-      if (typeof closeSortDrawer === 'function') {
-        closeSortDrawer();
-      }
+      if (typeof closeSortDrawer === 'function') closeSortDrawer();
     }
   }
 });
 
-// Initialize sort UI on page load
-window.addEventListener('DOMContentLoaded', function() {
+// Sync UI on initial page load (e.g. back navigation)
+window.addEventListener('DOMContentLoaded', function () {
   const urlParams = new URLSearchParams(window.location.search);
   const currentSort = urlParams.get('sort_by');
-  if (currentSort) {
-    updateSortUI(currentSort);
-  }
+  if (currentSort) updateSortUI(currentSort);
 });
 
-// ============================================
-// PERFORMANCE MONITORING (Optional)
-// ============================================
-if (window.performance && console.table) {
-  const originalRenderPage = FacetFiltersForm.renderPage;
-  FacetFiltersForm.renderPage = async function(...args) {
-    const startTime = performance.now();
-    await originalRenderPage.apply(this, args);
-    const endTime = performance.now();
-    console.log(`Filter render took ${(endTime - startTime).toFixed(2)}ms`);
-  };
-}
+// Also override selectSortOption used in the Liquid template onclick
+window.selectSortOption = function (value, name) {
+  updateSortUI(value);
+  triggerSortSubmit(value);
+  if (typeof closeSortDrawer === 'function') closeSortDrawer();
+};
