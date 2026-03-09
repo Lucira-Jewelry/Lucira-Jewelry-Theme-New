@@ -544,9 +544,11 @@ class FacetFiltersForm extends HTMLElement {
       '#FacetFiltersForm .js-filter, #FacetFiltersFormMobile .js-filter, #FacetFiltersPillsForm .js-filter'
     );
 
-    Array.from(fromDom).forEach(cur => {
-      if (!Array.from(fromFetch).some(({ id }) => cur.id === id)) cur.remove();
-    });
+    if (fromFetch.length > 0) {
+      Array.from(fromDom).forEach(cur => {
+        if (!Array.from(fromFetch).some(({ id }) => cur.id === id)) cur.remove();
+      });
+    }
 
     const matchesId = el => {
       const jsFilter = event ? event.target.closest('.js-filter') : undefined;
