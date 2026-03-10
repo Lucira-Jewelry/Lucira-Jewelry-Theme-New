@@ -118,35 +118,62 @@
                   {%- assign lazy_load = true -%}
                 {%- endif -%}
 
-                {% assign banner_desktop = section.settings.plp_banner_1_desktop %}
-                {% assign banner_mobile = section.settings.plp_banner_1_mobile %}
+                {% assign first_banner_position = section.settings.first_banner_position %}
+                {% assign second_banner_position = section.settings.second_banner_position %}
+                {% assign banner_repeat_interval = section.settings.banner_repeat_interval %}
 
-                {% if global_index >= second_banner_position %}
-                  {% assign banner_desktop = section.settings.plp_banner_2_desktop %}
-                  {% assign banner_mobile = section.settings.plp_banner_2_mobile %}
+                {% assign global_index = paginate.current_offset | plus: forloop.index %}
+
+                {% assign show_banner = false %}
+
+                {% if global_index == first_banner_position %}
+                  {% assign show_banner = true %}
+                {% elsif global_index == second_banner_position %}
+                  {% assign show_banner = true %}
+                {% elsif global_index > second_banner_position %}
+                  {% assign remainder = global_index | minus: second_banner_position | modulo: banner_repeat_interval %}
+                  {% if remainder == 0 %}
+                    {% assign show_banner = true %}
+                  {% endif %}
                 {% endif %}
 
-                {% if banner_desktop != blank %}
-                  <picture class="lucira-plp-pg-component-image-wrapper-picture">
-
-                    {% if banner_mobile != blank %}
-                      <source
-                        media="(max-width: 749px)"
-                        srcset="{{ banner_mobile | image_url: width: 600 }}"
-                      >
-                    {% endif %}
-
-                    <img
-                      class="lucira-plp-pg-component-image"
-                      src="{{ banner_desktop | image_url: width: 800 }}"
-                      alt="PLP Banner"
-                      width="374"
-                      height="420"
-                      loading="lazy"
+                {% unless product.tags contains 'hidden' %}
+                  {% if show_banner %}
+                    <li
+                      class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
+                      {% if settings.animations_reveal_on_scroll %}
+                        data-cascade
+                        style="--animation-order: {{ forloop.index }};"
+                      {% endif %}
                     >
+                      <div class="lucira-plp-pg-component">
+                        <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
+                          {% if section.settings.plp_banner_id != blank %}
+                            <picture class="lucira-plp-pg-component-image-wrapper-picture">
 
-                  </picture>
-                {% endif %}
+                              {% if section.settings.plp_banner_mobile_id != blank %}
+                                <source
+                                  media="(max-width: 749px)"
+                                  srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}"
+                                >
+                              {% endif %}
+
+                              <img
+                                class="lucira-plp-pg-component-image"
+                                src="{{ section.settings.plp_banner_id | img_url: 'master' }}"
+                                alt="PLP Banner"
+                                title="PLP Banner"
+                                width="374"
+                                height="420"
+                              >
+
+                            </picture>
+                          {% endif %}
+                        </div>
+                      </div>
+                    </li>
+                  {% endif %}
+                {% endunless %}
 
                 {% unless product.tags contains 'hidden' %}
                   {% capture di_values %}
@@ -352,26 +379,6 @@
       "content": "PLP Banner Settings"
     },
     {
-      "type": "image_picker",
-      "id": "plp_banner_1_desktop",
-      "label": "Banner 1 Desktop Image"
-    },
-    {
-      "type": "image_picker",
-      "id": "plp_banner_1_mobile",
-      "label": "Banner 1 Mobile Image"
-    },
-    {
-      "type": "image_picker",
-      "id": "plp_banner_2_desktop",
-      "label": "Banner 2 Desktop Image"
-    },
-    {
-      "type": "image_picker",
-      "id": "plp_banner_2_mobile",
-      "label": "Banner 2 Mobile Image"
-    },
-    {
       "type": "number",
       "id": "first_banner_position",
       "label": "First Banner Position",
@@ -381,12 +388,25 @@
       "type": "number",
       "id": "second_banner_position",
       "label": "Second Banner Position",
-      "default": 16
+      "default": 18
     },
     {
       "type": "number",
       "id": "banner_repeat_interval",
-      "label": "Repeat Banner Interval",
+      "label": "Repeat Banner After (Products)",
+      "default": 6,
+      "info": "After the second banner, banner will repeat every X products"
+    },
+    {
+      "type": "image_picker",
+      "id": "plp_banner_mobile_id",
+      "label": "PLP Banner Image (Mobile)",
+      "info": "Upload a separate image to show on mobile (<= 749px). If blank, desktop banner will be used."
+    },
+    {
+      "type": "number",
+      "id": "banner_grid_position",
+      "label": "Banner Grid Position",
       "default": 6
     },
     {
