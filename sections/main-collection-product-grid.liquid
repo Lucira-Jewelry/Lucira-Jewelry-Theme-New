@@ -118,16 +118,59 @@
                   {%- assign lazy_load = true -%}
                 {%- endif -%}
 
-                {% assign first_banner_position = 6 %}
-                {% assign subsequent_banner_position = 18 %}
+                {% assign first_banner_position = section.settings.first_banner_position %}
+                {% assign second_banner_position = section.settings.second_banner_position %}
+                {% assign banner_gap = section.settings.banner_loop_gap %}
 
-                {% if paginate.current_page == 1 %}
-                  {% assign banner_position = first_banner_position %}
-                {% else %}
-                  {% assign banner_position = subsequent_banner_position %}
+                {% assign product_counter = paginate.current_offset | plus: forloop.index %}
+                {% assign global_index = product_counter %}
+
+                {% assign show_banner = false %}
+                {% assign banner_image = '' %}
+                {% assign banner_mobile_image = '' %}
+                {% assign banner_link = '' %}
+
+                {% if global_index == first_banner_position %}
+
+                  {% assign show_banner = true %}
+                  {% assign banner_image = section.settings.plp_banner_id %}
+                  {% assign banner_mobile_image = section.settings.plp_banner_mobile_id %}
+                  {% assign banner_link = section.settings.plp_banner_link %}
+
+                {% elsif global_index == second_banner_position %}
+
+                  {% assign show_banner = true %}
+                  {% assign banner_image = section.settings.plp_banner_second_id %}
+                  {% assign banner_mobile_image = section.settings.plp_banner_second_mobile_id %}
+                  {% assign banner_link = section.settings.plp_banner_second_link %}
+
+                {% elsif global_index > second_banner_position %}
+
+                    {% assign diff = global_index | minus: second_banner_position | minus: 1 %}
+                    {% assign remainder = diff | modulo: banner_gap %}
+
+                    {% if remainder == 0 %}
+
+                    {% assign show_banner = true %}
+                    {% assign loop_step = diff | divided_by: banner_gap %}
+                    {% assign loop_mod = loop_step | modulo: 2 %}
+
+                    {% if loop_mod == 1 %}
+                      {% assign banner_image = section.settings.plp_banner_second_id %}
+                      {% assign banner_mobile_image = section.settings.plp_banner_second_mobile_id %}
+                      {% assign banner_link = section.settings.plp_banner_second_link %}
+                    {% else %}
+                      {% assign banner_image = section.settings.plp_banner_id %}
+                      {% assign banner_mobile_image = section.settings.plp_banner_mobile_id %}
+                      {% assign banner_link = section.settings.plp_banner_link %}
+                    {% endif %}
+
+                  {% endif %}
+
                 {% endif %}
+
                 {% unless product.tags contains 'hidden' %}
-                  {% if forloop.index0 == banner_position %}
+                  {% if show_banner %}
                     <li
                       class="lucira-collec-banner grid__item{% if settings.animations_reveal_on_scroll %}--span-2 scroll-trigger animate--slide-in{% endif %}"
                       {% if settings.animations_reveal_on_scroll %}
@@ -136,27 +179,31 @@
                       {% endif %}
                     >
                       <div class="lucira-plp-pg-component">
+                        <a href="{{ banner_link }}" class="plp-banner-link">
                         <div id="lucira-plp-img-1" class="lucira-plp-pg-component-image-wrapper active">
-                          {% if section.settings.plp_banner_id != blank %}
+                          {% if banner_image != blank %}
                             <picture class="lucira-plp-pg-component-image-wrapper-picture">
-                              {% if section.settings.plp_banner_mobile_id != blank %}
+
+                              {% if banner_mobile_image != blank %}
                                 <source
                                   media="(max-width: 749px)"
-                                  srcset="{{ section.settings.plp_banner_mobile_id | img_url: 'master' }}"
+                                  srcset="{{ banner_mobile_image | img_url: 'master' }}"
                                 >
                               {% endif %}
+
                               <img
                                 class="lucira-plp-pg-component-image"
-                                src="{{ section.settings.plp_banner_id | img_url: 'master' }}"
+                                src="{{ banner_image | img_url: 'master' }}"
                                 alt="PLP Banner"
                                 title="PLP Banner"
-                                href="https://www.lucirajewelry.com/collections/hexa"
                                 width="374"
                                 height="420"
                               >
+
                             </picture>
                           {% endif %}
                         </div>
+                        </a>
                       </div>
                     </li>
                   {% endif %}
@@ -363,9 +410,53 @@
     },
     {
       "type": "image_picker",
+      "id": "plp_banner_second_id",
+      "label": "PLP Second Banner Image"
+    },
+    {
+      "type": "header",
+      "content": "PLP Banner Settings"
+    },
+    {
+      "type": "number",
+      "id": "first_banner_position",
+      "label": "First Banner Position",
+      "default": 6
+    },
+    {
+      "type": "number",
+      "id": "second_banner_position",
+      "label": "Second Banner Position",
+      "default": 14
+    },
+    {
+      "type": "number",
+      "id": "banner_loop_gap",
+      "label": "Banner Repeat Every (products)",
+      "default": 10,
+      "info": "After the 2nd banner, repeat banners every X products. e.g. 10 = positions 24, 34, 44..."
+    },
+    {
+      "type": "image_picker",
       "id": "plp_banner_mobile_id",
       "label": "PLP Banner Image (Mobile)",
       "info": "Upload a separate image to show on mobile (<= 749px). If blank, desktop banner will be used."
+    },
+    {
+      "type": "image_picker",
+      "id": "plp_banner_second_mobile_id",
+      "label": "PLP Second Banner Image (Mobile)"
+    },
+    
+    {
+      "type": "url",
+      "id": "plp_banner_link",
+      "label": "PLP Banner 1 Link"
+    },
+    {
+      "type": "url",
+      "id": "plp_banner_second_link",
+      "label": "PLP Banner 2 Link"
     },
     {
       "type": "number",
