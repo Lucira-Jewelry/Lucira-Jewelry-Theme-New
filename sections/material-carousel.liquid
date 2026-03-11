@@ -1,86 +1,194 @@
 {%- liquid
-  assign s_id    = 'mc-' | append: section.id
+  assign s_id    = 'ms-' | append: section.id
   assign s_total = section.blocks.size
 -%}
 
 <section
-  class="mc-root"
+  class="ms-root"
   id="{{ s_id }}"
-  data-mc-section
-  data-mc-id="{{ s_id }}"
-  data-mc-total="{{ s_total }}"
+  data-ms-section
+  data-ms-id="{{ s_id }}"
+  data-ms-total="{{ s_total }}"
+  tabindex="-1"
 >
-  <div class="mc-inner">
+  <div class="ms-inner">
 
-    {%- comment -%}── MAIN TITLE SECTION (MATERIALS) ──{%- endcomment -%}
-    <div class="mc-header">
-      <h2 class="mc-header__title">{{ section.settings.title | default: 'MATERIALS' | escape }}</h2>
-      <p class="mc-header__desc">{{ section.settings.header_description | default: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.' }}</p>
+    {%- comment -%}── HEADER ──{%- endcomment -%}
+    <div class="ms-head">
+      {%- if section.settings.title != blank -%}
+        <h2 class="ms-head__title">{{ section.settings.title | escape }}</h2>
+      {%- endif -%}
+      {%- if section.settings.subtitle != blank -%}
+        <p class="ms-head__subtitle">{{ section.settings.subtitle }}</p>
+      {%- endif -%}
     </div>
 
-    {%- comment -%}── CYLINDRICAL CAROUSEL WITH 5 VISIBLE IMAGES ──{%- endcomment -%}
-    <div class="mc-carousel-wrapper">
-      <!-- Curved background cylinder -->
-      <div class="mc-cylinder-bg"></div>
-      
-      <div class="mc-carousel" data-mc-carousel>
-        <button class="mc-arrow mc-arrow--left" data-mc-prev aria-label="Previous">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
+    {%- comment -%}
+      ── CAROUSEL STAGE ──
+      All slides stacked via position:absolute inside a fixed-height
+      container — zero layout shift on every transition.
+    {%- endcomment -%}
+    <div class="ms-stage-wrap">
+      <div class="ms-stage" data-ms-stage>
 
-        <div class="mc-track-container">
-          <div class="mc-track" data-mc-track>
-            {%- comment -%}Create enough slides for infinite loop effect with 5 visible{%- endcomment -%}
-            {%- for i in (1..15) -%}
-              {%- assign block_index = forloop.index0 | modulo: s_total -%}
-              {%- assign block = section.blocks[block_index] -%}
-              
-              <div class="mc-slide" data-mc-slide="{{ block_index }}" data-mc-pos="{{ forloop.index0 }}">
-                <div class="mc-slide-inner">
-                  {%- if block.settings.image != blank -%}
-                    {{- block.settings.image
-                        | image_url: width: 400
-                        | image_tag:
-                            class: 'mc-slide__img',
-                            loading: 'lazy',
-                            alt: block.settings.name,
-                            widths: '200,300,400' -}}
-                  {%- else -%}
-                    <div class="mc-slide__placeholder"></div>
-                  {%- endif -%}
-                </div>
-              </div>
-            {%- endfor -%}
-          </div>
-        </div>
-
-        <button class="mc-arrow mc-arrow--right" data-mc-next aria-label="Next">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </button>
-      </div>
-
-      <!-- Material indicators (dots) -->
-      <div class="mc-indicators" data-mc-indicators>
         {%- for block in section.blocks -%}
-          <button class="mc-indicator{% if forloop.first %} is-active{% endif %}" data-mc-indicator="{{ forloop.index0 }}" aria-label="Go to {{ block.settings.name }}">
-            <span class="mc-indicator-dot"></span>
-          </button>
+          {%- liquid
+            assign bi = forloop.index0
+            assign pi = bi | minus: 1
+            if pi < 0
+              assign pi = s_total | minus: 1
+            endif
+            assign ni = bi | plus: 1
+            if ni >= s_total
+              assign ni = 0
+            endif
+            assign pb = section.blocks[pi]
+            assign nb = section.blocks[ni]
+          -%}
+
+          <div
+            class="ms-slide{% if forloop.first %} is-active{% endif %}"
+            data-ms-slide="{{ bi }}"
+            aria-hidden="{% unless forloop.first %}true{% else %}false{% endunless %}"
+            {{ block.shopify_attributes }}
+          >
+            {%- comment -%}── DESKTOP 3-panel ──{%- endcomment -%}
+            <div class="ms-panels">
+
+              <div class="ms-panel ms-panel--l">
+                {%- if pb.settings.desktop_image != blank -%}
+                  {{- pb.settings.desktop_image
+                      | image_url: width: 480
+                      | image_tag:
+                          class: 'ms-panel__img',
+                          loading: 'lazy',
+                          alt: pb.settings.name,
+                          widths: '240,360,480' -}}
+                {%- endif -%}
+              </div>
+
+              <div class="ms-panel ms-panel--c">
+                {%- if block.settings.desktop_image != blank -%}
+                  {{- block.settings.desktop_image
+                      | image_url: width: 700
+                      | image_tag:
+                          class: 'ms-panel__img',
+                          loading: 'lazy',
+                          alt: block.settings.name,
+                          widths: '400,560,700' -}}
+                {%- elsif block.settings.mobile_image != blank -%}
+                  {{- block.settings.mobile_image
+                      | image_url: width: 700
+                      | image_tag:
+                          class: 'ms-panel__img',
+                          loading: 'lazy',
+                          alt: block.settings.name -}}
+                {%- endif -%}
+              </div>
+
+              <div class="ms-panel ms-panel--r">
+                {%- if nb.settings.desktop_image != blank -%}
+                  {{- nb.settings.desktop_image
+                      | image_url: width: 480
+                      | image_tag:
+                          class: 'ms-panel__img',
+                          loading: 'lazy',
+                          alt: nb.settings.name,
+                          widths: '240,360,480' -}}
+                {%- endif -%}
+              </div>
+
+              
+
+            </div>
+
+            {%- comment -%}── MOBILE single panel ──{%- endcomment -%}
+            <div class="ms-mobile-panel">
+              {%- if block.settings.mobile_image != blank -%}
+                {{- block.settings.mobile_image
+                    | image_url: width: 600
+                    | image_tag:
+                        class: 'ms-panel__img',
+                        loading: 'lazy',
+                        alt: block.settings.name,
+                        widths: '300,450,600' -}}
+              {%- elsif block.settings.desktop_image != blank -%}
+                {{- block.settings.desktop_image
+                    | image_url: width: 600
+                    | image_tag:
+                        class: 'ms-panel__img',
+                        loading: 'lazy',
+                        alt: block.settings.name,
+                        widths: '300,450,600' -}}
+              {%- endif -%}
+            </div>
+
+          </div>
+        {%- endfor -%}
+
+      </div>
+    </div>
+
+    {%- comment -%}── CONTROLS: arrow · single active dot · arrow ──{%- endcomment -%}
+    <div class="ms-controls">
+
+      <button class="ms-arrow ms-arrow--prev" type="button" data-ms-prev aria-label="Previous material">
+        <svg width="7" height="13" viewBox="0 0 7 13" fill="none" aria-hidden="true">
+          <path d="M6 1.5 1 6.5l5 5" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
+      <div class="ms-dot-display" data-ms-dot-display aria-hidden="true">
+        {%- for block in section.blocks -%}
+          <div
+            class="ms-dot-icon{% if forloop.first %} is-visible{% endif %}"
+            data-ms-dot-icon="{{ forloop.index0 }}"
+          >
+            {%- if block.settings.icon != blank -%}
+              {{- block.settings.icon
+                  | image_url: width: 80
+                  | image_tag:
+                      class: 'ms-dot-icon__img',
+                      loading: 'lazy',
+                      alt: block.settings.name -}}
+            {%- else -%}
+              <span
+                class="ms-dot-icon__swatch"
+                style="background:{{ block.settings.icon_color | default: '#1a1a1a' }};"
+              ></span>
+            {%- endif -%}
+          </div>
         {%- endfor -%}
       </div>
+
+      <button class="ms-arrow ms-arrow--next" type="button" data-ms-next aria-label="Next material">
+        <svg width="7" height="13" viewBox="0 0 7 13" fill="none" aria-hidden="true">
+          <path d="M1 1.5l5 5-5 5" stroke="currentColor" stroke-width="1.6"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+
     </div>
 
-    {%- comment -%}── MATERIAL INFO SECTION (BLACK BEADS + description + button) ──{%- endcomment -%}
-    <div class="mc-info-panel" data-mc-info-panel>
+    {%- comment -%}── INFO PANEL ──{%- endcomment -%}
+    <div class="ms-info-wrap" data-ms-info-wrap>
       {%- for block in section.blocks -%}
-        <div class="mc-info{% if forloop.first %} is-active{% endif %}" data-mc-info="{{ forloop.index0 }}">
-          <h3 class="mc-info__title">{{ block.settings.name | default: 'BLACK BEADS' | upcase }}</h3>
-          <p class="mc-info__desc">{{ block.settings.description | default: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.' }}</p>
+        <div
+          class="ms-info-item{% if forloop.first %} is-active{% endif %}"
+          data-ms-info="{{ forloop.index0 }}"
+          role="region"
+          aria-hidden="{% unless forloop.first %}true{% else %}false{% endunless %}"
+        >
+          <h3 class="ms-info-item__name">{{ block.settings.name | upcase | escape }}</h3>
+          {%- if block.settings.description != blank -%}
+            <p class="ms-info-item__desc">{{ block.settings.description }}</p>
+          {%- endif -%}
           {%- if block.settings.button_label != blank -%}
-            <a href="{{ block.settings.button_url | default: '#' }}" class="mc-info__btn">{{ block.settings.button_label | upcase }}</a>
+            <a
+              href="{{ block.settings.button_url | default: '#' }}"
+              class="ms-info-item__btn"
+            >{{ block.settings.button_label | upcase | escape }}</a>
           {%- endif -%}
         </div>
       {%- endfor -%}
@@ -91,497 +199,539 @@
 
 <style>
 /* ============================================================
-   MATERIALS CYLINDER CAROUSEL
-   Exact match to provided design
+   MATERIALS CAROUSEL  ·  prefix: ms-
+   Double-scoped: [data-ms-section] .ms-*  — zero bleed
    ============================================================ */
-[data-mc-section] {
-  --mc-bg: #f5f3f0;
-  --mc-cylinder-bg: #e8e4df;
-  --mc-slide-bg: #ffffff;
-  --mc-border: #d4d0cb;
-  --mc-text-dark: #1a1a1a;
-  --mc-text-light: #6b6b6b;
-  --mc-accent: #8c7a6b;
-  --mc-ease: cubic-bezier(0.4, 0, 0.2, 1);
-  --mc-dur: 500ms;
+[data-ms-section] {
+  --ms-bg:        #f0eeea;
+  --ms-arch-bg:   #e8e6e1;
+  --ms-panel-bg:  #ffffff;
+  --ms-border:    #e2e0db;
+  --ms-shad-c:    0 4px 32px rgba(0,0,0,0.10);
+  --ms-shad-s:    0 2px 12px rgba(0,0,0,0.05);
+  --ms-title-clr: #1a1a1a;
+  --ms-text-clr:  #6b6b6b;
+  --ms-btn-bg:    {{ section.settings.button_color | default: '#8c6464' }};
+  --ms-btn-hov:   {{ section.settings.button_hover_color | default: '#7a5555' }};
+  --ms-dot-sz:    56px;
+  --ms-arrow-sz:  36px;
+  --ms-ease:      cubic-bezier(0.4,0,0.2,1);
+  --ms-dur:       420ms;
+  --ms-stage-h:   380px;
 
-  background: var(--mc-bg);
-  padding: 80px 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-[data-mc-section] * {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-[data-mc-section] .mc-inner {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 40px;
-}
-
-/* ── HEADER SECTION (MATERIALS) ───────────────── */
-[data-mc-section] .mc-header {
-  text-align: center;
-  margin-bottom: 60px;
-}
-
-[data-mc-section] .mc-header__title {
-  font-size: 32px;
-  font-weight: 400;
-  letter-spacing: 8px;
-  text-transform: uppercase;
-  color: var(--mc-text-dark);
-  margin-bottom: 20px;
-}
-
-[data-mc-section] .mc-header__desc {
-  font-size: 16px;
-  line-height: 1.8;
-  color: var(--mc-text-light);
-  max-width: 700px;
-  margin: 0 auto;
-}
-
-/* ── CYLINDRICAL CAROUSEL ─────────────────────── */
-[data-mc-section] .mc-carousel-wrapper {
-  position: relative;
-  margin: 40px 0 30px;
-  padding: 30px 0;
-}
-
-/* Cylinder background (the curved shape) */
-[data-mc-section] .mc-cylinder-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: var(--mc-cylinder-bg);
-  border-radius: 50% / 60px 60px 60px 60px;
-  transform: scaleY(0.85);
-  box-shadow: 0 20px 30px rgba(0,0,0,0.05);
-  z-index: 0;
-}
-
-[data-mc-section] .mc-carousel {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  z-index: 2;
-}
-
-[data-mc-section] .mc-track-container {
-  flex: 1;
+  background: var(--ms-bg);
+  padding: 60px 0 56px;
   overflow: hidden;
-  padding: 20px 0;
+  font-family: inherit;
+  isolation: isolate;
 }
 
-[data-mc-section] .mc-track {
-  display: flex;
-  gap: 20px;
-  transition: transform var(--mc-dur) var(--mc-ease);
-  will-change: transform;
-}
+[data-ms-section] *,
+[data-ms-section] *::before,
+[data-ms-section] *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-/* Individual slides */
-[data-mc-section] .mc-slide {
-  flex: 0 0 calc(20% - 16px); /* 5 slides visible with gap */
-  min-width: 180px;
-  aspect-ratio: 3/4;
-  background: var(--mc-slide-bg);
-  border: 1px solid var(--mc-border);
-  border-radius: 40px 40px 20px 20px; /* Squeezed top/bottom radius */
-  overflow: hidden;
-  box-shadow: 0 15px 25px rgba(0,0,0,0.1);
-  transition: all 0.3s ease;
-  position: relative;
-}
+[data-ms-section] a          { text-decoration: none; }
+[data-ms-section] img        { display: block; }
+[data-ms-section] button     { appearance: none; -webkit-appearance: none; border: none; background: none; cursor: pointer; font-family: inherit; }
 
-/* Inner circle effect */
-[data-mc-section] .mc-slide::before {
-  content: '';
-  position: absolute;
-  inset: 8px;
-  border-radius: 32px 32px 16px 16px;
-  background: rgba(255,255,255,0.15);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Active slide highlight */
-[data-mc-section] .mc-slide.is-active {
-  transform: scale(1.02);
-  box-shadow: 0 20px 30px rgba(0,0,0,0.15);
-  border-color: var(--mc-accent);
-}
-
-[data-mc-section] .mc-slide-inner {
-  width: 100%;
-  height: 100%;
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-[data-mc-section] .mc-slide__img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1));
-}
-
-[data-mc-section] .mc-slide__placeholder {
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(135deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-  background-size: 200% 200%;
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* Navigation arrows */
-[data-mc-section] .mc-arrow {
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--mc-border);
-  border-radius: 50%;
-  background: white;
-  color: var(--mc-text-dark);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  z-index: 3;
-}
-
-[data-mc-section] .mc-arrow:hover {
-  background: var(--mc-accent);
-  color: white;
-  border-color: var(--mc-accent);
-  transform: scale(1.05);
-}
-
-[data-mc-section] .mc-arrow:active {
-  transform: scale(0.95);
-}
-
-/* Indicators (dots) */
-[data-mc-section] .mc-indicators {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 20px;
-  position: relative;
-  z-index: 2;
-}
-
-[data-mc-section] .mc-indicator {
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 5px;
-}
-
-[data-mc-section] .mc-indicator-dot {
-  display: block;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--mc-border);
-  transition: all 0.3s var(--mc-ease);
-}
-
-[data-mc-section] .mc-indicator.is-active .mc-indicator-dot {
-  width: 24px;
-  border-radius: 12px;
-  background: var(--mc-accent);
-}
-
-/* ── INFO PANEL (BLACK BEADS section) ──────────── */
-[data-mc-section] .mc-info-panel {
-  position: relative;
-  min-height: 200px;
-  margin-top: 40px;
+/* ── Layout ─────────────────────────────────── */
+[data-ms-section] .ms-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 24px;
   text-align: center;
 }
 
-[data-mc-section] .mc-info {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  opacity: 0;
-  visibility: hidden;
-  transform: translateY(20px);
-  transition: all 0.4s var(--mc-ease);
-  pointer-events: none;
-}
+/* ── Header ─────────────────────────────────── */
+[data-ms-section] .ms-head { margin-bottom: 44px; }
 
-[data-mc-section] .mc-info.is-active {
-  opacity: 1;
-  visibility: visible;
-  transform: translateY(0);
-  pointer-events: auto;
-}
-
-[data-mc-section] .mc-info__title {
-  font-size: 24px;
+[data-ms-section] .ms-head__title {
+  font-size: clamp(18px, 2vw, 26px);
   font-weight: 400;
   letter-spacing: 6px;
   text-transform: uppercase;
-  color: var(--mc-text-dark);
-  margin-bottom: 16px;
+  color: var(--ms-title-clr);
+  margin-bottom: 18px;
 }
 
-[data-mc-section] .mc-info__desc {
-  font-size: 16px;
+[data-ms-section] .ms-head__subtitle {
+  font-size: 15px;
+  color: var(--ms-text-clr);
   line-height: 1.8;
-  color: var(--mc-text-light);
-  max-width: 600px;
-  margin: 0 auto 24px;
+  max-width: 560px;
+  margin: 0 auto;
 }
 
-[data-mc-section] .mc-info__btn {
+/* ── Stage wrap + arch ───────────────────────── */
+[data-ms-section] .ms-stage-wrap {
+  position: relative;
+}
+
+[data-ms-section] .ms-stage-wrap::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  height: 88%;
+  background: var(--ms-arch-bg);
+  border-radius: 50% 50% 0 0 / 18% 18% 0 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* Fixed-height stage prevents layout shift */
+[data-ms-section] .ms-stage {
+  position: relative;
+  height: var(--ms-stage-h);
+  z-index: 1;
+}
+
+/* ── Slides: ALL stacked, no display:none ────── */
+[data-ms-section] .ms-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(32px);
+  transition:
+    opacity var(--ms-dur) var(--ms-ease),
+    transform var(--ms-dur) var(--ms-ease),
+    visibility 0s linear var(--ms-dur);
+  will-change: opacity, transform;
+}
+
+[data-ms-section] .ms-slide.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(0);
+  z-index: 2;
+  transition:
+    opacity var(--ms-dur) var(--ms-ease),
+    transform var(--ms-dur) var(--ms-ease),
+    visibility 0s linear 0s;
+}
+
+/* Direction-aware outgoing animations */
+[data-ms-section] .ms-slide.is-out-left {
+  opacity: 0;
+  transform: translateX(-32px);
+  transition:
+    opacity var(--ms-dur) var(--ms-ease),
+    transform var(--ms-dur) var(--ms-ease);
+  z-index: 1;
+}
+
+[data-ms-section] .ms-slide.is-out-right {
+  opacity: 0;
+  transform: translateX(32px);
+  transition:
+    opacity var(--ms-dur) var(--ms-ease),
+    transform var(--ms-dur) var(--ms-ease);
+  z-index: 1;
+}
+
+/* ── 3-panel desktop ─────────────────────────── */
+[data-ms-section] .ms-panels {
+  display: flex;
+  align-items: stretch;
+  height: 100%;
+  gap:10px;
+}
+
+[data-ms-section] .ms-panel {
+  flex: 1;
+  background: var(--ms-panel-bg);
+  border: 1px solid var(--ms-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  height: 100%;
+}
+
+[data-ms-section] .ms-panel--l {
+  border-right: none;
+  border-radius: 10px 0 0 10px;
+  transform: perspective(1000px) rotateY(30deg) scaleY(0.96);
+  transform-origin: right center;
+  box-shadow: var(--ms-shad-s);
+  opacity: 0.82;
+}
+
+[data-ms-section] .ms-panel--r {
+  border-left: none;
+  border-radius: 0 10px 10px 0;
+  transform: perspective(1000px) rotateY(-30deg) scaleY(0.96);
+  transform-origin: left center;
+  box-shadow: var(--ms-shad-s);
+  opacity: 0.82;
+}
+
+[data-ms-section] .ms-panel--c {
+  z-index: 3;
+  border-radius: 4px;
+  box-shadow: var(--ms-shad-c);
+  flex: 1.15;
+}
+
+/* Images fill panels while preserving aspect ratio */
+[data-ms-section] .ms-panel__img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 24px 18px;
+}
+
+/* ── Mobile single panel ─────────────────────── */
+[data-ms-section] .ms-mobile-panel {
+  display: none;
+  height: 100%;
+  align-items: center;
+  justify-content: center;
+  background: var(--ms-panel-bg);
+  border: 1px solid var(--ms-border);
+  border-radius: 6px;
+  box-shadow: var(--ms-shad-c);
+  overflow: hidden;
+}
+
+/* ── Controls ────────────────────────────────── */
+[data-ms-section] .ms-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 28px 0 4px;
+  position: relative;
+  z-index: 4;
+}
+
+[data-ms-section] .ms-arrow {
+  flex-shrink: 0;
+  width: var(--ms-arrow-sz);
+  height: var(--ms-arrow-sz);
+  border: 1.5px solid #c8c8c8 !important;
+  border-radius: 50%;
+  background: transparent !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #444;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+}
+[data-ms-section] .ms-arrow:hover {
+  border-color: #888 !important;
+  background: rgba(0,0,0,0.04) !important;
+}
+[data-ms-section] .ms-arrow:active { transform: scale(0.90); }
+
+/* ── Single dot display ──────────────────────── */
+[data-ms-section] .ms-dot-display {
+  position: relative;
+  width: var(--ms-dot-sz);
+  height: var(--ms-dot-sz);
+  flex-shrink: 0;
+  border-radius: 50%;
+  /* Outer ring */
+  box-shadow: 0 0 0 2.5px #1a1a1a;
+}
+
+/* All icons stacked, only .is-visible shows */
+[data-ms-section] .ms-dot-icon {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  opacity: 0;
+  transform: scale(0.65) rotate(-20deg);
+  pointer-events: none;
+  transition:
+    opacity 0.32s var(--ms-ease),
+    transform 0.32s var(--ms-ease);
+}
+
+[data-ms-section] .ms-dot-icon.is-visible {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+
+[data-ms-section] .ms-dot-icon__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+[data-ms-section] .ms-dot-icon__swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+/* ── Info block ──────────────────────────────── */
+[data-ms-section] .ms-info-wrap {
+  position: relative;
+  min-height: 152px;
+  margin-top: 24px;
+}
+
+[data-ms-section] .ms-info-item {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition:
+    opacity 0.35s var(--ms-ease),
+    transform 0.35s var(--ms-ease),
+    visibility 0s linear 0.35s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+[data-ms-section] .ms-info-item.is-active {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+  transition:
+    opacity 0.35s var(--ms-ease) 0.12s,
+    transform 0.35s var(--ms-ease) 0.12s,
+    visibility 0s linear 0s;
+}
+
+[data-ms-section] .ms-info-item__name {
+  font-size: clamp(15px, 1.6vw, 20px);
+  font-weight: 400;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--ms-title-clr);
+}
+
+[data-ms-section] .ms-info-item__desc {
+  font-size: 14px;
+  color: var(--ms-text-clr);
+  line-height: 1.8;
+  max-width: 480px;
+}
+
+[data-ms-section] .ms-info-item__btn {
   display: inline-block;
-  padding: 14px 42px;
-  background: transparent;
-  color: var(--mc-text-dark);
-  border: 1px solid var(--mc-accent);
-  font-size: 12px;
+  padding: 13px 38px;
+  background: var(--ms-btn-bg);
+  color: #fff;
+  font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
-  text-decoration: none;
-  transition: all 0.3s ease;
+  transition: background 0.22s var(--ms-ease), transform 0.15s;
+  margin-top: 4px;
+}
+[data-ms-section] .ms-info-item__btn:hover {
+  background: var(--ms-btn-hov);
+  color: #fff;
+}
+[data-ms-section] .ms-info-item__btn:active { transform: scale(0.97); }
+
+/* ── Responsive ──────────────────────────────── */
+@media screen and (max-width: 767px) {
+  [data-ms-section] {
+    padding: 40px 0 44px;
+    --ms-stage-h: 300px;
+  }
+  [data-ms-section] .ms-inner    { padding: 0 16px; }
+  [data-ms-section] .ms-head     { margin-bottom: 28px; }
+  [data-ms-section] .ms-head__title { font-size: 17px; letter-spacing: 4px; }
+
+  [data-ms-section] .ms-panels         { display: none !important; }
+  [data-ms-section] .ms-mobile-panel   { display: flex; }
+
+  [data-ms-section] .ms-stage-wrap::before {
+    border-radius: 50% 50% 0 0 / 12% 12% 0 0;
+    height: 84%;
+  }
+  [data-ms-section] .ms-info-wrap     { min-height: 164px; }
+  [data-ms-section] .ms-info-item__desc { max-width: 300px; }
 }
 
-[data-mc-section] .mc-info__btn:hover {
-  background: var(--mc-accent);
-  color: white;
-}
-
-/* ── RESPONSIVE ───────────────────────────────── */
-@media screen and (max-width: 1024px) {
-  [data-mc-section] .mc-slide {
-    flex: 0 0 calc(25% - 15px); /* 4 slides visible */
-  }
-}
-
-@media screen and (max-width: 768px) {
-  [data-mc-section] {
-    padding: 40px 0;
-  }
-
-  [data-mc-section] .mc-inner {
-    padding: 0 20px;
-  }
-
-  [data-mc-section] .mc-header__title {
-    font-size: 24px;
-    letter-spacing: 4px;
-  }
-
-  [data-mc-section] .mc-header__desc {
-    font-size: 14px;
-  }
-
-  [data-mc-section] .mc-slide {
-    flex: 0 0 calc(33.33% - 14px); /* 3 slides visible on tablet */
-    min-width: 140px;
-  }
-
-  [data-mc-section] .mc-arrow {
-    width: 36px;
-    height: 36px;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  [data-mc-section] .mc-slide {
-    flex: 0 0 calc(50% - 10px); /* 2 slides visible on mobile */
-  }
-
-  [data-mc-section] .mc-info__title {
-    font-size: 20px;
-    letter-spacing: 3px;
-  }
-
-  [data-mc-section] .mc-info__desc {
-    font-size: 14px;
-  }
-
-  [data-mc-section] .mc-info__btn {
-    padding: 12px 32px;
-    font-size: 11px;
-  }
-}
+[data-ms-section][data-ms-total="1"] .ms-controls { display: none; }
 </style>
 
 <script>
-(function() {
-  const section = document.querySelector('[data-mc-section]');
-  if (!section) return;
+(function () {
+  'use strict';
 
-  const track = section.querySelector('[data-mc-track]');
-  const slides = Array.from(section.querySelectorAll('[data-mc-slide]'));
-  const indicators = Array.from(section.querySelectorAll('[data-mc-indicator]'));
-  const infoItems = Array.from(section.querySelectorAll('[data-mc-info]'));
-  const prevBtn = section.querySelector('[data-mc-prev]');
-  const nextBtn = section.querySelector('[data-mc-next]');
+  var ROOT = document.getElementById('{{ s_id }}');
+  if (!ROOT) return;
 
-  const totalSlides = {{ s_total }};
-  let currentIndex = 0;
-  let isAnimating = false;
+  var STAGE      = ROOT.querySelector('[data-ms-stage]');
+  var SLIDES     = Array.from(ROOT.querySelectorAll('[data-ms-slide]'));
+  var DOT_ICONS  = Array.from(ROOT.querySelectorAll('[data-ms-dot-icon]'));
+  var INFO_ITEMS = Array.from(ROOT.querySelectorAll('[data-ms-info]'));
+  var PREV_BTN   = ROOT.querySelector('[data-ms-prev]');
+  var NEXT_BTN   = ROOT.querySelector('[data-ms-next]');
 
-  // Calculate how many slides to show based on screen width
-  function getSlidesPerView() {
-    if (window.innerWidth <= 480) return 2;
-    if (window.innerWidth <= 768) return 3;
-    if (window.innerWidth <= 1024) return 4;
-    return 5;
+  var total    = SLIDES.length;
+  var current  = 0;
+  var locked   = false;
+  var DURATION = 420; // keep in sync with --ms-dur
+
+  if (total <= 1) return;
+
+  /* ── Core go() ──────────────────────────── */
+  function go(next, dir) {
+    if (locked) return;
+    next = ((next % total) + total) % total;
+    if (next === current) return;
+
+    locked = true;
+    var from = current;
+    current  = next;
+
+    var oldSlide = SLIDES[from];
+    var newSlide = SLIDES[next];
+
+    /* 1. Set incoming slide starting position (off-screen) */
+    var startX = dir === 'next' ? '32px' : '-32px';
+    newSlide.style.cssText =
+      'position:absolute;inset:0;opacity:0;visibility:visible;pointer-events:none;' +
+      'transform:translateX(' + startX + ');transition:none;z-index:2;';
+
+    /* 2. Force reflow — critical to make the starting state "stick" */
+    void newSlide.offsetWidth;
+
+    /* 3. Remove inline override so CSS transitions take over on oldSlide */
+    oldSlide.classList.remove('is-active');
+    oldSlide.classList.add(dir === 'next' ? 'is-out-left' : 'is-out-right');
+
+    /* 4. Animate new slide in via CSS */
+    newSlide.style.cssText = ''; // clear inline, let CSS .is-active drive it
+    newSlide.classList.add('is-active');
+    newSlide.setAttribute('aria-hidden', 'false');
+    oldSlide.setAttribute('aria-hidden', 'true');
+
+    /* 5. Clean up after animation */
+    var cleanup = setTimeout(function () {
+      oldSlide.classList.remove('is-out-left', 'is-out-right');
+      oldSlide.style.cssText = '';
+      locked = false;
+    }, DURATION + 60);
+
+    /* ── Dot icon ── */
+    var oldDot = DOT_ICONS[from];
+    var newDot = DOT_ICONS[next];
+    if (oldDot) oldDot.classList.remove('is-visible');
+    setTimeout(function () {
+      if (newDot) newDot.classList.add('is-visible');
+    }, 80);
+
+    /* ── Info panel ── */
+    var oldInfo = INFO_ITEMS[from];
+    var newInfo = INFO_ITEMS[next];
+    if (oldInfo) {
+      oldInfo.classList.remove('is-active');
+      oldInfo.setAttribute('aria-hidden', 'true');
+    }
+    if (newInfo) {
+      newInfo.classList.add('is-active');
+      newInfo.setAttribute('aria-hidden', 'false');
+    }
   }
 
-  // Update track position
-  function updateCarousel(index, animate = true) {
-    if (isAnimating) return;
-    isAnimating = true;
+  /* ── Buttons ── */
+  PREV_BTN && PREV_BTN.addEventListener('click', function () { go(current - 1, 'prev'); });
+  NEXT_BTN && NEXT_BTN.addEventListener('click', function () { go(current + 1, 'next'); });
 
-    const slidesPerView = getSlidesPerView();
-    const slideWidth = slides[0]?.offsetWidth || 200;
-    const gap = 20; // matches gap in CSS
-    const moveAmount = (slideWidth + gap) * index;
-    
-    track.style.transition = animate ? `transform var(--mc-dur) var(--mc-ease)` : 'none';
-    track.style.transform = `translateX(-${moveAmount}px)`;
-
-    // Update active states
-    slides.forEach(slide => {
-      const slideIndex = parseInt(slide.dataset.mcSlide);
-      if (slideIndex === index) {
-        slide.classList.add('is-active');
-      } else {
-        slide.classList.remove('is-active');
-      }
-    });
-
-    // Update indicators
-    indicators.forEach((indicator, i) => {
-      if (i === index) {
-        indicator.classList.add('is-active');
-      } else {
-        indicator.classList.remove('is-active');
-      }
-    });
-
-    // Update info panels
-    infoItems.forEach((item, i) => {
-      if (i === index) {
-        item.classList.add('is-active');
-      } else {
-        item.classList.remove('is-active');
-      }
-    });
-
-    setTimeout(() => {
-      isAnimating = false;
-    }, 500);
-  }
-
-  // Navigation
-  function nextSlide() {
-    const next = (currentIndex + 1) % totalSlides;
-    currentIndex = next;
-    updateCarousel(currentIndex);
-  }
-
-  function prevSlide() {
-    const prev = (currentIndex - 1 + totalSlides) % totalSlides;
-    currentIndex = prev;
-    updateCarousel(currentIndex);
-  }
-
-  // Event listeners
-  prevBtn?.addEventListener('click', prevSlide);
-  nextBtn?.addEventListener('click', nextSlide);
-
-  indicators.forEach((indicator, index) => {
-    indicator.addEventListener('click', () => {
-      currentIndex = index;
-      updateCarousel(currentIndex);
-    });
-  });
-
-  // Touch events
-  let touchStartX = 0;
-  track.addEventListener('touchstart', (e) => {
-    touchStartX = e.touches[0].clientX;
+  /* ── Touch swipe ── */
+  var tx = 0, ty = 0;
+  STAGE.addEventListener('touchstart', function (e) {
+    tx = e.changedTouches[0].clientX;
+    ty = e.changedTouches[0].clientY;
   }, { passive: true });
-
-  track.addEventListener('touchend', (e) => {
-    const touchEndX = e.changedTouches[0].clientX;
-    const diff = touchStartX - touchEndX;
-    
-    if (Math.abs(diff) > 50) {
-      if (diff > 0) {
-        nextSlide();
-      } else {
-        prevSlide();
-      }
+  STAGE.addEventListener('touchend', function (e) {
+    var dx = e.changedTouches[0].clientX - tx;
+    var dy = e.changedTouches[0].clientY - ty;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      go(dx < 0 ? current + 1 : current - 1, dx < 0 ? 'next' : 'prev');
     }
   }, { passive: true });
 
-  // Keyboard navigation
-  section.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') {
-      e.preventDefault();
-      prevSlide();
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault();
-      nextSlide();
-    }
+  /* ── Keyboard ── */
+  ROOT.addEventListener('keydown', function (e) {
+    if (e.key === 'ArrowLeft')  go(current - 1, 'prev');
+    if (e.key === 'ArrowRight') go(current + 1, 'next');
   });
 
-  // Resize handler
-  let resizeTimeout;
-  window.addEventListener('resize', () => {
-    clearTimeout(resizeTimeout);
-    resizeTimeout = setTimeout(() => {
-      updateCarousel(currentIndex, false);
-    }, 150);
+  /* ── Auto-height lock: measure tallest slide, set stage height ──
+     This guarantees zero layout shift independent of CSS variable. */
+  function lockHeight() {
+    if (!STAGE) return;
+    var max = 0;
+    SLIDES.forEach(function (s) {
+      var prev = s.style.cssText;
+      s.style.cssText = 'position:relative!important;opacity:0!important;visibility:visible!important;transform:none!important;pointer-events:none!important;transition:none!important;';
+      var h = s.offsetHeight;
+      s.style.cssText = prev;
+      if (h > max) max = h;
+    });
+    if (max > 10) STAGE.style.height = max + 'px';
+  }
+
+  if (document.readyState === 'complete') {
+    lockHeight();
+  } else {
+    window.addEventListener('load', lockHeight);
+  }
+
+  var resizeTimer;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(lockHeight, 120);
   });
 
-  // Initialize
-  updateCarousel(0, false);
 })();
 </script>
 
 {% schema %}
 {
-  "name": "Materials Cylinder",
+  "name": "Materials Carousel",
   "tag": "section",
-  "class": "section-materials-cylinder",
+  "class": "section-materials-carousel",
   "settings": [
     {
       "type": "text",
       "id": "title",
-      "label": "Main Title",
+      "label": "Section Title",
       "default": "MATERIALS"
     },
     {
       "type": "textarea",
-      "id": "header_description",
-      "label": "Header Description",
+      "id": "subtitle",
+      "label": "Subtitle / Description",
       "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+    },
+    {
+      "type": "header",
+      "content": "Colours"
+    },
+    {
+      "type": "color",
+      "id": "button_color",
+      "label": "Button Background",
+      "default": "#8c6464"
+    },
+    {
+      "type": "color",
+      "id": "button_hover_color",
+      "label": "Button Hover",
+      "default": "#7a5555"
     }
   ],
   "blocks": [
@@ -593,19 +743,50 @@
           "type": "text",
           "id": "name",
           "label": "Material Name",
-          "default": "BLACK BEADS"
+          "default": "Black Beads"
         },
         {
           "type": "textarea",
           "id": "description",
           "label": "Description",
-          "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."
+          "default": "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt."
+        },
+        {
+          "type": "header",
+          "content": "Selector Icon"
         },
         {
           "type": "image_picker",
-          "id": "image",
-          "label": "Material Image",
-          "info": "Recommended: Square image with transparent background"
+          "id": "icon",
+          "label": "Icon Image",
+          "info": "Circular icon shown in the selector. Recommended: 120×120 px PNG."
+        },
+        {
+          "type": "color",
+          "id": "icon_color",
+          "label": "Fallback Swatch Colour",
+          "default": "#1a1a1a",
+          "info": "Used when no Icon Image is set."
+        },
+        {
+          "type": "header",
+          "content": "Product Images"
+        },
+        {
+          "type": "image_picker",
+          "id": "desktop_image",
+          "label": "Desktop Image",
+          "info": "Centre panel on desktop, fallback on mobile. Recommended: 700×500 px."
+        },
+        {
+          "type": "image_picker",
+          "id": "mobile_image",
+          "label": "Mobile Image (optional)",
+          "info": "If blank, Desktop Image is used on mobile. Recommended: 600×600 px."
+        },
+        {
+          "type": "header",
+          "content": "Button"
         },
         {
           "type": "text",
@@ -623,15 +804,16 @@
   ],
   "presets": [
     {
-      "name": "Materials Cylinder",
+      "name": "Materials Carousel",
       "blocks": [
-        { "type": "material" },
-        { "type": "material" },
-        { "type": "material" },
-        { "type": "material" },
-        { "type": "material" }
+        { "type": "material", "settings": { "name": "Black Beads", "icon_color": "#1a1a1a" } },
+        { "type": "material", "settings": { "name": "Pearls",      "icon_color": "#e8e0d0" } },
+        { "type": "material", "settings": { "name": "Enamel",      "icon_color": "#e85b3a" } },
+        { "type": "material", "settings": { "name": "Evil Eye",    "icon_color": "#2244cc" } },
+        { "type": "material", "settings": { "name": "Steel",       "icon_color": "#8a8a8a" } }
       ]
     }
-  ]
+  ],
+  "max_blocks": 12
 }
 {% endschema %}
