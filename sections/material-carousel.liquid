@@ -24,91 +24,52 @@
     </div>
 
     {%- comment -%}
-      ── CAROUSEL STAGE ──
-      All slides stacked via position:absolute inside a fixed-height
-      container — zero layout shift on every transition.
+      ── CYLINDRICAL CAROUSEL ──
+      5 images visible at once with 3D cylinder effect
     {%- endcomment -%}
     <div class="ms-stage-wrap">
+      <div class="ms-cylinder-bg"></div>
       <div class="ms-stage" data-ms-stage>
-
-        {%- for block in section.blocks -%}
-          {%- liquid
-            assign bi = forloop.index0
-            assign pi = bi | minus: 1
-            if pi < 0
-              assign pi = s_total | minus: 1
-            endif
-            assign ni = bi | plus: 1
-            if ni >= s_total
-              assign ni = 0
-            endif
-            assign pb = section.blocks[pi]
-            assign nb = section.blocks[ni]
-          -%}
-
-          <div
-            class="ms-slide{% if forloop.first %} is-active{% endif %}"
-            data-ms-slide="{{ bi }}"
-            aria-hidden="{% unless forloop.first %}true{% else %}false{% endunless %}"
-            {{ block.shopify_attributes }}
-          >
-            {%- comment -%}── DESKTOP 3-panel ──{%- endcomment -%}
-            <div class="ms-panels">
-
-              <div class="ms-panel ms-panel--l">
-                {%- if pb.settings.desktop_image != blank -%}
-                  {{- pb.settings.desktop_image
-                      | image_url: width: 480
+        
+        {%- comment -%}Create a continuous loop of slides for cylinder effect{%- endcomment -%}
+        {%- assign extended_blocks = section.blocks | concat: section.blocks | concat: section.blocks -%}
+        {%- assign start_index = s_total -%}
+        
+        <div class="ms-cylinder" data-ms-cylinder>
+          {%- for block in extended_blocks limit: 15 -%}
+            {%- assign original_index = forloop.index0 | modulo: s_total -%}
+            {%- assign block_data = section.blocks[original_index] -%}
+            
+            <div
+              class="ms-cylinder-face{% if forloop.index == start_index %} is-active{% endif %}"
+              data-ms-face="{{ original_index }}"
+              data-ms-position="{{ forloop.index0 }}"
+              {{ block_data.shopify_attributes }}
+            >
+              <div class="ms-face-inner">
+                {%- if block_data.settings.desktop_image != blank -%}
+                  {{- block_data.settings.desktop_image
+                      | image_url: width: 600
                       | image_tag:
-                          class: 'ms-panel__img',
+                          class: 'ms-face__img',
                           loading: 'lazy',
-                          alt: pb.settings.name,
-                          widths: '240,360,480' -}}
+                          alt: block_data.settings.name,
+                          widths: '300,450,600' -}}
                 {%- endif -%}
               </div>
-
-              <div class="ms-panel ms-panel--c">
-                {%- if block.settings.desktop_image != blank -%}
-                  {{- block.settings.desktop_image
-                      | image_url: width: 700
-                      | image_tag:
-                          class: 'ms-panel__img',
-                          loading: 'lazy',
-                          alt: block.settings.name,
-                          widths: '400,560,700' -}}
-                {%- elsif block.settings.mobile_image != blank -%}
-                  {{- block.settings.mobile_image
-                      | image_url: width: 700
-                      | image_tag:
-                          class: 'ms-panel__img',
-                          loading: 'lazy',
-                          alt: block.settings.name -}}
-                {%- endif -%}
-              </div>
-
-              <div class="ms-panel ms-panel--r">
-                {%- if nb.settings.desktop_image != blank -%}
-                  {{- nb.settings.desktop_image
-                      | image_url: width: 480
-                      | image_tag:
-                          class: 'ms-panel__img',
-                          loading: 'lazy',
-                          alt: nb.settings.name,
-                          widths: '240,360,480' -}}
-                {%- endif -%}
-              </div>
-
-              
-
             </div>
+          {%- endfor -%}
+        </div>
 
-            {%- comment -%}── MOBILE single panel ──{%- endcomment -%}
-            <div class="ms-mobile-panel">
+        {%- comment -%}Mobile fallback (standard carousel){%- endcomment -%}
+        <div class="ms-mobile-carousel">
+          {%- for block in section.blocks -%}
+            <div class="ms-mobile-slide{% if forloop.first %} is-active{% endif %}" data-ms-mobile-slide="{{ forloop.index0 }}">
               {%- if block.settings.mobile_image != blank -%}
                 {{- block.settings.mobile_image
                     | image_url: width: 600
                     | image_tag:
-                        class: 'ms-panel__img',
+                        class: 'ms-mobile__img',
                         loading: 'lazy',
                         alt: block.settings.name,
                         widths: '300,450,600' -}}
@@ -116,59 +77,40 @@
                 {{- block.settings.desktop_image
                     | image_url: width: 600
                     | image_tag:
-                        class: 'ms-panel__img',
+                        class: 'ms-mobile__img',
                         loading: 'lazy',
                         alt: block.settings.name,
                         widths: '300,450,600' -}}
               {%- endif -%}
             </div>
-
-          </div>
-        {%- endfor -%}
-
+          {%- endfor -%}
+        </div>
       </div>
     </div>
 
-    {%- comment -%}── CONTROLS: arrow · single active dot · arrow ──{%- endcomment -%}
+    {%- comment -%}── CONTROLS ──{%- endcomment -%}
     <div class="ms-controls">
-
       <button class="ms-arrow ms-arrow--prev" type="button" data-ms-prev aria-label="Previous material">
-        <svg width="7" height="13" viewBox="0 0 7 13" fill="none" aria-hidden="true">
-          <path d="M6 1.5 1 6.5l5 5" stroke="currentColor" stroke-width="1.6"
-                stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
 
-      <div class="ms-dot-display" data-ms-dot-display aria-hidden="true">
+      <div class="ms-dots" data-ms-dots>
         {%- for block in section.blocks -%}
-          <div
-            class="ms-dot-icon{% if forloop.first %} is-visible{% endif %}"
-            data-ms-dot-icon="{{ forloop.index0 }}"
-          >
-            {%- if block.settings.icon != blank -%}
-              {{- block.settings.icon
-                  | image_url: width: 80
-                  | image_tag:
-                      class: 'ms-dot-icon__img',
-                      loading: 'lazy',
-                      alt: block.settings.name -}}
-            {%- else -%}
-              <span
-                class="ms-dot-icon__swatch"
-                style="background:{{ block.settings.icon_color | default: '#1a1a1a' }};"
-              ></span>
-            {%- endif -%}
-          </div>
+          <button
+            class="ms-dot{% if forloop.first %} is-active{% endif %}"
+            data-ms-dot="{{ forloop.index0 }}"
+            aria-label="Go to slide {{ forloop.index }}"
+          ></button>
         {%- endfor -%}
       </div>
 
       <button class="ms-arrow ms-arrow--next" type="button" data-ms-next aria-label="Next material">
-        <svg width="7" height="13" viewBox="0 0 7 13" fill="none" aria-hidden="true">
-          <path d="M1 1.5l5 5-5 5" stroke="currentColor" stroke-width="1.6"
-                stroke-linecap="round" stroke-linejoin="round"/>
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-
     </div>
 
     {%- comment -%}── INFO PANEL ──{%- endcomment -%}
@@ -177,8 +119,6 @@
         <div
           class="ms-info-item{% if forloop.first %} is-active{% endif %}"
           data-ms-info="{{ forloop.index0 }}"
-          role="region"
-          aria-hidden="{% unless forloop.first %}true{% else %}false{% endunless %}"
         >
           <h3 class="ms-info-item__name">{{ block.settings.name | upcase | escape }}</h3>
           {%- if block.settings.description != blank -%}
@@ -199,51 +139,65 @@
 
 <style>
 /* ============================================================
-   MATERIALS CAROUSEL  ·  prefix: ms-
-   Double-scoped: [data-ms-section] .ms-*  — zero bleed
+   CYLINDRICAL MATERIALS CAROUSEL
+   Features: 5 images visible, 3D cylinder effect with squeeze
    ============================================================ */
 [data-ms-section] {
-  --ms-bg:        #f0eeea;
-  --ms-arch-bg:   #e8e6e1;
-  --ms-panel-bg:  #ffffff;
-  --ms-border:    #e2e0db;
-  --ms-shad-c:    0 4px 32px rgba(0,0,0,0.10);
-  --ms-shad-s:    0 2px 12px rgba(0,0,0,0.05);
+  --ms-bg: #f0eeea;
+  --ms-cylinder-bg: #e8e6e1;
+  --ms-panel-bg: #ffffff;
+  --ms-border: #e2e0db;
   --ms-title-clr: #1a1a1a;
-  --ms-text-clr:  #6b6b6b;
-  --ms-btn-bg:    {{ section.settings.button_color | default: '#8c6464' }};
-  --ms-btn-hov:   {{ section.settings.button_hover_color | default: '#7a5555' }};
-  --ms-dot-sz:    56px;
-  --ms-arrow-sz:  36px;
-  --ms-ease:      cubic-bezier(0.4,0,0.2,1);
-  --ms-dur:       420ms;
-  --ms-stage-h:   380px;
+  --ms-text-clr: #6b6b6b;
+  --ms-btn-bg: {{ section.settings.button_color | default: '#8c6464' }};
+  --ms-btn-hov: {{ section.settings.button_hover_color | default: '#7a5555' }};
+  --ms-dot-color: #c8c8c8;
+  --ms-dot-active: #1a1a1a;
+  --ms-cylinder-width: min(1200px, 90vw);
+  --ms-face-width: min(220px, 18vw);
+  --ms-face-height: min(320px, 45vh);
+  --ms-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --ms-dur: 600ms;
 
   background: var(--ms-bg);
   padding: 60px 0 56px;
   overflow: hidden;
   font-family: inherit;
   isolation: isolate;
+  position: relative;
 }
 
 [data-ms-section] *,
 [data-ms-section] *::before,
-[data-ms-section] *::after { box-sizing: border-box; margin: 0; padding: 0; }
+[data-ms-section] *::after { 
+  box-sizing: border-box; 
+  margin: 0; 
+  padding: 0; 
+}
 
-[data-ms-section] a          { text-decoration: none; }
-[data-ms-section] img        { display: block; }
-[data-ms-section] button     { appearance: none; -webkit-appearance: none; border: none; background: none; cursor: pointer; font-family: inherit; }
+[data-ms-section] button { 
+  appearance: none; 
+  -webkit-appearance: none; 
+  border: none; 
+  background: none; 
+  cursor: pointer; 
+  font-family: inherit; 
+}
 
 /* ── Layout ─────────────────────────────────── */
 [data-ms-section] .ms-inner {
-  max-width: 1100px;
+  max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
   text-align: center;
 }
 
 /* ── Header ─────────────────────────────────── */
-[data-ms-section] .ms-head { margin-bottom: 44px; }
+[data-ms-section] .ms-head { 
+  margin-bottom: 44px; 
+  position: relative;
+  z-index: 2;
+}
 
 [data-ms-section] .ms-head__title {
   font-size: clamp(18px, 2vw, 26px);
@@ -262,141 +216,143 @@
   margin: 0 auto;
 }
 
-/* ── Stage wrap + arch ───────────────────────── */
+/* ── Cylinder Stage ─────────────────────────── */
 [data-ms-section] .ms-stage-wrap {
   position: relative;
+  min-height: 400px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0 20px;
 }
 
-[data-ms-section] .ms-stage-wrap::before {
-  content: '';
+[data-ms-section] .ms-cylinder-bg {
   position: absolute;
-  bottom: 0;
+  top: 50%;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
   width: 100%;
-  height: 88%;
-  background: var(--ms-arch-bg);
-  border-radius: 50% 50% 0 0 / 18% 18% 0 0;
+  height: 100%;
+  background: var(--ms-cylinder-bg);
+  border-radius: 50% / 20% 20% 20% 20%;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.08);
   z-index: 0;
-  pointer-events: none;
 }
 
-/* Fixed-height stage prevents layout shift */
 [data-ms-section] .ms-stage {
   position: relative;
-  height: var(--ms-stage-h);
-  z-index: 1;
-}
-
-/* ── Slides: ALL stacked, no display:none ────── */
-[data-ms-section] .ms-slide {
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  visibility: hidden;
-  pointer-events: none;
-  transform: translateX(32px);
-  transition:
-    opacity var(--ms-dur) var(--ms-ease),
-    transform var(--ms-dur) var(--ms-ease),
-    visibility 0s linear var(--ms-dur);
-  will-change: opacity, transform;
-}
-
-[data-ms-section] .ms-slide.is-active {
-  opacity: 1;
-  visibility: visible;
-  pointer-events: auto;
-  transform: translateX(0);
-  z-index: 2;
-  transition:
-    opacity var(--ms-dur) var(--ms-ease),
-    transform var(--ms-dur) var(--ms-ease),
-    visibility 0s linear 0s;
-}
-
-/* Direction-aware outgoing animations */
-[data-ms-section] .ms-slide.is-out-left {
-  opacity: 0;
-  transform: translateX(-32px);
-  transition:
-    opacity var(--ms-dur) var(--ms-ease),
-    transform var(--ms-dur) var(--ms-ease);
-  z-index: 1;
-}
-
-[data-ms-section] .ms-slide.is-out-right {
-  opacity: 0;
-  transform: translateX(32px);
-  transition:
-    opacity var(--ms-dur) var(--ms-ease),
-    transform var(--ms-dur) var(--ms-ease);
-  z-index: 1;
-}
-
-/* ── 3-panel desktop ─────────────────────────── */
-[data-ms-section] .ms-panels {
+  width: 100%;
+  height: 400px;
   display: flex;
-  align-items: stretch;
-  height: 100%;
-  gap:10px;
+  justify-content: center;
+  align-items: center;
+  perspective: 2000px;
+  transform-style: preserve-3d;
+  z-index: 1;
 }
 
-[data-ms-section] .ms-panel {
-  flex: 1;
+/* ── Cylinder Container ──────────────────────── */
+[data-ms-section] .ms-cylinder {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  transform-style: preserve-3d;
+  transition: transform var(--ms-dur) var(--ms-ease);
+}
+
+/* ── Cylinder Faces (5 visible) ─────────────── */
+[data-ms-section] .ms-cylinder-face {
+  position: absolute;
+  width: var(--ms-face-width);
+  height: var(--ms-face-height);
+  left: 50%;
+  top: 50%;
+  margin-left: calc(var(--ms-face-width) / -2);
+  margin-top: calc(var(--ms-face-height) / -2);
   background: var(--ms-panel-bg);
   border: 1px solid var(--ms-border);
+  border-radius: 40px 40px 20px 20px; /* Squeezed top/bottom radius */
+  overflow: hidden;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+  transform-style: preserve-3d;
+  backface-visibility: visible;
+  transition: all var(--ms-dur) var(--ms-ease);
+  
+  /* 3D Cylinder positioning */
+  transform: 
+    rotateY(calc(var(--face-index) * 60deg))
+    translateZ(calc(var(--ms-face-width) * 1.2))
+    scaleY(0.92); /* Squeeze effect from top/bottom */
+}
+
+/* Inner circle effect - additional radius on front */
+[data-ms-section] .ms-cylinder-face::before {
+  content: '';
+  position: absolute;
+  inset: 10px;
+  border-radius: 30px 30px 15px 15px;
+  background: rgba(255,255,255,0.1);
+  pointer-events: none;
+  z-index: 1;
+}
+
+[data-ms-section] .ms-face-inner {
+  width: 100%;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
-  height: 100%;
+  padding: 20px;
 }
 
-[data-ms-section] .ms-panel--l {
-  border-right: none;
-  border-radius: 10px 0 0 10px;
-  transform: perspective(1000px) rotateY(30deg) scaleY(0.96);
-  transform-origin: right center;
-  box-shadow: var(--ms-shad-s);
-  opacity: 0.82;
-}
-
-[data-ms-section] .ms-panel--r {
-  border-left: none;
-  border-radius: 0 10px 10px 0;
-  transform: perspective(1000px) rotateY(-30deg) scaleY(0.96);
-  transform-origin: left center;
-  box-shadow: var(--ms-shad-s);
-  opacity: 0.82;
-}
-
-[data-ms-section] .ms-panel--c {
-  z-index: 3;
-  border-radius: 4px;
-  box-shadow: var(--ms-shad-c);
-  flex: 1.15;
-}
-
-/* Images fill panels while preserving aspect ratio */
-[data-ms-section] .ms-panel__img {
+[data-ms-section] .ms-face__img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  padding: 24px 18px;
+  filter: drop-shadow(0 5px 10px rgba(0,0,0,0.1));
+  transition: transform 0.3s ease;
 }
 
-/* ── Mobile single panel ─────────────────────── */
-[data-ms-section] .ms-mobile-panel {
+[data-ms-section] .ms-cylinder-face.is-active .ms-face__img {
+  transform: scale(1.05);
+}
+
+/* Dynamic face positioning via JS */
+[data-ms-section] .ms-cylinder-face {
+  --face-index: 0;
+}
+
+/* ── Mobile Carousel (hidden on desktop) ─────── */
+[data-ms-section] .ms-mobile-carousel {
   display: none;
-  height: 100%;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  position: relative;
+}
+
+[data-ms-section] .ms-mobile-slide {
+  display: none;
+  width: 100%;
+  max-width: 400px;
+  margin: 0 auto;
   background: var(--ms-panel-bg);
   border: 1px solid var(--ms-border);
-  border-radius: 6px;
-  box-shadow: var(--ms-shad-c);
+  border-radius: 40px 40px 20px 20px;
   overflow: hidden;
+  box-shadow: 0 15px 30px rgba(0,0,0,0.15);
+  padding: 20px;
+}
+
+[data-ms-section] .ms-mobile-slide.is-active {
+  display: block;
+}
+
+[data-ms-section] .ms-mobile__img {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
 }
 
 /* ── Controls ────────────────────────────────── */
@@ -404,73 +360,58 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
-  margin: 28px 0 4px;
+  gap: 30px;
+  margin: 40px 0 20px;
   position: relative;
   z-index: 4;
 }
 
 [data-ms-section] .ms-arrow {
   flex-shrink: 0;
-  width: var(--ms-arrow-sz);
-  height: var(--ms-arrow-sz);
-  border: 1.5px solid #c8c8c8 !important;
+  width: 44px;
+  height: 44px;
+  border: 1.5px solid var(--ms-dot-color) !important;
   border-radius: 50%;
-  background: transparent !important;
+  background: white !important;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #444;
-  transition: border-color 0.2s, background 0.2s, transform 0.15s;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
 }
+
 [data-ms-section] .ms-arrow:hover {
-  border-color: #888 !important;
-  background: rgba(0,0,0,0.04) !important;
+  border-color: var(--ms-dot-active) !important;
+  background: #f8f8f8 !important;
+  transform: scale(1.05);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.1);
 }
-[data-ms-section] .ms-arrow:active { transform: scale(0.90); }
 
-/* ── Single dot display ──────────────────────── */
-[data-ms-section] .ms-dot-display {
-  position: relative;
-  width: var(--ms-dot-sz);
-  height: var(--ms-dot-sz);
-  flex-shrink: 0;
+[data-ms-section] .ms-arrow:active { 
+  transform: scale(0.95); 
+}
+
+/* ── Dots ────────────────────────────────────── */
+[data-ms-section] .ms-dots {
+  display: flex;
+  gap: 12px;
+}
+
+[data-ms-section] .ms-dot {
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  /* Outer ring */
-  box-shadow: 0 0 0 2.5px #1a1a1a;
+  background: var(--ms-dot-color);
+  transition: all 0.3s var(--ms-ease);
+  padding: 0;
 }
 
-/* All icons stacked, only .is-visible shows */
-[data-ms-section] .ms-dot-icon {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  overflow: hidden;
-  opacity: 0;
-  transform: scale(0.65) rotate(-20deg);
-  pointer-events: none;
-  transition:
-    opacity 0.32s var(--ms-ease),
-    transform 0.32s var(--ms-ease);
-}
-
-[data-ms-section] .ms-dot-icon.is-visible {
-  opacity: 1;
-  transform: scale(1) rotate(0deg);
-}
-
-[data-ms-section] .ms-dot-icon__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 50%;
-}
-
-[data-ms-section] .ms-dot-icon__swatch {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
+[data-ms-section] .ms-dot.is-active {
+  background: var(--ms-dot-active);
+  transform: scale(1.3);
+  width: 24px;
+  border-radius: 12px;
 }
 
 /* ── Info block ──────────────────────────────── */
@@ -487,14 +428,11 @@
   visibility: hidden;
   pointer-events: none;
   transform: translateY(10px);
-  transition:
-    opacity 0.35s var(--ms-ease),
-    transform 0.35s var(--ms-ease),
-    visibility 0s linear 0.35s;
+  transition: all 0.35s var(--ms-ease);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 [data-ms-section] .ms-info-item.is-active {
@@ -502,10 +440,6 @@
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0);
-  transition:
-    opacity 0.35s var(--ms-ease) 0.12s,
-    transform 0.35s var(--ms-ease) 0.12s,
-    visibility 0s linear 0s;
 }
 
 [data-ms-section] .ms-info-item__name {
@@ -531,179 +465,297 @@
   font-size: 10px;
   letter-spacing: 3px;
   text-transform: uppercase;
-  transition: background 0.22s var(--ms-ease), transform 0.15s;
+  transition: all 0.22s var(--ms-ease);
   margin-top: 4px;
+  border-radius: 2px;
 }
 [data-ms-section] .ms-info-item__btn:hover {
   background: var(--ms-btn-hov);
-  color: #fff;
 }
-[data-ms-section] .ms-info-item__btn:active { transform: scale(0.97); }
+[data-ms-section] .ms-info-item__btn:active { 
+  transform: scale(0.97); 
+}
 
-/* ── Responsive ──────────────────────────────── */
+/* ── Desktop only ────────────────────────────── */
+@media screen and (min-width: 768px) {
+  [data-ms-section] .ms-cylinder {
+    display: flex !important;
+  }
+  [data-ms-section] .ms-mobile-carousel {
+    display: none !important;
+  }
+}
+
+/* ── Mobile Responsive ───────────────────────── */
 @media screen and (max-width: 767px) {
   [data-ms-section] {
     padding: 40px 0 44px;
-    --ms-stage-h: 300px;
   }
-  [data-ms-section] .ms-inner    { padding: 0 16px; }
-  [data-ms-section] .ms-head     { margin-bottom: 28px; }
-  [data-ms-section] .ms-head__title { font-size: 17px; letter-spacing: 4px; }
-
-  [data-ms-section] .ms-panels         { display: none !important; }
-  [data-ms-section] .ms-mobile-panel   { display: flex; }
-
-  [data-ms-section] .ms-stage-wrap::before {
-    border-radius: 50% 50% 0 0 / 12% 12% 0 0;
-    height: 84%;
+  
+  [data-ms-section] .ms-inner { 
+    padding: 0 16px; 
   }
-  [data-ms-section] .ms-info-wrap     { min-height: 164px; }
-  [data-ms-section] .ms-info-item__desc { max-width: 300px; }
+  
+  [data-ms-section] .ms-head { 
+    margin-bottom: 28px; 
+  }
+  
+  [data-ms-section] .ms-head__title { 
+    font-size: 17px; 
+    letter-spacing: 4px; 
+  }
+
+  [data-ms-section] .ms-cylinder,
+  [data-ms-section] .ms-cylinder-bg {
+    display: none !important;
+  }
+
+  [data-ms-section] .ms-mobile-carousel {
+    display: block !important;
+  }
+
+  [data-ms-section] .ms-stage {
+    height: auto;
+    min-height: 300px;
+    perspective: none;
+  }
+
+  [data-ms-section] .ms-stage-wrap {
+    min-height: auto;
+    margin: 20px 0;
+  }
+
+  [data-ms-section] .ms-controls {
+    margin: 20px 0;
+    gap: 20px;
+  }
+
+  [data-ms-section] .ms-info-wrap { 
+    min-height: 164px; 
+  }
+  
+  [data-ms-section] .ms-info-item__desc { 
+    max-width: 300px; 
+  }
 }
 
-[data-ms-section][data-ms-total="1"] .ms-controls { display: none; }
+[data-ms-section][data-ms-total="1"] .ms-controls { 
+  display: none; 
+}
+
+/* Animation keyframes for smooth rotation */
+@keyframes cylinderGlow {
+  0%, 100% { filter: brightness(1); }
+  50% { filter: brightness(1.05); }
+}
+
+.ms-cylinder-face.is-active {
+  animation: cylinderGlow 3s infinite;
+}
 </style>
 
 <script>
 (function () {
   'use strict';
 
-  var ROOT = document.getElementById('{{ s_id }}');
+  const ROOT = document.getElementById('{{ s_id }}');
   if (!ROOT) return;
 
-  var STAGE      = ROOT.querySelector('[data-ms-stage]');
-  var SLIDES     = Array.from(ROOT.querySelectorAll('[data-ms-slide]'));
-  var DOT_ICONS  = Array.from(ROOT.querySelectorAll('[data-ms-dot-icon]'));
-  var INFO_ITEMS = Array.from(ROOT.querySelectorAll('[data-ms-info]'));
-  var PREV_BTN   = ROOT.querySelector('[data-ms-prev]');
-  var NEXT_BTN   = ROOT.querySelector('[data-ms-next]');
+  const STAGE = ROOT.querySelector('[data-ms-stage]');
+  const CYLINDER = ROOT.querySelector('[data-ms-cylinder]');
+  const FACES = Array.from(ROOT.querySelectorAll('[data-ms-face]'));
+  const MOBILE_SLIDES = Array.from(ROOT.querySelectorAll('[data-ms-mobile-slide]'));
+  const DOTS = Array.from(ROOT.querySelectorAll('[data-ms-dot]'));
+  const INFO_ITEMS = Array.from(ROOT.querySelectorAll('[data-ms-info]'));
+  const PREV_BTN = ROOT.querySelector('[data-ms-prev]');
+  const NEXT_BTN = ROOT.querySelector('[data-ms-next]');
 
-  var total    = SLIDES.length;
-  var current  = 0;
-  var locked   = false;
-  var DURATION = 420; // keep in sync with --ms-dur
+  const total = {{ s_total }};
+  let currentIndex = 0;
+  let isAnimating = false;
+  const DURATION = 600; // match CSS var
 
   if (total <= 1) return;
 
-  /* ── Core go() ──────────────────────────── */
-  function go(next, dir) {
-    if (locked) return;
-    next = ((next % total) + total) % total;
-    if (next === current) return;
+  // Initialize cylinder face positions
+  function updateCylinderRotation(index) {
+    if (!CYLINDER || window.innerWidth < 768) return;
 
-    locked = true;
-    var from = current;
-    current  = next;
-
-    var oldSlide = SLIDES[from];
-    var newSlide = SLIDES[next];
-
-    /* 1. Set incoming slide starting position (off-screen) */
-    var startX = dir === 'next' ? '32px' : '-32px';
-    newSlide.style.cssText =
-      'position:absolute;inset:0;opacity:0;visibility:visible;pointer-events:none;' +
-      'transform:translateX(' + startX + ');transition:none;z-index:2;';
-
-    /* 2. Force reflow — critical to make the starting state "stick" */
-    void newSlide.offsetWidth;
-
-    /* 3. Remove inline override so CSS transitions take over on oldSlide */
-    oldSlide.classList.remove('is-active');
-    oldSlide.classList.add(dir === 'next' ? 'is-out-left' : 'is-out-right');
-
-    /* 4. Animate new slide in via CSS */
-    newSlide.style.cssText = ''; // clear inline, let CSS .is-active drive it
-    newSlide.classList.add('is-active');
-    newSlide.setAttribute('aria-hidden', 'false');
-    oldSlide.setAttribute('aria-hidden', 'true');
-
-    /* 5. Clean up after animation */
-    var cleanup = setTimeout(function () {
-      oldSlide.classList.remove('is-out-left', 'is-out-right');
-      oldSlide.style.cssText = '';
-      locked = false;
-    }, DURATION + 60);
-
-    /* ── Dot icon ── */
-    var oldDot = DOT_ICONS[from];
-    var newDot = DOT_ICONS[next];
-    if (oldDot) oldDot.classList.remove('is-visible');
-    setTimeout(function () {
-      if (newDot) newDot.classList.add('is-visible');
-    }, 80);
-
-    /* ── Info panel ── */
-    var oldInfo = INFO_ITEMS[from];
-    var newInfo = INFO_ITEMS[next];
-    if (oldInfo) {
-      oldInfo.classList.remove('is-active');
-      oldInfo.setAttribute('aria-hidden', 'true');
-    }
-    if (newInfo) {
-      newInfo.classList.add('is-active');
-      newInfo.setAttribute('aria-hidden', 'false');
-    }
+    // Calculate rotation based on current index
+    // Each face is 60deg apart (360/6 = 60deg for 6 faces, but we show 5)
+    const rotation = -(index * 60); // Rotate opposite direction of navigation
+    
+    CYLINDER.style.transform = `rotateY(${rotation}deg)`;
+    
+    // Update active states
+    FACES.forEach(face => {
+      const faceIndex = parseInt(face.dataset.msFace);
+      const position = parseInt(face.dataset.msPosition);
+      
+      // Calculate if this face should be active based on proximity to center
+      const normalizedPos = ((position - index + total * 2) % total);
+      if (normalizedPos === 0) {
+        face.classList.add('is-active');
+      } else {
+        face.classList.remove('is-active');
+      }
+      
+      // Set custom property for face index (used in CSS)
+      face.style.setProperty('--face-index', normalizedPos);
+    });
   }
 
-  /* ── Buttons ── */
-  PREV_BTN && PREV_BTN.addEventListener('click', function () { go(current - 1, 'prev'); });
-  NEXT_BTN && NEXT_BTN.addEventListener('click', function () { go(current + 1, 'next'); });
+  // Update all UI elements
+  function updateUI(newIndex, direction = 'next') {
+    if (isAnimating) return;
+    isAnimating = true;
 
-  /* ── Touch swipe ── */
-  var tx = 0, ty = 0;
-  STAGE.addEventListener('touchstart', function (e) {
-    tx = e.changedTouches[0].clientX;
-    ty = e.changedTouches[0].clientY;
-  }, { passive: true });
-  STAGE.addEventListener('touchend', function (e) {
-    var dx = e.changedTouches[0].clientX - tx;
-    var dy = e.changedTouches[0].clientY - ty;
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
-      go(dx < 0 ? current + 1 : current - 1, dx < 0 ? 'next' : 'prev');
+    // Update current index
+    currentIndex = newIndex;
+
+    // Update cylinder rotation (desktop)
+    if (window.innerWidth >= 768) {
+      updateCylinderRotation(currentIndex);
     }
-  }, { passive: true });
 
-  /* ── Keyboard ── */
-  ROOT.addEventListener('keydown', function (e) {
-    if (e.key === 'ArrowLeft')  go(current - 1, 'prev');
-    if (e.key === 'ArrowRight') go(current + 1, 'next');
+    // Update mobile slides
+    MOBILE_SLIDES.forEach((slide, idx) => {
+      if (idx === currentIndex) {
+        slide.classList.add('is-active');
+      } else {
+        slide.classList.remove('is-active');
+      }
+    });
+
+    // Update dots
+    DOTS.forEach((dot, idx) => {
+      if (idx === currentIndex) {
+        dot.classList.add('is-active');
+      } else {
+        dot.classList.remove('is-active');
+      }
+    });
+
+    // Update info panels
+    INFO_ITEMS.forEach((item, idx) => {
+      if (idx === currentIndex) {
+        item.classList.add('is-active');
+        item.setAttribute('aria-hidden', 'false');
+      } else {
+        item.classList.remove('is-active');
+        item.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    // Reset animation lock after duration
+    setTimeout(() => {
+      isAnimating = false;
+    }, DURATION);
+  }
+
+  // Navigation functions
+  function goToNext() {
+    if (isAnimating) return;
+    const nextIndex = (currentIndex + 1) % total;
+    updateUI(nextIndex, 'next');
+  }
+
+  function goToPrev() {
+    if (isAnimating) return;
+    const prevIndex = (currentIndex - 1 + total) % total;
+    updateUI(prevIndex, 'prev');
+  }
+
+  function goToIndex(index) {
+    if (isAnimating || index === currentIndex) return;
+    const direction = index > currentIndex ? 'next' : 'prev';
+    updateUI(index, direction);
+  }
+
+  // Event listeners
+  PREV_BTN && PREV_BTN.addEventListener('click', goToPrev);
+  NEXT_BTN && NEXT_BTN.addEventListener('click', goToNext);
+
+  // Dot clicks
+  DOTS.forEach((dot, index) => {
+    dot.addEventListener('click', () => goToIndex(index));
   });
 
-  /* ── Auto-height lock: measure tallest slide, set stage height ──
-     This guarantees zero layout shift independent of CSS variable. */
-  function lockHeight() {
-    if (!STAGE) return;
-    var max = 0;
-    SLIDES.forEach(function (s) {
-      var prev = s.style.cssText;
-      s.style.cssText = 'position:relative!important;opacity:0!important;visibility:visible!important;transform:none!important;pointer-events:none!important;transition:none!important;';
-      var h = s.offsetHeight;
-      s.style.cssText = prev;
-      if (h > max) max = h;
+  // Touch swipe
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  STAGE.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].screenX;
+  }, { passive: true });
+
+  STAGE.addEventListener('touchend', (e) => {
+    touchEndX = e.changedTouches[0].screenX;
+    const diff = touchStartX - touchEndX;
+    
+    if (Math.abs(diff) > 50) {
+      if (diff > 0) {
+        goToNext();
+      } else {
+        goToPrev();
+      }
+    }
+  }, { passive: true });
+
+  // Keyboard navigation
+  ROOT.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      goToPrev();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      goToNext();
+    }
+  });
+
+  // Handle window resize
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (window.innerWidth >= 768) {
+        updateCylinderRotation(currentIndex);
+      }
+    }, 150);
+  });
+
+  // Initialize
+  updateUI(0);
+
+  // Preload images for smoother animation
+  const preloadImages = () => {
+    const images = document.querySelectorAll('[data-ms-face] img, [data-ms-mobile-slide] img');
+    images.forEach(img => {
+      const src = img.src;
+      if (src) {
+        const preloadLink = document.createElement('link');
+        preloadLink.rel = 'preload';
+        preloadLink.as = 'image';
+        preloadLink.href = src;
+        document.head.appendChild(preloadLink);
+      }
     });
-    if (max > 10) STAGE.style.height = max + 'px';
-  }
+  };
 
   if (document.readyState === 'complete') {
-    lockHeight();
+    preloadImages();
   } else {
-    window.addEventListener('load', lockHeight);
+    window.addEventListener('load', preloadImages);
   }
-
-  var resizeTimer;
-  window.addEventListener('resize', function () {
-    clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(lockHeight, 120);
-  });
 
 })();
 </script>
 
 {% schema %}
 {
-  "name": "Materials Carousel",
+  "name": "Cylinder Materials",
   "tag": "section",
-  "class": "section-materials-carousel",
+  "class": "section-cylinder-materials",
   "settings": [
     {
       "type": "text",
@@ -719,7 +771,7 @@
     },
     {
       "type": "header",
-      "content": "Colours"
+      "content": "Colors"
     },
     {
       "type": "color",
@@ -753,36 +805,19 @@
         },
         {
           "type": "header",
-          "content": "Selector Icon"
-        },
-        {
-          "type": "image_picker",
-          "id": "icon",
-          "label": "Icon Image",
-          "info": "Circular icon shown in the selector. Recommended: 120×120 px PNG."
-        },
-        {
-          "type": "color",
-          "id": "icon_color",
-          "label": "Fallback Swatch Colour",
-          "default": "#1a1a1a",
-          "info": "Used when no Icon Image is set."
-        },
-        {
-          "type": "header",
-          "content": "Product Images"
+          "content": "Images"
         },
         {
           "type": "image_picker",
           "id": "desktop_image",
           "label": "Desktop Image",
-          "info": "Centre panel on desktop, fallback on mobile. Recommended: 700×500 px."
+          "info": "Used in cylinder view. Recommended: 600x600px square with transparency"
         },
         {
           "type": "image_picker",
           "id": "mobile_image",
           "label": "Mobile Image (optional)",
-          "info": "If blank, Desktop Image is used on mobile. Recommended: 600×600 px."
+          "info": "If blank, Desktop Image is used. Recommended: 400x400px"
         },
         {
           "type": "header",
@@ -804,13 +839,13 @@
   ],
   "presets": [
     {
-      "name": "Materials Carousel",
+      "name": "Cylinder Materials",
       "blocks": [
-        { "type": "material", "settings": { "name": "Black Beads", "icon_color": "#1a1a1a" } },
-        { "type": "material", "settings": { "name": "Pearls",      "icon_color": "#e8e0d0" } },
-        { "type": "material", "settings": { "name": "Enamel",      "icon_color": "#e85b3a" } },
-        { "type": "material", "settings": { "name": "Evil Eye",    "icon_color": "#2244cc" } },
-        { "type": "material", "settings": { "name": "Steel",       "icon_color": "#8a8a8a" } }
+        { "type": "material" },
+        { "type": "material" },
+        { "type": "material" },
+        { "type": "material" },
+        { "type": "material" }
       ]
     }
   ],
