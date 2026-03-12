@@ -1012,201 +1012,322 @@ window.MainBaseCharm = function () {
       return linearPts;
     }
 
+    // async _placeCharmsSymmetric(charms) {
+    //   const count = charms.length;
+    //   if (count === 0) return;
+
+    //   const linear = this._computeArcPositionsLinear(count);
+    //   const pts = this._computeSymmetricOrder(linear);
+
+    //   const baseSize = Math.round(this.stageSize * this.charmScale);
+    //   const size = Math.max(10, Math.round(baseSize * SIZE_MULTIPLIER));
+
+    //   this._placedCharmPositions = [];
+
+    //   const geom = this._chainGeom || {
+    //     center: {
+    //       x: this.stageSize / 2,
+    //       y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+    //     },
+    //     radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+    //   };
+
+    //   const chainR = geom.radius;
+    //   const centerIndex = Math.floor((count - 1) / 2);
+
+    //   for (let i = 0; i < count; i++) {
+    //     const c = charms[i];
+    //     const basePt = pts[i] || pts[0];
+    //     const angleRad = (basePt.angle * Math.PI) / 180;
+    //     const chainX = geom.center.x + chainR * Math.cos(angleRad);
+    //     const chainY = geom.center.y - chainR * Math.sin(angleRad);
+
+    //     const baseOverlap = 0.28;
+    //     const distFromCenter = Math.abs(i - centerIndex);
+    //     const curveCorrection = distFromCenter * 0.04;
+    //     const totalOverlap = baseOverlap + curveCorrection;
+
+    //     const isMobile = isMobileLayout();
+    //     let x = chainX;
+    //     let y = chainY + (size / 2) - (size * totalOverlap);
+
+    //     // Mobile specific: Hang directly from the chain point
+    //     if (isMobile) {
+    //       y = chainY;
+    //     }
+
+    //     try {
+    //       const img = await this.createImage(c.image || '');
+    //       const kimg = new Konva.Image({
+    //         x: Math.round(x),
+    //         y: Math.round(y),
+    //         image: img,
+    //         width: size,
+    //         height: size,
+    //         listening: true,
+    //         offsetX: size / 2,
+    //         // Mobile: Pivot at top ring (approx 6% down). Desktop: Pivot at center.
+    //         offsetY: isMobile ? size * 0.06 : size / 2,
+    //         // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
+    //         hitStrokeWidth: 80,
+    //       });
+    //       let rotation = 0;
+    //       if (i !== centerIndex) {
+    //         const chainAngleDeg = basePt.angle;
+    //         if (chainAngleDeg > 270) {
+    //           rotation = -((chainAngleDeg - 270) * 0.8);
+    //         } else if (chainAngleDeg < 270) {
+    //           rotation = (270 - chainAngleDeg) * 0.8;
+    //         }
+    //         rotation = Math.max(-30, Math.min(30, rotation));
+    //       }
+
+    //       // Tilt only the leftmost and rightmost charms on mobile
+    //       if (isMobile) {
+    //         if (i !== 0 && i !== count - 1) {
+    //           rotation = 0;
+    //         }
+    //       }
+
+    //       kimg.rotation(rotation);
+    //       kimg._productId = c.id;
+    //       kimg._charmIndex = i;
+
+    //       const originalMouseEnter = () => {
+    //         document.body.style.cursor = 'pointer';
+    //         kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
+    //       };
+
+    //       const originalMouseLeave = () => {
+    //         document.body.style.cursor = 'default';
+    //         kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
+    //       };
+
+    //       // Mouse hover effects
+    //       kimg.on('mouseenter', originalMouseEnter);
+    //       kimg.on('mouseleave', originalMouseLeave);
+
+    //       kimg.draggable(true);
+    //       kimg._charmIndex = i;
+
+    //       let dragStartScale = 1;
+    //       let dragStartOpacity = 1;
+
+    //       // Explicitly handle touchstart to guarantee drag starts
+    //       kimg.on('touchstart', (e) => {
+    //         e.cancelBubble = true;
+    //         // Stop any potential stage dragging
+    //         if (this && this.stage) this.stage.stopDrag();
+
+    //         // Manually start drag on the charm
+    //         kimg.startDrag();
+
+    //         dragStartScale = kimg.scaleX() || 1;
+    //         dragStartOpacity = kimg.opacity() || 1;
+
+    //         kimg.to({
+    //           opacity: 0.7,
+    //           scaleX: dragStartScale * 1.15,
+    //           scaleY: dragStartScale * 1.15,
+    //           duration: 0.15,
+    //         });
+    //       });
+
+    //       kimg.on('dragstart', (e) => {
+    //         // dragStartScale and dragStartOpacity are already set in touchstart if it's a touch event
+    //         // For mouse events, set them here
+    //         if (!e.evt.touches) { // Only if it's not a touch event
+    //           dragStartScale = kimg.scaleX() || 1;
+    //           dragStartOpacity = kimg.opacity() || 1;
+
+    //           kimg.to({
+    //             opacity: 0.7,
+    //             scaleX: dragStartScale * 1.15,
+    //             scaleY: dragStartScale * 1.15,
+    //             duration: 0.15,
+    //           });
+    //         }
+
+    //         document.body.style.cursor = 'grabbing';
+    //         kimg.zIndex(this.charmLayer.children.length + 1);
+    //         this.charmLayer.draw();
+    //       });
+
+    //       kimg.on('tap', (e) => {
+    //         e.cancelBubble = true;
+    //       });
+
+    //       kimg.on('dragend', (e) => {
+    //         kimg.to({
+    //           opacity: dragStartOpacity,
+    //           scaleX: dragStartScale,
+    //           scaleY: dragStartScale,
+    //           duration: 0.15,
+    //         });
+
+    //         document.body.style.cursor = 'default';
+
+    //         const allCharms = this.charmLayer.children || [];
+    //         const draggedIndex = kimg._charmIndex;
+
+    //         let swapIndex = null;
+
+    //         for (let j = 0; j < allCharms.length; j++) {
+    //           const other = allCharms[j];
+    //           if (other === kimg) continue;
+
+    //           const dx = kimg.x() - other.x();
+    //           const dy = kimg.y() - other.y();
+    //           const dist = Math.sqrt(dx * dx + dy * dy);
+
+    //           if (dist < size * 0.7) {
+    //             swapIndex = other._charmIndex;
+    //             break;
+    //           }
+    //         }
+
+    //         kimg.position({
+    //           x: this._placedCharmPositions[draggedIndex].x,
+    //           y: this._placedCharmPositions[draggedIndex].y
+    //         });
+
+    //         if (swapIndex !== null && swapIndex !== draggedIndex) {
+    //           this._swapCharmsInVisualiser(draggedIndex, swapIndex);
+    //         } else {
+    //           this.charmLayer.destroyChildren();
+    //           this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
+    //         }
+    //       });
+
+
+    //       this.charmLayer.add(kimg);
+    //       this._placedCharmPositions.push({ x, y, w: size, h: size });
+    //     } catch (e) {
+    //       console.warn('Charm image load failed', e);
+    //     }
+    //   }
+    // }
+
     async _placeCharmsSymmetric(charms) {
-      const count = charms.length;
-      if (count === 0) return;
+  const count = charms.length;
+  if (count === 0) return;
 
-      const linear = this._computeArcPositionsLinear(count);
-      const pts = this._computeSymmetricOrder(linear);
-
-      const baseSize = Math.round(this.stageSize * this.charmScale);
-      const size = Math.max(10, Math.round(baseSize * SIZE_MULTIPLIER));
-
-      this._placedCharmPositions = [];
-
-      const geom = this._chainGeom || {
-        center: {
-          x: this.stageSize / 2,
-          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
-        },
-        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
-      };
-
-      const chainR = geom.radius;
-      const centerIndex = Math.floor((count - 1) / 2);
-
-      for (let i = 0; i < count; i++) {
-        const c = charms[i];
-        const basePt = pts[i] || pts[0];
-        const angleRad = (basePt.angle * Math.PI) / 180;
-        const chainX = geom.center.x + chainR * Math.cos(angleRad);
-        const chainY = geom.center.y - chainR * Math.sin(angleRad);
-
-        const baseOverlap = 0.28;
-        const distFromCenter = Math.abs(i - centerIndex);
-        const curveCorrection = distFromCenter * 0.04;
-        const totalOverlap = baseOverlap + curveCorrection;
-
-        const isMobile = isMobileLayout();
-        let x = chainX;
-        let y = chainY + (size / 2) - (size * totalOverlap);
-
-        // Mobile specific: Hang directly from the chain point
-        if (isMobile) {
-          y = chainY;
-        }
-
-        try {
-          const img = await this.createImage(c.image || '');
-          const kimg = new Konva.Image({
-            x: Math.round(x),
-            y: Math.round(y),
-            image: img,
-            width: size,
-            height: size,
-            listening: true,
-            offsetX: size / 2,
-            // Mobile: Pivot at top ring (approx 6% down). Desktop: Pivot at center.
-            offsetY: isMobile ? size * 0.06 : size / 2,
-            // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
-            hitStrokeWidth: 80,
-          });
-          let rotation = 0;
-          if (i !== centerIndex) {
-            const chainAngleDeg = basePt.angle;
-            if (chainAngleDeg > 270) {
-              rotation = -((chainAngleDeg - 270) * 0.8);
-            } else if (chainAngleDeg < 270) {
-              rotation = (270 - chainAngleDeg) * 0.8;
-            }
-            rotation = Math.max(-30, Math.min(30, rotation));
-          }
-
-          // Tilt only the leftmost and rightmost charms on mobile
-          if (isMobile) {
-            if (i !== 0 && i !== count - 1) {
-              rotation = 0;
-            }
-          }
-
-          kimg.rotation(rotation);
-          kimg._productId = c.id;
-          kimg._charmIndex = i;
-
-          const originalMouseEnter = () => {
-            document.body.style.cursor = 'pointer';
-            kimg.to({ scaleX: 1.08, scaleY: 1.08, duration: 0.12 });
-          };
-
-          const originalMouseLeave = () => {
-            document.body.style.cursor = 'default';
-            kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
-          };
-
-          // Mouse hover effects
-          kimg.on('mouseenter', originalMouseEnter);
-          kimg.on('mouseleave', originalMouseLeave);
-
-          kimg.draggable(true);
-          kimg._charmIndex = i;
-
-          let dragStartScale = 1;
-          let dragStartOpacity = 1;
-
-          // Explicitly handle touchstart to guarantee drag starts
-          kimg.on('touchstart', (e) => {
-            e.cancelBubble = true;
-            // Stop any potential stage dragging
-            if (this && this.stage) this.stage.stopDrag();
-
-            // Manually start drag on the charm
-            kimg.startDrag();
-
-            dragStartScale = kimg.scaleX() || 1;
-            dragStartOpacity = kimg.opacity() || 1;
-
-            kimg.to({
-              opacity: 0.7,
-              scaleX: dragStartScale * 1.15,
-              scaleY: dragStartScale * 1.15,
-              duration: 0.15,
-            });
-          });
-
-          kimg.on('dragstart', (e) => {
-            // dragStartScale and dragStartOpacity are already set in touchstart if it's a touch event
-            // For mouse events, set them here
-            if (!e.evt.touches) { // Only if it's not a touch event
-              dragStartScale = kimg.scaleX() || 1;
-              dragStartOpacity = kimg.opacity() || 1;
-
-              kimg.to({
-                opacity: 0.7,
-                scaleX: dragStartScale * 1.15,
-                scaleY: dragStartScale * 1.15,
-                duration: 0.15,
-              });
-            }
-
-            document.body.style.cursor = 'grabbing';
-            kimg.zIndex(this.charmLayer.children.length + 1);
-            this.charmLayer.draw();
-          });
-
-          kimg.on('tap', (e) => {
-            e.cancelBubble = true;
-          });
-
-          kimg.on('dragend', (e) => {
-            kimg.to({
-              opacity: dragStartOpacity,
-              scaleX: dragStartScale,
-              scaleY: dragStartScale,
-              duration: 0.15,
-            });
-
-            document.body.style.cursor = 'default';
-
-            const allCharms = this.charmLayer.children || [];
-            const draggedIndex = kimg._charmIndex;
-
-            let swapIndex = null;
-
-            for (let j = 0; j < allCharms.length; j++) {
-              const other = allCharms[j];
-              if (other === kimg) continue;
-
-              const dx = kimg.x() - other.x();
-              const dy = kimg.y() - other.y();
-              const dist = Math.sqrt(dx * dx + dy * dy);
-
-              if (dist < size * 0.7) {
-                swapIndex = other._charmIndex;
-                break;
-              }
-            }
-
-            kimg.position({
-              x: this._placedCharmPositions[draggedIndex].x,
-              y: this._placedCharmPositions[draggedIndex].y
-            });
-
-            if (swapIndex !== null && swapIndex !== draggedIndex) {
-              this._swapCharmsInVisualiser(draggedIndex, swapIndex);
-            } else {
-              this.charmLayer.destroyChildren();
-              this._placeCharmsSymmetric(visualiser.charms).catch(() => { });
-            }
-          });
-
-
-          this.charmLayer.add(kimg);
-          this._placedCharmPositions.push({ x, y, w: size, h: size });
-        } catch (e) {
-          console.warn('Charm image load failed', e);
+  const isMobile = isMobileLayout();
+  
+  // Chain geometry - adjust these values for better positioning
+  const centerYFactor = isMobile ? 0.55 : 0.48; // Adjusted for better vertical center
+  const radiusFactor = isMobile ? 0.42 : 0.52;  // Slightly smaller radius
+  
+  const center = {
+    x: this.stageSize / 2,
+    y: this.stageSize * centerYFactor
+  };
+  
+  const radius = Math.max(8, this.stageSize * radiusFactor);
+  
+  // Charm sizing
+  const baseSize = Math.round(this.stageSize * this.charmScale);
+  const size = Math.max(10, Math.round(baseSize * SIZE_MULTIPLIER));
+  
+  // Calculate positions along the arc
+  const startAngle = (ARC_START_DEG * Math.PI) / 180; // 210° in radians
+  const endAngle = (ARC_END_DEG * Math.PI) / 180;     // 330° in radians
+  
+  // For charms, we want them to hang from the chain, so we need to:
+  // 1. Position them along the arc
+  // 2. Offset them downward so they hang from the chain
+  
+  for (let i = 0; i < count; i++) {
+    // Calculate position along the arc (evenly spaced)
+    const t = count === 1 ? 0.5 : i / (count - 1);
+    const angle = startAngle + (endAngle - startAngle) * t;
+    
+    // Chain attachment point (where the charm's jump ring attaches)
+    const chainX = center.x + radius * Math.cos(angle);
+    const chainY = center.y - radius * Math.sin(angle); // Negative because Y increases downward
+    
+    // Calculate charm position (hanging below the chain)
+    // The charm's attachment point is at the top, so we offset by half height
+    const charmX = chainX;
+    
+    // CRITICAL FIX: The charm should hang WITH its top at the chain point
+    // This means the charm's image's top should be at the chain point
+    // Since we use offsetY = size/2 (center pivot), we need to add half the height
+    let charmY;
+    
+    if (isMobile) {
+      // Mobile: Hang directly from chain with slight offset
+      charmY = chainY + (size * 0.35); // Hang below chain
+    } else {
+      // Desktop: Standard hanging
+      charmY = chainY + (size * 0.3);
+    }
+    
+    // Calculate rotation for charms on the sides (so they follow the chain curve)
+    let rotation = 0;
+    
+    if (count > 1) {
+      // Convert angle to degrees for rotation
+      const angleDeg = (angle * 180) / Math.PI;
+      
+      // Calculate how far from center (270° is bottom center)
+      const centerAngle = 270; // Bottom of arc
+      let angleDiff = angleDeg - centerAngle;
+      
+      // Normalize angle difference to -60 to +60 degrees
+      if (angleDiff > 180) angleDiff -= 360;
+      
+      // Maximum rotation at ends (30 degrees), minimum in middle (0 degrees)
+      const maxRotation = 25; // degrees
+      const rotationFactor = Math.abs(angleDiff) / 60; // Normalize to 0-1
+      rotation = angleDiff > 0 
+        ? -maxRotation * rotationFactor  // Right side tilts left
+        : maxRotation * rotationFactor;   // Left side tilts right
+      
+      // Limit rotation
+      rotation = Math.max(-maxRotation, Math.min(maxRotation, rotation));
+      
+      // On mobile, only tilt the outermost charms
+      if (isMobile) {
+        if (i !== 0 && i !== count - 1) {
+          rotation = 0; // No tilt for middle charms on mobile
         }
       }
     }
+    
+    try {
+      const img = await this.createImage(charms[i].image || '');
+      
+      const kimg = new Konva.Image({
+        x: Math.round(charmX),
+        y: Math.round(charmY),
+        image: img,
+        width: size,
+        height: size,
+        listening: true,
+        offsetX: size / 2,     // Center horizontally
+        offsetY: size / 2,      // Center vertically (so rotation works correctly)
+        // Increase hit area for easier dragging
+        hitStrokeWidth: 40,
+      });
+      
+      // Apply rotation
+      kimg.rotation(rotation);
+      
+      // Store metadata
+      kimg._productId = charms[i].id;
+      kimg._charmIndex = i;
+      
+      // ... (rest of your event handlers remain the same)
+      
+      this.charmLayer.add(kimg);
+      
+    } catch (e) {
+      console.warn('Charm image load failed', e);
+    }
+  }
+}
+
     _focusCharmsAtScale(scale, animate = true) {
       const pts = this._placedCharmPositions || [];
       const stage = this.stage;
