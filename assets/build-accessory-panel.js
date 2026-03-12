@@ -23,7 +23,7 @@ window.MainBaseCharm = function () {
   // Increase this value to make the chain (and charms) render larger on desktop.
   // Charms scale automatically because all positions use stageSize * factor.
   // Recommended range: 480–620. Default was effectively ~440 (container width).
-  const DESKTOP_CANVAS_SIZE = 560;
+  const DESKTOP_CANVAS_SIZE = 500;
 
   // Arc range for charm placement along the bottom of the chain.
   // 270° = dead bottom. Wider range = outer charms rise up the steep sides of the ring
