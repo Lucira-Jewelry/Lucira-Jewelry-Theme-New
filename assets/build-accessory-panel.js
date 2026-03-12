@@ -60,8 +60,12 @@ window.MainBaseCharm = function () {
 
   // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
   // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
-  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
-  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
+  // CALIBRATION: Adjust these two values if charms land off the chain.
+  // CHAIN_CENTER_Y_FACTOR – vertical center of the chain ring as a fraction of stageSize (0=top, 1=bottom).
+  // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
+  // Rule of thumb: measure the chain ring in the product image; radius ≈ ring_diameter_px / (2 * stageSize_px).
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.40;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.38;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -1038,15 +1042,14 @@ window.MainBaseCharm = function () {
       for (let i = 0; i < count; i++) {
         const c = charms[i];
         const basePt = pts[i] || pts[0];
-        // basePt.x / basePt.y are already the chain-surface contact point computed
-        // by _computeArcPositionsLinear — reuse them directly to avoid float drift.
+        // basePt.x / basePt.y are already the exact chain-surface contact points
+        // computed by _computeArcPositionsLinear — reuse them to avoid float drift.
         const chainX = basePt.x;
         const chainY = basePt.y;
 
         const isMobile = isMobileLayout();
-        // Both mobile and desktop: attach the charm's bail/ring at the chain contact point.
-        // offsetY = size * 0.06 aligns the top-ring of the charm image to this anchor,
-        // so the charm body hangs below the chain naturally.
+        // Place the charm's bail/ring (top ~6% of the image) exactly at the chain contact point.
+        // offsetY below handles this pivot; the charm body then hangs naturally below the chain.
         let x = chainX;
         let y = chainY;
 
@@ -1060,8 +1063,8 @@ window.MainBaseCharm = function () {
             height: size,
             listening: true,
             offsetX: size / 2,
-            // Pivot at top ring (~6% from top = bail/ring) for both mobile and desktop.
-            // This ensures the charm hangs from the chain contact point on all screen sizes.
+            // Pivot point = top ring/bail of the charm image (~6% from top).
+            // Both mobile and desktop: charm hangs from the chain contact point.
             offsetY: size * 0.06,
             // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
             hitStrokeWidth: 80,
