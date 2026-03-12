@@ -62,6 +62,35 @@ window.MainBaseCharm = function () {
   // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
   // const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
   // const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
+
+// REMOVE these two lines:
+// const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
+// const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.55;
+
+// ADD this function instead (tune the necklace values to match your product image):
+  function getChainGeometryFactors() {
+    const mobile = isMobileLayout();
+    const type   = __BASE_TYPE__;            // 'bracelet' | 'anklet' | 'necklace' | null
+
+    if (type === 'necklace') {
+      return {
+        centerY: mobile ? 0.46 : 0.38,      // necklace chain sits higher in the image
+        radius:  mobile ? 0.38 : 0.44,      // necklace chain is smaller radius visually
+      };
+    }
+    if (type === 'anklet') {
+      return {
+        centerY: mobile ? 0.50 : 0.44,
+        radius:  mobile ? 0.45 : 0.52,
+      };
+    }
+    // bracelet / default
+    return {
+      centerY: mobile ? 0.50 : 0.42,
+      radius:  mobile ? 0.45 : 0.55,
+    };
+  }
+
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -958,10 +987,8 @@ window.MainBaseCharm = function () {
     }
 
     _computeArcPositionsLinear(count) {
-      // Dynamic factors based on layout
       const isMobile = isMobileLayout();
-      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
-      const radiusFactor = isMobile ? 0.45 : CHAIN_RADIUS_FACTOR;
+      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors(); // ← use function
 
       const center = {
         x: this.stageSize / 2,
