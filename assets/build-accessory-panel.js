@@ -19,8 +19,12 @@ window.MainBaseCharm = function () {
 
   const SIZE_MULTIPLIER = 1.20;
 
-  const ARC_START_DEG = 210;
-  const ARC_END_DEG = 330;
+  // Arc range for charm placement along the bottom of the chain.
+  // 270° = dead bottom. Wider range = outer charms rise up the steep sides of the ring
+  // and visually fall off the chain wire. Keep range ≤ 76° total for 5 charms.
+  // Previous: 210–330 (120°) — outer charms at 210°/330° sat on steep 30° sections of the ring.
+  const ARC_START_DEG = 232;
+  const ARC_END_DEG   = 308;
 
   const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
@@ -65,7 +69,7 @@ window.MainBaseCharm = function () {
   // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
   // Rule of thumb: measure the chain ring in the product image; radius ≈ ring_diameter_px / (2 * stageSize_px).
   const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.40;
-  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.31;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.38;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
