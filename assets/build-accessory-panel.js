@@ -23,18 +23,22 @@ window.MainBaseCharm = function () {
   // Increase this value to make the chain (and charms) render larger on desktop.
   // Charms scale automatically because all positions use stageSize * factor.
   // Recommended range: 480–620. Default was effectively ~440 (container width).
-  const DESKTOP_CANVAS_SIZE = 500;
+  const DESKTOP_CANVAS_SIZE = 560;
 
   // Arc range for charm placement along the bottom of the chain.
   // 270° = dead bottom. Wider range = outer charms rise up the steep sides of the ring
-  // and visually fall off the chain wire. Keep range ≤ 76° total for 5 charms.
-  // Previous: 210–330 (120°) — outer charms at 210°/330° sat on steep 30° sections of the ring.
-  const ARC_START_DEG = 232;
-  const ARC_END_DEG   = 308;
+  // and visually fall off the chain wire.
+  // Widened slightly from 232–308 (76°) to 225–315 (90°) to accommodate larger spacing.
+  const ARC_START_DEG = 225;
+  const ARC_END_DEG   = 315;
 
   const CHAIN_LENGTH_CM = 18;
-  const CHARM_SPACING_CM = 2.54;
-  const MIN_SPACING_PX = 26;
+  // CHARM_SPACING_CM – physical gap between charm bail points along the arc.
+  // Increase this to spread charms further apart. Previous value: 2.54
+  const CHARM_SPACING_CM = 3.6;
+  // MIN_SPACING_PX – minimum pixel gap enforced regardless of canvas size.
+  // Previous value: 26
+  const MIN_SPACING_PX = 48;
 
   function injectSafeStyles() {
     if (typeof document === 'undefined') return;
