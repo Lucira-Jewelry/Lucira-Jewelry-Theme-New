@@ -19,8 +19,8 @@ window.MainBaseCharm = function () {
 
   const SIZE_MULTIPLIER = 1.20;
 
-  const ARC_START_DEG = 250;
-  const ARC_END_DEG = 350;
+  const ARC_START_DEG = 220;
+  const ARC_END_DEG = 330;
 
   const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
