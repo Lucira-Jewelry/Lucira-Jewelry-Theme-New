@@ -24,7 +24,7 @@ window.MainBaseCharm = function () {
 
   const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
-  const MIN_SPACING_PX = 29;
+  const MIN_SPACING_PX = 26;
 
   function injectSafeStyles() {
     if (typeof document === 'undefined') return;
