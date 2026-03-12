@@ -17,12 +17,12 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 1.10;
+  const SIZE_MULTIPLIER = 1.20;
 
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
 
-  const CHAIN_LENGTH_CM = 19;
+  const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
@@ -58,10 +58,6 @@ window.MainBaseCharm = function () {
   const MIN_ZOOM = 1.0;
   const MAX_ZOOM = 2.0;
 
-  // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
-  // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
-  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
-  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -161,6 +157,38 @@ window.MainBaseCharm = function () {
   const __BASE_TYPE__ = detectBaseType();
   const MAX_CHARMS = getCapForBaseType(__BASE_TYPE__);
 
+  // ─── geometry helper ────────────────────────────────────────────────────────
+  // Returns centerY and radius factors appropriate for the current product type
+  // and layout. Replaces the old CHAIN_CENTER_Y_FACTOR / CHAIN_RADIUS_FACTOR
+  // constants so that necklaces, anklets, and bracelets each get correct values.
+  function getChainGeometryFactors() {
+    const mobile = isMobileLayout();
+    const type   = __BASE_TYPE__;  // 'bracelet' | 'anklet' | 'necklace' | null
+
+    if (type === 'necklace') {
+      return {
+        centerY: mobile ? 0.46 : 0.38,
+        radius:  mobile ? 0.38 : 0.44,
+      };
+    }
+    if (type === 'anklet') {
+      return {
+        centerY: mobile ? 0.50 : 0.44,
+        radius:  mobile ? 0.45 : 0.52,
+      };
+    }
+    // bracelet / default
+    return {
+      centerY: mobile ? 0.50 : 0.42,
+      radius:  mobile ? 0.45 : 0.55,
+    };
+  }
+  // ────────────────────────────────────────────────────────────────────────────
+
+  function isMobileLayout() {
+    return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+  }
+
   function getSelectedCount() {
     try {
       const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
@@ -212,7 +240,6 @@ window.MainBaseCharm = function () {
     updateMinusButtonsForCap(atCap);
   }
 
-
   function toggleZoomBar() {
     const slider = document.getElementById('zoom-range');
     const zoomIn = document.getElementById('zoom-in');
@@ -240,7 +267,6 @@ window.MainBaseCharm = function () {
     if (zoomOut) zoomOut.style.display = display;
   }
 
-
   function updateMinusButtonsForCap(atCap) {
     document.querySelectorAll('.charm-card').forEach((card) => {
       const minus = card.querySelector('.qty-decr');
@@ -255,6 +281,7 @@ window.MainBaseCharm = function () {
       minus.setAttribute('aria-disabled', shouldDisable ? 'true' : 'false');
     });
   }
+
   function setSelectedBorder(card) {
     try {
       const v = Number(card.querySelector('.qty-input')?.value || 0);
@@ -369,10 +396,6 @@ window.MainBaseCharm = function () {
 
   let currentCollectionId = null;
   let currentColorLabel = 'All';
-
-  function isMobileLayout() {
-    return window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
-  }
 
   function moveGridsColumnBelowTile(targetId) {
     const gridsColumn = document.querySelector('.grids-column');
@@ -654,6 +677,7 @@ window.MainBaseCharm = function () {
       initUIFromCart();
     }
   })();
+
   document.addEventListener('charmCartUpdated', () => {
     try {
       syncUIFromCart();
@@ -683,6 +707,7 @@ window.MainBaseCharm = function () {
 
     if (currentCollectionId) setActiveCollectionById(currentCollectionId);
   }
+
   class BVCanvas {
     constructor(containerId) {
       this.containerId = containerId;
@@ -701,6 +726,7 @@ window.MainBaseCharm = function () {
       this._bindZoomUI();
       this.initStage();
     }
+
     _bindZoomUI() {
       const slider = this.slider;
       const btnIn = this.btnIn;
@@ -781,14 +807,13 @@ window.MainBaseCharm = function () {
 
       updateTrack();
     }
+
     initStage() {
       const container = document.getElementById(this.containerId);
       if (!container) return;
 
-      // Fix for mobile drag-and-drop: prevent browser scrolling when touching the canvas
       container.style.touchAction = 'none';
       container.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
-
 
       const wrapper = container.closest('.variant-img-wrap');
       if (isMobileLayout()) {
@@ -796,17 +821,11 @@ window.MainBaseCharm = function () {
           wrapper.style.setProperty('width', '350px', 'important');
           wrapper.style.setProperty('height', '200px', 'important');
         }
-      } else {
-        // Desktop: Increase main container height to prevent cropping
-        if (wrapper) {
-          //wrapper.style.setProperty('height', '470px', 'important');
-        }
       }
 
       const rect = container.getBoundingClientRect();
       let width = isMobileLayout() ? 350 : (rect.width || 440);
       width = Math.max(300, width || 400);
-      // Desktop: Slightly decrease canvas layer height to 445px
       const height = isMobileLayout() ? 353 : (width * (445 / 440));
 
       this.stageWidth = width;
@@ -820,10 +839,9 @@ window.MainBaseCharm = function () {
         width: this.stageWidth,
         height: this.stageHeight,
         draggable: false,
-        dragDistance: 0, // Make drag start immediately for smoother feel
+        dragDistance: 0,
       });
 
-      // CRITICAL FIX: Disable browser touch actions on the stage content directly
       if (this.stage.content) {
         this.stage.content.style.touchAction = 'none';
       }
@@ -852,9 +870,9 @@ window.MainBaseCharm = function () {
       }
 
       this.setZoom(1, { animate: false });
-
       this._updateZoomTrack && this._updateZoomTrack();
     }
+
     createImage(url) {
       return new Promise((resolve, reject) => {
         if (!url) return reject('no-url');
@@ -865,6 +883,7 @@ window.MainBaseCharm = function () {
         img.src = url;
       });
     }
+
     _renderProductIfNeeded() {
       if (this._productRendered) return;
 
@@ -893,25 +912,11 @@ window.MainBaseCharm = function () {
       const stage = this.stage;
       if (!stage) return;
 
-      const isMobile = isMobileLayout();
-      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
-
-      const center = {
-        x: this.stageSize / 2,
-        y: this.stageSize * (centerYFactor - 0.05),
-      };
-
       const posX = 0;
       const posY = 0;
 
       if (animate) {
-        stage.to({
-          scaleX: 1,
-          scaleY: 1,
-          x: posX,
-          y: posY,
-          duration: 0.18,
-        });
+        stage.to({ scaleX: 1, scaleY: 1, x: posX, y: posY, duration: 0.18 });
       } else {
         stage.scale({ x: 1, y: 1 });
         stage.position({ x: posX, y: posY });
@@ -936,13 +941,11 @@ window.MainBaseCharm = function () {
       this.charmLayer.destroyChildren();
       this._placedCharmPositions = [];
 
-      // Force product re-render if stageSize is different from rendered size
       this._renderProductIfNeeded();
 
       if (Array.isArray(vis.charms) && vis.charms.length) {
         await this._placeCharmsSymmetric(vis.charms);
 
-        // Always stay at base view on mobile to ensure same size every time
         if (isMobileLayout()) {
           this._resetToBaseView(true);
         } else if (vis.charms.length < 3) {
@@ -958,10 +961,7 @@ window.MainBaseCharm = function () {
     }
 
     _computeArcPositionsLinear(count) {
-      // Dynamic factors based on layout
-      const isMobile = isMobileLayout();
-      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
-      const radiusFactor = isMobile ? 0.45 : CHAIN_RADIUS_FACTOR;
+      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors();
 
       const center = {
         x: this.stageSize / 2,
@@ -1024,12 +1024,13 @@ window.MainBaseCharm = function () {
 
       this._placedCharmPositions = [];
 
+      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors();
       const geom = this._chainGeom || {
         center: {
           x: this.stageSize / 2,
-          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+          y: this.stageSize * centerYFactor,
         },
-        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+        radius: Math.max(8, this.stageSize * radiusFactor),
       };
 
       const chainR = geom.radius;
@@ -1051,7 +1052,6 @@ window.MainBaseCharm = function () {
         let x = chainX;
         let y = chainY + (size / 2) - (size * totalOverlap);
 
-        // Mobile specific: Hang directly from the chain point
         if (isMobile) {
           y = chainY;
         }
@@ -1066,11 +1066,10 @@ window.MainBaseCharm = function () {
             height: size,
             listening: true,
             offsetX: size / 2,
-            // Mobile: Pivot at top ring (approx 6% down). Desktop: Pivot at center.
             offsetY: isMobile ? size * 0.06 : size / 2,
-            // Ultra-wide hit area (approx 2cm padding) for easy mobile grabbing
             hitStrokeWidth: 80,
           });
+
           let rotation = 0;
           if (i !== centerIndex) {
             const chainAngleDeg = basePt.angle;
@@ -1082,7 +1081,6 @@ window.MainBaseCharm = function () {
             rotation = Math.max(-30, Math.min(30, rotation));
           }
 
-          // Tilt only the leftmost and rightmost charms on mobile
           if (isMobile) {
             if (i !== 0 && i !== count - 1) {
               rotation = 0;
@@ -1103,7 +1101,6 @@ window.MainBaseCharm = function () {
             kimg.to({ scaleX: 1, scaleY: 1, duration: 0.12 });
           };
 
-          // Mouse hover effects
           kimg.on('mouseenter', originalMouseEnter);
           kimg.on('mouseleave', originalMouseLeave);
 
@@ -1113,13 +1110,10 @@ window.MainBaseCharm = function () {
           let dragStartScale = 1;
           let dragStartOpacity = 1;
 
-          // Explicitly handle touchstart to guarantee drag starts
           kimg.on('touchstart', (e) => {
             e.cancelBubble = true;
-            // Stop any potential stage dragging
             if (this && this.stage) this.stage.stopDrag();
 
-            // Manually start drag on the charm
             kimg.startDrag();
 
             dragStartScale = kimg.scaleX() || 1;
@@ -1134,9 +1128,7 @@ window.MainBaseCharm = function () {
           });
 
           kimg.on('dragstart', (e) => {
-            // dragStartScale and dragStartOpacity are already set in touchstart if it's a touch event
-            // For mouse events, set them here
-            if (!e.evt.touches) { // Only if it's not a touch event
+            if (!e.evt.touches) {
               dragStartScale = kimg.scaleX() || 1;
               dragStartOpacity = kimg.opacity() || 1;
 
@@ -1199,7 +1191,6 @@ window.MainBaseCharm = function () {
             }
           });
 
-
           this.charmLayer.add(kimg);
           this._placedCharmPositions.push({ x, y, w: size, h: size });
         } catch (e) {
@@ -1207,27 +1198,23 @@ window.MainBaseCharm = function () {
         }
       }
     }
+
     _focusCharmsAtScale(scale, animate = true) {
       const pts = this._placedCharmPositions || [];
       const stage = this.stage;
       if (!stage) return;
 
       if (!pts.length) {
+        const { centerY: centerYFactor } = getChainGeometryFactors();
         const center = {
           x: this.stageSize / 2,
-          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+          y: this.stageSize * centerYFactor,
         };
         const posX = center.x - center.x * scale;
         const posY = center.y - center.y * scale;
 
         if (animate) {
-          stage.to({
-            scaleX: scale,
-            scaleY: scale,
-            x: posX,
-            y: posY,
-            duration: 0.18,
-          });
+          stage.to({ scaleX: scale, scaleY: scale, x: posX, y: posY, duration: 0.18 });
         } else {
           stage.scale({ x: scale, y: scale });
           stage.position({ x: posX, y: posY });
@@ -1235,6 +1222,7 @@ window.MainBaseCharm = function () {
         }
         return;
       }
+
       let minX = Infinity;
       let minY = Infinity;
       let maxX = -Infinity;
@@ -1255,28 +1243,24 @@ window.MainBaseCharm = function () {
       const boxCenterX = minX + (maxX - minX) / 2;
       const boxCenterY = minY + (maxY - minY) / 2;
 
+      const { centerY: centerYFactor } = getChainGeometryFactors();
       const viewportCenter = {
         x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        y: this.stageSize * centerYFactor,
       };
 
       const posX = viewportCenter.x - boxCenterX * scale;
       const posY = viewportCenter.y - boxCenterY * scale;
 
       if (animate) {
-        stage.to({
-          scaleX: scale,
-          scaleY: scale,
-          x: posX,
-          y: posY,
-          duration: 0.18,
-        });
+        stage.to({ scaleX: scale, scaleY: scale, x: posX, y: posY, duration: 0.18 });
       } else {
         stage.scale({ x: scale, y: scale });
         stage.position({ x: posX, y: posY });
         stage.batchDraw();
       }
     }
+
     autoZoomToCharms() {
       const pts = this._placedCharmPositions || [];
       if (!pts.length) {
@@ -1305,7 +1289,7 @@ window.MainBaseCharm = function () {
       const boxH = Math.max(1, maxY - minY);
       const boxCenterX = minX + boxW / 2;
       const boxCenterY = minY + boxH / 2;
-      const desiredFraction = 0.5; // Increased from 0.42 for better view
+      const desiredFraction = 0.5;
       const scaleX = (this.stageSize * desiredFraction) / boxW;
       const scaleY = (this.stageSize * desiredFraction) / boxH;
 
@@ -1314,21 +1298,16 @@ window.MainBaseCharm = function () {
       targetScale = Math.max(1.0, targetScale);
 
       const sx = targetScale;
+      const { centerY: centerYFactor } = getChainGeometryFactors();
       const viewportCenter = {
         x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        y: this.stageSize * centerYFactor,
       };
 
       const posX = viewportCenter.x - boxCenterX * sx;
       const posY = viewportCenter.y - boxCenterY * sx;
 
-      this.stage.to({
-        scaleX: sx,
-        scaleY: sx,
-        x: posX,
-        y: posY,
-        duration: 0.22,
-      });
+      this.stage.to({ scaleX: sx, scaleY: sx, x: posX, y: posY, duration: 0.22 });
       this.zoomFactor = sx;
 
       if (this.slider) this.slider.value = sx.toFixed(2);
@@ -1336,6 +1315,7 @@ window.MainBaseCharm = function () {
 
       this.stage.draggable(sx > 1);
     }
+
     setZoom(scale, opts = { animate: true }) {
       const stage = this.stage;
       if (!stage) return;
@@ -1344,15 +1324,17 @@ window.MainBaseCharm = function () {
         this._resetToBaseView(opts?.animate !== false);
         return;
       }
+
       scale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, scale));
       this.zoomFactor = scale;
 
       const animate = opts && opts.animate !== false;
       const hasCharms = this._placedCharmPositions && this._placedCharmPositions.length;
 
+      const { centerY: centerYFactor } = getChainGeometryFactors();
       const center = {
         x: this.stageSize / 2,
-        y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+        y: this.stageSize * centerYFactor,
       };
 
       const applyCenterZoom = () => {
@@ -1360,13 +1342,7 @@ window.MainBaseCharm = function () {
         const posY = center.y - center.y * scale;
 
         if (animate) {
-          stage.to({
-            scaleX: scale,
-            scaleY: scale,
-            x: posX,
-            y: posY,
-            duration: 0.18,
-          });
+          stage.to({ scaleX: scale, scaleY: scale, x: posX, y: posY, duration: 0.18 });
         } else {
           stage.scale({ x: scale, y: scale });
           stage.position({ x: posX, y: posY });
@@ -1389,7 +1365,6 @@ window.MainBaseCharm = function () {
 
     _swapCharmsInVisualiser(index1, index2) {
       try {
-        // Swap in visualiser.charms array
         if (visualiser.charms && index1 >= 0 && index2 >= 0 &&
           index1 < visualiser.charms.length && index2 < visualiser.charms.length) {
           const temp = visualiser.charms[index1];
@@ -1397,7 +1372,6 @@ window.MainBaseCharm = function () {
           visualiser.charms[index2] = temp;
         }
 
-        // Swap in localStorage charm_cart_v1.sequence
         try {
           const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
           if (cart && Array.isArray(cart.sequence) && index1 >= 0 && index2 >= 0 &&
@@ -1426,23 +1400,18 @@ window.MainBaseCharm = function () {
       try {
         if (!this.stage) return null;
 
-        // Save current state
         const oldScale = this.stage.scaleX();
         const oldPos = this.stage.position();
 
-        // Reset view for capture
         this.stage.scale({ x: 1, y: 1 });
         this.stage.position({ x: 0, y: 0 });
-        this.stage.draw(); // Use draw() for synchronous capture
+        this.stage.draw();
 
         let dataURL = null;
         try {
-          dataURL = this.stage.toDataURL({
-            pixelRatio: 2
-          });
+          dataURL = this.stage.toDataURL({ pixelRatio: 2 });
         } catch (err) {
           console.error('Visualizer: Capture failed. This is likely a CORS issue (tainted canvas).', err);
-          // If it's a security error, high-level fallback won't help, but we'll try standard ratio
           try {
             dataURL = this.stage.toDataURL({ pixelRatio: 1 });
           } catch (inner) {
@@ -1450,10 +1419,9 @@ window.MainBaseCharm = function () {
           }
         }
 
-        // Restore view
         this.stage.scale({ x: oldScale, y: oldScale });
         this.stage.position(oldPos);
-        this.stage.draw(); // Synchronous draw to restore view
+        this.stage.draw();
 
         return dataURL;
       } catch (e) {
@@ -1461,7 +1429,6 @@ window.MainBaseCharm = function () {
         return null;
       }
     }
-
   }
 
   window.getVisualizerImage = function () {
@@ -1492,6 +1459,7 @@ window.MainBaseCharm = function () {
     }
     return bv;
   }
+
   function readSavedVariantFromLS() {
     try {
       const raw = localStorage.getItem(LS_KEY);
@@ -1536,6 +1504,7 @@ window.MainBaseCharm = function () {
 
     return null;
   }
+
   function renderLeftSafe(variant) {
     try {
       const img =
@@ -1554,6 +1523,7 @@ window.MainBaseCharm = function () {
       }
     } catch (e) { }
   }
+
   function ensureBaseProductFromLS() {
     if (visualiser.product.image) return;
 
@@ -1578,7 +1548,6 @@ window.MainBaseCharm = function () {
 
   function getSelectedVariantCarat() {
     try {
-      // First try to get from Carat-value localStorage (most reliable)
       const caratValue = localStorage.getItem('Carat-value');
       if (caratValue) {
         const normalized = caratValue.toUpperCase().trim();
@@ -1595,6 +1564,7 @@ window.MainBaseCharm = function () {
 
       const resolved = resolveVariantFromPage(vid);
       if (!resolved) return null;
+
       const variantText = `${resolved.title || ''} ${resolved.option1 || ''} ${resolved.option2 || ''} ${resolved.option3 || ''}`.toUpperCase();
 
       if (variantText.includes('18KT') || variantText.includes('18 KT')) return '18KT';
@@ -1606,6 +1576,7 @@ window.MainBaseCharm = function () {
       return null;
     }
   }
+
   let countsInitialized = false;
 
   function filterCharmsBySelectedVariantCarat() {
@@ -1627,6 +1598,7 @@ window.MainBaseCharm = function () {
     let hiddenCount = 0;
     let shownCount = 0;
     let debugCount = 0;
+
     document.querySelectorAll('.charm-card').forEach((card) => {
       const wasAlreadyHidden = card.style.display === 'none';
       if (wasAlreadyHidden) return;
@@ -1634,6 +1606,7 @@ window.MainBaseCharm = function () {
       const cardTitle = card.dataset.title || card.querySelector('.charm-title')?.textContent || '';
       const cardCarats = (card.dataset.carat || '').split(',').map(c => c.trim().toUpperCase()).filter(c => c !== '');
       let shouldShow = false;
+
       if (cardCarats.length > 0) {
         shouldShow = cardCarats.some(carat => {
           const normalizedCarat = carat.replace(/\s+/g, '');
@@ -1651,10 +1624,12 @@ window.MainBaseCharm = function () {
           (selectedKT.includes('18') && titleUpper.includes('18KT')) ||
           titleUpper.includes(selectedKT);
       }
+
       if (debugCount < 5) {
         console.log(`Card ${debugCount + 1}: "${cardTitle.substring(0, 30)}...", Carats: [${cardCarats.join(', ')}], Should show: ${shouldShow}`);
         debugCount++;
       }
+
       if (!shouldShow) {
         card.style.display = 'none';
         hiddenCount++;
@@ -1668,9 +1643,10 @@ window.MainBaseCharm = function () {
     const colorNameEl = document.getElementById('lf-color-name');
     if (colorNameEl) {
       const currentText = colorNameEl.textContent;
-      const cleanText = currentText.replace(/^\d+KT\s*/, ''); // Remove existing KT prefix
+      const cleanText = currentText.replace(/^\d+KT\s*/, '');
       colorNameEl.textContent = `${selectedKT} ${cleanText}`;
     }
+
     if (!countsInitialized) {
       setTimeout(() => {
         updateCountsUI();
@@ -1754,12 +1730,14 @@ window.MainBaseCharm = function () {
         }, 100);
       }, 200);
     }, 80);
+
     if (full) {
       full.style.display = 'block';
       document.querySelector('.carat-section').style.display = 'none';
       full.setAttribute('aria-hidden', 'false');
       document.body.style.overflow = 'hidden';
     }
+
     setTimeout(() => {
       try {
         ensureBV();
@@ -1843,6 +1821,7 @@ window.MainBaseCharm = function () {
 
     mo.observe(document.body, { childList: true, subtree: true });
   })();
+
   function productJsonForCard(card) {
     const pid = card?.dataset?.productId;
     if (!pid) return null;
@@ -1922,6 +1901,7 @@ window.MainBaseCharm = function () {
       diamond_1_weight: mf.diamond,
     };
   }
+
   function rebuildVisualiserFromCart() {
     try {
       const cart = JSON.parse(localStorage.getItem('charm_cart_v1'));
@@ -1943,7 +1923,6 @@ window.MainBaseCharm = function () {
     }
   }
 
-
   function syncUIFromCart() {
     ensureBaseProductFromLS();
     rebuildVisualiserFromCart();
@@ -1961,6 +1940,7 @@ window.MainBaseCharm = function () {
     }
     refreshCapState();
   }
+
   function attachQtyHandlersKonva() {
     const gridsWrapper = document.getElementById('lf-charms-grids-wrapper');
     if (!gridsWrapper) return;
@@ -2008,7 +1988,6 @@ window.MainBaseCharm = function () {
         },
         { passive: true }
       );
-
 
       newDe?.addEventListener(
         'click',
@@ -2089,8 +2068,6 @@ window.MainBaseCharm = function () {
       try {
         ensureBV().initStage();
         bv.render(visualiser);
-
-        if (typeof currentCollectionId === 'string' && currentCollectionId) { }
       } catch (e) { }
     },
     { passive: true }
@@ -2425,7 +2402,6 @@ window.MainBaseCharm = function () {
     buildColorMapForActiveGrid();
     buildSwatchDots();
     refreshSelectedBorders();
-    // updateCTATotal();
     refreshCapState();
   }
 
@@ -2445,6 +2421,7 @@ window.MainBaseCharm = function () {
   window.luciraCloseAccessory = closePanel;
   window.filterCharmsBySelectedVariantCarat = filterCharmsBySelectedVariantCarat;
   window.getSelectedVariantCarat = getSelectedVariantCarat;
+
   window.debugCaratFiltering = function () {
     const caratValue = localStorage.getItem('Carat-value');
 
@@ -2478,6 +2455,7 @@ window.MainBaseCharm = function () {
 
     return { caratValue, totalCards: charmCards.length, visibleCount, hiddenCount };
   };
+
   window.testCaratFilter = function () {
     console.log('Manually triggering carat filter...');
     filterCharmsBySelectedVariantCarat();
@@ -2550,6 +2528,7 @@ window.MainBaseCharm = function () {
     }
     console.log('=== END DEBUG ===');
   };
+
   window.debugCanvasBounds = function () {
     console.log('=== CANVAS BOUNDS DEBUG ===');
     if (window.bv && window.bv.stage) {
@@ -2567,7 +2546,6 @@ window.MainBaseCharm = function () {
         });
       }
     }
-    // console.log('=== END DEBUG ===');
   };
 
 };
@@ -2737,7 +2715,6 @@ function computeCountsSimple() {
   });
 }
 
-
 function updateCountsUI() {
   computeCountsSimple();
 }
@@ -2747,18 +2724,18 @@ let __countsScheduled = false;
 function scheduleUpdateCounts() {
   let totalQty = 0;
   document.querySelectorAll('.qty-input').forEach((each) => {
-    totalQty += Number(each.value)
+    totalQty += Number(each.value);
   });
   if (totalQty >= 5) return;
 
-
   if (__countsScheduled) return;
   __countsScheduled = true;
+
   const run = () => {
     __countsScheduled = false;
-    // Don't update counts directly - let KT filtering handle it
     console.log('Scheduled count update - will be handled by KT filtering');
   };
+
   if (typeof requestAnimationFrame === 'function') {
     requestAnimationFrame(() =>
       (typeof window.requestIdleCallback === 'function' ? requestIdleCallback(run) : setTimeout(run, 1))
@@ -2787,4 +2764,4 @@ window.addEventListener('storage', (e) => {
   if (e.key === 'Carat-value') scheduleUpdateCounts();
 });
 
-window.updateCharmCounts = updateCountsUI
+window.updateCharmCounts = updateCountsUI;
