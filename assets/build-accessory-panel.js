@@ -92,6 +92,55 @@ window.MainBaseCharm = function () {
 
   const __VariantIndex = { built: false, idToVariant: new Map(), idToProduct: new Map() };
 
+
+  // Add this temporarily to see the chain arc
+_debugDrawChain() {
+  const layer = new Konva.Layer();
+  const center = {
+    x: this.stageSize / 2,
+    y: this.stageSize * CHAIN_CENTER_Y_FACTOR
+  };
+  const radius = this.stageSize * CHAIN_RADIUS_FACTOR;
+  
+  // Draw chain line
+  const line = new Konva.Line({
+    points: this._getArcPoints(center.x, center.y, radius, 50),
+    stroke: 'red',
+    strokeWidth: 2,
+    dash: [10, 5]
+  });
+  
+  // Draw attachment points
+  for (let i = 0; i <= 10; i++) {
+    const t = i / 10;
+    const angle = (ARC_START_DEG + (ARC_END_DEG - ARC_START_DEG) * t) * Math.PI / 180;
+    const x = center.x + radius * Math.cos(angle);
+    const y = center.y - radius * Math.sin(angle);
+    
+    const circle = new Konva.Circle({
+      x, y,
+      radius: 3,
+      fill: 'blue',
+      stroke: 'white'
+    });
+    layer.add(circle);
+  }
+  
+  layer.add(line);
+  this.stage.add(layer);
+}
+
+_getArcPoints(cx, cy, r, segments) {
+  const points = [];
+  for (let i = 0; i <= segments; i++) {
+    const t = i / segments;
+    const angle = (ARC_START_DEG + (ARC_END_DEG - ARC_START_DEG) * t) * Math.PI / 180;
+    points.push(cx + r * Math.cos(angle));
+    points.push(cy - r * Math.sin(angle));
+  }
+  return points;
+}
+
   function buildVariantIndexOnce() {
     if (__VariantIndex.built) return;
 
