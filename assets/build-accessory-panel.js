@@ -60,8 +60,8 @@ window.MainBaseCharm = function () {
 
   // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
   // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
-  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
-  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
+  // const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
+  // const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
