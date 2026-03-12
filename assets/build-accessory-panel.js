@@ -17,12 +17,12 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 1.20;
+  const SIZE_MULTIPLIER = 1.10;
 
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
 
-  const CHAIN_LENGTH_CM = 18;
+  const CHAIN_LENGTH_CM = 19;
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
@@ -60,37 +60,8 @@ window.MainBaseCharm = function () {
 
   // Mobile: Radius 0.40 ensures full circle fits within the width with 10% padding.
   // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
-  // const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
-  // const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
-
-// REMOVE these two lines:
-// const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
-// const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.55;
-
-// ADD this function instead (tune the necklace values to match your product image):
-  function getChainGeometryFactors() {
-    const mobile = isMobileLayout();
-    const type   = __BASE_TYPE__;            // 'bracelet' | 'anklet' | 'necklace' | null
-
-    if (type === 'necklace') {
-      return {
-        centerY: mobile ? 0.46 : 0.38,      // necklace chain sits higher in the image
-        radius:  mobile ? 0.38 : 0.44,      // necklace chain is smaller radius visually
-      };
-    }
-    if (type === 'anklet') {
-      return {
-        centerY: mobile ? 0.50 : 0.44,
-        radius:  mobile ? 0.45 : 0.52,
-      };
-    }
-    // bracelet / default
-    return {
-      centerY: mobile ? 0.50 : 0.42,
-      radius:  mobile ? 0.45 : 0.55,
-    };
-  }
-
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.42;
+  const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.45 : 0.55;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -919,11 +890,6 @@ window.MainBaseCharm = function () {
     }
 
     _resetToBaseView(animate = true) {
-      const { centerY: centerYFactor } = getChainGeometryFactors(); // ← dynamic
-      const center = {
-        x: this.stageSize / 2,
-        y: this.stageSize * (centerYFactor - 0.05),
-      };
       const stage = this.stage;
       if (!stage) return;
 
@@ -992,8 +958,10 @@ window.MainBaseCharm = function () {
     }
 
     _computeArcPositionsLinear(count) {
+      // Dynamic factors based on layout
       const isMobile = isMobileLayout();
-      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors(); // ← use function
+      const centerYFactor = isMobile ? 0.50 : CHAIN_CENTER_Y_FACTOR;
+      const radiusFactor = isMobile ? 0.45 : CHAIN_RADIUS_FACTOR;
 
       const center = {
         x: this.stageSize / 2,
@@ -1056,13 +1024,12 @@ window.MainBaseCharm = function () {
 
       this._placedCharmPositions = [];
 
-      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors();
       const geom = this._chainGeom || {
         center: {
           x: this.stageSize / 2,
-          y: this.stageSize * centerYFactor,   // ← was CHAIN_CENTER_Y_FACTOR
+          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
         },
-        radius: Math.max(8, this.stageSize * radiusFactor),  // ← was CHAIN_RADIUS_FACTOR
+        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
       };
 
       const chainR = geom.radius;
