@@ -19,12 +19,12 @@ window.MainBaseCharm = function () {
 
   const SIZE_MULTIPLIER = 1.20;
 
-  const ARC_START_DEG = 220;
+  const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
 
   const CHAIN_LENGTH_CM = 18;
   const CHARM_SPACING_CM = 2.54;
-  const MIN_SPACING_PX = 26;
+  const MIN_SPACING_PX = 29;
 
   function injectSafeStyles() {
     if (typeof document === 'undefined') return;
