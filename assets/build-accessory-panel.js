@@ -62,7 +62,7 @@ window.MainBaseCharm = function () {
   // Mobile: Radius 0.45 and Center Y 0.50 ensures 350px box fits everything and charms hang well.
   const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.55 : 0.48;
   const CHAIN_RADIUS_FACTOR = isMobileLayout() ? 0.42 : 0.52;
-  const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
+  const CHARM_ATTACH_OFFSET_FACTOR = 0.35;
   const CHARM_TOUCH_OVERLAP = 3;
 
   const $ = (id) => document.getElementById(id);
