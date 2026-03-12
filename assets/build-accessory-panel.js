@@ -26,11 +26,10 @@ window.MainBaseCharm = function () {
   const DESKTOP_CANVAS_SIZE = 560;
 
   // Arc range for charm placement along the bottom of the chain.
-  // 270° = dead bottom. Wider range = outer charms rise up the steep sides of the ring
-  // and visually fall off the chain wire.
-  // Widened slightly from 232–308 (76°) to 225–315 (90°) to accommodate larger spacing.
-  const ARC_START_DEG = 225;
-  const ARC_END_DEG   = 315;
+  // 270° = dead bottom. Narrower range keeps all charms on the flat bottom section.
+  // Tightened from 225–315 (90°) back to 235–305 (70°) — 225/315 was hitting steep side sections.
+  const ARC_START_DEG = 235;
+  const ARC_END_DEG   = 305;
 
   const CHAIN_LENGTH_CM = 18;
   // CHARM_SPACING_CM – physical gap between charm bail points along the arc.
@@ -91,13 +90,19 @@ window.MainBaseCharm = function () {
   // CALIBRATION: Adjust these two values if charms land off the chain.
   // CHAIN_CENTER_Y_FACTOR – vertical center of the chain ring as a fraction of stageSize (0=top, 1=bottom).
   // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
-  // Calibrated by measuring the chain ring in the product screenshot at DESKTOP_CANVAS_SIZE=560:
-  //   chain top ≈ 15px, chain bottom ≈ 330px → radius = 157/560 ≈ 0.28, centerY = 172/560 ≈ 0.31
-  // If charms sit BELOW the chain  → decrease CHAIN_CENTER_Y_FACTOR and/or CHAIN_RADIUS_FACTOR
-  // If charms sit INSIDE the chain → increase CHAIN_RADIUS_FACTOR
-  // If charms are too high         → increase CHAIN_CENTER_Y_FACTOR
-  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.31;
-  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.29;
+  //
+  // From screenshot (canvas 560px wide, ~566px tall):
+  //   Chain center ≈ y:213px → 213/560 = 0.38
+  //   Chain radius ≈ 190px  → 190/560 = 0.34
+  //   Arc bottom   ≈ 403px  (center + radius = 213+190)
+  //
+  // Diagnosis guide:
+  //   Charms on chain SIDES (not bottom) → INCREASE CHAIN_CENTER_Y_FACTOR
+  //   Charms BELOW chain                 → DECREASE CHAIN_CENTER_Y_FACTOR
+  //   Charms INSIDE the ring             → INCREASE CHAIN_RADIUS_FACTOR
+  //   Charms floating OUTSIDE the ring   → DECREASE CHAIN_RADIUS_FACTOR
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.38;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.34;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
