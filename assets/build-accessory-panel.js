@@ -22,7 +22,7 @@ window.MainBaseCharm = function () {
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
 
-  const CHAIN_LENGTH_CM = 18;
+  const CHAIN_LENGTH_CM = 19;
   const CHARM_SPACING_CM = 2.54;
   const MIN_SPACING_PX = 26;
 
