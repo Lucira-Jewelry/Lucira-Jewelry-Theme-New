@@ -91,9 +91,13 @@ window.MainBaseCharm = function () {
   // CALIBRATION: Adjust these two values if charms land off the chain.
   // CHAIN_CENTER_Y_FACTOR – vertical center of the chain ring as a fraction of stageSize (0=top, 1=bottom).
   // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
-  // Rule of thumb: measure the chain ring in the product image; radius ≈ ring_diameter_px / (2 * stageSize_px).
-  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.40;
-  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.38;
+  // Calibrated by measuring the chain ring in the product screenshot at DESKTOP_CANVAS_SIZE=560:
+  //   chain top ≈ 15px, chain bottom ≈ 330px → radius = 157/560 ≈ 0.28, centerY = 172/560 ≈ 0.31
+  // If charms sit BELOW the chain  → decrease CHAIN_CENTER_Y_FACTOR and/or CHAIN_RADIUS_FACTOR
+  // If charms sit INSIDE the chain → increase CHAIN_RADIUS_FACTOR
+  // If charms are too high         → increase CHAIN_CENTER_Y_FACTOR
+  const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.31;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.29;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
