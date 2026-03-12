@@ -17,7 +17,7 @@ window.MainBaseCharm = function () {
   const DEFAULT_CHARM_SCALE = 0.058;
   const DEFAULT_CHARM_POSITION = 0.62;
 
-  const SIZE_MULTIPLIER = 1.20;
+  const SIZE_MULTIPLIER = 1.10;
 
   const ARC_START_DEG = 210;
   const ARC_END_DEG = 330;
