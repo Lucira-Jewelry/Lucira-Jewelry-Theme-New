@@ -19,26 +19,16 @@ window.MainBaseCharm = function () {
 
   const SIZE_MULTIPLIER = 1.20;
 
-  // ── Desktop canvas size ───────────────────────────────────────────────────
-  // Increase this value to make the chain (and charms) render larger on desktop.
-  // Charms scale automatically because all positions use stageSize * factor.
-  // Recommended range: 480–620. Default was effectively ~440 (container width).
-  const DESKTOP_CANVAS_SIZE = 560;
-
   // Arc range for charm placement along the bottom of the chain.
   // 270° = dead bottom. Wider range = outer charms rise up the steep sides of the ring
-  // and visually fall off the chain wire.
-  // Widened slightly from 232–308 (76°) to 225–315 (90°) to accommodate larger spacing.
-  const ARC_START_DEG = 225;
-  const ARC_END_DEG   = 315;
+  // and visually fall off the chain wire. Keep range ≤ 76° total for 5 charms.
+  // Previous: 210–330 (120°) — outer charms at 210°/330° sat on steep 30° sections of the ring.
+  const ARC_START_DEG = 232;
+  const ARC_END_DEG   = 308;
 
   const CHAIN_LENGTH_CM = 18;
-  // CHARM_SPACING_CM – physical gap between charm bail points along the arc.
-  // Increase this to spread charms further apart. Previous value: 2.54
-  const CHARM_SPACING_CM = 3.6;
-  // MIN_SPACING_PX – minimum pixel gap enforced regardless of canvas size.
-  // Previous value: 26
-  const MIN_SPACING_PX = 48;
+  const CHARM_SPACING_CM = 2.54;
+  const MIN_SPACING_PX = 26;
 
   function injectSafeStyles() {
     if (typeof document === 'undefined') return;
@@ -64,20 +54,6 @@ window.MainBaseCharm = function () {
           height: 200px !important;
         }
       }
-      @media (min-width: 769px) {
-        .variant-img-wrap {
-          width: ${DESKTOP_CANVAS_SIZE}px !important;
-          height: ${Math.round(DESKTOP_CANVAS_SIZE * (445 / 440))}px !important;
-        }
-        #vis-Visualiser_Canvas {
-          width: ${DESKTOP_CANVAS_SIZE}px !important;
-          height: ${Math.round(DESKTOP_CANVAS_SIZE * (445 / 440))}px !important;
-        }
-        #vis-Visualiser_Canvas canvas {
-          width: ${DESKTOP_CANVAS_SIZE}px !important;
-          height: ${Math.round(DESKTOP_CANVAS_SIZE * (445 / 440))}px !important;
-        }
-      }
     `;
     document.head.appendChild(style);
   }
@@ -93,7 +69,7 @@ window.MainBaseCharm = function () {
   // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
   // Rule of thumb: measure the chain ring in the product image; radius ≈ ring_diameter_px / (2 * stageSize_px).
   const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.40;
-  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.38;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.30;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
@@ -829,18 +805,14 @@ window.MainBaseCharm = function () {
           wrapper.style.setProperty('height', '200px', 'important');
         }
       } else {
-        // Desktop: explicitly size wrapper to DESKTOP_CANVAS_SIZE so the Konva
-        // stage fills it and the chain + charms render at the desired scale.
+        // Desktop: Increase main container height to prevent cropping
         if (wrapper) {
-          wrapper.style.setProperty('width', DESKTOP_CANVAS_SIZE + 'px', 'important');
-          wrapper.style.setProperty('height', Math.round(DESKTOP_CANVAS_SIZE * (445 / 440)) + 'px', 'important');
+          //wrapper.style.setProperty('height', '470px', 'important');
         }
       }
 
       const rect = container.getBoundingClientRect();
-      // Desktop: use DESKTOP_CANVAS_SIZE as the authoritative width so the chain
-      // always renders at the desired scale regardless of container reflow timing.
-      let width = isMobileLayout() ? 350 : Math.max(DESKTOP_CANVAS_SIZE, rect.width || 0);
+      let width = isMobileLayout() ? 350 : (rect.width || 440);
       width = Math.max(300, width || 400);
       // Desktop: Slightly decrease canvas layer height to 445px
       const height = isMobileLayout() ? 353 : (width * (445 / 440));
