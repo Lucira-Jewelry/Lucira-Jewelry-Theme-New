@@ -919,6 +919,11 @@ window.MainBaseCharm = function () {
     }
 
     _resetToBaseView(animate = true) {
+      const { centerY: centerYFactor } = getChainGeometryFactors(); // ← dynamic
+      const center = {
+        x: this.stageSize / 2,
+        y: this.stageSize * (centerYFactor - 0.05),
+      };
       const stage = this.stage;
       if (!stage) return;
 
@@ -1051,12 +1056,13 @@ window.MainBaseCharm = function () {
 
       this._placedCharmPositions = [];
 
+      const { centerY: centerYFactor, radius: radiusFactor } = getChainGeometryFactors();
       const geom = this._chainGeom || {
         center: {
           x: this.stageSize / 2,
-          y: this.stageSize * CHAIN_CENTER_Y_FACTOR,
+          y: this.stageSize * centerYFactor,   // ← was CHAIN_CENTER_Y_FACTOR
         },
-        radius: Math.max(8, this.stageSize * CHAIN_RADIUS_FACTOR),
+        radius: Math.max(8, this.stageSize * radiusFactor),  // ← was CHAIN_RADIUS_FACTOR
       };
 
       const chainR = geom.radius;
