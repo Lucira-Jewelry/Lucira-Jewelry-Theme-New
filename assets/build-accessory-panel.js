@@ -65,7 +65,7 @@ window.MainBaseCharm = function () {
   // CHAIN_RADIUS_FACTOR   – radius of the chain ring as a fraction of stageSize.
   // Rule of thumb: measure the chain ring in the product image; radius ≈ ring_diameter_px / (2 * stageSize_px).
   const CHAIN_CENTER_Y_FACTOR = isMobileLayout() ? 0.50 : 0.40;
-  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.32;
+  const CHAIN_RADIUS_FACTOR   = isMobileLayout() ? 0.45 : 0.31;
   const CHARM_ATTACH_OFFSET_FACTOR = 0.0;
   const CHARM_TOUCH_OVERLAP = 3;
 
