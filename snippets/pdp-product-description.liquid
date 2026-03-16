@@ -211,53 +211,141 @@
                 {%- endif -%}
               {%- endfor -%}
 
-              {%- unless diamonds_displayed -%}
-                {%- for i in (1..4) -%}
-                  {%- assign clarity_key = 'diamond_' | append: i | append: '_clarity' -%}
-                  {%- assign color_key = 'diamond_' | append: i | append: '_color' -%}
-                  {%- assign shape_key = 'diamond_' | append: i | append: '_shape' -%}
-                  {%- assign numbers_key = 'diamond_' | append: i | append: '_numbers' -%}
-                  {%- assign weight_key = 'diamond_' | append: i | append: '_weight' -%}
+{%- unless diamonds_displayed -%}
+  {%- comment -%} Collect which diamond indices have data {%- endcomment -%}
+  {%- assign active_diamonds = '' -%}
+  {%- for i in (1..4) -%}
+    {%- assign clarity_key = 'diamond_' | append: i | append: '_clarity' -%}
+    {%- assign color_key   = 'diamond_' | append: i | append: '_color' -%}
+    {%- assign shape_key   = 'diamond_' | append: i | append: '_shape' -%}
+    {%- assign numbers_key = 'diamond_' | append: i | append: '_numbers' -%}
+    {%- assign weight_key  = 'diamond_' | append: i | append: '_weight' -%}
 
-                  {%- if variant.metafields.custom[clarity_key] != blank
-                    or variant.metafields.custom[color_key] != blank
-                    or variant.metafields.custom[shape_key] != blank
-                    or variant.metafields.custom[numbers_key] != blank
-                    or variant.metafields.custom[weight_key] != blank
-                  -%}
-                    <div class="pdp-info-item" data-diamond="{{ i }}" data-source="custom">
-                      {% if variant.metafields.custom[clarity_key] != blank
-                        or variant.metafields.custom[color_key] != blank
-                      -%}
-                        <span class="pdp-info-title" id="diamond-clarity-color-{{ i }}">
-                          {{ variant.metafields.custom[clarity_key] -}}
-                          {%- if variant.metafields.custom[clarity_key] != blank
-                            and variant.metafields.custom[color_key] != blank
-                          -%}
-                            ,
-                          {% endif -%}
-                          {{- variant.metafields.custom[color_key] }}
-                        </span>
-                      {% endif %}
-                      {% if variant.metafields.custom[shape_key] != blank -%}
-                        <span class="pdp-info-title" id="diamond-shape-{{ i }}">
-                          {{ variant.metafields.custom[shape_key] }}
-                        </span>
-                      {% endif %}
-                      {% if variant.metafields.custom[numbers_key] != blank -%}
-                        <span class="pdp-info-title" id="diamond-pcs-{{ i }}">
-                          {{- variant.metafields.custom[numbers_key] }}pcs
-                        </span>
-                      {%- endif %}
-                      {% if variant.metafields.custom[weight_key] != blank -%}
-                        <span class="pdp-info-title" id="diamond-weight-{{ i }}">
-                          {{- variant.metafields.custom[weight_key] }}ct
-                        </span>
-                      {%- endif %}
-                    </div>
-                  {%- endif -%}
-                {%- endfor -%}
-              {%- endunless -%}
+    {%- if variant.metafields.custom[clarity_key] != blank
+      or variant.metafields.custom[color_key] != blank
+      or variant.metafields.custom[shape_key] != blank
+      or variant.metafields.custom[numbers_key] != blank
+      or variant.metafields.custom[weight_key] != blank
+    -%}
+      {%- if active_diamonds == '' -%}
+        {%- assign active_diamonds = i | append: '' -%}
+      {%- else -%}
+        {%- assign active_diamonds = active_diamonds | append: ',' | append: i -%}
+      {%- endif -%}
+    {%- endif -%}
+  {%- endfor -%}
+
+  {%- if active_diamonds != '' -%}
+    {%- assign diamond_indices = active_diamonds | split: ',' -%}
+
+    <div class="pdp-diamond-section">
+
+      {%- comment -%} Header {%- endcomment -%}
+      <div class="pdp-diamond-header">
+        <svg class="pdp-diamond-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M2 9l3-5h14l3 5-10 11L2 9z"/>
+          <path d="M2 9h20M7 4l-2 5 7 11M17 4l2 5-7 11"/>
+        </svg>
+        <span>Diamond</span>
+      </div>
+
+      {%- comment -%} Table {%- endcomment -%}
+      <div class="pdp-diamond-table">
+
+        {%- comment -%} Quality row (clarity + color) {%- endcomment -%}
+        {%- assign has_quality = false -%}
+        {%- for idx in diamond_indices -%}
+          {%- assign clarity_key = 'diamond_' | append: idx | append: '_clarity' -%}
+          {%- assign color_key   = 'diamond_' | append: idx | append: '_color' -%}
+          {%- if variant.metafields.custom[clarity_key] != blank or variant.metafields.custom[color_key] != blank -%}
+            {%- assign has_quality = true -%}
+          {%- endif -%}
+        {%- endfor -%}
+        {%- if has_quality -%}
+          <div class="pdp-diamond-row">
+            <span class="pdp-diamond-label">Quality</span>
+            <div class="pdp-diamond-values">
+              {%- for idx in diamond_indices -%}
+                {%- assign clarity_key = 'diamond_' | append: idx | append: '_clarity' -%}
+                {%- assign color_key   = 'diamond_' | append: idx | append: '_color' -%}
+                <span class="pdp-diamond-value" id="diamond-clarity-color-{{ idx }}">
+                  {{- variant.metafields.custom[clarity_key] -}}
+                  {%- if variant.metafields.custom[clarity_key] != blank and variant.metafields.custom[color_key] != blank -%},{%- endif -%}
+                  {{- ' ' -}}{{- variant.metafields.custom[color_key] -}}
+                </span>
+              {%- endfor -%}
+            </div>
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Shape row {%- endcomment -%}
+        {%- assign has_shape = false -%}
+        {%- for idx in diamond_indices -%}
+          {%- assign shape_key = 'diamond_' | append: idx | append: '_shape' -%}
+          {%- if variant.metafields.custom[shape_key] != blank -%}{%- assign has_shape = true -%}{%- endif -%}
+        {%- endfor -%}
+        {%- if has_shape -%}
+          <div class="pdp-diamond-row">
+            <span class="pdp-diamond-label">Shape</span>
+            <div class="pdp-diamond-values">
+              {%- for idx in diamond_indices -%}
+                {%- assign shape_key = 'diamond_' | append: idx | append: '_shape' -%}
+                <span class="pdp-diamond-value" id="diamond-shape-{{ idx }}">
+                  {{- variant.metafields.custom[shape_key] | default: '—' -}}
+                </span>
+              {%- endfor -%}
+            </div>
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Quantity row {%- endcomment -%}
+        {%- assign has_numbers = false -%}
+        {%- for idx in diamond_indices -%}
+          {%- assign numbers_key = 'diamond_' | append: idx | append: '_numbers' -%}
+          {%- if variant.metafields.custom[numbers_key] != blank -%}{%- assign has_numbers = true -%}{%- endif -%}
+        {%- endfor -%}
+        {%- if has_numbers -%}
+          <div class="pdp-diamond-row">
+            <span class="pdp-diamond-label">Quantity</span>
+            <div class="pdp-diamond-values">
+              {%- for idx in diamond_indices -%}
+                {%- assign numbers_key = 'diamond_' | append: idx | append: '_numbers' -%}
+                <span class="pdp-diamond-value" id="diamond-pcs-{{ idx }}">
+                  {%- if variant.metafields.custom[numbers_key] != blank -%}
+                    {{- variant.metafields.custom[numbers_key] -}}pcs
+                  {%- else -%}—{%- endif -%}
+                </span>
+              {%- endfor -%}
+            </div>
+          </div>
+        {%- endif -%}
+
+        {%- comment -%} Carat row {%- endcomment -%}
+        {%- assign has_weight = false -%}
+        {%- for idx in diamond_indices -%}
+          {%- assign weight_key = 'diamond_' | append: idx | append: '_weight' -%}
+          {%- if variant.metafields.custom[weight_key] != blank -%}{%- assign has_weight = true -%}{%- endif -%}
+        {%- endfor -%}
+        {%- if has_weight -%}
+          <div class="pdp-diamond-row">
+            <span class="pdp-diamond-label">Carat</span>
+            <div class="pdp-diamond-values">
+              {%- for idx in diamond_indices -%}
+                {%- assign weight_key = 'diamond_' | append: idx | append: '_weight' -%}
+                <span class="pdp-diamond-value" id="diamond-weight-{{ idx }}">
+                  {%- if variant.metafields.custom[weight_key] != blank -%}
+                    {{- variant.metafields.custom[weight_key] -}}ct
+                  {%- else -%}—{%- endif -%}
+                </span>
+              {%- endfor -%}
+            </div>
+          </div>
+        {%- endif -%}
+
+      </div>{%- comment -%} /.pdp-diamond-table {%- endcomment -%}
+    </div>{%- comment -%} /.pdp-diamond-section {%- endcomment -%}
+  {%- endif -%}
+{%- endunless -%}
             </div>
           </div>
         {%- endif -%}
