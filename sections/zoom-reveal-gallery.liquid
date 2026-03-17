@@ -1,0 +1,242 @@
+<section class="gallery-section">
+
+  <div class="gallery-wrap">
+    <div class="gallery gallery--full" id="gallery-{{ section.id }}">
+      
+      {% for block in section.blocks %}
+        <div class="gallery__item" {{ block.shopify_attributes }}>
+          {% if block.settings.image %}
+            <img
+              src="{{ block.settings.image | image_url: width: 1600 }}"
+              loading="lazy"
+              width="{{ block.settings.image.width }}"
+              height="{{ block.settings.image.height }}"
+              alt="{{ block.settings.image.alt | escape }}"
+            >
+          {% endif %}
+        </div>
+      {% endfor %}
+
+    </div>
+  </div>
+
+  <div class="scroll-hint" id="scrollHint-{{ section.id }}">
+    <span>scroll</span>
+    <div class="scroll-hint__line"></div>
+  </div>
+
+</section>
+
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --gap: 1vh;
+}
+
+.gallery-wrap {
+  position: relative;
+  width: 100%;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gallery {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  flex: none;
+}
+
+.gallery__item {
+  background-position: 50% 50%;
+  background-size: cover;
+  flex: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.gallery__item img {
+  object-fit: cover;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* BENTO GRID */
+
+.gallery--bento {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(3, 32.5vw);
+  grid-template-rows: repeat(4, 23vh);
+  justify-content: center;
+  align-content: center;
+}
+
+.gallery--bento .gallery__item:nth-child(1) { grid-area: 1 / 1 / 3 / 2; }
+.gallery--bento .gallery__item:nth-child(2) { grid-area: 1 / 2 / 2 / 3; }
+.gallery--bento .gallery__item:nth-child(3) { grid-area: 2 / 2 / 4 / 3; }
+.gallery--bento .gallery__item:nth-child(4) { grid-area: 1 / 3 / 3 / 4; }
+.gallery--bento .gallery__item:nth-child(5) { grid-area: 3 / 1 / 4 / 2; }
+.gallery--bento .gallery__item:nth-child(6) { grid-area: 3 / 3 / 5 / 4; }
+.gallery--bento .gallery__item:nth-child(7) { grid-area: 4 / 1 / 5 / 2; }
+.gallery--bento .gallery__item:nth-child(8) { grid-area: 4 / 2 / 5 / 3; }
+
+/* FULL STATE */
+
+.gallery--full {
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: repeat(3, 100vw);
+  grid-template-rows: repeat(4, 49.5vh);
+  justify-content: center;
+  align-content: center;
+}
+
+.gallery--full .gallery__item:nth-child(1) { grid-area: 1 / 1 / 3 / 2; }
+.gallery--full .gallery__item:nth-child(2) { grid-area: 1 / 2 / 2 / 3; }
+.gallery--full .gallery__item:nth-child(3) { grid-area: 2 / 2 / 4 / 3; }
+.gallery--full .gallery__item:nth-child(4) { grid-area: 1 / 3 / 3 / 4; }
+.gallery--full .gallery__item:nth-child(5) { grid-area: 3 / 1 / 4 / 2; }
+.gallery--full .gallery__item:nth-child(6) { grid-area: 3 / 3 / 5 / 4; }
+.gallery--full .gallery__item:nth-child(7) { grid-area: 4 / 1 / 5 / 2; }
+.gallery--full .gallery__item:nth-child(8) { grid-area: 4 / 2 / 5 / 3; }
+
+/* SCROLL HINT */
+
+.scroll-hint {
+  position: fixed;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 1;
+  transition: opacity 0.4s;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.scroll-hint span {
+  font-size: 0.7rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(232,224,212,0.5);
+}
+
+.scroll-hint__line {
+  width: 1px;
+  height: 40px;
+  background: linear-gradient(to bottom, rgba(232,224,212,0.5), transparent);
+  animation: scrollLine 1.4s ease-in-out infinite;
+}
+
+@keyframes scrollLine {
+  0% { transform: scaleY(0); transform-origin: top; }
+  50% { transform: scaleY(1); transform-origin: top; }
+  51% { transform: scaleY(1); transform-origin: bottom; }
+  100% { transform: scaleY(0); transform-origin: bottom; }
+}
+
+.scroll-hint.hidden { opacity: 0; }
+</style>
+
+<script src="https://unpkg.com/gsap@3/dist/gsap.min.js"></script>
+<script src="https://unpkg.com/gsap@3/dist/EasePack.min.js"></script>
+<script src="https://unpkg.com/gsap@3/dist/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/gsap@3/dist/Flip.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function(){
+
+gsap.registerPlugin(ScrollTrigger, Flip);
+
+let flipCtx;
+
+const createTween = () => {
+
+  const galleryElement = document.querySelector("#gallery-{{ section.id }}");
+  if(!galleryElement) return;
+
+  const galleryItems = galleryElement.querySelectorAll(".gallery__item");
+
+  flipCtx && flipCtx.revert();
+
+  galleryElement.classList.remove("gallery--bento");
+  galleryElement.classList.add("gallery--full");
+
+  flipCtx = gsap.context(() => {
+
+    galleryElement.classList.add("gallery--bento");
+    galleryElement.classList.remove("gallery--full");
+
+    const bentoState = Flip.getState(galleryItems);
+
+    galleryElement.classList.remove("gallery--bento");
+    galleryElement.classList.add("gallery--full");
+
+    const flip = Flip.to(bentoState, {
+      simple: true,
+      ease: "expoScale(5,1)"
+    });
+
+    const tl = gsap.timeline({
+      scrollTrigger: {
+        trigger: galleryElement,
+        start: "center center",
+        end: "+=100%",
+        scrub: true,
+        pin: galleryElement.parentNode,
+      }
+    });
+
+    tl.add(flip);
+
+  });
+
+};
+
+createTween();
+window.addEventListener("resize", createTween);
+
+const hint = document.getElementById("scrollHint-{{ section.id }}");
+
+window.addEventListener("scroll", () => {
+  if (window.scrollY > 20) hint.classList.add("hidden");
+  else hint.classList.remove("hidden");
+}, { passive: true });
+
+});
+</script>
+
+{% schema %}
+{
+  "name": "Scroll Flip Gallery",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "image",
+      "name": "Gallery Image",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Image"
+        }
+      ]
+    }
+  ],
+  "max_blocks": 8,
+  "presets": [
+    {
+      "name": "Scroll Flip Gallery"
+    }
+  ]
+}
+{% endschema %}

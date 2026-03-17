@@ -499,7 +499,7 @@
 {% assign diamond_final = 0.0 %}
 {% assign diamond_original = 0.0 %}
 {% assign diamond_pcs = 0 %}
-{% assign diamond_title = '' %}
+{% assign diamond_groups = '' %}
 
 {% assign gemstone_final = 0.0 %}
 {% assign gemstone_original = 0.0 %}
@@ -539,10 +539,11 @@
   {% assign item_final_cost = item_base_cost | minus: discount_amount %}
 
   {% if stone_item.stone_type == 'diamond' %}
-    {% assign diamond_final = diamond_final | plus: item_final_cost %}
-    {% assign diamond_original = diamond_original | plus: item_base_cost %}
-    {% assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity %}
-    {% if diamond_title == '' %}{% assign diamond_title = current_title %}{% endif %}
+
+  {% assign diamond_final = diamond_final | plus: item_final_cost %}
+  {% assign diamond_original = diamond_original | plus: item_base_cost %}
+  {% assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity %}
+
   {% else %}
     {% assign gemstone_final = gemstone_final | plus: item_final_cost %}
     {% assign gemstone_original = gemstone_original | plus: item_base_cost %}
@@ -550,6 +551,78 @@
     {% if gemstone_title == '' %}{% assign gemstone_title = current_title %}{% endif %}
   {% endif %}
 {% endfor %}
+
+{% assign grp_diamond_titles = '' %}
+{% for stone_item in config.advanced_stone_config %}
+  {% if stone_item.stone_type == 'diamond' %}
+    {% assign grp_pr = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
+    {% if grp_pr %}
+      {% assign grp_t = grp_pr.title %}
+      {% assign grp_title_list = grp_diamond_titles | split: '||' %}
+      {% assign grp_already = false %}
+      {% for grp_existing in grp_title_list %}
+        {% if grp_existing == grp_t %}{% assign grp_already = true %}{% break %}{% endif %}
+      {% endfor %}
+      {% unless grp_already %}
+        {% if grp_diamond_titles == '' %}
+          {% assign grp_diamond_titles = grp_t %}
+        {% else %}
+          {% assign grp_diamond_titles = grp_diamond_titles | append: '||' | append: grp_t %}
+        {% endif %}
+      {% endunless %}
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+{% assign grp_title_arr = grp_diamond_titles | split: '||' %}
+{% capture diamond_rows %}
+  {% for grp_title in grp_title_arr %}
+    {% assign grp_qty   = 0 %}
+    {% assign grp_base  = 0.0 %}
+    {% assign grp_final = 0.0 %}
+
+    {% for stone_item in config.advanced_stone_config %}
+      {% if stone_item.stone_type == 'diamond' %}
+        {% assign grp_pr = stone_pricing_db | where: 'id', stone_item.pricing_id | first %}
+        {% if grp_pr and grp_pr.title == grp_title %}
+          {% assign grp_avg_wt    = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity %}
+          {% assign grp_slab_rate = 0 %}
+          {% assign grp_slab_disc = 0 %}
+          {% for slab in grp_pr.slabs %}
+            {% if grp_avg_wt >= slab.from_weight and grp_avg_wt <= slab.to_weight %}
+              {% assign grp_slab_rate = slab.price | times: 100 %}
+              {% assign grp_slab_disc = slab.discount | default: 0 %}
+              {% break %}
+            {% endif %}
+          {% endfor %}
+          {% assign grp_item_base  = grp_slab_rate | times: stone_item.stone_weight %}
+          {% assign grp_app_disc   = config.diamond_discount | default: grp_slab_disc %}
+          {% assign grp_disc_amt   = grp_item_base | times: grp_app_disc | divided_by: 100.0 %}
+          {% assign grp_item_final = grp_item_base | minus: grp_disc_amt %}
+          {% assign grp_qty   = grp_qty   | plus: stone_item.stone_quantity %}
+          {% assign grp_base  = grp_base  | plus: grp_item_base %}
+          {% assign grp_final = grp_final | plus: grp_item_final %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+
+     <div class="price-breakdown-box-item">
+      <span>
+        {{ grp_title }} ({{ grp_qty }} Pcs.)
+        {% assign grp_saving = grp_base | minus: grp_final %}
+        {% if grp_app_disc > 0 and grp_saving >= 100 %}
+          <small class="discount-text">{{ grp_app_disc }}% OFF</small>
+        {% endif %}
+      </span>
+      <div>
+        {% if grp_base > grp_final and grp_saving >= 100 %}
+          <span class="price-breakdown-box-del-value">{{ grp_base | money }}</span>
+        {% endif %}
+        <span class="price-breakdown-box-value">{{ grp_final | money }}</span>
+      </div>
+    </div>
+  {% endfor %}
+{% endcapture %}
 
 {% assign mc_rate_original = config.making_charges | default: 0 | times: 100 %}
 {% assign mc_discount_percent = config.making_charges_discount | default: 0 %}
@@ -590,7 +663,7 @@
             </div>
             {% unless product.tags contains 'Gold Jewelry' %}
               <div tabindex="0" class="contained-switch" data-tab="comparison">
-                <span class="switch-item">Your Savings</span>
+                <span class="switch-item">Price Comparison</span>
             </div>
             {% endunless %}
           </div>
@@ -627,32 +700,7 @@
                   | round %}
               {% endif %}
 
-              {% if diamond_final > 0 %}
-                <div class="price-breakdown-box-item">
-                  <span>
-                    {{ diamond_title }} ({{ diamond_pcs }} Pcs.)
-                    {% if diamond_percent > 0 %}
-                      <small class="discount-text">{{ diamond_percent }}% OFF</small>
-                    {% endif %}
-                  </span>
-
-                  <div>
-                    {% if diamond_original > diamond_final %}
-                      <span class="price-breakdown-box-del-value">
-                        {{ diamond_original | money }}
-                      </span>
-                    {% endif %}
-
-                    <span
-                      class="price-breakdown-box-value"
-                      id="source-diamond-cost"
-                      data-value="{{ diamond_final }}"
-                    >
-                      {{ diamond_final | money }}
-                    </span>
-                  </div>
-                </div>
-              {% endif %}
+              {{ diamond_rows }}
 
 
               {% if gemstone_final > 0 %}
@@ -685,17 +733,30 @@
                   <span class="price-breakdown-box-value" 
                     id="source-making-charges" 
                     data-value="{{ mc_cost_final }}">
-                    {{ mc_cost_final | money }}
+                    {% if mc_cost_final == 0 and mc_percent == 100 %}
+                      <strong class="free-highlight">FREE</strong>
+                    {% else %}
+                      {{ mc_cost_final | money }}
+                    {% endif %}
                   </span>
                 </div>
               </div>
 
-              <div class="price-breakdown-box-item">
-                <span>GST ({{ metal_rates.default_tax }}%)</span>
+             <div class="price-breakdown-box-item">
+              <span>GST ({{ metal_rates.default_tax }}%)</span>
+
+              <div>
+                {% if original_tax > tax_amount %}
+                  <span class="price-breakdown-box-del-value">
+                    {{ original_tax | money }}
+                  </span>
+                {% endif %}
+
                 <span class="price-breakdown-box-value" id="source-gst" data-value="{{ tax_amount }}">
                   {{ tax_amount | money }}
                 </span>
               </div>
+            </div>
 
               <hr style="border: 0; margin: 15px 0; background: #e6e6e6; height: 0.5px;">
 
@@ -706,6 +767,25 @@
                 </span>
               </div>
             </div>
+            {% assign original_subtotal = metal_cost 
+                | plus: diamond_original 
+                | plus: gemstone_original 
+                | plus: mc_cost_original %}
+
+              {% assign original_tax = original_subtotal 
+                | times: metal_rates.default_tax 
+                | divided_by: 100.0 %}
+
+              {% assign original_total = original_subtotal | plus: original_tax %}
+
+              {% assign total_savings = original_total | minus: grand_total %}
+
+              {% if total_savings > 0 %}
+              <div class="jewelry-saving-box">
+                <span>Save on this jewelry</span>
+                <span class="saving-amount">{{ total_savings | money }}</span>
+              </div>
+              {% endif %}
           </div>
           {% unless product.tags contains 'Gold Jewelry' %}
             <div class="tab-content" id="comparison">
@@ -929,7 +1009,7 @@
       function pushTabClick(tabName, savingsAmount = null) {
 
         let promoPosition = 'Product Details Section';
-        if (tabName === 'Your Savings' && savingsAmount) {
+        if (tabName === 'Price Comparison' && savingsAmount) {
           promoPosition = savingsAmount;
         }
 
@@ -1007,7 +1087,7 @@
         if (tabId === 'price-breakup') {
           pushTabClick('Price Breakup');
         } else if (tabId === 'comparison') {
-          pushTabClick('Your Savings', totalSavings);
+          pushTabClick('Price Comparison', totalSavings);
         }
 
         const allSwitches = wrapper.querySelectorAll('.contained-switch');
