@@ -253,7 +253,7 @@
   flex-shrink: 0;
   border-radius: 50%;
 }
-[data-ms-section] .ms-dot-icon {
+{% comment %} [data-ms-section] .ms-dot-icon {
   position: absolute;
   inset: 0;
   border-radius: 50%;
@@ -268,7 +268,61 @@
 [data-ms-section] .ms-dot-icon.is-visible {
   opacity: 1;
   transform: scale(1) rotate(0deg);
+} {% endcomment %}
+[data-ms-section] .ms-dot-display {
+  position: relative;
+  width: var(--ms-dot-sz);
+  height: var(--ms-dot-sz);
+  flex-shrink: 0;
+  border-radius: 50%;
+  overflow: hidden;           /* clip sliding dots inside the circle */
 }
+
+[data-ms-section] .ms-dot-icon {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(100%);   /* default: waiting off-screen right */
+  pointer-events: none;
+  transition:
+    opacity var(--ms-dur) var(--ms-ease),
+    transform var(--ms-dur) var(--ms-ease);
+}
+
+/* Active dot: centred, fully visible */
+[data-ms-section] .ms-dot-icon.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Exiting to the left (user went Next) */
+[data-ms-section] .ms-dot-icon.is-exit-left {
+  opacity: 0;
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+/* Exiting to the right (user went Prev) */
+[data-ms-section] .ms-dot-icon.is-exit-right {
+  opacity: 0;
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+/* Entering from the left (user went Prev) */
+[data-ms-section] .ms-dot-icon.is-enter-left {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+/* Entering from the right (user went Next) */
+[data-ms-section] .ms-dot-icon.is-enter-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
 [data-ms-section] .ms-dot-icon__img {
   width: 100%;
   height: 100%;
@@ -394,14 +448,17 @@
 
     if (total <= 1) return;
 
+    // Track swipe direction: 1 = next (→), -1 = prev (←)
+    var direction = 1;
+    var prevRealIndex = 0;
+
     var swiper = new Swiper('#{{ s_id }}-swiper', {
       loop:            true,
       slidesPerView:   2,
       spaceBetween:    20,
       centeredSlides:  true,
-      speed:           1000,
+      speed:           500,
       grabCursor:      true,
-
       touchRatio:      1,
       touchAngle:      45,
 
@@ -420,10 +477,37 @@
         slideChange: function () {
           var idx = this.realIndex;
 
-          DOT_ICONS.forEach(function (dot, i) {
-            dot.classList.toggle('is-visible', i === idx);
+          // ── Dot slide animation ──────────────────────────────────
+          var outgoing = DOT_ICONS[prevRealIndex];
+          var incoming = DOT_ICONS[idx];
+
+          var exitClass  = direction === 1 ? 'is-exit-left'  : 'is-exit-right';
+          var enterClass = direction === 1 ? 'is-enter-right' : 'is-enter-left';
+
+          // 1. Set incoming to its off-screen start position (no transition)
+          incoming.style.transition = 'none';
+          incoming.classList.remove('is-visible', 'is-exit-left', 'is-exit-right');
+          incoming.classList.add(enterClass);
+
+          // 2. Force reflow so the browser registers the start position
+          incoming.getBoundingClientRect();
+
+          // 3. Re-enable transitions and animate both dots
+          incoming.style.transition = '';
+          outgoing.classList.remove('is-visible');
+          outgoing.classList.add(exitClass);
+          incoming.classList.remove(enterClass);
+          incoming.classList.add('is-visible');
+
+          // 4. Clean up exit classes after transition ends
+          outgoing.addEventListener('transitionend', function cleanup() {
+            outgoing.classList.remove('is-exit-left', 'is-exit-right');
+            outgoing.removeEventListener('transitionend', cleanup);
           });
 
+          prevRealIndex = idx;
+
+          // ── Info panel swap ──────────────────────────────────────
           INFO_ITEMS.forEach(function (item, i) {
             var active = (i === idx);
             item.classList.toggle('is-active', active);
@@ -433,37 +517,43 @@
       }
     });
 
-    PREV_BTN && PREV_BTN.addEventListener('click', function () { swiper.slidePrev(); });
-    NEXT_BTN && NEXT_BTN.addEventListener('click', function () { swiper.slideNext(); });
+    // Set direction BEFORE slide changes so slideChange reads the correct value
+    PREV_BTN && PREV_BTN.addEventListener('click', function () {
+      direction = -1;
+      swiper.slidePrev();
+    });
+    NEXT_BTN && NEXT_BTN.addEventListener('click', function () {
+      direction = 1;
+      swiper.slideNext();
+    });
 
+    // Keyboard nav
     ROOT.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowLeft')  swiper.slidePrev();
-      if (e.key === 'ArrowRight') swiper.slideNext();
+      if (e.key === 'ArrowLeft')  { direction = -1; swiper.slidePrev(); }
+      if (e.key === 'ArrowRight') { direction =  1; swiper.slideNext(); }
+    });
+
+    // Touch/drag: detect direction from swiper's internal progress
+    swiper.on('sliderFirstMove', function () {
+      direction = swiper.swipeDirection === 'prev' ? -1 : 1;
     });
   }
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     var attempts = 0;
     var poll = setInterval(function () {
-      if (typeof Swiper !== 'undefined') {
-        clearInterval(poll);
-        init();
-      }
-      if (++attempts > 40) clearInterval(poll); 
+      if (typeof Swiper !== 'undefined') { clearInterval(poll); init(); }
+      if (++attempts > 40) clearInterval(poll);
     }, 50);
   } else {
     document.addEventListener('DOMContentLoaded', function () {
       var attempts = 0;
       var poll = setInterval(function () {
-        if (typeof Swiper !== 'undefined') {
-          clearInterval(poll);
-          init();
-        }
+        if (typeof Swiper !== 'undefined') { clearInterval(poll); init(); }
         if (++attempts > 40) clearInterval(poll);
       }, 50);
     });
   }
-
 })();
 </script>
 
