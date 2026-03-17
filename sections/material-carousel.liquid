@@ -330,17 +330,29 @@
 (function () {
   'use strict';
 
+  var SECTION_ID  = '{{ s_id }}';
+  var SWIPER_ID   = '{{ s_id }}-swiper';
+  var swiperInst  = null;  // keep reference so we can destroy on re-init
+
+  // ── Polling helper: waits for Swiper global to be available ──────────────
   function startPolling(cb) {
     var attempts = 0;
     var poll = setInterval(function () {
       if (typeof Swiper !== 'undefined') { clearInterval(poll); cb(); }
-      if (++attempts > 40)               { clearInterval(poll); }
+      if (++attempts > 80)               { clearInterval(poll); } // ~4 s timeout
     }, 50);
   }
 
+  // ── Core init ─────────────────────────────────────────────────────────────
   function init() {
-    var ROOT = document.getElementById('{{ s_id }}');
+    var ROOT = document.getElementById(SECTION_ID);
     if (!ROOT) return;
+
+    // Destroy any existing instance before re-initialising (editor block add/remove)
+    if (swiperInst) {
+      swiperInst.destroy(true, true);
+      swiperInst = null;
+    }
 
     var total      = parseInt(ROOT.getAttribute('data-ms-total'), 10) || 0;
     var DOT_ICONS  = Array.from(ROOT.querySelectorAll('[data-ms-dot-icon]'));
@@ -350,16 +362,32 @@
 
     if (total <= 1) return;
 
+    // Start centered on the middle slide so both left and right peeking slides
+    // are always visible on first render regardless of total count.
+    var midIndex      = Math.floor((total - 1) / 2);
     var direction     = 1;
-    var prevRealIndex = 0;
+    var prevRealIndex = midIndex;
 
-    var swiper = new Swiper('#{{ s_id }}-swiper', {
+    // Sync the dot display to the initial middle slide
+    DOT_ICONS.forEach(function (el, i) {
+      el.classList.toggle('is-visible', i === midIndex);
+    });
+    INFO_ITEMS.forEach(function (el, i) {
+      var active = i === midIndex;
+      el.classList.toggle('is-active', active);
+      el.setAttribute('aria-hidden', active ? 'false' : 'true');
+    });
+
+    swiperInst = new Swiper('#' + SWIPER_ID, {
       loop:           true,
       centeredSlides: true,
+      initialSlide:   midIndex,   // ← start at the middle real slide
       speed:          500,
       grabCursor:     true,
       touchRatio:     1,
       touchAngle:     45,
+      // Swiper loop needs enough slides; loopAdditionalSlides pads clones
+      loopAdditionalSlides: Math.max(total, 2),
       breakpoints: {
         0:   { slidesPerView: 1.3, spaceBetween: 16 },
         768: { slidesPerView: 2,   spaceBetween: 20 }
@@ -369,15 +397,15 @@
           var idx      = this.realIndex;
           var outgoing = DOT_ICONS[prevRealIndex];
           var incoming = DOT_ICONS[idx];
+          if (!outgoing || !incoming) return;
 
-          var exitClass  = direction === 1 ? 'is-exit-left'   : 'is-exit-right';
-          var enterClass = direction === 1 ? 'is-enter-right'  : 'is-enter-left';
+          var exitClass  = direction === 1 ? 'is-exit-left'  : 'is-exit-right';
+          var enterClass = direction === 1 ? 'is-enter-right' : 'is-enter-left';
 
-          // Snap incoming to off-screen start (no transition), then animate
+          // Snap to off-screen start (no transition), then animate in
           incoming.style.transition = 'none';
           incoming.classList.remove('is-visible', 'is-exit-left', 'is-exit-right');
           incoming.classList.add(enterClass);
-
           incoming.getBoundingClientRect(); // force reflow
 
           incoming.style.transition = '';
@@ -402,24 +430,38 @@
       }
     });
 
-    PREV_BTN && PREV_BTN.addEventListener('click', function () { direction = -1; swiper.slidePrev(); });
-    NEXT_BTN && NEXT_BTN.addEventListener('click', function () { direction =  1; swiper.slideNext(); });
+    PREV_BTN && PREV_BTN.addEventListener('click', function () { direction = -1; swiperInst.slidePrev(); });
+    NEXT_BTN && NEXT_BTN.addEventListener('click', function () { direction =  1; swiperInst.slideNext(); });
 
     ROOT.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowLeft')  { direction = -1; swiper.slidePrev(); }
-      if (e.key === 'ArrowRight') { direction =  1; swiper.slideNext(); }
+      if (e.key === 'ArrowLeft')  { direction = -1; swiperInst.slidePrev(); }
+      if (e.key === 'ArrowRight') { direction =  1; swiperInst.slideNext(); }
     });
 
-    swiper.on('sliderFirstMove', function () {
-      direction = swiper.swipeDirection === 'prev' ? -1 : 1;
+    swiperInst.on('sliderFirstMove', function () {
+      direction = swiperInst.swipeDirection === 'prev' ? -1 : 1;
     });
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  function boot() {
+    startPolling(init);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function () { startPolling(init); });
+    document.addEventListener('DOMContentLoaded', boot);
   } else {
-    startPolling(init);
+    boot();
   }
+
+  // ── Shopify theme-editor events (re-init when blocks are added/removed) ───
+  // These fire inside the customizer iframe; ignored on storefront.
+  document.addEventListener('shopify:section:load',    function (e) {
+    if (e.detail && e.detail.sectionId && ('{{ section.id }}').indexOf(e.detail.sectionId) !== -1) boot();
+  });
+  document.addEventListener('shopify:block:select',    function () { boot(); });
+  document.addEventListener('shopify:block:deselect',  function () { boot(); });
+
 })();
 </script>
 
