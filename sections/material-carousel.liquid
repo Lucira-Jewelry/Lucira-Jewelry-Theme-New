@@ -33,14 +33,19 @@
               data-ms-swiper-slide="{{ forloop.index0 }}"
               {{ block.shopify_attributes }}
             >
-              {%- assign slide_img = block.settings.desktop_image | default: block.settings.mobile_image -%}
-              {%- if slide_img != blank -%}
-                {{- slide_img
+              {%- if block.settings.desktop_image != blank -%}
+                {{- block.settings.desktop_image
                     | image_url: width: 800
                     | image_tag:
                         loading: 'lazy',
                         alt: block.settings.name,
                         widths: '400,600,800' -}}
+              {%- elsif block.settings.mobile_image != blank -%}
+                {{- block.settings.mobile_image
+                    | image_url: width: 800
+                    | image_tag:
+                        loading: 'lazy',
+                        alt: block.settings.name -}}
               {%- endif -%}
             </div>
           {%- endfor -%}
@@ -54,7 +59,7 @@
           <path d="M6 1.5 1 6.5l5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </button>
-      <div class="ms-background-dot">
+      <div class="ms-background-dot" style="background:white; padding:12px; border-radius:50%;">
         <div class="ms-dot-display" data-ms-dot-display aria-hidden="true">
           {%- for block in section.blocks -%}
             <div class="ms-dot-icon{% if forloop.first %} is-visible{% endif %}" data-ms-dot-icon="{{ forloop.index0 }}">
@@ -99,25 +104,35 @@
 </section>
 
 <style>
+
 [data-ms-section] {
-  --ms-bg:        #f1f1f1;
+  --ms-bg:        #f1F1F1;
   --ms-panel-bg:  #ffffff;
   --ms-border:    #e2e0db;
-  --ms-shad-c:    0 4px 32px rgba(0,0,0,.10);
-  --ms-shad-s:    0 2px 12px rgba(0,0,0,.05);
+  --ms-shad-c:    0 4px 32px rgba(0,0,0,0.10);
+  --ms-shad-s:    0 2px 12px rgba(0,0,0,0.05);
   --ms-title-clr: #1a1a1a;
   --ms-text-clr:  #6b6b6b;
   --ms-btn-bg:    {{ section.settings.button_color | default: '#A68380' }};
   --ms-btn-hov:   {{ section.settings.button_hover_color | default: '#7a5555' }};
   --ms-dot-sz:    80px;
   --ms-arrow-sz:  42px;
-  --ms-ease:      cubic-bezier(.4,0,.2,1);
+  --ms-ease:      cubic-bezier(0.4,0,0.2,1);
   --ms-dur:       500ms;
   --ms-slide-h:   380px;
   background: var(--ms-bg);
   padding: 60px 0 56px;
-  overflow-x: clip;   /* visually clips without creating a scroll container */
-  overflow-y: hidden;
+  /*
+   * FIX (distortion + right-slide clip):
+   * The original `overflow: hidden` was clipping peek slides that extend
+   * beyond the 800 px swiper box on narrower desktop viewports AND was the
+   * cause of the FOUC layout shift (slides temporarily rendered in flow).
+   * `overflow-x: clip` prevents a horizontal scrollbar without creating the
+   * block-formatting-context that `overflow: hidden` creates, so absolutely-
+   * positioned / transformed children are no longer clipped.
+   */
+  overflow-x: clip;
+  overflow-y: visible;
   font-family: inherit;
   isolation: isolate;
 }
@@ -130,9 +145,14 @@
 [data-ms-section] img    { display: block; }
 [data-ms-section] button { appearance: none; -webkit-appearance: none; border: none; background: none; cursor: pointer; font-family: inherit; }
 
-[data-ms-section] .ms-inner { margin: 0 auto; text-align: center; }
+[data-ms-section] .ms-inner {
+  margin: 0 auto;
+  text-align: center;
+  /* must not clip so peek slides are visible */
+  overflow: visible;
+}
 
-[data-ms-section] .ms-head { margin-bottom: 0; position: relative; z-index: 10; }
+[data-ms-section] .ms-head { margin-bottom: 0px; position: relative; z-index: 10; }
 [data-ms-section] .ms-head__title {
   font-size: clamp(18px, 2vw, 26px);
   font-weight: 400;
@@ -150,20 +170,41 @@
   padding-top: 8px;
 }
 
-[data-ms-section] .ms-stage-wrap { position: relative; overflow: visible; padding: 0 40px; }
+[data-ms-section] .ms-stage-wrap {
+  position: relative;
+  overflow: visible;
+}
 
 [data-ms-section] .ms-swiper {
   position: relative;
   width: 800px;
   margin-inline: auto;
-  overflow: visible;
+  /*
+   * FIX: !important overrides Swiper's own injected `overflow: hidden`
+   * on the .swiper element so adjacent peek slides remain visible.
+   */
+  overflow: visible !important;
 }
 
-/* Curved masks that bleed full-width to clip side slides */
-[data-ms-section] .ms-swiper::before,
-[data-ms-section] .ms-swiper::after {
+/*
+ * FIX (FOUC / distortion on load):
+ * Hide swiper-wrapper before Swiper JS adds .swiper-initialized.
+ * This prevents the raw slides from rendering in document flow (stacked,
+ * full-width) before the JS calculates transforms. The class is added
+ * synchronously inside `new Swiper()`, so the hidden window is only the
+ * ~50 ms polling interval — imperceptible to users.
+ */
+[data-ms-section] .ms-swiper:not(.swiper-initialized) .swiper-wrapper {
+  visibility: hidden;
+}
+[data-ms-section] .ms-swiper.swiper-initialized .swiper-wrapper {
+  visibility: visible;
+}
+
+[data-ms-section] .ms-swiper::before {
   content: '';
   position: absolute;
+  top: -40px;
   left: 50%;
   transform: translateX(-50%);
   width: 100vw;
@@ -173,8 +214,20 @@
   z-index: 10;
   pointer-events: none;
 }
-[data-ms-section] .ms-swiper::before { top: -40px; }
-[data-ms-section] .ms-swiper::after  { bottom: -50px; }
+
+[data-ms-section] .ms-swiper::after {
+  content: '';
+  position: absolute;
+  bottom: -50px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100vw;
+  height: 100px;
+  background: var(--ms-bg);
+  border-radius: 100%;
+  z-index: 10;
+  pointer-events: none;
+}
 
 [data-ms-section] .ms-swiper .swiper-slide {
   height: var(--ms-slide-h);
@@ -185,8 +238,16 @@
   box-shadow: var(--ms-shad-s);
   transition: box-shadow var(--ms-dur) var(--ms-ease);
 }
-[data-ms-section] .ms-swiper .swiper-slide-active { box-shadow: var(--ms-shad-c); }
-[data-ms-section] .ms-swiper .swiper-slide img    { width: 100%; height: 100%; object-fit: cover; }
+
+[data-ms-section] .ms-swiper .swiper-slide-active {
+  box-shadow: var(--ms-shad-c);
+}
+
+[data-ms-section] .ms-swiper .swiper-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 [data-ms-section] .ms-controls {
   display: flex;
@@ -203,22 +264,19 @@
   width: var(--ms-arrow-sz);
   height: var(--ms-arrow-sz);
   border-radius: 50%;
-  background: #fff;
+  background: white !important;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #444;
-  transition: background .2s, transform .15s;
+  transition: border-color 0.2s, background 0.2s, transform 0.15s;
 }
-[data-ms-section] .ms-arrow:hover  { background: rgba(0,0,0,.04); }
-[data-ms-section] .ms-arrow:active { transform: scale(.90); }
+[data-ms-section] .ms-arrow:hover {
+  border-color: #888 !important;
+  background: rgba(0,0,0,0.04) !important;
+}
+[data-ms-section] .ms-arrow:active { transform: scale(0.90); }
 
-/* Dot container */
-[data-ms-section] .ms-background-dot {
-  background: #fff;
-  padding: 12px;
-  border-radius: 50%;
-}
 [data-ms-section] .ms-dot-display {
   position: relative;
   width: var(--ms-dot-sz);
@@ -228,7 +286,6 @@
   overflow: hidden;
 }
 
-/* Dot slide states */
 [data-ms-section] .ms-dot-icon {
   position: absolute;
   inset: 0;
@@ -241,17 +298,52 @@
     opacity var(--ms-dur) var(--ms-ease),
     transform var(--ms-dur) var(--ms-ease);
 }
-[data-ms-section] .ms-dot-icon.is-visible     { opacity: 1; transform: translateX(0); }
-[data-ms-section] .ms-dot-icon.is-exit-left   { opacity: 0; transform: translateX(-100%); pointer-events: none; }
-[data-ms-section] .ms-dot-icon.is-exit-right  { opacity: 0; transform: translateX(100%);  pointer-events: none; }
-[data-ms-section] .ms-dot-icon.is-enter-left  { opacity: 0; transform: translateX(-100%); }
-[data-ms-section] .ms-dot-icon.is-enter-right { opacity: 0; transform: translateX(100%);  }
 
-[data-ms-section] .ms-dot-icon__img   { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
-[data-ms-section] .ms-dot-icon__swatch { display: block; width: 100%; height: 100%; border-radius: 50%; }
+[data-ms-section] .ms-dot-icon.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
 
-/* Info panel */
-[data-ms-section] .ms-info-wrap { position: relative; min-height: 152px; margin-top: 24px; }
+[data-ms-section] .ms-dot-icon.is-exit-left {
+  opacity: 0;
+  transform: translateX(-100%);
+  pointer-events: none;
+}
+
+[data-ms-section] .ms-dot-icon.is-exit-right {
+  opacity: 0;
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+[data-ms-section] .ms-dot-icon.is-enter-left {
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+[data-ms-section] .ms-dot-icon.is-enter-right {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+[data-ms-section] .ms-dot-icon__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+[data-ms-section] .ms-dot-icon__swatch {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+}
+
+[data-ms-section] .ms-info-wrap {
+  position: relative;
+  min-height: 152px;
+  margin-top: 24px;
+}
 [data-ms-section] .ms-info-item {
   position: absolute;
   inset: 0;
@@ -260,9 +352,9 @@
   pointer-events: none;
   transform: translateY(10px);
   transition:
-    opacity .35s var(--ms-ease),
-    transform .35s var(--ms-ease),
-    visibility 0s linear .35s;
+    opacity 0.35s var(--ms-ease),
+    transform 0.35s var(--ms-ease),
+    visibility 0s linear 0.35s;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -274,8 +366,8 @@
   pointer-events: auto;
   transform: translateY(0);
   transition:
-    opacity .35s var(--ms-ease) .12s,
-    transform .35s var(--ms-ease) .12s,
+    opacity 0.35s var(--ms-ease) 0.12s,
+    transform 0.35s var(--ms-ease) 0.12s,
     visibility 0s linear 0s;
 }
 [data-ms-section] .ms-info-item__name {
@@ -299,26 +391,43 @@
   font-size: 12px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  border-radius: 12px;
+  transition: background 0.22s var(--ms-ease), transform 0.15s;
   margin-top: 30px;
-  transition: background .22s var(--ms-ease), transform .15s;
+  border-radius: 12px;
 }
-[data-ms-section] .ms-info-item__btn:hover  { background: var(--ms-btn-hov); color: #fff; }
-[data-ms-section] .ms-info-item__btn:active { transform: scale(.97); }
+[data-ms-section] .ms-info-item__btn:hover {
+  background: var(--ms-btn-hov);
+  color: #fff;
+}
+[data-ms-section] .ms-info-item__btn:active { transform: scale(0.97); }
 
 @media screen and (max-width: 767px) {
   [data-ms-section] {
     padding: 40px 0 44px;
     --ms-slide-h: 300px;
   }
-  [data-ms-section] .ms-inner           { padding: 0 16px; }
-  [data-ms-section] .ms-head            { margin-bottom: 28px; }
-  [data-ms-section] .ms-head__title     { font-size: 17px; letter-spacing: 2px; }
-  [data-ms-section] .ms-swiper          { width: 100%; max-width: 100%; overflow: visible; }
-  [data-ms-section] .ms-stage-wrap      { overflow: visible; padding: 0 16px; }
-  [data-ms-section] .ms-swiper::before  { top: -50px; height: 80px; }
-  [data-ms-section] .ms-swiper::after   { bottom: -45px; height: 80px; }
-  [data-ms-section] .ms-info-wrap       { min-height: 164px; }
+  [data-ms-section] .ms-inner    { padding: 0 16px; }
+  [data-ms-section] .ms-head     { margin-bottom: 28px; }
+  [data-ms-section] .ms-head__title { font-size: 17px; letter-spacing: 2px; }
+
+  [data-ms-section] .ms-swiper {
+    width: 100%;
+    max-width: 100%;
+    overflow: visible !important;
+  }
+  [data-ms-section] .ms-stage-wrap {
+    overflow: visible;
+  }
+  [data-ms-section] .ms-swiper::before {
+    top: -50px;
+    height: 80px;
+  }
+  [data-ms-section] .ms-swiper::after {
+    bottom: -45px;
+    height: 80px;
+  }
+
+  [data-ms-section] .ms-info-wrap { min-height: 164px; }
 }
 
 [data-ms-section][data-ms-total="1"] .ms-controls { display: none; }
@@ -330,29 +439,9 @@
 (function () {
   'use strict';
 
-  var SECTION_ID  = '{{ s_id }}';
-  var SWIPER_ID   = '{{ s_id }}-swiper';
-  var swiperInst  = null;  // keep reference so we can destroy on re-init
-
-  // ── Polling helper: waits for Swiper global to be available ──────────────
-  function startPolling(cb) {
-    var attempts = 0;
-    var poll = setInterval(function () {
-      if (typeof Swiper !== 'undefined') { clearInterval(poll); cb(); }
-      if (++attempts > 80)               { clearInterval(poll); } // ~4 s timeout
-    }, 50);
-  }
-
-  // ── Core init ─────────────────────────────────────────────────────────────
   function init() {
-    var ROOT = document.getElementById(SECTION_ID);
+    var ROOT = document.getElementById('{{ s_id }}');
     if (!ROOT) return;
-
-    // Destroy any existing instance before re-initialising (editor block add/remove)
-    if (swiperInst) {
-      swiperInst.destroy(true, true);
-      swiperInst = null;
-    }
 
     var total      = parseInt(ROOT.getAttribute('data-ms-total'), 10) || 0;
     var DOT_ICONS  = Array.from(ROOT.querySelectorAll('[data-ms-dot-icon]'));
@@ -362,50 +451,86 @@
 
     if (total <= 1) return;
 
-    // Start centered on the middle slide so both left and right peeking slides
-    // are always visible on first render regardless of total count.
-    var midIndex      = Math.floor((total - 1) / 2);
     var direction     = 1;
-    var prevRealIndex = midIndex;
+    var prevRealIndex = 0;
 
-    // Sync the dot display to the initial middle slide
-    DOT_ICONS.forEach(function (el, i) {
-      el.classList.toggle('is-visible', i === midIndex);
-    });
-    INFO_ITEMS.forEach(function (el, i) {
-      var active = i === midIndex;
-      el.classList.toggle('is-active', active);
-      el.setAttribute('aria-hidden', active ? 'false' : 'true');
-    });
-
-    swiperInst = new Swiper('#' + SWIPER_ID, {
+    var swiper = new Swiper('#{{ s_id }}-swiper', {
       loop:           true,
+      slidesPerView:  2,
+      spaceBetween:   20,
       centeredSlides: true,
-      initialSlide:   midIndex,   // ← start at the middle real slide
       speed:          500,
       grabCursor:     true,
       touchRatio:     1,
       touchAngle:     45,
-      // Swiper loop needs enough slides; loopAdditionalSlides pads clones
-      loopAdditionalSlides: Math.max(total, 2),
+
+      /*
+       * FIX (right slide missing on init):
+       * loopAdditionalSlides: Swiper clones extra slides so the peek
+       * positions on both sides always have a real (cloned) slide to show,
+       * even before the user has swiped.
+       */
+      loopAdditionalSlides: 2,
+
+      /*
+       * FIX (right slide missing on init):
+       * observer + observeParents + observeSlideChildren tell Swiper to
+       * watch for DOM/style mutations (theme editor, image lazy-load, etc.)
+       * and automatically call update() so the wrapper translate is always
+       * correct from the very first paint.
+       */
+      observer:             true,
+      observeParents:       true,
+      observeSlideChildren: true,
+
+      /*
+       * FIX (right slide missing on init):
+       * resizeObserver uses a ResizeObserver instead of window.resize so
+       * Swiper recalculates the moment the container reaches its final CSS
+       * width — this is the primary guard against the stale-width problem.
+       */
+      resizeObserver: true,
+
       breakpoints: {
-        0:   { slidesPerView: 1.3, spaceBetween: 16 },
-        768: { slidesPerView: 2,   spaceBetween: 20 }
+        0: {
+          slidesPerView: 1.3,
+          spaceBetween:  16
+        },
+        768: {
+          slidesPerView: 2,
+          spaceBetween:  20
+        }
       },
+
       on: {
+        /*
+         * FIX (right slide missing on init):
+         * Calling update() synchronously inside init() forces Swiper to
+         * recalculate slide sizes and the wrapper translate with the final
+         * container dimensions. The rAF call is an extra safety net for
+         * when fonts or images shift layout after the sync call.
+         */
+        init: function () {
+          var self = this;
+          self.update();
+          requestAnimationFrame(function () {
+            self.update();
+          });
+        },
+
         slideChange: function () {
-          var idx      = this.realIndex;
+          var idx = this.realIndex;
+
           var outgoing = DOT_ICONS[prevRealIndex];
           var incoming = DOT_ICONS[idx];
-          if (!outgoing || !incoming) return;
 
           var exitClass  = direction === 1 ? 'is-exit-left'  : 'is-exit-right';
           var enterClass = direction === 1 ? 'is-enter-right' : 'is-enter-left';
 
-          // Snap to off-screen start (no transition), then animate in
           incoming.style.transition = 'none';
           incoming.classList.remove('is-visible', 'is-exit-left', 'is-exit-right');
           incoming.classList.add(enterClass);
+
           incoming.getBoundingClientRect(); // force reflow
 
           incoming.style.transition = '';
@@ -422,7 +547,7 @@
           prevRealIndex = idx;
 
           INFO_ITEMS.forEach(function (item, i) {
-            var active = i === idx;
+            var active = (i === idx);
             item.classList.toggle('is-active', active);
             item.setAttribute('aria-hidden', active ? 'false' : 'true');
           });
@@ -430,38 +555,41 @@
       }
     });
 
-    PREV_BTN && PREV_BTN.addEventListener('click', function () { direction = -1; swiperInst.slidePrev(); });
-    NEXT_BTN && NEXT_BTN.addEventListener('click', function () { direction =  1; swiperInst.slideNext(); });
-
-    ROOT.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowLeft')  { direction = -1; swiperInst.slidePrev(); }
-      if (e.key === 'ArrowRight') { direction =  1; swiperInst.slideNext(); }
+    // Set direction BEFORE slide changes so slideChange reads the correct value
+    PREV_BTN && PREV_BTN.addEventListener('click', function () {
+      direction = -1;
+      swiper.slidePrev();
+    });
+    NEXT_BTN && NEXT_BTN.addEventListener('click', function () {
+      direction = 1;
+      swiper.slideNext();
     });
 
-    swiperInst.on('sliderFirstMove', function () {
-      direction = swiperInst.swipeDirection === 'prev' ? -1 : 1;
+    ROOT.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowLeft')  { direction = -1; swiper.slidePrev(); }
+      if (e.key === 'ArrowRight') { direction =  1; swiper.slideNext(); }
+    });
+
+    swiper.on('sliderFirstMove', function () {
+      direction = swiper.swipeDirection === 'prev' ? -1 : 1;
     });
   }
 
-  // ── Boot ──────────────────────────────────────────────────────────────────
-  function boot() {
-    startPolling(init);
+  // Consolidated poll — handles both defer and async script load orders
+  function waitForSwiper(cb) {
+    if (typeof Swiper !== 'undefined') { cb(); return; }
+    var attempts = 0;
+    var poll = setInterval(function () {
+      if (typeof Swiper !== 'undefined') { clearInterval(poll); cb(); }
+      if (++attempts > 60) clearInterval(poll); // 3 s hard timeout
+    }, 50);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', function () { waitForSwiper(init); });
   } else {
-    boot();
+    waitForSwiper(init);
   }
-
-  // ── Shopify theme-editor events (re-init when blocks are added/removed) ───
-  // These fire inside the customizer iframe; ignored on storefront.
-  document.addEventListener('shopify:section:load',    function (e) {
-    if (e.detail && e.detail.sectionId && ('{{ section.id }}').indexOf(e.detail.sectionId) !== -1) boot();
-  });
-  document.addEventListener('shopify:block:select',    function () { boot(); });
-  document.addEventListener('shopify:block:deselect',  function () { boot(); });
-
 })();
 </script>
 
