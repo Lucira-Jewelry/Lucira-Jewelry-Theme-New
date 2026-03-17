@@ -1,6 +1,7 @@
 {%- liquid
-  assign s_id    = 'ms-' | append: section.id
-  assign s_total = section.blocks.size
+  assign s_id      = 'ms-' | append: section.id
+  assign s_total   = section.blocks.size
+  assign center_idx = s_total | divided_by: 2
 -%}
 
 {{- 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css' | stylesheet_tag -}}
@@ -11,6 +12,7 @@
   data-ms-section
   data-ms-id="{{ s_id }}"
   data-ms-total="{{ s_total }}"
+  data-ms-center="{{ center_idx }}"
   tabindex="-1"
 >
   <div class="ms-inner">
@@ -62,7 +64,10 @@
       <div class="ms-background-dot" style="background:white; padding:12px; border-radius:50%;">
         <div class="ms-dot-display" data-ms-dot-display aria-hidden="true">
           {%- for block in section.blocks -%}
-            <div class="ms-dot-icon{% if forloop.first %} is-visible{% endif %}" data-ms-dot-icon="{{ forloop.index0 }}">
+            <div
+              class="ms-dot-icon{% if forloop.index0 == center_idx %} is-visible{% endif %}"
+              data-ms-dot-icon="{{ forloop.index0 }}"
+            >
               {%- if block.settings.icon != blank -%}
                 {{- block.settings.icon | image_url: width: 80 | image_tag: class: 'ms-dot-icon__img', loading: 'lazy', alt: block.settings.name -}}
               {%- else -%}
@@ -82,10 +87,10 @@
     <div class="ms-info-wrap" data-ms-info-wrap>
       {%- for block in section.blocks -%}
         <div
-          class="ms-info-item{% if forloop.first %} is-active{% endif %}"
+          class="ms-info-item{% if forloop.index0 == center_idx %} is-active{% endif %}"
           data-ms-info="{{ forloop.index0 }}"
           role="region"
-          aria-hidden="{% unless forloop.first %}true{% else %}false{% endunless %}"
+          aria-hidden="{% if forloop.index0 == center_idx %}false{% else %}true{% endif %}"
         >
           <h3 class="ms-info-item__name">{{ block.settings.name | upcase | escape }}</h3>
           {%- if block.settings.description != blank -%}
@@ -122,15 +127,6 @@
   --ms-slide-h:   380px;
   background: var(--ms-bg);
   padding: 60px 0 56px;
-  /*
-   * FIX (distortion + right-slide clip):
-   * The original `overflow: hidden` was clipping peek slides that extend
-   * beyond the 800 px swiper box on narrower desktop viewports AND was the
-   * cause of the FOUC layout shift (slides temporarily rendered in flow).
-   * `overflow-x: clip` prevents a horizontal scrollbar without creating the
-   * block-formatting-context that `overflow: hidden` creates, so absolutely-
-   * positioned / transformed children are no longer clipped.
-   */
   overflow-x: clip;
   overflow-y: visible;
   font-family: inherit;
@@ -148,7 +144,6 @@
 [data-ms-section] .ms-inner {
   margin: 0 auto;
   text-align: center;
-  /* must not clip so peek slides are visible */
   overflow: visible;
 }
 
@@ -179,21 +174,9 @@
   position: relative;
   width: 800px;
   margin-inline: auto;
-  /*
-   * FIX: !important overrides Swiper's own injected `overflow: hidden`
-   * on the .swiper element so adjacent peek slides remain visible.
-   */
   overflow: visible !important;
 }
 
-/*
- * FIX (FOUC / distortion on load):
- * Hide swiper-wrapper before Swiper JS adds .swiper-initialized.
- * This prevents the raw slides from rendering in document flow (stacked,
- * full-width) before the JS calculates transforms. The class is added
- * synchronously inside `new Swiper()`, so the hidden window is only the
- * ~50 ms polling interval — imperceptible to users.
- */
 [data-ms-section] .ms-swiper:not(.swiper-initialized) .swiper-wrapper {
   visibility: hidden;
 }
@@ -443,7 +426,9 @@
     var ROOT = document.getElementById('{{ s_id }}');
     if (!ROOT) return;
 
-    var total      = parseInt(ROOT.getAttribute('data-ms-total'), 10) || 0;
+    var total     = parseInt(ROOT.getAttribute('data-ms-total'),  10) || 0;
+    var centerIdx = parseInt(ROOT.getAttribute('data-ms-center'), 10) || 0;
+
     var DOT_ICONS  = Array.from(ROOT.querySelectorAll('[data-ms-dot-icon]'));
     var INFO_ITEMS = Array.from(ROOT.querySelectorAll('[data-ms-info]'));
     var PREV_BTN   = ROOT.querySelector('[data-ms-prev]');
@@ -452,10 +437,11 @@
     if (total <= 1) return;
 
     var direction     = 1;
-    var prevRealIndex = 0;
+    var prevRealIndex = centerIdx; // ← initialised to center, not 0
 
     var swiper = new Swiper('#{{ s_id }}-swiper', {
       loop:           true,
+      initialSlide:   centerIdx,  // ← start at center so both sides have peek slides
       slidesPerView:  2,
       spaceBetween:   20,
       centeredSlides: true,
@@ -465,31 +451,17 @@
       touchAngle:     45,
 
       /*
-       * FIX (right slide missing on init):
-       * loopAdditionalSlides: Swiper clones extra slides so the peek
-       * positions on both sides always have a real (cloned) slide to show,
-       * even before the user has swiped.
+       * FIX: set to `total` (not a fixed 2) so Swiper clones enough slides
+       * on each side for any block count up to max_blocks: 12.
+       * With the old value of 2, blocks 6+ had no clone in the loop buffer
+       * and would never appear in the peek position.
        */
-      loopAdditionalSlides: 2,
+      loopAdditionalSlides: total,
 
-      /*
-       * FIX (right slide missing on init):
-       * observer + observeParents + observeSlideChildren tell Swiper to
-       * watch for DOM/style mutations (theme editor, image lazy-load, etc.)
-       * and automatically call update() so the wrapper translate is always
-       * correct from the very first paint.
-       */
       observer:             true,
       observeParents:       true,
       observeSlideChildren: true,
-
-      /*
-       * FIX (right slide missing on init):
-       * resizeObserver uses a ResizeObserver instead of window.resize so
-       * Swiper recalculates the moment the container reaches its final CSS
-       * width — this is the primary guard against the stale-width problem.
-       */
-      resizeObserver: true,
+      resizeObserver:       true,
 
       breakpoints: {
         0: {
@@ -503,13 +475,6 @@
       },
 
       on: {
-        /*
-         * FIX (right slide missing on init):
-         * Calling update() synchronously inside init() forces Swiper to
-         * recalculate slide sizes and the wrapper translate with the final
-         * container dimensions. The rAF call is an extra safety net for
-         * when fonts or images shift layout after the sync call.
-         */
         init: function () {
           var self = this;
           self.update();
@@ -524,7 +489,7 @@
           var outgoing = DOT_ICONS[prevRealIndex];
           var incoming = DOT_ICONS[idx];
 
-          var exitClass  = direction === 1 ? 'is-exit-left'  : 'is-exit-right';
+          var exitClass  = direction === 1 ? 'is-exit-left'   : 'is-exit-right';
           var enterClass = direction === 1 ? 'is-enter-right' : 'is-enter-left';
 
           incoming.style.transition = 'none';
@@ -575,7 +540,6 @@
     });
   }
 
-  // Consolidated poll — handles both defer and async script load orders
   function waitForSwiper(cb) {
     if (typeof Swiper !== 'undefined') { cb(); return; }
     var attempts = 0;
