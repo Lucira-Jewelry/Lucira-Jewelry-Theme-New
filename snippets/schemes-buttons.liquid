@@ -1,0 +1,285 @@
+{% comment %} ── Resolve price from selected variant ── {% endcomment %}
+{% if variant %}
+  {% assign _raw_price = variant.price %}
+{% else %}
+  {% assign _raw_price = product.selected_or_first_available_variant.price %}
+{% endif %}
+
+{% comment %}
+  STEP 1 — Convert paise → rupees
+{% endcomment %}
+{% assign _price_rupees = _raw_price | divided_by: 100 %}
+
+{% comment %}
+  STEP 2 — CEIL to next ₹500 (monthly × 10 must always >= product price)
+{% endcomment %}
+{% assign _raw_monthly = _price_rupees | divided_by: 10 %}
+{% assign _remainder   = _raw_monthly  | modulo: 500 %}
+
+{% if _remainder == 0 %}
+  {% assign _monthly = _raw_monthly %}
+{% else %}
+  {% assign _monthly = _raw_monthly | minus: _remainder | plus: 500 %}
+{% endif %}
+
+{% comment %}
+  STEP 3 — Effective scheme price = product price − free 10th month
+{% endcomment %}
+{% assign _scheme_price = _price_rupees | minus: _monthly %}
+
+{% comment %}
+  STEP 4 — Multiply × 100 before money_without_currency to avoid double-division
+{% endcomment %}
+{% assign _scheme_price_paise = _scheme_price | times: 100 %}
+
+{% comment %}
+  ── Scheme URL builder ────────────────────────────────────────────────
+  _monthly is now resolved above (e.g. ₹4,000 = the free 10th month saving).
+  Logged-in  → full SSO URL with phone, HMAC signature + &amount=_monthly
+  Logged-out → base URL with &amount=_monthly only
+{% endcomment %}
+
+{% comment %} ── Step A: Clean & normalise customer phone ── {% endcomment %}
+{% assign _raw_phone    = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+{% if _raw_phone.size == 12 %}
+  {% assign _phone_prefix = _raw_phone | slice: 0, 2 %}
+  {% if _phone_prefix == "91" %}
+    {% assign _clean_phone = _raw_phone | slice: 2, 10 %}
+  {% else %}
+    {% assign _clean_phone = _raw_phone %}
+  {% endif %}
+{% else %}
+  {% assign _clean_phone = _raw_phone %}
+{% endif %}
+
+{% comment %} ── Step B: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
+{% assign _ts        = 'now' | date: '%s' %}
+{% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+{% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+{% comment %} ── Step C: Compose scheme_url with _monthly as amount ── {% endcomment %}
+{% if customer %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
+    | append: _clean_phone
+    | append: '&ts='
+    | append: _ts
+    | append: '&sig='
+    | append: _sig
+    | append: '&amount='
+    | append: _monthly %}
+{% else %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _monthly %}
+{% endif %}
+
+{% if _price_rupees > 0 %}
+
+{% comment %}
+  Pass ALL variant prices as a JSON map so JS can recalculate
+  without any extra API calls when the user switches variants.
+  Format: { "variant_id": price_in_paise, ... }
+{% endcomment %}
+{% capture _variant_prices_json %}{
+  {% for v in product.variants %}
+    "{{ v.id }}": {{ v.price }}{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}{% endcapture %}
+
+<div
+  class="lucira-scheme-wrapper"
+  data-scheme-wrapper
+  data-variant-prices='{{ _variant_prices_json }}'
+  data-scheme-url="{{ scheme_url }}"
+>
+  <a
+    href="{{ scheme_url }}"
+    class="lucira-scheme-btn"
+    data-scheme-link
+    target="_blank" 
+    rel="noopener noreferrer"
+  >
+    <span class="lucira-scheme-btn__text">
+      BUY AT
+      <strong
+        class="lucira-scheme-btn__price"
+        data-scheme-price
+      >&#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}</strong>
+      WITH SCHEME
+    </span>
+  </a>
+</div>
+
+<style>
+  /* Wrapper */
+  .lucira-scheme-wrapper {
+   margin-top: 12px; 
+    width: 100%;
+  }
+
+  /* Button / link */
+  .lucira-scheme-wrapper .lucira-scheme-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid #A68380;
+    border-radius: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #5a4a44;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn:hover {
+    background: #f7f0ee;
+    border-color: #8c6b62;
+    color: #3d2e28;
+    text-decoration: none;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn__text {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color:#A68380;
+    font-size:14px;
+    letter-spacing:1px;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn__price {
+    font-weight: 600;
+    font-size: 14px;
+    color:#A68380;
+  }
+
+  /* ── Sticky ATC overrides — scoped, won't bleed ── */
+  #md-sticky-atc .lucira-scheme-wrapper {
+    margin-top: 0;
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  #md-sticky-atc .lucira-scheme-wrapper .lucira-scheme-btn {
+    width: auto;
+    white-space: nowrap;
+    padding: 10px 18px;
+    font-size: 11px;
+    border-radius: 50px;
+  }
+
+@media screen and (max-width:767px){
+    .lucira-scheme-wrapper {
+    padding: 0 0 10px 0;
+    margin-top:0;
+  }
+  .lucira-scheme-wrapper .lucira-scheme-btn{
+  border-radius:8px;
+  padding: 11px 24px;
+  }
+}
+</style>
+
+<script>
+(function () {
+  // ── Avoid registering multiple listeners if snippet renders twice ──
+  if (window.__luciraSchemeInit) return;
+  window.__luciraSchemeInit = true;
+
+  // ── Core calculation (mirrors Liquid logic exactly) ───────────────
+  // pricePaise : number  — variant.price in paise (Shopify native unit)
+  // returns    : { schemePrice, monthly } both in rupees
+  function calcScheme(pricePaise) {
+    var priceRupees = Math.floor(pricePaise / 100);
+    var rawMonthly  = Math.floor(priceRupees / 10);
+    var remainder   = rawMonthly % 500;
+    var monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+    return {
+      schemePrice: priceRupees - monthly,
+      monthly: monthly
+    };
+  }
+
+  // Format as en-IN  e.g. 62788 → "62,788"
+  function formatINR(amount) {
+    return amount.toLocaleString('en-IN');
+  }
+
+  // Update every scheme wrapper on the page
+  function updateAllWrappers(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      var prices     = JSON.parse(wrapper.dataset.variantPrices || '{}');
+      var pricePaise = prices[variantId];
+      if (pricePaise === undefined) return;
+
+      var result = calcScheme(pricePaise);
+
+      // Update displayed scheme price on button
+      var priceEl = wrapper.querySelector('[data-scheme-price]');
+      if (priceEl) {
+        priceEl.textContent = '₹' + formatINR(result.schemePrice);
+      }
+
+      // ── Keep href in sync with updated _monthly amount ──
+      var link = wrapper.querySelector('[data-scheme-link]');
+      if (link) {
+        // Rebuild the URL: preserve base SSO path, only replace/add &amount=
+        var currentHref = link.getAttribute('href') || '';
+        var baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+        var separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+        link.href       = baseUrl + separator + 'amount=' + result.monthly;
+      }
+    });
+  }
+
+  // ── Event listeners for variant change ────────────────────────────
+
+  // 1. Shopify native variant:change (most custom themes)
+  document.addEventListener('variant:change', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 2. Dawn / Prestige style
+  document.addEventListener('variant:changed', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 3. Fallback — watch the hidden variant ID input in the main product form
+  document.addEventListener('DOMContentLoaded', function () {
+    var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
+    if (!mainForm) return;
+
+    var variantInput = mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
+
+    new MutationObserver(function () {
+      if (variantInput.value) updateAllWrappers(variantInput.value);
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+    variantInput.addEventListener('change', function () {
+      if (this.value) updateAllWrappers(this.value);
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) {
+        updateAllWrappers(e.target.value);
+      }
+    });
+  });
+})();
+</script>
+
+{% endif %}
+{% comment %} End scheme-button.liquid {% endcomment %}

@@ -11,6 +11,155 @@
         assign show_dynamic_checkout = true
       endif
     -%}
+
+    {%- liquid
+      assign current_variant = product.selected_or_first_available_variant
+      assign config = current_variant.metafields['DI-GoldPrice'].variant_config.value
+      assign metal_rates = shop.metafields['DI-GoldPrice'].metal_prices.value
+      assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value
+      assign metal_color = 'Yellow'
+      assign variant_title_down = current_variant.title | downcase
+      if variant_title_down contains 'rose'
+        assign metal_color = 'Rose'
+      elsif variant_title_down contains 'white'
+        assign metal_color = 'White'
+      endif
+      assign purity_key = config.purity | downcase | prepend: 'gold_price_'
+      assign gold_rate = metal_rates[purity_key] | times: 100
+      assign metal_cost = gold_rate | times: config.metal_weight
+      assign diamond_final = 0.0
+      assign diamond_pcs = 0
+      assign gemstone_final = 0.0
+
+      for stone_item in config.advanced_stone_config
+        assign slab_rate = 0
+        assign slab_discount = 0
+        assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first
+
+        if pricing_ref
+          assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity
+          for slab in pricing_ref.slabs
+            if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight
+              assign slab_rate = slab.price | times: 100
+              assign slab_discount = slab.discount | default: 0
+              break
+            endif
+          endfor
+        endif
+
+        assign item_base_cost = slab_rate | times: stone_item.stone_weight
+        assign applied_discount = 0
+        if stone_item.stone_type == 'diamond'
+          assign applied_discount = config.diamond_discount | default: slab_discount
+        else
+          assign applied_discount = slab_discount
+        endif
+        assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0
+        assign item_final_cost = item_base_cost | minus: discount_amount
+
+        if stone_item.stone_type == 'diamond'
+          assign diamond_final = diamond_final | plus: item_final_cost
+          assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity
+        else
+          assign gemstone_final = gemstone_final | plus: item_final_cost
+        endif
+      endfor
+
+      assign mc_rate_original = config.making_charges | default: 0 | times: 100
+      assign mc_discount_percent = config.making_charges_discount | default: 0
+      assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0
+      assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt
+      assign mc_cost_final = mc_rate_final | times: config.metal_weight
+      assign subtotal = metal_cost | plus: diamond_final | plus: gemstone_final | plus: mc_cost_final
+      assign tax_amount = subtotal | times: metal_rates.default_tax | divided_by: 100.0
+      assign grand_total = subtotal | plus: tax_amount
+      assign val_gold_rate = gold_rate | divided_by: 100.0
+      assign val_metal_cost = metal_cost | divided_by: 100.0
+      assign val_mc_cost = mc_cost_final | divided_by: 100.0
+      assign val_diamond_cost = diamond_final | divided_by: 100.0
+      assign val_tax = tax_amount | divided_by: 100.0
+      assign val_total = grand_total | divided_by: 100.0
+      assign seconds_in_day = 86400
+      if current_variant.inventory_quantity > 0
+        assign days_to_add = 2
+      else
+        assign days_to_add = 15
+      endif
+      assign shipping_seconds = days_to_add | times: seconds_in_day
+      assign shipping_date = 'now' | date: '%s' | plus: shipping_seconds | date: '%d/%m/%Y'
+    -%}
+
+    {%- liquid
+      assign current_variant = product.selected_or_first_available_variant
+      if current_variant.available and current_variant.inventory_quantity > 0
+        assign days_to_add = 2
+      else
+        assign days_to_add = 15
+      endif
+      assign seconds_in_day = 86400
+      assign added_seconds = days_to_add | times: seconds_in_day
+      assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
+    -%}
+
+    {% comment %}
+      ── Scheme URL builder ──────────────────────────────────────────────
+      Mirrors scheme-button.liquid calcSchemePrice() exactly:
+        1. monthly_raw  = floor(val_total / 10)
+        2. monthly      = ceil monthly_raw to next ₹500
+        3. scheme_amount = val_total − monthly   ← free 10th month saving
+      This is the value shown on the "BUY AT ₹XX WITH SCHEME" button CTA.
+      Logged-in  → full SSO URL with phone, HMAC signature + scheme_amount
+      Logged-out → base URL with scheme_amount only
+    {% endcomment %}
+
+    {% comment %} ── Scheme visibility gate: only show for products >= ₹18,000 ── {% endcomment %}
+    {% assign _show_scheme_btn = false %}
+    {% if val_total >= 18000 %}
+      {% assign _show_scheme_btn = true %}
+    {% endif %}
+
+    {% comment %} ── Step 1: Compute scheme_amount (mirrors scheme-button.liquid logic) ── {% endcomment %}
+    {% assign _monthly_raw   = val_total | divided_by: 10 | floor %}
+    {% assign _remainder     = _monthly_raw | modulo: 500 %}
+    {% if _remainder == 0 %}
+      {% assign _monthly     = _monthly_raw %}
+    {% else %}
+      {% assign _monthly     = _monthly_raw | minus: _remainder | plus: 500 %}
+    {% endif %}
+    {% assign _scheme_amount = val_total | minus: _monthly %}
+
+    {% comment %} ── Step 2: Clean & normalise customer phone ── {% endcomment %}
+    {% assign _raw = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+    {% if _raw.size == 12 %}
+      {% assign _prefix = _raw | slice: 0, 2 %}
+      {% if _prefix == "91" %}
+        {% assign _clean_phone = _raw | slice: 2, 10 %}
+      {% else %}
+        {% assign _clean_phone = _raw %}
+      {% endif %}
+    {% else %}
+      {% assign _clean_phone = _raw %}
+    {% endif %}
+
+    {% comment %} ── Step 3: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
+    {% assign _ts        = 'now' | date: '%s' %}
+    {% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+    {% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+    {% comment %} ── Step 4: Compose scheme_url with _scheme_amount ── {% endcomment %}
+    {% if customer %}
+      {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
+        | append: _clean_phone
+        | append: '&ts='
+        | append: _ts
+        | append: '&sig='
+        | append: _sig
+        | append: '&amount='
+        | append: _monthly %}
+    {% else %}
+      {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _monthly %}
+    {% endif %}
+
 {% unless product.tags contains 'hide_ATC' %}
     <product-form
       class="product-form"
@@ -23,94 +172,6 @@
         </span>
         <span class="product-form__error-message"></span>
       </div>
-
-      {%- liquid
-        assign current_variant = product.selected_or_first_available_variant
-        assign config = current_variant.metafields['DI-GoldPrice'].variant_config.value
-        assign metal_rates = shop.metafields['DI-GoldPrice'].metal_prices.value
-        assign stone_pricing_db = shop.metafields['DI-GoldPrice'].stone_pricing.value
-        assign metal_color = 'Yellow'
-        assign variant_title_down = current_variant.title | downcase
-        if variant_title_down contains 'rose'
-          assign metal_color = 'Rose'
-        elsif variant_title_down contains 'white'
-          assign metal_color = 'White'
-        endif
-        assign purity_key = config.purity | downcase | prepend: 'gold_price_'
-        assign gold_rate = metal_rates[purity_key] | times: 100 
-        assign metal_cost = gold_rate | times: config.metal_weight
-        assign diamond_final = 0.0
-        assign diamond_pcs = 0
-        assign gemstone_final = 0.0
-
-        for stone_item in config.advanced_stone_config
-          assign slab_rate = 0
-          assign slab_discount = 0
-          assign pricing_ref = stone_pricing_db | where: 'id', stone_item.pricing_id | first
-
-          if pricing_ref
-            assign avg_weight = stone_item.stone_weight | times: 1.0 | divided_by: stone_item.stone_quantity
-            for slab in pricing_ref.slabs
-              if avg_weight >= slab.from_weight and avg_weight <= slab.to_weight
-                assign slab_rate = slab.price | times: 100
-                assign slab_discount = slab.discount | default: 0
-                break
-              endif
-            endfor
-          endif
-
-          assign item_base_cost = slab_rate | times: stone_item.stone_weight
-          assign applied_discount = 0
-          if stone_item.stone_type == 'diamond'
-            assign applied_discount = config.diamond_discount | default: slab_discount
-          else
-            assign applied_discount = slab_discount
-          endif
-          assign discount_amount = item_base_cost | times: applied_discount | divided_by: 100.0
-          assign item_final_cost = item_base_cost | minus: discount_amount
-
-          if stone_item.stone_type == 'diamond'
-            assign diamond_final = diamond_final | plus: item_final_cost
-            assign diamond_pcs = diamond_pcs | plus: stone_item.stone_quantity
-          else
-            assign gemstone_final = gemstone_final | plus: item_final_cost
-          endif
-        endfor
-        assign mc_rate_original = config.making_charges | default: 0 | times: 100
-        assign mc_discount_percent = config.making_charges_discount | default: 0
-        assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0
-        assign mc_rate_final = mc_rate_original | minus: mc_rate_disc_amt
-        assign mc_cost_final = mc_rate_final | times: config.metal_weight
-        assign subtotal = metal_cost | plus: diamond_final | plus: gemstone_final | plus: mc_cost_final
-        assign tax_amount = subtotal | times: metal_rates.default_tax | divided_by: 100.0
-        assign grand_total = subtotal | plus: tax_amount
-        assign val_gold_rate = gold_rate | divided_by: 100.0
-        assign val_metal_cost = metal_cost | divided_by: 100.0
-        assign val_mc_cost = mc_cost_final | divided_by: 100.0
-        assign val_diamond_cost = diamond_final | divided_by: 100.0
-        assign val_tax = tax_amount | divided_by: 100.0
-        assign val_total = grand_total | divided_by: 100.0
-        assign seconds_in_day = 86400
-        if current_variant.inventory_quantity > 0
-          assign days_to_add = 2
-        else
-          assign days_to_add = 15
-        endif
-        assign shipping_seconds = days_to_add | times: seconds_in_day
-        assign shipping_date = 'now' | date: '%s' | plus: shipping_seconds | date: '%d/%m/%Y'
-      -%}
-
-      {%- liquid
-        assign current_variant = product.selected_or_first_available_variant
-        if current_variant.available and current_variant.inventory_quantity > 0
-          assign days_to_add = 2
-        else
-          assign days_to_add = 15
-        endif
-        assign seconds_in_day = 86400
-        assign added_seconds = days_to_add | times: seconds_in_day
-        assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
-      -%}
 
       {%- form 'product',
         product,
@@ -162,6 +223,13 @@
             endif
           -%}
 
+          {% comment %} <a
+            href="{{ scheme_url }}"
+            class="lucira-mobile-scheme-btn"
+          >
+            BUY WITH SCHEME
+          </a> {% endcomment %}
+
           <button
             id="ProductSubmitButton-{{ section_id }}"
             type="submit"
@@ -208,6 +276,7 @@
           {%- endif -%}
         </div>
       {%- endform -%}
+
       <div class="desktop-show inline-flex">
         <div class="iwish-app-block-product">
           <a
@@ -220,13 +289,13 @@
         </div>
       </div>
 
-      <div class="mobile-show">
+      {% comment %} <div class="mobile-show">
         <div class="custom-wp_btn-link">
           <a
             href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
             style="padding: 0 !important; border: 0 !important;"
             target="_blank"
-            class= "chat-with-experts-mobile"
+            class="chat-with-experts-mobile"
           >
             <img
               class="chat-with-experts"
@@ -238,7 +307,7 @@
             >
           </a>
         </div>
-      </div>
+      </div> {% endcomment %}
 
       <div class="custom-share-icon desktop-show">
         <div>
@@ -247,7 +316,7 @@
           </div>
         </div>
       </div>
-      
+
     </product-form>
 {% endunless %}
   {%- else -%}
@@ -301,10 +370,61 @@
   {%- endif -%}
 </div>
 
+<style>
+  /* ── Mobile-only scheme button ────────────────────────────────────────
+     Hidden on desktop (≥750px). No interference with desktop layout.   */
+
+  {% comment %} .lucira-mobile-scheme-btn {
+    display: none;
+  } {% endcomment %}
+
+  @media (max-width: 749px) {
+    /* Make .product-form__buttons a flex row on mobile */
+    .buy-buttons-wrapper .product-form__buttons {
+      display: flex;
+      align-items: stretch;
+      gap: 10px;
+    }
+
+    /* Show the scheme button on mobile only */
+    .lucira-mobile-scheme-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      padding: 0 16px;
+      background: transparent;
+      border: 1.5px solid #A68380;
+      border-radius: 12px;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #5a4a44;
+      white-space: nowrap;
+      box-sizing: border-box;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+
+    .lucira-mobile-scheme-btn:hover {
+      background: #f7f0ee;
+      border-color: #8c6b62;
+      color: #3d2e28;
+      text-decoration: none;
+    }
+
+    /* ATC button takes remaining width */
+    .buy-buttons-wrapper .product-form__buttons .product-form__submit {
+      flex: 1 1 auto;
+    }
+  }
+</style>
+
 <script>
   document.addEventListener('DOMContentLoaded', function () {
     const chatLink = document.querySelector('.chat-with-experts-mobile');
-
     if (!chatLink) return;
 
     chatLink.addEventListener('click', function () {
@@ -324,4 +444,247 @@
       console.log('✅ Chat with Experts dataLayer pushed:', chatData);
     });
   });
+</script>
+
+
+{% comment %} ── Sticky Mobile Bar — pure JS clone approach ── {% endcomment %}
+
+<style>
+  @media (min-width: 750px) {
+    #lucira-sticky-bar { display: none !important; }
+  }
+
+  @media (max-width: 749px) {
+    #lucira-sticky-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      z-index: 9999;
+      background: #ffffff;
+      border-top: 1px solid #e8e0de;
+      padding: 10px 16px;
+      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.10);
+      transform: translateY(100%);
+      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+      will-change: transform;
+      pointer-events: none;
+      box-sizing: border-box;
+    }
+
+    #lucira-sticky-bar.is-visible {
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    #lucira-sticky-bar .product-form__buttons {
+      margin: 0 !important;
+      display: flex;
+      align-items: stretch;
+      gap: 8px;
+    }
+
+    /* WhatsApp circle icon */
+    #lucira-sticky-bar .lucira-sticky-wa-btn {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 46px;
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: transparent;
+      border: none;
+      text-decoration: none;
+      align-self: center;
+      flex-shrink: 0;
+      padding: 0 !important;
+    }
+
+    #lucira-sticky-bar .lucira-sticky-wa-btn img {
+      width: 46px;
+      height: 46px;
+      display: block;
+    }
+
+    /* BUY WITH SCHEME — outlined, no price */
+    #lucira-sticky-bar .lucira-mobile-scheme-btn {
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      flex: 0 0 auto;
+      padding: 0 15px;
+      background: transparent;
+      border: 1.5px solid #A68380;
+      border-radius: 8px;
+      text-decoration: none;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #5a4a44;
+      white-space: nowrap;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    /* ATC takes remaining width */
+    #lucira-sticky-bar .product-form__submit {
+      flex: 1 1 auto;
+    }
+  }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  if (window.__luciraStickyBarInit) return;
+  window.__luciraStickyBarInit = true;
+
+  /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
+  var SCHEME_URL      = {{ scheme_url | json }};
+  var SHOW_SCHEME_BTN = {{ _show_scheme_btn }};
+
+  /* ── Build the sticky bar by CLONING the real button row ── */
+  function buildBar() {
+    var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+    if (!originalButtons) return null;
+
+    var bar = document.createElement('div');
+    bar.id = 'lucira-sticky-bar';
+    bar.setAttribute('aria-hidden', 'true');
+
+    /* Deep-clone the entire buttons row */
+    var cloned = originalButtons.cloneNode(true);
+
+    /* Remove any accidentally cloned scheme buttons (safety net) */
+    var existingScheme = cloned.querySelector('.lucira-mobile-scheme-btn');
+    if (existingScheme) existingScheme.remove();
+
+    /* Wire ATC clone → original submit */
+    var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
+    if (clonedSubmit) {
+      clonedSubmit.id = 'lucira-sticky-atc-btn';
+      clonedSubmit.addEventListener('click', function (e) {
+        e.preventDefault();
+        var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+        if (origBtn && !origBtn.disabled) origBtn.click();
+      });
+    }
+
+    /* ── Build WhatsApp icon ── */
+    var waLink = document.createElement('a');
+    waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
+    waLink.target = '_blank';
+    waLink.rel = 'noopener noreferrer';
+    waLink.className = 'lucira-sticky-wa-btn chat-with-experts-mobile';
+    waLink.setAttribute('aria-label', 'Chat on WhatsApp');
+    waLink.style.cssText = 'padding:0!important;border:0!important;';
+
+    var waImg = document.createElement('img');
+    waImg.src = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733.svg?v=1772780374';
+    waImg.width = 46;
+    waImg.height = 46;
+    waImg.alt = 'whatsapp icon';
+    waImg.title = 'whatsapp';
+    waImg.className = 'chat-with-experts';
+    waLink.appendChild(waImg);
+
+    /* ── Build Scheme button using Liquid-resolved SCHEME_URL ── */
+    var schemeBtn = document.createElement('a');
+    schemeBtn.href = SCHEME_URL;
+    schemeBtn.className = 'lucira-mobile-scheme-btn';
+    schemeBtn.target = '_blank';
+    schemeBtn.rel = 'noopener noreferrer';
+    schemeBtn.textContent = 'BUY WITH SCHEME';
+
+    /* Order: [WA icon] [SCHEME btn] [ATC btn] */
+    if (SHOW_SCHEME_BTN) {
+      cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
+    }
+    cloned.insertBefore(waLink, cloned.firstChild);    // WA always shown
+
+    bar.appendChild(cloned);
+    document.body.appendChild(bar);
+    return bar;
+  }
+
+  /* ── Sync disabled state + button text from original → clone ── */
+  function syncATC() {
+    var origBtn   = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+    var stickyBtn = document.getElementById('lucira-sticky-atc-btn');
+    if (!origBtn || !stickyBtn) return;
+
+    stickyBtn.disabled = origBtn.disabled;
+
+    var origTxt   = origBtn.querySelector('.add-to-cart-text');
+    var stickyTxt = stickyBtn.querySelector('.add-to-cart-text');
+    if (origTxt && stickyTxt) {
+      stickyTxt.textContent = origTxt.textContent.trim();
+    }
+  }
+
+  /* ── Show / hide ── */
+  function setBarVisible(visible) {
+    var bar = document.getElementById('lucira-sticky-bar');
+    if (!bar) return;
+    bar.classList.toggle('is-visible', visible);
+    bar.setAttribute('aria-hidden', String(!visible));
+  }
+
+  /* ── IntersectionObserver on the real button row ── */
+  function initObserver() {
+    var sentinel = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+    if (!sentinel) sentinel = document.querySelector('.buy-buttons-wrapper');
+    if (!sentinel) return;
+
+    var observer = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        // Show sticky bar whenever ATC is NOT visible in viewport (above OR below)
+        setBarVisible(!entry.isIntersecting);
+      });
+    }, { threshold: 0, rootMargin: '0px' });
+
+    observer.observe(sentinel);
+  }
+
+  /* ── Variant change → sync ATC state only ── */
+  function onVariantChange() {
+    requestAnimationFrame(syncATC);
+  }
+
+  document.addEventListener('variant:change',  function () { onVariantChange(); });
+  document.addEventListener('variant:changed', function () { onVariantChange(); });
+
+  /* MutationObserver fallback on hidden input[name="id"] */
+  function watchVariantInput() {
+    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
+
+    new MutationObserver(function () {
+      if (variantInput.value) onVariantChange();
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+    variantInput.addEventListener('change', function () {
+      if (this.value) onVariantChange();
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) onVariantChange();
+    });
+  }
+
+  /* ── Boot ── */
+  document.addEventListener('DOMContentLoaded', function () {
+    buildBar();
+    syncATC();
+    initObserver();
+    watchVariantInput();
+  });
+
+})();
 </script>
