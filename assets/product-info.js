@@ -187,6 +187,22 @@ if (!customElements.get('product-info')) {
           this.updateMetafields(html);
           this.updateSku(html);
           this.updatePriceBreakup(html);
+          // ✅ ADD HERE (correct place)
+          try {
+            const priceBreakupEl =
+              this.querySelector('.pdp-price-breakup-tabs') ||
+              document.querySelector('.pdp-price-breakup-tabs');
+
+            if (priceBreakupEl) {
+              if (!variant || variant.price <= 1500000) {
+                priceBreakupEl.style.display = 'none';
+              } else {
+                priceBreakupEl.style.display = '';
+              }
+            }
+          } catch (e) {
+            console.error('price breakup visibility error', e);
+          }
           this.updateComparison?.(html);
           this.updateStickyATC({ html, variant });
           this.updateDeliveryWidget(variant);
@@ -245,27 +261,7 @@ if (!customElements.get('product-info')) {
           });
         };
 
-        this.updatePriceBreakup(html);
-
-        // 👉 ADD THIS BLOCK (no change to original function)
-        try {
-          const variantJson = html.querySelector('variant-selects [data-selected-variant]')?.innerHTML;
-          const variant = variantJson ? JSON.parse(variantJson) : null;
-
-          const priceBreakupEl =
-            this.querySelector('.pdp-price-breakup-tabs') ||
-            document.querySelector('.pdp-price-breakup-tabs');
-
-          if (priceBreakupEl) {
-            if (!variant || variant.price <= 1500000) {
-              priceBreakupEl.style.display = 'none';
-            } else {
-              priceBreakupEl.style.display = '';
-            }
-          }
-        } catch (e) {
-          console.error('price breakup visibility error', e);
-        }
+        
       }
 
       updateVariantInputs(variantId) {
