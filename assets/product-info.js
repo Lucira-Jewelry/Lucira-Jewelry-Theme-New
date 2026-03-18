@@ -307,23 +307,68 @@ if (!customElements.get('product-info')) {
 
       updatePriceBreakup(html) {
         try {
-          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
-          const dest =
-            this.querySelector(`.pdp-price-breakup-tabs`) ||
-            this.querySelector(`#price-breakup-${this.dataset.section}`) ||
-            document.querySelector('.pdp-price-breakup-tabs');
+          const sourceRoot = html.querySelector('product-info') || html;
+
+          // Get full wrapper
+          const source = sourceRoot.querySelector('.pdp-price-breakup-tabs');
+          const dest = this.querySelector('.pdp-price-breakup-tabs');
 
           if (!source || !dest) return;
+
+          // Replace full block
           dest.innerHTML = source.innerHTML;
-          const readMoreBtn = dest.querySelector('#readMoreBtn');
-          const readMoreContent = dest.querySelector('#readMoreContent');
-          if (readMoreBtn && readMoreContent) {
-            readMoreBtn.addEventListener('click', () => {
-              readMoreContent.classList.toggle('collapsed');
-              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+
+          // 🔁 Re-bind tab switching (VERY IMPORTANT)
+          const switches = dest.querySelectorAll('.contained-switch');
+
+          switches.forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+              const wrapper = btn.closest('.pdp-tab-wrapper');
+              if (!wrapper) return;
+
+              const tabId = btn.getAttribute('data-tab');
+
+              // Switch active button
+              wrapper.querySelectorAll('.contained-switch')
+                .forEach((s) => s.classList.remove('active'));
+              btn.classList.add('active');
+
+              // Move bubble
+              const index = Array.from(wrapper.querySelectorAll('.contained-switch')).indexOf(btn);
+              btn.parentElement.style.setProperty('--bubble-position', `${index * 100}%`);
+
+              // Switch content
+              wrapper.querySelectorAll('.tab-content')
+                .forEach((c) => c.classList.remove('active'));
+
+              const activeContent = wrapper.querySelector(`#${tabId}`);
+              if (activeContent) activeContent.classList.add('active');
             });
-          }
-          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
+          });
+
+          // 🔁 Re-bind tooltip (comparison)
+          dest.querySelectorAll('.cw-info-wrapper').forEach((wrapper) => {
+            const tooltip = wrapper.querySelector('.tooltip-box');
+            if (!tooltip) return;
+
+            wrapper.addEventListener('mouseenter', () => tooltip.classList.add('visible'));
+            wrapper.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+            wrapper.addEventListener('click', (e) => {
+              e.stopPropagation();
+              tooltip.classList.toggle('visible');
+            });
+          });
+
+          // 🔁 Close tooltip on outside click
+          document.addEventListener('click', () => {
+            dest.querySelectorAll('.tooltip-box').forEach(t => t.classList.remove('visible'));
+          });
+
+          // 🔁 Fire event (like metafields)
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, {
+            data: { section: this.sectionId }
+          });
+
         } catch (e) {
           console.error('updatePriceBreakup error', e);
         }
