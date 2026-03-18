@@ -43,7 +43,18 @@ const wheelSegments = [
 ];
 
 function openloginPopup(id) {
-    document.getElementById(id).style.display = 'flex';
+    const popup = document.getElementById(id);
+    if (!popup) return;
+    
+    // Lazy load images when popup opens
+    popup.querySelectorAll('.lazy-popup-image').forEach(img => {
+      if (img.dataset.src) {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+      }
+    });
+
+    popup.style.display = 'flex';
     document.body.style.overflow = 'hidden';
     sessionStorage.setItem('lucira_login_manually_opened', 'true');
 }
@@ -678,6 +689,15 @@ if (document.body.classList.contains('customer-logged-in')) return;
 setTimeout(() => {
     if (hasLuciraSessionPopup()) return;
     if (sessionStorage.getItem('lucira_login_manually_opened') === 'true') return;
+    
+    // Lazy load images when popup triggers automatically
+    popup.querySelectorAll('.lazy-popup-image').forEach(img => {
+      if (img.dataset.src) {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+      }
+    });
+
     popup.style.display = 'flex';
     popup.classList.add('register-popup');
     document.body.style.overflow = 'hidden';
