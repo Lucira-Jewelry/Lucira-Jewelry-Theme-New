@@ -306,58 +306,28 @@ if (!customElements.get('product-info')) {
       }
 
       updatePriceBreakup(html) {
-      try {
-        const source =
-          html.querySelector('.pdp-price-breakup-tabs') ||
-          html.getElementById('price-breakup');
+        try {
+          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
+          const dest =
+            this.querySelector(`.pdp-price-breakup-tabs`) ||
+            this.querySelector(`#price-breakup-${this.dataset.section}`) ||
+            document.querySelector('.pdp-price-breakup-tabs');
 
-        let dest =
-          this.querySelector(`.pdp-price-breakup-tabs`) ||
-          this.querySelector(`#price-breakup-${this.dataset.section}`) ||
-          document.querySelector('.pdp-price-breakup-tabs');
-
-        // ✅ IF source NOT present → remove existing
-        if (!source) {
-          if (dest) dest.remove();
-          return;
-        }
-
-        // ✅ IF dest NOT present → CREATE at correct position
-        if (!dest) {
-          const anchor = this.querySelector('.pdp-tabs-container'); // your stable block
-
-          if (anchor) {
-            anchor.insertAdjacentHTML('afterend', source.outerHTML);
-            dest = this.querySelector('.pdp-price-breakup-tabs'); // re-select
+          if (!source || !dest) return;
+          dest.innerHTML = source.innerHTML;
+          const readMoreBtn = dest.querySelector('#readMoreBtn');
+          const readMoreContent = dest.querySelector('#readMoreContent');
+          if (readMoreBtn && readMoreContent) {
+            readMoreBtn.addEventListener('click', () => {
+              readMoreContent.classList.toggle('collapsed');
+              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+            });
           }
-
-          if (!dest) return;
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
+        } catch (e) {
+          console.error('updatePriceBreakup error', e);
         }
-
-        // ✅ EXISTING LOGIC (UNCHANGED)
-        dest.innerHTML = source.innerHTML;
-
-        const readMoreBtn = dest.querySelector('#readMoreBtn');
-        const readMoreContent = dest.querySelector('#readMoreContent');
-
-        if (readMoreBtn && readMoreContent) {
-          readMoreBtn.addEventListener('click', () => {
-            readMoreContent.classList.toggle('collapsed');
-            readMoreBtn.textContent =
-              readMoreContent.classList.contains('collapsed')
-                ? 'Read More'
-                : 'Read Less';
-          });
-        }
-
-        publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, {
-          data: { section: this.sectionId }
-        });
-
-      } catch (e) {
-        console.error('updatePriceBreakup error', e);
       }
-    }
 
       updateComparison(html) {
         try {
