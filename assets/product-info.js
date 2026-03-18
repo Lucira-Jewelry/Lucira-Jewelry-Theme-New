@@ -307,24 +307,23 @@ if (!customElements.get('product-info')) {
 
       updatePriceBreakup(html) {
         try {
-          const source =
-            html.querySelector('.pdp-price-breakup-tabs');
-
+          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
           const dest =
-            this.querySelector('.pdp-price-breakup-tabs');
+            this.querySelector(`.pdp-price-breakup-tabs`) ||
+            this.querySelector(`#price-breakup-${this.dataset.section}`) ||
+            document.querySelector('.pdp-price-breakup-tabs');
 
-          // ❗ If new variant does NOT have breakup → hide it
-          if (!source) {
-            if (dest) dest.classList.add('hidden');
-            return;
+          if (!source || !dest) return;
+          dest.innerHTML = source.innerHTML;
+          const readMoreBtn = dest.querySelector('#readMoreBtn');
+          const readMoreContent = dest.querySelector('#readMoreContent');
+          if (readMoreBtn && readMoreContent) {
+            readMoreBtn.addEventListener('click', () => {
+              readMoreContent.classList.toggle('collapsed');
+              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+            });
           }
-
-          // ❗ If exists → show + update
-          if (dest) {
-            dest.classList.remove('hidden');
-            dest.innerHTML = source.innerHTML;
-          }
-
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
         } catch (e) {
           console.error('updatePriceBreakup error', e);
         }
