@@ -310,21 +310,15 @@ if (!customElements.get('product-info')) {
           const source =
             html.querySelector('.pdp-price-breakup-tabs') ||
             html.getElementById('price-breakup');
-
           let dest =
             this.querySelector('.pdp-price-breakup-tabs') ||
             this.querySelector(`#price-breakup-${this.dataset.section}`) ||
             document.querySelector('.pdp-price-breakup-tabs');
-
-          // ❗ CASE 1: source not present → remove existing
           if (!source) {
             if (dest) dest.remove();
             return;
           }
-
-          // ❗ CASE 2: dest not present → CREATE it
           if (!dest) {
-            // append after product info (adjust if needed)
             const anchor = this.querySelector('.pdp-tabs-container');
 
             if (anchor) {
@@ -332,8 +326,6 @@ if (!customElements.get('product-info')) {
             }
             return;
           }
-
-          // ❗ CASE 3: both exist → update
           dest.innerHTML = source.innerHTML;
 
           const readMoreBtn = dest.querySelector('#readMoreBtn');
