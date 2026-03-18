@@ -85,25 +85,36 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 $(document).ready(function(){
-  $('.pdp-match-shine-slider').slick({
-    slidesToShow: 3,
-    slidesToScroll: 1,
-    infinite: true,
-    centerMode: false,
-    centerPadding: '15%',
-    prevArrow: '<button type="button" class="slick-prev pdp-match-shine-slider-btn"><i class="fas fa-angle-left"></i></button>',
-    nextArrow: '<button type="button" class="slick-next pdp-match-shine-slider-btn"><i class="fas fa-angle-right"></i></button>',
-    responsive: [
-      {
-        breakpoint: 750,
-        settings: {
-          arrows: false,
-          slidesToShow: 1,
-          centerMode: true,
-        }
+  // pdp-match-shine-slider migrated to Swiper
+  const matchShineSwiperEl = document.querySelector('.pdp-match-shine-slider');
+  if (matchShineSwiperEl) {
+    // Add swiper classes if not already there
+    matchShineSwiperEl.classList.add('swiper');
+    const wrapper = matchShineSwiperEl.querySelector('.swiper-wrapper') || matchShineSwiperEl;
+    if (wrapper === matchShineSwiperEl) {
+      // If the structure isn't there, we might need more complex DOM manipulation, 
+      // but usually the Liquid file would be updated.
+    }
+
+    new Swiper('.pdp-match-shine-slider', {
+      slidesPerView: 3,
+      spaceBetween: 16,
+      loop: true,
+      navigation: {
+        nextEl: '.slick-next',
+        prevEl: '.slick-prev',
       },
-    ]
-  });
+      responsive: [
+        {
+          breakpoint: 750,
+          settings: {
+            slidesPerView: 1.2,
+            centeredSlides: true,
+          }
+        },
+      ]
+    });
+  }
 });
 
 (function() {

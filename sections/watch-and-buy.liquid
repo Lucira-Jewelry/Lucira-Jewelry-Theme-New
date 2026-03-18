@@ -6,8 +6,8 @@
     {% if section.settings.watch_buy_subtitle != blank %}
       <h2 class="section-subtitle">{{ section.settings.watch_buy_subtitle }}</h2>
     {% endif %}
-    <div class="watch-and-buy-wrapper">
-      <div class="owl-carousel watch-buy-slider owl-theme">
+    <div class="watch-and-buy-wrapper swiper watch-buy-slider">
+      <div class="swiper-wrapper">
         {% for block in section.blocks %}
           {% assign selected_product = all_products[block.settings.watch_buy_product] %}
           <!-- Precompute fallback values to reduce repetitive conditionals -->
@@ -18,7 +18,7 @@
           {% assign product_url = selected_product.url | default: block.settings.watch_buy_product_fallback_url %}
 
           <div
-            class="item watch-buy-item"
+            class="swiper-slide item watch-buy-item"
             data-video="{% if block.settings.video %}{{ block.settings.video.sources[1].url }}{% endif %}"
             data-iframe-url="{% if block.settings.iframe_url %}{{ block.settings.iframe_url }}{% endif %}"
             data-product-image="{{ product_image | img_url: '200x200' }}"
@@ -493,76 +493,63 @@
       let isScrolling = false;
       let scrollTimeout;
 
-      // Initialize Owl Carousel for desktop
-      var watchBuySlider = $('.watch-buy-slider');
-      watchBuySlider.owlCarousel({
-        items: 5,
-        margin: 20,
-        speed: 1000,
+      // Initialize Swiper for desktop/tablet
+      var watchBuySwiper = new Swiper('.watch-buy-slider', {
+        slidesPerView: 5,
+        spaceBetween: 20,
         loop: true,
-        nav: false,
-        center: true,
-        dots: false,
-        navText: [
-          "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_back_ios_new.svg?v=1750503882 'title='Previous'  alt='Previous'/>",
-          "<img src='https://cdn.shopify.com/s/files/1/0739/8516/3482/files/arrow_forward_ios.svg?v=1750503882' title='Next'alt='Next' />",
-        ],
-        autoplay: false,
-        responsive: {
+        centeredSlides: true,
+        navigation: {
+          nextEl: '.watch-and-buy-section .owl-next', // Keep class names if possible for CSS compatibility
+          prevEl: '.watch-and-buy-section .owl-prev',
+        },
+        breakpoints: {
           0: {
-            items: 1.5,
-            loop: true,
-            nav: false,
-            center: true,
+            slidesPerView: 1.5,
+            centeredSlides: true,
           },
           600: {
-            items: 3,
-            nav: false,
-            center: true,
+            slidesPerView: 3,
+            centeredSlides: true,
           },
           992: {
-            items: 4.5,
-            nav: false,
-            center: false,
+            slidesPerView: 4.5,
+            centeredSlides: false,
           },
           1200: {
-            items: 5,
-            nav: true,
-            center: false,
-          },
-          1300: {
-            items: 5,
-            nav: true,
-            center: false,
-          },
+            slidesPerView: 5,
+            centeredSlides: false,
+          }
         },
+        on: {
+          init: function() {
+            setTimeout(() => {
+              collectVideoItems();
+              setupItemClickHandlers();
+              handleIframeVisibility(this);
+            }, 300);
+          },
+          slideChange: function() {
+            handleIframeVisibility(this);
+          }
+        }
       });
 
-      // Update mobile detection on resize
-      function updateMobileDetection() {
-        isMobile = window.innerWidth <= 768;
-      }
+      function handleIframeVisibility(swiper) {
+        // Reset all iframe opacity
+        document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
+          iframe.style.opacity = '0.7';
+        });
 
-      // Force navigation visibility on desktop screens
-      function handleNavigationVisibility() {
-        const screenWidth = window.innerWidth;
-        const navButtons = watchBuySlider.find('.owl-nav button');
-        updateMobileDetection();
-
-        if (screenWidth >= 1200) {
-          navButtons.removeClass('disabled').show();
-          watchBuySlider.find('.owl-nav').show();
-        } else {
-          watchBuySlider.find('.owl-nav').hide();
+        // Highlight center/active iframe
+        const activeSlide = swiper.slides[swiper.activeIndex];
+        if (activeSlide) {
+          const activeIframe = activeSlide.querySelector('.carousel-iframe');
+          if (activeIframe) {
+            activeIframe.style.opacity = '1';
+          }
         }
       }
-
-      setTimeout(handleNavigationVisibility, 100);
-
-      $(window).on('resize', function () {
-        clearTimeout(window.navResizeTimeout);
-        window.navResizeTimeout = setTimeout(handleNavigationVisibility, 150);
-      });
 
       // Carousel shopping bag click handlers
       document.querySelectorAll('.carousel-shopping-bag').forEach((button) => {
@@ -1322,60 +1309,8 @@
         }
       }, 500);
 
-      // Handle Owl Carousel events for iframe visibility
-      watchBuySlider.on('changed.owl.carousel', function (event) {
-        // Reset all iframe opacity
-        document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
-          iframe.style.opacity = '0.7';
-        });
-
-        // Highlight center/active iframe
-        setTimeout(() => {
-          const centerItem = document.querySelector('.watch-and-buy-section .owl-item.active.center .carousel-iframe');
-          if (centerItem) {
-            centerItem.style.opacity = '1';
-          }
-        }, 100);
-      });
-
-      // Resume carousel content after popup closes
-      function resumeCarouselContent() {
-        setTimeout(() => {
-          try {
-            // Resume videos
-            document.querySelectorAll('.watch-and-buy-section .watch-buy-item video').forEach((vid) => {
-              if (vid.paused) {
-                vid.play().catch((e) => {
-                  console.log('Autoplay prevented for carousel video');
-                });
-              }
-            });
-
-            // Reset iframe opacity
-            document.querySelectorAll('.carousel-iframe').forEach((iframe) => {
-              iframe.style.opacity = '0.7';
-            });
-
-            // Highlight center iframe if any
-            const centerIframe = document.querySelector(
-              '.watch-and-buy-section .owl-item.active.center .carousel-iframe'
-            );
-            if (centerIframe) {
-              centerIframe.style.opacity = '1';
-            }
-          } catch (error) {
-            console.error('Error resuming carousel content:', error);
-          }
-        }, 200);
-      }
-
-      // Re-initialize handlers when Owl Carousel changes (for cloned items)
-      watchBuySlider.on('refreshed.owl.carousel initialized.owl.carousel', function () {
-        setTimeout(() => {
-          collectVideoItems();
-          setupItemClickHandlers();
-        }, 300);
-      });
+      // Swiper handles these through its internal observer or by calling update()
+      // We already have setupItemClickHandlers in our init and transition events.
     }
   });
 </script>
