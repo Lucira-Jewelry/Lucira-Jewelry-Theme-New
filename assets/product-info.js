@@ -307,36 +307,23 @@ if (!customElements.get('product-info')) {
 
       updatePriceBreakup(html) {
         try {
-          const variant = this.getSelectedVariant(html);
-
+          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
           const dest =
-            this.querySelector('.pdp-price-breakup-tabs') ||
+            this.querySelector(`.pdp-price-breakup-tabs`) ||
+            this.querySelector(`#price-breakup-${this.dataset.section}`) ||
             document.querySelector('.pdp-price-breakup-tabs');
 
-          if (!dest) return;
-
-          // 🔥 CONDITION (same as Liquid)
-          if (!variant || variant.price > 1500000) {
-            dest.style.display = 'none';
-            return;
-          }
-
-          const source = html.querySelector('.pdp-price-breakup-tabs');
-
-          if (!source) {
-            dest.style.display = 'none';
-            return;
-          }
-
-          // ✅ SHOW again if hidden
-          dest.style.display = '';
-
+          if (!source || !dest) return;
           dest.innerHTML = source.innerHTML;
-
-          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, {
-            data: { section: this.sectionId },
-          });
-
+          const readMoreBtn = dest.querySelector('#readMoreBtn');
+          const readMoreContent = dest.querySelector('#readMoreContent');
+          if (readMoreBtn && readMoreContent) {
+            readMoreBtn.addEventListener('click', () => {
+              readMoreContent.classList.toggle('collapsed');
+              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+            });
+          }
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
         } catch (e) {
           console.error('updatePriceBreakup error', e);
         }
@@ -344,34 +331,43 @@ if (!customElements.get('product-info')) {
 
       updateComparison(html) {
         try {
-          const variant = this.getSelectedVariant(html);
+          const source =
+            html.querySelector('.comp-container') ||
+            html.getElementById(`comp-container-${this.dataset.section}`);
 
           const dest =
             this.querySelector('.comp-container') ||
+            this.querySelector(`#comp-container-${this.dataset.section}`) ||
             document.querySelector('.comp-container');
 
-          if (!dest) return;
-
-          // 🔥 SAME CONDITION
-          if (!variant || variant.price > 1500000) {
-            dest.style.display = 'none';
-            return;
-          }
-
-          const source = html.querySelector('.comp-container');
-
-          if (!source) {
-            dest.style.display = 'none';
-            return;
-          }
-
-          dest.style.display = '';
+          if (!source || !dest) return;
           dest.innerHTML = source.innerHTML;
-
-          publish?.(PUB_SUB_EVENTS.comparisonUpdate, {
-            data: { section: this.sectionId },
+          dest.querySelectorAll('.cw-info-wrapper').forEach((wrapper) => {
+            const infoIcon = wrapper.querySelector('.cw-info-icon');
+            const tooltip = wrapper.querySelector('.tooltip-box');
+            wrapper.replaceWith(wrapper.cloneNode(true));
           });
-
+          const freshDest = this.querySelector('.comp-container') || document.querySelector('.comp-container');
+          if (!freshDest) return;
+          freshDest.querySelectorAll('.cw-info-wrapper').forEach((wrapper) => {
+            const tooltip = wrapper.querySelector('.tooltip-box');
+            const icon = wrapper.querySelector('.cw-info-icon');
+            if (!tooltip || !icon) return;
+            const show = () => tooltip.classList.add('visible');
+            const hide = () => tooltip.classList.remove('visible');
+            icon.addEventListener('mouseenter', show);
+            icon.addEventListener('mouseleave', hide);
+            icon.addEventListener('focus', show);
+            icon.addEventListener('blur', hide);
+            icon.addEventListener('click', (e) => {
+              e.preventDefault();
+              tooltip.classList.toggle('visible');
+            });
+            document.addEventListener('click', (e) => {
+              if (!wrapper.contains(e.target)) tooltip.classList.remove('visible');
+            });
+          });
+          publish?.(PUB_SUB_EVENTS.comparisonUpdate, { data: { section: this.sectionId } });
         } catch (e) {
           console.error('updateComparison error', e);
         }
