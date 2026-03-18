@@ -101,18 +101,19 @@ $(document).ready(function(){
       spaceBetween: 16,
       loop: true,
       navigation: {
-        nextEl: '.slick-next',
-        prevEl: '.slick-prev',
+        nextEl: '.pdp-match-shine-slider-next',
+        prevEl: '.pdp-match-shine-slider-prev',
       },
-      responsive: [
-        {
-          breakpoint: 750,
-          settings: {
-            slidesPerView: 1.2,
-            centeredSlides: true,
-          }
+      breakpoints: {
+        0: {
+          slidesPerView: 1.2,
+          centeredSlides: true,
         },
-      ]
+        750: {
+          slidesPerView: 3,
+          centeredSlides: false,
+        }
+      }
     });
   }
 });
