@@ -307,23 +307,52 @@ if (!customElements.get('product-info')) {
 
       updatePriceBreakup(html) {
         try {
-          const source = html.querySelector('.pdp-price-breakup-tabs') || html.getElementById('price-breakup');
-          const dest =
-            this.querySelector(`.pdp-price-breakup-tabs`) ||
+          const source =
+            html.querySelector('.pdp-price-breakup-tabs') ||
+            html.getElementById('price-breakup');
+
+          let dest =
+            this.querySelector('.pdp-price-breakup-tabs') ||
             this.querySelector(`#price-breakup-${this.dataset.section}`) ||
             document.querySelector('.pdp-price-breakup-tabs');
 
-          if (!source || !dest) return;
+          // ❗ CASE 1: source not present → remove existing
+          if (!source) {
+            if (dest) dest.remove();
+            return;
+          }
+
+          // ❗ CASE 2: dest not present → CREATE it
+          if (!dest) {
+            // append after product info (adjust if needed)
+            const anchor = this.querySelector('.pdp-tabs-container');
+
+            if (anchor) {
+              anchor.insertAdjacentHTML('afterend', source.outerHTML);
+            }
+            return;
+          }
+
+          // ❗ CASE 3: both exist → update
           dest.innerHTML = source.innerHTML;
+
           const readMoreBtn = dest.querySelector('#readMoreBtn');
           const readMoreContent = dest.querySelector('#readMoreContent');
+
           if (readMoreBtn && readMoreContent) {
             readMoreBtn.addEventListener('click', () => {
               readMoreContent.classList.toggle('collapsed');
-              readMoreBtn.textContent = readMoreContent.classList.contains('collapsed') ? 'Read More' : 'Read Less';
+              readMoreBtn.textContent =
+                readMoreContent.classList.contains('collapsed')
+                  ? 'Read More'
+                  : 'Read Less';
             });
           }
-          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, { data: { section: this.sectionId } });
+
+          publish?.(PUB_SUB_EVENTS.priceBreakupUpdate, {
+            data: { section: this.sectionId }
+          });
+
         } catch (e) {
           console.error('updatePriceBreakup error', e);
         }
