@@ -1,0 +1,169 @@
+<!-- 1. HTML -->
+<div class="byoj-step2">
+  <div class="page-width">
+
+    <h2 class="byoj-heading">{{ section.settings.heading }}</h2>
+
+    <div id="chain-list" class="byoj-chain-grid">
+      <!-- Chains will render here -->
+    </div>
+
+  </div>
+</div>
+
+
+<!-- 2. Shopify Data Injection -->
+<script>
+  document.addEventListener("DOMContentLoaded", function () {
+
+    const type = new URLSearchParams(window.location.search).get("type") 
+                  || localStorage.getItem("byoj_type");
+
+    const allChains = window.byojChains || [];
+
+    // Filter chains by type
+    const filtered = allChains.filter(c => c.type === type);
+
+    const container = document.getElementById("chain-list");
+
+    if (!filtered.length) {
+      container.innerHTML = "<p>No chains found</p>";
+      return;
+    }
+
+    filtered.forEach(chain => {
+      const div = document.createElement("div");
+      div.className = "byoj-chain-item";
+
+      div.innerHTML = `
+        <img src="${chain.image}" />
+        <p>${chain.title}</p>
+      `;
+
+      div.onclick = () => {
+        localStorage.setItem("byoj_chain", chain.id);
+        window.location.href = "/pages/build-your-jewelry-step-3";
+      };
+
+      container.appendChild(div);
+    });
+
+  });
+</script>
+
+<!-- 3. Logic Script -->
+<script>
+  window.byojChains = [
+
+    /* COLLECTION PRODUCTS */
+    {% for block in section.blocks %}
+      {% if block.type == 'collection' %}
+        {% assign col = collections[block.settings.collection] %}
+        {% if col != blank %}
+          {% for product in col.products %}
+            {
+              id: "{{ product.id }}",
+              title: {{ product.title | json }},
+              image: "{{ product.featured_image | image_url: width: 500 }}",
+              type: "{{ block.settings.type }}"
+            },
+          {% endfor %}
+        {% endif %}
+      {% endif %}
+    {% endfor %}
+
+    /* MANUAL PRODUCTS */
+    {% for block in section.blocks %}
+      {% if block.type == 'manual' and block.settings.product != blank %}
+        {
+          id: "{{ block.settings.product.id }}",
+          title: {{ block.settings.product.title | json }},
+          image: "{{ block.settings.product.featured_image | image_url: width: 500 }}",
+          type: "{{ block.settings.type }}"
+        },
+      {% endif %}
+    {% endfor %}
+
+  ];
+</script>
+
+<style>
+.byoj-chain-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.byoj-chain-item {
+  cursor: pointer;
+  text-align: center;
+}
+
+.byoj-chain-item img {
+  width: 100%;
+}
+</style>
+
+<!-- 5. Schema -->
+{% schema %}
+{
+  "name": "BYO Chains",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "Select Your Chain"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "collection",
+      "name": "Collection Chains",
+      "settings": [
+        {
+          "type": "select",
+          "id": "type",
+          "label": "Jewelry Type",
+          "options": [
+            { "value": "bracelet", "label": "Bracelet" },
+            { "value": "necklace", "label": "Necklace" },
+            { "value": "anklet", "label": "Anklet" }
+          ]
+        },
+        {
+          "type": "collection",
+          "id": "collection",
+          "label": "Select Collection"
+        }
+      ]
+    },
+    {
+      "type": "manual",
+      "name": "Manual Chain",
+      "settings": [
+        {
+          "type": "select",
+          "id": "type",
+          "label": "Jewelry Type",
+          "options": [
+            { "value": "bracelet", "label": "Bracelet" },
+            { "value": "necklace", "label": "Necklace" },
+            { "value": "anklet", "label": "Anklet" }
+          ]
+        },
+        {
+          "type": "product",
+          "id": "product",
+          "label": "Select Product"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "BYO Chains"
+    }
+  ]
+}
+{% endschema %}
