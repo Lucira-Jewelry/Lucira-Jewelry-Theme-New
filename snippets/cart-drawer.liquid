@@ -602,47 +602,107 @@
 </script>
 
 <script>
-  // Insurance ADD / REMOVE buttons — proxy clicks to hidden checkbox so insurance-manager.js fires normally
   (function () {
-    function initInsuranceCard() {
+    const INSURANCE_VARIANT_ID = 47220042989786;
+    let _observer = null;
+    let _debounceTimer = null;
+
+    // Fetch actual cart and check if insurance variant is present
+    async function isInsuranceInCart() {
+      try {
+        const res = await fetch('/cart.js');
+        const cart = await res.json();
+        return cart.items.some(function (item) {
+          return item.variant_id === INSURANCE_VARIANT_ID;
+        });
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function syncUI(checkbox, addBtn, wrapper) {
+      if (checkbox.checked) {
+        addBtn.textContent = 'ADDED ✓';
+        addBtn.classList.add('added');
+        wrapper.classList.add('is-added');
+      } else {
+        addBtn.textContent = 'ADD';
+        addBtn.classList.remove('added');
+        wrapper.classList.remove('is-added');
+      }
+    }
+
+    async function initInsuranceCard() {
       const addBtn    = document.getElementById('insuranceAddBtn');
       const removeBtn = document.getElementById('insuranceRemoveBtn');
       const wrapper   = document.getElementById('insuranceBtnWrapper');
       const checkbox  = document.getElementById('insuranceCheckbox');
       if (!addBtn || !removeBtn || !wrapper || !checkbox) return;
 
-      function syncUI() {
-        if (checkbox.checked) {
-          addBtn.textContent = 'ADDED ✓';
-          addBtn.classList.add('added');
-          wrapper.classList.add('is-added');
-        } else {
-          addBtn.textContent = 'ADD';
-          addBtn.classList.remove('added');
-          wrapper.classList.remove('is-added');
-        }
-      }
+      // Always sync checkbox state from actual cart — not from DOM
+      const inCart = await isInsuranceInCart();
+      checkbox.checked = inCart;
+      syncUI(checkbox, addBtn, wrapper);
 
-      // ADD / ADDED click
-      addBtn.addEventListener('click', function () {
+      // Clone nodes to wipe any stale duplicate listeners from previous renders
+      const freshAddBtn    = addBtn.cloneNode(true);
+      const freshRemoveBtn = removeBtn.cloneNode(true);
+      addBtn.parentNode.replaceChild(freshAddBtn, addBtn);
+      removeBtn.parentNode.replaceChild(freshRemoveBtn, removeBtn);
+
+      freshAddBtn.addEventListener('click', function () {
         checkbox.click(); // fires 'change' → insurance-manager.js handles cart add/remove
       });
 
-      // REMOVE click — uncheck if currently checked
-      removeBtn.addEventListener('click', function () {
+      freshRemoveBtn.addEventListener('click', function () {
         if (checkbox.checked) {
           checkbox.click();
         }
       });
 
-      checkbox.addEventListener('change', syncUI);
-      syncUI(); // sync on initial load
+      checkbox.addEventListener('change', function () {
+        syncUI(checkbox, freshAddBtn, wrapper);
+      });
+    }
+
+    // Debounced re-init — called by MutationObserver after every cart re-render
+    function debouncedInit() {
+      clearTimeout(_debounceTimer);
+      _debounceTimer = setTimeout(initInsuranceCard, 300);
+    }
+
+    // Watch the entire cart drawer for DOM changes (covers quantity updates,
+    // item adds/removes — all of which cause Dawn's cart.js to replace innerHTML)
+    function observeCartDrawer() {
+      if (_observer) {
+        _observer.disconnect();
+      }
+      const cartDrawer = document.getElementById('CartDrawer');
+      if (!cartDrawer) return;
+
+      _observer = new MutationObserver(function (mutations) {
+        // Only act on childList / subtree mutations (actual DOM re-renders),
+        // not attribute changes (avoids infinite loop from syncUI class toggles)
+        const hasStructural = mutations.some(function (m) {
+          return m.type === 'childList';
+        });
+        if (hasStructural) {
+          debouncedInit();
+        }
+      });
+
+      _observer.observe(cartDrawer, { childList: true, subtree: true });
+    }
+
+    function boot() {
+      initInsuranceCard();
+      observeCartDrawer();
     }
 
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initInsuranceCard);
+      document.addEventListener('DOMContentLoaded', boot);
     } else {
-      initInsuranceCard();
+      boot();
     }
   })();
 </script>
