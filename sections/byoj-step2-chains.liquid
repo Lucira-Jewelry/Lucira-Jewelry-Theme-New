@@ -6,16 +6,40 @@
   </div>
 </div>
 
-
 <!-- 2. Shopify Data Injection -->
 <script>
-window.byojChains = [
+  window.byojChains = [
 
-{% for block in section.blocks %}
-  {% if block.type == 'collection' %}
-    {% assign col = collections[block.settings.collection] %}
-    {% if col != blank %}
-      {% for product in col.products %}
+  {% for block in section.blocks %}
+    {% if block.type == 'collection' %}
+      {% assign col = collections[block.settings.collection] %}
+      {% if col != blank %}
+        {% for product in col.products %}
+        {
+          id: "{{ product.id }}",
+          title: {{ product.title | json }},
+          type: "{{ block.settings.type }}",
+
+          variants: [
+            {% for variant in product.variants %}
+            {
+              id: "{{ variant.id }}",
+              image: "{{ variant.featured_image | default: product.featured_image | image_url: width: 600 }}",
+              price: "{{ variant.price | money_without_currency | replace: ',', '' }}",
+              compare: "{{ variant.compare_at_price | money_without_currency | replace: ',', '' }}",
+              options: {{ variant.options | json }}
+            },
+            {% endfor %}
+          ]
+        },
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+  {% for block in section.blocks %}
+    {% if block.type == 'manual' and block.settings.product != blank %}
+      {% assign product = block.settings.product %}
       {
         id: "{{ product.id }}",
         title: {{ product.title | json }},
@@ -33,102 +57,73 @@ window.byojChains = [
           {% endfor %}
         ]
       },
-      {% endfor %}
     {% endif %}
-  {% endif %}
-{% endfor %}
+  {% endfor %}
 
-{% for block in section.blocks %}
-  {% if block.type == 'manual' and block.settings.product != blank %}
-    {% assign product = block.settings.product %}
-    {
-      id: "{{ product.id }}",
-      title: {{ product.title | json }},
-      type: "{{ block.settings.type }}",
-
-      variants: [
-        {% for variant in product.variants %}
-        {
-          id: "{{ variant.id }}",
-          image: "{{ variant.featured_image | default: product.featured_image | image_url: width: 600 }}",
-          price: "{{ variant.price | money_without_currency | replace: ',', '' }}",
-          compare: "{{ variant.compare_at_price | money_without_currency | replace: ',', '' }}",
-          options: {{ variant.options | json }}
-        },
-        {% endfor %}
-      ]
-    },
-  {% endif %}
-{% endfor %}
-
-];
+  ];
 </script>
-
 
 <!-- 3. Logic -->
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+  document.addEventListener('DOMContentLoaded', function () {
+    const type = new URLSearchParams(window.location.search).get('type') || localStorage.getItem('byoj_type');
 
-  const type = new URLSearchParams(window.location.search).get("type") 
-                || localStorage.getItem("byoj_type");
+    const allChains = window.byojChains || [];
+    const container = document.getElementById('chain-list');
 
-  const allChains = window.byojChains || [];
-  const container = document.getElementById("chain-list");
+    const filtered = allChains.filter((c) => c.type === type);
 
-  const filtered = allChains.filter(c => c.type === type);
+    if (!filtered.length) {
+      container.innerHTML = '<p>No chains found</p>';
+      return;
+    }
 
-  if (!filtered.length) {
-    container.innerHTML = "<p>No chains found</p>";
-    return;
-  }
+    function extractColor(options) {
+      return options && options.length ? options[0] : null;
+    }
 
-  function extractColor(options) {
-    return options && options.length ? options[0] : null;
-  }
+    function getColorCode(name) {
+      if (!name) return '#ccc';
+      name = name.toLowerCase();
 
-  function getColorCode(name) {
-    if (!name) return '#ccc';
-    name = name.toLowerCase();
+      if (name.includes('yellow')) return '#D4AF37';
+      if (name.includes('gold')) return '#D4AF37';
+      if (name.includes('rose')) return '#E6B7A9';
+      if (name.includes('pink')) return '#E6B7A9';
+      if (name.includes('white')) return '#D9D9D9';
+      if (name.includes('silver')) return '#C0C0C0';
 
-    if (name.includes('yellow')) return '#D4AF37';
-    if (name.includes('gold')) return '#D4AF37';
-    if (name.includes('rose')) return '#E6B7A9';
-    if (name.includes('pink')) return '#E6B7A9';
-    if (name.includes('white')) return '#D9D9D9';
-    if (name.includes('silver')) return '#C0C0C0';
+      return '#ccc';
+    }
 
-    return '#ccc';
-  }
+    filtered.forEach((chain) => {
+      let usedColors = new Map();
 
-  filtered.forEach(chain => {
+      chain.variants.forEach((v) => {
+        const color = extractColor(v.options);
+        if (color && !usedColors.has(color)) {
+          usedColors.set(color, v); // map color → variant
+        }
+      });
 
-    let usedColors = new Map();
+      const firstVariant = chain.variants[0];
 
-    chain.variants.forEach(v => {
-      const color = extractColor(v.options);
-      if (color && !usedColors.has(color)) {
-        usedColors.set(color, v); // map color → variant
-      }
-    });
+      const div = document.createElement('div');
+      div.className = 'byoj-chain-item';
 
-    const firstVariant = chain.variants[0];
+      let swatchesHTML = '';
 
-    const div = document.createElement("div");
-    div.className = "byoj-chain-item";
-
-    let swatchesHTML = '';
-
-    usedColors.forEach((variant, color) => {
-      swatchesHTML += `
+      usedColors.forEach((variant, color) => {
+        swatchesHTML += `
         <span class="swatch"
               data-variant='${JSON.stringify(variant)}'
               style="background:${getColorCode(color)}"
               title="${color}">
         </span>
       `;
-    });
+      });
 
-    div.innerHTML = `
+      div.innerHTML = `
       <div class="chain-img-wrap">
         <img src="${firstVariant.image}" class="chain-img"/>
       </div>
@@ -142,118 +137,135 @@ document.addEventListener("DOMContentLoaded", function () {
 
         <p class="chain-price">
           ₹<span class="price">${firstVariant.price}</span>
-          ${firstVariant.compare && firstVariant.compare != "0" ? `<span class="compare">₹${firstVariant.compare}</span>` : ''}
+          ${
+            firstVariant.compare && firstVariant.compare != '0'
+              ? `<span class="compare">₹${firstVariant.compare}</span>`
+              : ''
+          }
         </p>
       </div>
     `;
 
-    // SWATCH CLICK LOGIC
-    div.querySelectorAll('.swatch').forEach(swatch => {
+      // SWATCH CLICK LOGIC
+      div.querySelectorAll('.swatch').forEach((swatch) => {
+        swatch.addEventListener('click', function (e) {
+          e.stopPropagation();
 
-      swatch.addEventListener('click', function (e) {
-        e.stopPropagation();
+          const variant = JSON.parse(this.dataset.variant);
 
-        const variant = JSON.parse(this.dataset.variant);
+          // Update image
+          div.querySelector('.chain-img').src = variant.image;
 
-        // Update image
-        div.querySelector('.chain-img').src = variant.image;
+          // Update price
+          div.querySelector('.price').innerText = variant.price;
 
-        // Update price
-        div.querySelector('.price').innerText = variant.price;
+          const compareEl = div.querySelector('.compare');
+          if (compareEl) {
+            compareEl.innerText = '₹' + variant.compare;
+          }
 
-        const compareEl = div.querySelector('.compare');
-        if (compareEl) {
-          compareEl.innerText = "₹" + variant.compare;
-        }
+          // Active state
+          div.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
+          this.classList.add('active');
 
-        // Active state
-        div.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-        this.classList.add('active');
-
-        // Save selected variant
-        div.setAttribute('data-selected-variant', variant.id);
+          // Save selected variant
+          div.setAttribute('data-selected-variant', variant.id);
+        });
       });
 
+      // Default selected variant
+      div.setAttribute('data-selected-variant', firstVariant.id);
+
+      // CARD CLICK
+      div.onclick = () => {
+        const selectedVariant = div.getAttribute('data-selected-variant');
+        div.onclick = () => {
+          const selectedVariant = div.getAttribute('data-selected-variant');
+
+          // get selected variant data
+          const activeSwatch = div.querySelector('.swatch.active');
+          let variantData;
+
+          if (activeSwatch) {
+            variantData = JSON.parse(activeSwatch.dataset.variant);
+          } else {
+            variantData = chain.variants[0];
+          }
+
+          // 🔥 SAVE EVERYTHING
+          localStorage.setItem('byoj_chain_variant', selectedVariant);
+          localStorage.setItem('byoj_chain_image', variantData.image);
+
+          window.location.href = '/pages/build-your-jewelry-step-3';
+        };
+        window.location.href = '/pages/build-your-jewelry-step-3';
+      };
+
+      container.appendChild(div);
     });
-
-    // Default selected variant
-    div.setAttribute('data-selected-variant', firstVariant.id);
-
-    // CARD CLICK
-    div.onclick = () => {
-      const selectedVariant = div.getAttribute('data-selected-variant');
-      localStorage.setItem("byoj_chain_variant", selectedVariant);
-      window.location.href = "/pages/build-your-jewelry-step-3";
-    };
-
-    container.appendChild(div);
   });
-
-});
 </script>
-
 
 <!-- 4. CSS -->
 <style>
-.byoj-heading {
-  text-align: center;
-  margin-bottom: 30px;
-}
+  .byoj-heading {
+    text-align: center;
+    margin-bottom: 30px;
+  }
 
-.byoj-chain-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 40px;
-}
+  .byoj-chain-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 40px;
+  }
 
-.byoj-chain-item {
-  text-align: center;
-  cursor: pointer;
-}
+  .byoj-chain-item {
+    text-align: center;
+    cursor: pointer;
+  }
 
-.chain-img-wrap img {
-  width: 100%;
-  max-width: 320px;
-  margin: auto;
-  display: block;
-}
+  .chain-img-wrap img {
+    width: 100%;
+    max-width: 320px;
+    margin: auto;
+    display: block;
+  }
 
-.chain-title {
-  margin-top: 15px;
-  font-size: 14px;
-}
+  .chain-title {
+    margin-top: 15px;
+    font-size: 14px;
+  }
 
-.chain-price {
-  margin-top: 5px;
-  font-weight: 600;
-}
+  .chain-price {
+    margin-top: 5px;
+    font-weight: 600;
+  }
 
-.chain-price .compare {
-  text-decoration: line-through;
-  color: #999;
-  margin-left: 5px;
-  font-weight: 400;
-}
+  .chain-price .compare {
+    text-decoration: line-through;
+    color: #999;
+    margin-left: 5px;
+    font-weight: 400;
+  }
 
-.chain-swatches {
-  margin-top: 10px;
-}
+  .chain-swatches {
+    margin-top: 10px;
+  }
 
-.swatch {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  margin: 0 5px;
-  border: 1px solid #ccc;
-  cursor: pointer;
-}
+  .swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    margin: 0 5px;
+    border: 1px solid #ccc;
+    cursor: pointer;
+  }
 
-.swatch.active {
-  border: 2px solid #000;
-}
+  .swatch.active {
+    border: 2px solid #000;
+  }
 </style>
-
 
 <!-- 5. Schema -->
 {% schema %}
