@@ -1,0 +1,185 @@
+<!-- 1. HTML -->
+<div class="byoj-step3">
+  <div class="page-width">
+
+    <h2 class="byoj-heading">Customize Your Jewelry</h2>
+
+    <!-- Chain Preview -->
+    <div class="chain-preview">
+      <img id="chain-image" />
+      <div id="charms-container" class="charms-container"></div>
+    </div>
+
+    <!-- Charms List -->
+    <div class="charms-list" id="charms-list"></div>
+
+  </div>
+</div>
+
+
+<!-- 2. Inject Charms -->
+<script>
+window.byojCharms = [
+
+{% for block in section.blocks %}
+  {% if block.settings.product != blank %}
+    {% assign product = block.settings.product %}
+    {
+      id: "{{ product.id }}",
+      title: {{ product.title | json }},
+      image: "{{ product.featured_image | image_url: width: 300 }}"
+    },
+  {% endif %}
+{% endfor %}
+
+];
+</script>
+
+
+<!-- 3. Logic -->
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const selectedVariant = localStorage.getItem("byoj_chain_variant");
+
+  // 🔥 Load chain image dynamically
+  fetch('/products.json?limit=250')
+    .then(res => res.json())
+    .then(data => {
+      let found = null;
+
+      data.products.forEach(p => {
+        p.variants.forEach(v => {
+          if (v.id == selectedVariant) {
+            found = p;
+          }
+        });
+      });
+
+      if (found) {
+        document.getElementById("chain-image").src = found.images[0].src;
+      }
+    });
+
+  const charmsContainer = document.getElementById("charms-container");
+  const charmsList = document.getElementById("charms-list");
+
+  let selectedCharms = [];
+
+  function renderCharms() {
+    charmsContainer.innerHTML = '';
+
+    const total = selectedCharms.length;
+
+    selectedCharms.forEach((charm, index) => {
+      const el = document.createElement("img");
+      el.src = charm.image;
+      el.className = "charm";
+
+      // evenly space charms
+      el.style.left = ((index + 1) / (total + 1)) * 100 + "%";
+
+      charmsContainer.appendChild(el);
+    });
+  }
+
+  // Render charm options
+  window.byojCharms.forEach(charm => {
+    const div = document.createElement("div");
+    div.className = "charm-item";
+
+    div.innerHTML = `
+      <img src="${charm.image}" />
+      <p>${charm.title}</p>
+    `;
+
+    div.onclick = () => {
+      selectedCharms.push(charm);
+      renderCharms();
+    };
+
+    charmsList.appendChild(div);
+  });
+
+});
+</script>
+
+
+<!-- 4. CSS -->
+<style>
+.byoj-heading {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+/* Chain preview */
+.chain-preview {
+  position: relative;
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+#chain-image {
+  max-width: 500px;
+  width: 100%;
+}
+
+/* Charms overlay */
+.charms-container {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 0;
+}
+
+.charm {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 40px;
+}
+
+/* Charm list */
+.charms-list {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 20px;
+}
+
+.charm-item {
+  text-align: center;
+  cursor: pointer;
+}
+
+.charm-item img {
+  width: 100%;
+  max-width: 80px;
+}
+</style>
+
+
+<!-- 5. Schema -->
+{% schema %}
+{
+  "name": "BYO Charms",
+  "settings": [],
+  "blocks": [
+    {
+      "type": "charm",
+      "name": "Charm",
+      "settings": [
+        {
+          "type": "product",
+          "id": "product",
+          "label": "Select Charm Product"
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "BYO Charms"
+    }
+  ]
+}
+{% endschema %}
