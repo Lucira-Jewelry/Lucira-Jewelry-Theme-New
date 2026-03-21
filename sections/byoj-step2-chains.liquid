@@ -7,7 +7,7 @@
 </div>
 
 
-<!-- 2. Shopify Data Injection (MUST COME FIRST) -->
+<!-- 2. Shopify Data Injection -->
 <script>
 window.byojChains = [
 
@@ -55,7 +55,7 @@ window.byojChains = [
           {% for variant in product.variants %}
           {
             id: "{{ variant.id }}",
-            title: {{ variant.title | json }}
+            options: {{ variant.options | json }}
           },
           {% endfor %}
         ]
@@ -75,7 +75,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 || localStorage.getItem("byoj_type");
 
   const allChains = window.byojChains || [];
-
   const container = document.getElementById("chain-list");
 
   const filtered = allChains.filter(c => c.type === type);
@@ -85,7 +84,16 @@ document.addEventListener("DOMContentLoaded", function () {
     return;
   }
 
-  function getColor(name) {
+  // Extract color from variant options
+  function extractColor(options) {
+    if (!options || !options.length) return null;
+    return options[0]; // assuming color is first option
+  }
+
+  // Map color name → actual color
+  function getColorCode(name) {
+    if (!name) return '#ccc';
+
     name = name.toLowerCase();
 
     if (name.includes('yellow')) return '#D4AF37';
@@ -101,13 +109,21 @@ document.addEventListener("DOMContentLoaded", function () {
   filtered.forEach(chain => {
 
     let swatchesHTML = '';
+    let usedColors = new Set();
 
     if (chain.variants && chain.variants.length) {
       chain.variants.forEach(v => {
+
+        const colorName = extractColor(v.options);
+
+        if (!colorName || usedColors.has(colorName)) return;
+
+        usedColors.add(colorName);
+
         swatchesHTML += `
-          <span class="swatch" 
-                style="background:${getColor(v.title)}"
-                data-variant="${v.id}">
+          <span class="swatch"
+                title="${colorName}"
+                style="background:${getColorCode(colorName)}">
           </span>
         `;
       });
