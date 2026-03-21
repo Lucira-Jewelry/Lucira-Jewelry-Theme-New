@@ -1,108 +1,208 @@
 <!-- 1. HTML -->
 <div class="byoj-step2">
   <div class="page-width">
-
     <h2 class="byoj-heading">{{ section.settings.heading }}</h2>
-
-    <div id="chain-list" class="byoj-chain-grid">
-      <!-- Chains will render here -->
-    </div>
-
+    <div id="chain-list" class="byoj-chain-grid"></div>
   </div>
 </div>
 
 
-<!-- 2. Shopify Data Injection -->
+<!-- 2. Shopify Data Injection (MUST COME FIRST) -->
 <script>
-  document.addEventListener("DOMContentLoaded", function () {
+window.byojChains = [
 
-    const type = new URLSearchParams(window.location.search).get("type") 
-                  || localStorage.getItem("byoj_type");
+  /* COLLECTION PRODUCTS */
+  {% for block in section.blocks %}
+    {% if block.type == 'collection' %}
+      {% assign col = collections[block.settings.collection] %}
+      {% if col != blank %}
+        {% for product in col.products %}
+        {
+          id: "{{ product.id }}",
+          title: {{ product.title | json }},
+          image: "{{ product.featured_image | image_url: width: 600 }}",
+          price: "{{ product.price | money_without_currency | replace: ',', '' }}",
+          compare: "{{ product.compare_at_price | money_without_currency | replace: ',', '' }}",
+          type: "{{ block.settings.type }}",
 
-    const allChains = window.byojChains || [];
+          variants: [
+            {% for variant in product.variants %}
+            {
+              id: "{{ variant.id }}",
+              title: {{ variant.title | json }}
+            },
+            {% endfor %}
+          ]
+        },
+        {% endfor %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
 
-    // Filter chains by type
-    const filtered = allChains.filter(c => c.type === type);
+  /* MANUAL PRODUCTS */
+  {% for block in section.blocks %}
+    {% if block.type == 'manual' and block.settings.product != blank %}
+      {% assign product = block.settings.product %}
+      {
+        id: "{{ product.id }}",
+        title: {{ product.title | json }},
+        image: "{{ product.featured_image | image_url: width: 600 }}",
+        price: "{{ product.price | money_without_currency | replace: ',', '' }}",
+        compare: "{{ product.compare_at_price | money_without_currency | replace: ',', '' }}",
+        type: "{{ block.settings.type }}",
 
-    const container = document.getElementById("chain-list");
+        variants: [
+          {% for variant in product.variants %}
+          {
+            id: "{{ variant.id }}",
+            title: {{ variant.title | json }}
+          },
+          {% endfor %}
+        ]
+      },
+    {% endif %}
+  {% endfor %}
 
-    if (!filtered.length) {
-      container.innerHTML = "<p>No chains found</p>";
-      return;
-    }
-
-    filtered.forEach(chain => {
-      const div = document.createElement("div");
-      div.className = "byoj-chain-item";
-
-      div.innerHTML = `
-        <img src="${chain.image}" />
-        <p>${chain.title}</p>
-      `;
-
-      div.onclick = () => {
-        localStorage.setItem("byoj_chain", chain.id);
-        window.location.href = "/pages/build-your-jewelry-step-3";
-      };
-
-      container.appendChild(div);
-    });
-
-  });
+];
 </script>
+
 
 <!-- 3. Logic Script -->
 <script>
-  window.byojChains = [
+document.addEventListener("DOMContentLoaded", function () {
 
-    /* COLLECTION PRODUCTS */
-    {% for block in section.blocks %}
-      {% if block.type == 'collection' %}
-        {% assign col = collections[block.settings.collection] %}
-        {% if col != blank %}
-          {% for product in col.products %}
-            {
-              id: "{{ product.id }}",
-              title: {{ product.title | json }},
-              image: "{{ product.featured_image | image_url: width: 500 }}",
-              type: "{{ block.settings.type }}"
-            },
-          {% endfor %}
-        {% endif %}
-      {% endif %}
-    {% endfor %}
+  const type = new URLSearchParams(window.location.search).get("type") 
+                || localStorage.getItem("byoj_type");
 
-    /* MANUAL PRODUCTS */
-    {% for block in section.blocks %}
-      {% if block.type == 'manual' and block.settings.product != blank %}
-        {
-          id: "{{ block.settings.product.id }}",
-          title: {{ block.settings.product.title | json }},
-          image: "{{ block.settings.product.featured_image | image_url: width: 500 }}",
-          type: "{{ block.settings.type }}"
-        },
-      {% endif %}
-    {% endfor %}
+  const allChains = window.byojChains || [];
 
-  ];
+  const container = document.getElementById("chain-list");
+
+  const filtered = allChains.filter(c => c.type === type);
+
+  if (!filtered.length) {
+    container.innerHTML = "<p>No chains found</p>";
+    return;
+  }
+
+  function getColor(name) {
+    name = name.toLowerCase();
+
+    if (name.includes('yellow')) return '#D4AF37';
+    if (name.includes('gold')) return '#D4AF37';
+    if (name.includes('rose')) return '#E6B7A9';
+    if (name.includes('pink')) return '#E6B7A9';
+    if (name.includes('white')) return '#D9D9D9';
+    if (name.includes('silver')) return '#C0C0C0';
+
+    return '#ccc';
+  }
+
+  filtered.forEach(chain => {
+
+    let swatchesHTML = '';
+
+    if (chain.variants && chain.variants.length) {
+      chain.variants.forEach(v => {
+        swatchesHTML += `
+          <span class="swatch" 
+                style="background:${getColor(v.title)}"
+                data-variant="${v.id}">
+          </span>
+        `;
+      });
+    }
+
+    const div = document.createElement("div");
+    div.className = "byoj-chain-item";
+
+    div.innerHTML = `
+      <div class="chain-img-wrap">
+        <img src="${chain.image}" />
+      </div>
+
+      <div class="chain-info">
+        <p class="chain-title">${chain.title}</p>
+
+        <div class="chain-swatches">
+          ${swatchesHTML}
+        </div>
+
+        <p class="chain-price">
+          ₹${chain.price}
+          ${chain.compare && chain.compare != "0" ? `<span class="compare">₹${chain.compare}</span>` : ''}
+        </p>
+      </div>
+    `;
+
+    div.onclick = () => {
+      localStorage.setItem("byoj_chain", chain.id);
+      window.location.href = "/pages/build-your-jewelry-step-3";
+    };
+
+    container.appendChild(div);
+  });
+
+});
 </script>
 
+
+<!-- 4. CSS -->
 <style>
+.byoj-heading {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
 .byoj-chain-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 20px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 40px;
 }
 
 .byoj-chain-item {
-  cursor: pointer;
   text-align: center;
+  cursor: pointer;
 }
 
-.byoj-chain-item img {
+.chain-img-wrap img {
   width: 100%;
+  max-width: 320px;
+  margin: auto;
+  display: block;
+}
+
+.chain-title {
+  margin-top: 15px;
+  font-size: 14px;
+}
+
+.chain-price {
+  margin-top: 5px;
+  font-weight: 600;
+}
+
+.chain-price .compare {
+  text-decoration: line-through;
+  color: #999;
+  margin-left: 5px;
+  font-weight: 400;
+}
+
+.chain-swatches {
+  margin-top: 10px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  margin: 0 5px;
+  border: 1px solid #ccc;
 }
 </style>
+
 
 <!-- 5. Schema -->
 {% schema %}
