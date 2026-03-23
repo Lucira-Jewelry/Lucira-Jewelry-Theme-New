@@ -105,7 +105,7 @@
       ── Scheme URL builder ──────────────────────────────────────────────
       Mirrors scheme-button.liquid calcSchemePrice() exactly:
         1. monthly_raw  = floor(val_total / 10)
-        2. monthly      = ceil monthly_raw to next ₹500
+        2. monthly      = FLOOR monthly_raw to previous ₹500
         3. scheme_amount = val_total − monthly   ← free 10th month saving
       This is the value shown on the "BUY AT ₹XX WITH SCHEME" button CTA.
       Logged-in  → full SSO URL with phone, HMAC signature + scheme_amount
@@ -118,14 +118,10 @@
       {% assign _show_scheme_btn = true %}
     {% endif %}
 
-    {% comment %} ── Step 1: Compute scheme_amount (mirrors scheme-button.liquid logic) ── {% endcomment %}
+    {% comment %} ── Step 1: Compute scheme_amount (FLOOR to previous ₹500) ── {% endcomment %}
     {% assign _monthly_raw   = val_total | divided_by: 10 | floor %}
     {% assign _remainder     = _monthly_raw | modulo: 500 %}
-    {% if _remainder == 0 %}
-      {% assign _monthly     = _monthly_raw %}
-    {% else %}
-      {% assign _monthly     = _monthly_raw | minus: _remainder | plus: 500 %}
-    {% endif %}
+    {% assign _monthly       = _monthly_raw | minus: _remainder %}
     {% assign _scheme_amount = val_total | minus: _monthly %}
 
     {% comment %} ── Step 2: Clean & normalise customer phone ── {% endcomment %}
@@ -146,7 +142,7 @@
     {% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
     {% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
 
-    {% comment %} ── Step 4: Compose scheme_url with _scheme_amount ── {% endcomment %}
+    {% comment %} ── Step 4: Compose scheme_url with _monthly ── {% endcomment %}
     {% if customer %}
       {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
         | append: _clean_phone
