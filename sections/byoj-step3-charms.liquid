@@ -23,7 +23,6 @@
 <!-- 3. INJECT CHARMS -->
 <script>
 window.byojCharms = [
-
 {% for block in section.blocks %}
   {% if block.settings.product != blank %}
     {% assign product = block.settings.product %}
@@ -34,7 +33,6 @@ window.byojCharms = [
     },
   {% endif %}
 {% endfor %}
-
 ];
 </script>
 
@@ -43,8 +41,8 @@ window.byojCharms = [
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-  const containerWidth = 600;
-  const containerHeight = 300;
+  const containerWidth = 650;
+  const containerHeight = 350;
 
   const stage = new Konva.Stage({
     container: 'konva-container',
@@ -69,20 +67,31 @@ document.addEventListener("DOMContentLoaded", function () {
     const chain = new Konva.Image({
       image: chainImg,
       x: 0,
-      y: 60,
+      y: 70,
       width: containerWidth,
-      height: 150
+      height: 180
     });
 
     layer.add(chain);
     layer.draw();
   };
 
-  // 🔥 CURVE FUNCTION (necklace dip)
+  // 🔥 REAL U-SHAPED CURVE (ELLIPSE)
   function getCurveY(x) {
-    const normalized = x / containerWidth;
-    const curveDepth = 40;
-    return 120 + Math.sin(normalized * Math.PI) * curveDepth;
+    const centerX = containerWidth / 2;
+
+    const a = containerWidth / 2.2; // width spread
+    const b = 90; // depth of chain
+
+    const dx = x - centerX;
+
+    const inside = 1 - (dx * dx) / (a * a);
+
+    if (inside <= 0) return 160;
+
+    const y = b * Math.sqrt(inside);
+
+    return 140 + (b - y); // shift vertically
   }
 
   let charms = [];
@@ -108,18 +117,27 @@ document.addEventListener("DOMContentLoaded", function () {
         draggable: true
       });
 
+      // 🔥 INITIAL RANDOM ROTATION (real hanging feel)
+      charm.rotation((Math.random() * 10) - 5);
+
       // 🔥 DRAG ALONG CURVE
       charm.on('dragmove', function () {
+
         let newX = charm.x();
 
-        // Keep inside bounds
-        newX = Math.max(20, Math.min(containerWidth - 20, newX));
+        // keep inside bounds
+        newX = Math.max(30, Math.min(containerWidth - 30, newX));
+
+        const baseY = getCurveY(newX);
+
+        // slight randomness
+        const randomOffset = (Math.random() * 4) - 2;
 
         charm.x(newX);
-        charm.y(getCurveY(newX));
+        charm.y(baseY + randomOffset);
       });
 
-      // 🔥 REMOVE ON DOUBLE CLICK
+      // 🔥 REMOVE CHARM
       charm.on('dblclick', function () {
         charm.destroy();
         layer.draw();
@@ -145,9 +163,7 @@ document.addEventListener("DOMContentLoaded", function () {
       <p>${charm.title}</p>
     `;
 
-    div.onclick = () => {
-      addCharm(charm);
-    };
+    div.onclick = () => addCharm(charm);
 
     charmsList.appendChild(div);
   });
@@ -162,7 +178,8 @@ document.addEventListener("DOMContentLoaded", function () {
 /* Layout */
 .byoj-wrapper {
   display: flex;
-  gap: 40px;
+  gap: 50px;
+  align-items: flex-start;
 }
 
 .byoj-left {
@@ -176,9 +193,10 @@ document.addEventListener("DOMContentLoaded", function () {
 /* Canvas */
 #konva-container {
   width: 100%;
-  max-width: 600px;
+  max-width: 650px;
   margin: auto;
   border: 1px solid #eee;
+  background: #fafafa;
 }
 
 /* Right Panel */
