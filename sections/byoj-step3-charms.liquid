@@ -1,13 +1,13 @@
-<!-- 1. HTML -->
+<!-- 1. LOAD KONVA -->
 <script src="https://cdn.jsdelivr.net/npm/konva@9/konva.min.js"></script>
+
+<!-- 2. HTML -->
 <div class="byoj-step3">
   <div class="byoj-wrapper">
-    <!-- LEFT: CHAIN PREVIEW -->
+
+    <!-- LEFT: CANVAS -->
     <div class="byoj-left">
-      <div class="chain-preview">
-        <img id="chain-image">
-        <div id="charms-container" class="charms-container"></div>
-      </div>
+      <div id="konva-container"></div>
     </div>
 
     <!-- RIGHT: CHARMS -->
@@ -15,165 +15,202 @@
       <h3 class="charms-heading">Select Your Charms</h3>
       <div id="charms-list" class="charms-list"></div>
     </div>
+
   </div>
 </div>
 
-<!-- 2. Inject Charms -->
+
+<!-- 3. INJECT CHARMS -->
 <script>
-  window.byojCharms = [
+window.byojCharms = [
 
-  {% for block in section.blocks %}
-    {% if block.settings.product != blank %}
-      {% assign product = block.settings.product %}
-      {
-        id: "{{ product.id }}",
-        title: {{ product.title | json }},
-        image: "{{ product.featured_image | image_url: width: 300 }}"
-      },
-    {% endif %}
-  {% endfor %}
+{% for block in section.blocks %}
+  {% if block.settings.product != blank %}
+    {% assign product = block.settings.product %}
+    {
+      id: "{{ product.id }}",
+      title: {{ product.title | json }},
+      image: "{{ product.featured_image | image_url: width: 300 }}"
+    },
+  {% endif %}
+{% endfor %}
 
-  ];
+];
 </script>
 
-<!-- 3. Logic -->
+
+<!-- 4. KONVA LOGIC -->
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const selectedVariant = localStorage.getItem('byoj_chain_variant');
+document.addEventListener("DOMContentLoaded", function () {
 
-    // 🔥 Load chain image
-    const chainImage = localStorage.getItem('byoj_chain_image');
+  const containerWidth = 600;
+  const containerHeight = 300;
 
-    if (chainImage) {
-      document.getElementById('chain-image').src = chainImage;
-    }
+  const stage = new Konva.Stage({
+    container: 'konva-container',
+    width: containerWidth,
+    height: containerHeight
+  });
 
-    const charmsContainer = document.getElementById('charms-container');
-    const charmsList = document.getElementById('charms-list');
+  const layer = new Konva.Layer();
+  stage.add(layer);
 
-    let selectedCharms = [];
+  const chainImageSrc = localStorage.getItem("byoj_chain_image");
 
-    function renderCharms() {
-      charmsContainer.innerHTML = '';
+  if (!chainImageSrc) {
+    console.error("No chain image found in localStorage");
+  }
 
-      const total = selectedCharms.length;
+  // 🔥 LOAD CHAIN IMAGE
+  const chainImg = new Image();
+  chainImg.src = chainImageSrc;
 
-      selectedCharms.forEach((charm, index) => {
-        const el = document.createElement('img');
-        el.src = charm.image;
-        el.className = 'charm';
+  chainImg.onload = function () {
+    const chain = new Konva.Image({
+      image: chainImg,
+      x: 0,
+      y: 60,
+      width: containerWidth,
+      height: 150
+    });
 
-        // Horizontal position
-        const xPercent = ((index + 1) / (total + 1)) * 100;
+    layer.add(chain);
+    layer.draw();
+  };
 
-        // 🔥 CURVE LOGIC (key part)
-        const curveDepth = 30; // increase = deeper curve
-        const xNormalized = (index + 1) / (total + 1); // 0 → 1
-        
-        // sine curve (center dips down)
-        const baseY = Math.sin(xNormalized * Math.PI) * curveDepth;
-        const randomY = (Math.random() * 6) - 3;
-        const finalY = baseY + randomY;
+  // 🔥 CURVE FUNCTION (necklace dip)
+  function getCurveY(x) {
+    const normalized = x / containerWidth;
+    const curveDepth = 40;
+    return 120 + Math.sin(normalized * Math.PI) * curveDepth;
+  }
 
-        el.style.left = xPercent + '%';
-        el.style.top = `calc(50% + ${finalY}px)`;
-        el.style.transform = 'translate(-50%, -50%)';
+  let charms = [];
 
-        charmsContainer.appendChild(el);
+  // 🔥 ADD CHARM
+  function addCharm(charmData) {
+
+    const img = new Image();
+    img.src = charmData.image;
+
+    img.onload = function () {
+
+      const startX = containerWidth / 2;
+
+      const charm = new Konva.Image({
+        image: img,
+        x: startX,
+        y: getCurveY(startX),
+        width: 45,
+        height: 45,
+        offsetX: 22.5,
+        offsetY: 22.5,
+        draggable: true
       });
-    }
 
-    // Render charm options
-    window.byojCharms.forEach((charm) => {
-      const div = document.createElement('div');
-      div.className = 'charm-item';
+      // 🔥 DRAG ALONG CURVE
+      charm.on('dragmove', function () {
+        let newX = charm.x();
 
-      div.innerHTML = `
+        // Keep inside bounds
+        newX = Math.max(20, Math.min(containerWidth - 20, newX));
+
+        charm.x(newX);
+        charm.y(getCurveY(newX));
+      });
+
+      // 🔥 REMOVE ON DOUBLE CLICK
+      charm.on('dblclick', function () {
+        charm.destroy();
+        layer.draw();
+      });
+
+      layer.add(charm);
+      layer.draw();
+
+      charms.push(charm);
+    };
+  }
+
+  // 🔥 RENDER CHARMS LIST
+  const charmsList = document.getElementById("charms-list");
+
+  window.byojCharms.forEach(charm => {
+
+    const div = document.createElement("div");
+    div.className = "charm-item";
+
+    div.innerHTML = `
       <img src="${charm.image}" />
       <p>${charm.title}</p>
     `;
 
-      div.onclick = () => {
-        selectedCharms.push(charm);
-        renderCharms();
-      };
+    div.onclick = () => {
+      addCharm(charm);
+    };
 
-      charmsList.appendChild(div);
-    });
+    charmsList.appendChild(div);
   });
+
+});
 </script>
 
-<!-- 4. CSS -->
+
+<!-- 5. CSS -->
 <style>
-  /* Layout */
-  .byoj-wrapper {
-    display: flex;
-    gap: 40px;
-    align-items: flex-start;
-  }
 
-  .byoj-left {
-    width: 60%;
-  }
+/* Layout */
+.byoj-wrapper {
+  display: flex;
+  gap: 40px;
+}
 
-  .byoj-right {
-    width: 40%;
-  }
+.byoj-left {
+  width: 60%;
+}
 
-  /* Chain Preview */
-  .chain-preview {
-    position: relative;
-    text-align: center;
-    padding: 40px;
-  }
+.byoj-right {
+  width: 40%;
+}
 
-  #chain-image {
-    width: 100%;
-    max-width: 600px;
-  }
+/* Canvas */
+#konva-container {
+  width: 100%;
+  max-width: 600px;
+  margin: auto;
+  border: 1px solid #eee;
+}
 
-  /* Charms on chain */
-  .charms-container {
-    position: absolute;
+/* Right Panel */
+.charms-heading {
+  margin-bottom: 20px;
+}
 
-    left: 0;
-    width: 100%;
-  }
+.charms-list {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
 
-  .charm {
-    position: absolute;
-    width: 45px;
-    transition: all 0.3s ease;
-  }
+.charm-item {
+  text-align: center;
+  cursor: pointer;
+  transition: 0.3s;
+}
 
-  /* Right Panel */
-  .charms-heading {
-    margin-bottom: 20px;
-  }
+.charm-item:hover {
+  transform: scale(1.05);
+}
 
-  .charms-list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-  }
+.charm-item img {
+  width: 100%;
+  max-width: 80px;
+}
 
-  .charm-item {
-    text-align: center;
-    cursor: pointer;
-    transition: 0.3s;
-  }
-
-  .charm-item:hover {
-    transform: scale(1.05);
-  }
-
-  .charm-item img {
-    width: 100%;
-    max-width: 80px;
-  }
 </style>
 
-<!-- 5. Schema -->
+
+<!-- 6. SCHEMA -->
 {% schema %}
 {
   "name": "BYO Charms",
