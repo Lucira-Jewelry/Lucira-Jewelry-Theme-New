@@ -1,5 +1,4 @@
-{% comment %} ── Resolve price from selected variant ── {% endcomment %}
-{% if variant %}
+{% comment %} {% if variant %}
   {% assign _raw_price = variant.price %}
 {% else %}
   {% assign _raw_price = product.selected_or_first_available_variant.price %}
@@ -276,5 +275,552 @@
 })();
 </script>
 
+{% endif %} {% endcomment %}
+
+{% comment %} ── Resolve price from selected variant ── {% endcomment %}
+{% if variant %}
+  {% assign _raw_price = variant.price %}
+{% else %}
+  {% assign _raw_price = product.selected_or_first_available_variant.price %}
+{% endif %}
+
+{% comment %}
+  STEP 1 — Convert paise → rupees
+{% endcomment %}
+{% assign _price_rupees = _raw_price | divided_by: 100 %}
+
+{% comment %}
+  STEP 2 — FLOOR to previous ₹500 (monthly × 10 may be <= product price)
+{% endcomment %}
+{% assign _raw_monthly = _price_rupees | divided_by: 10 %}
+{% assign _remainder   = _raw_monthly  | modulo: 500 %}
+{% assign _monthly     = _raw_monthly  | minus: _remainder %}
+
+{% comment %}
+  STEP 3 — Effective scheme price = product price − free 10th month
+{% endcomment %}
+{% assign _scheme_price = _price_rupees | minus: _monthly %}
+
+{% comment %}
+  STEP 4 — You Pay (9 Months) = monthly × 9
+{% endcomment %}
+{% assign _monthly_x9 = _monthly | times: 9 %}
+
+{% comment %}
+  STEP 5 — Multiply × 100 before money_without_currency to avoid double-division
+{% endcomment %}
+{% assign _scheme_price_paise = _scheme_price | times: 100 %}
+{% assign _monthly_paise      = _monthly      | times: 100 %}
+{% assign _monthly_x9_paise   = _monthly_x9   | times: 100 %}
+{% assign _price_paise        = _price_rupees  | times: 100 %}
+
+{% comment %}
+  ── Scheme URL builder ────────────────────────────────────────────────
+  _monthly is now resolved above.
+  Logged-in  → full SSO URL with phone, HMAC signature + &amount=_monthly
+  Logged-out → base URL with &amount=_monthly only
+{% endcomment %}
+
+{% comment %} ── Step A: Clean & normalise customer phone ── {% endcomment %}
+{% assign _raw_phone    = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+{% if _raw_phone.size == 12 %}
+  {% assign _phone_prefix = _raw_phone | slice: 0, 2 %}
+  {% if _phone_prefix == "91" %}
+    {% assign _clean_phone = _raw_phone | slice: 2, 10 %}
+  {% else %}
+    {% assign _clean_phone = _raw_phone %}
+  {% endif %}
+{% else %}
+  {% assign _clean_phone = _raw_phone %}
+{% endif %}
+
+{% comment %} ── Step B: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
+{% assign _ts        = 'now' | date: '%s' %}
+{% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+{% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+{% comment %} ── Step C: Compose scheme_url with _monthly as amount ── {% endcomment %}
+{% if customer %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
+    | append: _clean_phone
+    | append: '&ts='
+    | append: _ts
+    | append: '&sig='
+    | append: _sig
+    | append: '&amount='
+    | append: _monthly %}
+{% else %}
+  {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _monthly %}
+{% endif %}
+
+{% if _price_rupees > 0 %}
+
+{% comment %}
+  Pass ALL variant prices as a JSON map so JS can recalculate
+  without any extra API calls when the user switches variants.
+  Format: { "variant_id": price_in_paise, ... }
+{% endcomment %}
+{% capture _variant_prices_json %}{
+  {% for v in product.variants %}
+    "{{ v.id }}": {{ v.price }}{% unless forloop.last %},{% endunless %}
+  {% endfor %}
+}{% endcapture %}
+
+<div
+  class="lucira-scheme-wrapper"
+  data-scheme-wrapper
+  data-variant-prices='{{ _variant_prices_json }}'
+  data-scheme-url="{{ scheme_url }}"
+>
+  <!-- ── Toggle header ── -->
+  <button
+    class="lucira-scheme-btn"
+    data-scheme-toggle
+    aria-expanded="false"
+    type="button"
+  >
+    <span class="lucira-scheme-btn__text">
+      BUY AT
+      <strong class="lucira-scheme-btn__price" data-scheme-price>
+        &#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}
+      </strong>
+      WITH SCHEME
+    </span>
+    <span class="lucira-scheme-chevron" aria-hidden="true">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M2 5L7 10L12 5" stroke="#A68380" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+  </button>
+
+  <!-- ── Breakdown panel (hidden by default) ── -->
+  <div class="lucira-scheme-panel" data-scheme-panel hidden>
+    <div class="lucira-scheme-breakdown">
+      <p class="lucira-scheme-breakdown__title">9 + 1 Scheme Breakdown</p>
+
+      <div class="lucira-scheme-rows">
+        <div class="lucira-scheme-row">
+          <span class="lucira-scheme-row__label">Product Price</span>
+          <span class="lucira-scheme-row__value" data-scheme-product-price>
+            &#8377;{{ _price_paise | money_without_currency | replace: '.00', '' }}
+          </span>
+        </div>
+        <div class="lucira-scheme-row">
+          <span class="lucira-scheme-row__label">Monthly Installment</span>
+          <span class="lucira-scheme-row__value lucira-scheme-row__value--bold">
+            <span data-scheme-monthly-label>
+              &#8377;{{ _monthly_paise | money_without_currency | replace: '.00', '' }} x 9 Months
+            </span>
+          </span>
+        </div>
+        <div class="lucira-scheme-row">
+          <span class="lucira-scheme-row__label">You Pay (9 Months)</span>
+          <span class="lucira-scheme-row__value" data-scheme-pay9>
+            &#8377;{{ _monthly_x9_paise | money_without_currency | replace: '.00', '' }}
+          </span>
+        </div>
+        <div class="lucira-scheme-row">
+          <span class="lucira-scheme-row__label">10th Month</span>
+          <span class="lucira-scheme-row__value" data-scheme-10th>
+            &#8377;{{ _monthly_paise | money_without_currency | replace: '.00', '' }}
+          </span>
+        </div>
+      </div>
+
+      <div class="lucira-scheme-divider"></div>
+
+      <div class="lucira-scheme-rows">
+        <div class="lucira-scheme-row lucira-scheme-row--effective">
+          <span class="lucira-scheme-row__label lucira-scheme-row__label--bold">Effective Price</span>
+          <span class="lucira-scheme-row__value lucira-scheme-row__value--bold" data-scheme-effective>
+            &#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}
+          </span>
+        </div>
+        <div class="lucira-scheme-row">
+          <span class="lucira-scheme-row__label">You Save</span>
+          <span class="lucira-scheme-row__value" data-scheme-save>
+            &#8377;{{ _monthly_paise | money_without_currency | replace: '.00', '' }}
+          </span>
+        </div>
+      </div>
+
+      <a
+        href="{{ scheme_url }}"
+        class="lucira-scheme-enroll"
+        data-scheme-link
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        ENROLL NOW
+      </a>
+
+      <p class="lucira-scheme-note">
+        Note: You can redeem it to purchase any jewelry after 10 months.
+      </p>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* ── Wrapper ── */
+  .lucira-scheme-wrapper {
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  /* ── Toggle button ── */
+  .lucira-scheme-wrapper .lucira-scheme-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 24px;
+    background: transparent;
+    border: 1px solid #A68380;
+    border-radius: 12px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: #5a4a44;
+    transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease,
+                border-radius 0.2s ease;
+    box-sizing: border-box;
+  }
+
+  /* When panel is open, bottom corners flatten to connect visually */
+  .lucira-scheme-wrapper .lucira-scheme-btn[aria-expanded="true"] {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    border-bottom-color: transparent;
+    background: #faf6f4;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn:hover {
+    background: #f7f0ee;
+    border-color: #8c6b62;
+    color: #3d2e28;
+    text-decoration: none;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn__text {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #A68380;
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  .lucira-scheme-wrapper .lucira-scheme-btn__price {
+    font-weight: 600;
+    font-size: 14px;
+    color: #A68380;
+  }
+
+  /* ── Chevron rotation ── */
+  .lucira-scheme-chevron {
+    display: flex;
+    align-items: center;
+    margin-left: 4px;
+    transition: transform 0.22s ease;
+  }
+
+  .lucira-scheme-btn[aria-expanded="true"] .lucira-scheme-chevron {
+    transform: rotate(180deg);
+  }
+
+  /* ── Breakdown panel ── */
+  .lucira-scheme-panel {
+    background: #f5efec;
+    border: 1px solid #A68380;
+    border-top: none;
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    overflow: hidden;
+    /* Animate open */
+    animation: lucira-slide-down 0.22s ease forwards;
+  }
+
+  @keyframes lucira-slide-down {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .lucira-scheme-breakdown {
+    padding: 18px 20px 16px;
+  }
+
+  /* ── Title ── */
+  .lucira-scheme-breakdown__title {
+    font-size: 16px;
+    font-weight: 700;
+    color: #3d2e28;
+    margin: 0 0 14px;
+    letter-spacing: 0.01em;
+  }
+
+  /* ── Row group ── */
+  .lucira-scheme-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  /* ── Individual row ── */
+  .lucira-scheme-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  .lucira-scheme-row__label {
+    font-size: 13px;
+    color: #6b5650;
+    font-weight: 400;
+  }
+
+  .lucira-scheme-row__label--bold {
+    font-size: 15px;
+    font-weight: 700;
+    color: #3d2e28;
+  }
+
+  .lucira-scheme-row__value {
+    font-size: 13px;
+    color: #3d2e28;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .lucira-scheme-row__value--bold {
+    font-weight: 700;
+    font-size: 14px;
+    color: #3d2e28;
+  }
+
+  /* ── Divider ── */
+  .lucira-scheme-divider {
+    height: 1px;
+    background: #d9ccc8;
+    margin: 14px 0;
+  }
+
+  /* ── Enroll button ── */
+  .lucira-scheme-enroll {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    margin-top: 18px;
+    padding: 14px 24px;
+    background: #A68380;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: #ffffff;
+    box-sizing: border-box;
+    transition: background 0.2s ease;
+  }
+
+  .lucira-scheme-enroll:hover {
+    background: #8c6b62;
+    text-decoration: none;
+    color: #ffffff;
+  }
+
+  /* ── Note ── */
+  .lucira-scheme-note {
+    margin: 10px 0 0;
+    font-size: 11px;
+    color: #9a8480;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ── Sticky ATC overrides — scoped, won't bleed ── */
+  #md-sticky-atc .lucira-scheme-wrapper {
+    margin-top: 0;
+    width: auto;
+    flex-shrink: 0;
+  }
+
+  #md-sticky-atc .lucira-scheme-wrapper .lucira-scheme-btn {
+    width: auto;
+    white-space: nowrap;
+    padding: 10px 18px;
+    font-size: 11px;
+    border-radius: 50px !important;
+  }
+
+  /* Disable accordion in sticky ATC — just keep it as a plain link */
+  #md-sticky-atc .lucira-scheme-panel {
+    display: none !important;
+  }
+
+  @media screen and (max-width: 767px) {
+    .lucira-scheme-wrapper {
+      padding: 0 0 10px;
+      margin-top: 0;
+    }
+    .lucira-scheme-wrapper .lucira-scheme-btn {
+      border-radius: 8px;
+      padding: 11px 24px;
+    }
+    .lucira-scheme-wrapper .lucira-scheme-btn[aria-expanded="true"] {
+      border-bottom-left-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+  }
+</style>
+
+<script>
+(function () {
+  // ── Avoid registering multiple listeners if snippet renders twice ──
+  if (window.__luciraSchemeInit) return;
+  window.__luciraSchemeInit = true;
+
+  // ── Core calculation (mirrors Liquid logic exactly) ───────────────
+  // pricePaise : number  — variant.price in paise (Shopify native unit)
+  // returns    : { schemePrice, monthly, pay9, productPrice, save } all in rupees
+  function calcScheme(pricePaise) {
+    var priceRupees = Math.floor(pricePaise / 100);
+    var rawMonthly  = Math.floor(priceRupees / 10);
+    var remainder   = rawMonthly % 500;
+    var monthly     = rawMonthly - remainder;           // FLOOR to lower ₹500 slab
+    return {
+      productPrice: priceRupees,
+      monthly:      monthly,
+      pay9:         monthly * 9,
+      schemePrice:  priceRupees - monthly,              // effective price on button
+      save:         monthly                             // = 10th month saving
+    };
+  }
+
+  // Format as en-IN  e.g. 62788 → "62,788"
+  function formatINR(amount) {
+    return amount.toLocaleString('en-IN');
+  }
+
+  function rupees(n) {
+    return '₹' + formatINR(n);
+  }
+
+  // ── Accordion toggle (only outside sticky ATC) ────────────────────
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-scheme-toggle]');
+    if (!btn) return;
+
+    // Disable accordion inside sticky ATC — treat as plain no-op there
+    if (btn.closest('#md-sticky-atc')) return;
+
+    var wrapper = btn.closest('[data-scheme-wrapper]');
+    if (!wrapper) return;
+
+    var panel   = wrapper.querySelector('[data-scheme-panel]');
+    if (!panel)  return;
+
+    var isOpen  = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    panel.hidden = isOpen;
+  });
+
+  // ── Update every scheme wrapper on the page ───────────────────────
+  function updateAllWrappers(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      var prices     = JSON.parse(wrapper.dataset.variantPrices || '{}');
+      var pricePaise = prices[variantId];
+      if (pricePaise === undefined) return;
+
+      var r = calcScheme(pricePaise);
+
+      // Button header price
+      var priceEl = wrapper.querySelector('[data-scheme-price]');
+      if (priceEl) priceEl.textContent = rupees(r.schemePrice);
+
+      // Breakdown rows
+      var productPriceEl = wrapper.querySelector('[data-scheme-product-price]');
+      if (productPriceEl) productPriceEl.textContent = rupees(r.productPrice);
+
+      var monthlyLabelEl = wrapper.querySelector('[data-scheme-monthly-label]');
+      if (monthlyLabelEl) monthlyLabelEl.textContent = rupees(r.monthly) + ' x 9 Months';
+
+      var pay9El = wrapper.querySelector('[data-scheme-pay9]');
+      if (pay9El) pay9El.textContent = rupees(r.pay9);
+
+      var tenthEl = wrapper.querySelector('[data-scheme-10th]');
+      if (tenthEl) tenthEl.textContent = rupees(r.monthly);
+
+      var effectiveEl = wrapper.querySelector('[data-scheme-effective]');
+      if (effectiveEl) effectiveEl.textContent = rupees(r.schemePrice);
+
+      var saveEl = wrapper.querySelector('[data-scheme-save]');
+      if (saveEl) saveEl.textContent = rupees(r.save);
+
+      // ── Keep enroll href in sync with updated _monthly amount ──
+      var link = wrapper.querySelector('[data-scheme-link]');
+      if (link) {
+        var currentHref = link.getAttribute('href') || '';
+        var baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+        var separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+        link.href       = baseUrl + separator + 'amount=' + r.monthly;
+      }
+    });
+  }
+
+  // ── Event listeners for variant change ────────────────────────────
+
+  // 1. Shopify native variant:change (most custom themes)
+  document.addEventListener('variant:change', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 2. Dawn / Prestige style
+  document.addEventListener('variant:changed', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+    }
+  });
+
+  // 3. Fallback — watch the hidden variant ID input in the main product form
+  document.addEventListener('DOMContentLoaded', function () {
+    var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
+    if (!mainForm) return;
+
+    var variantInput = mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
+
+    new MutationObserver(function () {
+      if (variantInput.value) updateAllWrappers(variantInput.value);
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+    variantInput.addEventListener('change', function () {
+      if (this.value) updateAllWrappers(this.value);
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) {
+        updateAllWrappers(e.target.value);
+      }
+    });
+  });
+})();
+</script>
+
 {% endif %}
 {% comment %} End scheme-button.liquid {% endcomment %}
+
