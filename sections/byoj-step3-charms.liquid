@@ -2,12 +2,16 @@
 <script src="https://cdn.jsdelivr.net/npm/konva@9/konva.min.js"></script>
 
 <!-- 2. HTML -->
-<div class="byoj-step3">
-  <div id="chain-container">
+<div class="byoj-wrapper">
+  <div class="byoj-left">
     <div id="konva-container"></div>
   </div>
-</div>
 
+  <div class="byoj-right">
+    <h3 class="charms-heading">Select Charms</h3>
+    <div id="charms-list" class="charms-list"></div>
+  </div>
+</div>
 
 <!-- 3. INJECT CHARMS -->
 <script>
@@ -25,22 +29,24 @@ window.byojCharms = [
 ];
 </script>
 
-
 <!-- 4. KONVA LOGIC -->
 <script>
 document.addEventListener("DOMContentLoaded", function () {
 
-  const containerWidth = 650;
-  const containerHeight = 350;
+  // ✅ SQUARE CANVAS
+  const size = 600;
 
   const stage = new Konva.Stage({
     container: 'konva-container',
-    width: containerWidth,
-    height: containerHeight
+    width: size,
+    height: size
   });
 
   const layer = new Konva.Layer();
   stage.add(layer);
+
+  const centerX = size / 2;
+  const centerY = size / 2;
 
   const chainImageSrc = localStorage.getItem("byoj_chain_image");
 
@@ -48,39 +54,42 @@ document.addEventListener("DOMContentLoaded", function () {
     console.error("No chain image found in localStorage");
   }
 
-  // 🔥 LOAD CHAIN IMAGE
+  // 🔥 LOAD CHAIN IMAGE (CENTERED)
   const chainImg = new Image();
   chainImg.src = chainImageSrc;
 
   chainImg.onload = function () {
+
+    const chainWidth = size * 0.85;
+    const chainHeight = size * 0.25;
+
     const chain = new Konva.Image({
       image: chainImg,
-      x: 0,
-      y: 70,
-      width: containerWidth,
-      height: 180
+      x: centerX - chainWidth / 2,
+      y: size * 0.25,
+      width: chainWidth,
+      height: chainHeight
     });
 
     layer.add(chain);
     layer.draw();
   };
 
-  // 🔥 REAL U-SHAPED CURVE (ELLIPSE)
+  // 🔥 CURVE FOR SQUARE (BETTER U SHAPE)
   function getCurveY(x) {
-    const centerX = containerWidth / 2;
 
-    const a = containerWidth / 2.2; // width spread
-    const b = 90; // depth of chain
+    const a = size * 0.38;   // width spread
+    const b = size * 0.18;   // depth
 
     const dx = x - centerX;
 
     const inside = 1 - (dx * dx) / (a * a);
 
-    if (inside <= 0) return 160;
+    if (inside <= 0) return size * 0.45;
 
     const y = b * Math.sqrt(inside);
 
-    return 140 + (b - y); // shift vertically
+    return size * 0.42 + (b - y);
   }
 
   let charms = [];
@@ -93,40 +102,35 @@ document.addEventListener("DOMContentLoaded", function () {
 
     img.onload = function () {
 
-      const startX = containerWidth / 2;
+      const startX = centerX;
 
       const charm = new Konva.Image({
         image: img,
         x: startX,
         y: getCurveY(startX),
-        width: 45,
-        height: 45,
-        offsetX: 22.5,
-        offsetY: 22.5,
+        width: 50,
+        height: 50,
+        offsetX: 25,
+        offsetY: 25,
         draggable: true
       });
 
-      // 🔥 INITIAL RANDOM ROTATION (real hanging feel)
-      charm.rotation((Math.random() * 10) - 5);
+      // Slight natural tilt
+      charm.rotation((Math.random() * 8) - 4);
 
-      // 🔥 DRAG ALONG CURVE
       charm.on('dragmove', function () {
 
         let newX = charm.x();
 
         // keep inside bounds
-        newX = Math.max(30, Math.min(containerWidth - 30, newX));
+        newX = Math.max(40, Math.min(size - 40, newX));
 
         const baseY = getCurveY(newX);
 
-        // slight randomness
-        const randomOffset = (Math.random() * 4) - 2;
-
         charm.x(newX);
-        charm.y(baseY + randomOffset);
+        charm.y(baseY);
       });
 
-      // 🔥 REMOVE CHARM
       charm.on('dblclick', function () {
         charm.destroy();
         layer.draw();
@@ -160,14 +164,13 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 
-
 <!-- 5. CSS -->
 <style>
 
 /* Layout */
 .byoj-wrapper {
   display: flex;
-  gap: 50px;
+  gap: 40px;
   align-items: flex-start;
 }
 
@@ -179,10 +182,11 @@ document.addEventListener("DOMContentLoaded", function () {
   width: 40%;
 }
 
-/* Canvas */
+/* ✅ PERFECT SQUARE CANVAS */
 #konva-container {
   width: 100%;
-  max-width: 650px;
+  max-width: 600px;
+  aspect-ratio: 1 / 1;
   margin: auto;
   border: 1px solid #eee;
   background: #fafafa;
@@ -215,7 +219,6 @@ document.addEventListener("DOMContentLoaded", function () {
 }
 
 </style>
-
 
 <!-- 6. SCHEMA -->
 {% schema %}
