@@ -11,16 +11,11 @@
 {% assign _price_rupees = _raw_price | divided_by: 100 %}
 
 {% comment %}
-  STEP 2 — CEIL to next ₹500 (monthly × 10 must always >= product price)
+  STEP 2 — FLOOR to previous ₹500 (monthly × 10 may be <= product price)
 {% endcomment %}
 {% assign _raw_monthly = _price_rupees | divided_by: 10 %}
 {% assign _remainder   = _raw_monthly  | modulo: 500 %}
-
-{% if _remainder == 0 %}
-  {% assign _monthly = _raw_monthly %}
-{% else %}
-  {% assign _monthly = _raw_monthly | minus: _remainder | plus: 500 %}
-{% endif %}
+{% assign _monthly     = _raw_monthly  | minus: _remainder %}
 
 {% comment %}
   STEP 3 — Effective scheme price = product price − free 10th month
@@ -34,7 +29,7 @@
 
 {% comment %}
   ── Scheme URL builder ────────────────────────────────────────────────
-  _monthly is now resolved above (e.g. ₹4,000 = the free 10th month saving).
+  _monthly is now resolved above (e.g. ₹3,500 = the free 10th month saving).
   Logged-in  → full SSO URL with phone, HMAC signature + &amount=_monthly
   Logged-out → base URL with &amount=_monthly only
 {% endcomment %}
@@ -199,7 +194,7 @@
     var priceRupees = Math.floor(pricePaise / 100);
     var rawMonthly  = Math.floor(priceRupees / 10);
     var remainder   = rawMonthly % 500;
-    var monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+    var monthly     = rawMonthly - remainder;           // FLOOR to lower ₹500 slab
     return {
       schemePrice: priceRupees - monthly,
       monthly: monthly
