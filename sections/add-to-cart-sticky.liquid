@@ -7,26 +7,22 @@
   %}
 
   {% comment %}
-    ── Scheme price calculation (CEIL to next ₹500, same as scheme-button.liquid) ──
+    ── Scheme price calculation (FLOOR to previous ₹500, same as scheme-button.liquid) ──
     current_variant.price is in paise → ÷ 100 → rupees
-    monthly × 10 must always >= product price → always CEIL
+    monthly × 10 may be <= product price → always FLOOR
     Multiply × 100 before money_without_currency to avoid double-division
   {% endcomment %}
   {% assign _sticky_raw_price        = current_variant.price %}
   {% assign _sticky_price_rupees     = _sticky_raw_price   | divided_by: 100 %}
   {% assign _sticky_raw_monthly      = _sticky_price_rupees | divided_by: 10 %}
   {% assign _sticky_remainder        = _sticky_raw_monthly  | modulo: 500 %}
-  {% if _sticky_remainder == 0 %}
-    {% assign _sticky_monthly = _sticky_raw_monthly %}
-  {% else %}
-    {% assign _sticky_monthly = _sticky_raw_monthly | minus: _sticky_remainder | plus: 500 %}
-  {% endif %}
+  {% assign _sticky_monthly          = _sticky_raw_monthly  | minus: _sticky_remainder %}
   {% assign _sticky_scheme_price       = _sticky_price_rupees | minus: _sticky_monthly %}
   {% assign _sticky_scheme_price_paise = _sticky_scheme_price | times: 100 %}
 
   {% comment %}
     ── Scheme URL builder ────────────────────────────────────────────────
-    _sticky_monthly is now resolved above (e.g. ₹4,000 = free 10th month saving).
+    _sticky_monthly is now resolved above (e.g. ₹3,500 = free 10th month saving).
     Logged-in  → full SSO URL with phone, HMAC signature + &amount=_sticky_monthly
     Logged-out → base URL with &amount=_sticky_monthly only
   {% endcomment %}
@@ -250,7 +246,7 @@
         const priceRupees = Math.floor(pricePaise / 100);
         const rawMonthly  = Math.floor(priceRupees / 10);
         const remainder   = rawMonthly % 500;
-        const monthly     = remainder === 0 ? rawMonthly : rawMonthly - remainder + 500;
+        const monthly     = rawMonthly - remainder;           // FLOOR to lower ₹500 slab
         return {
           schemePrice: priceRupees - monthly,  // displayed on button CTA
           monthly                               // passed as &amount= in URL
