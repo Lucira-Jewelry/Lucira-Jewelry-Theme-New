@@ -1,270 +1,344 @@
 <!-- 1. LOAD KONVA -->
 <script src="https://cdn.jsdelivr.net/npm/konva@9/konva.min.js"></script>
 
-<!-- 2. HTML -->
-<div class="byoj-wrapper">
+<div class="byoj-container">
+
+  <!-- LEFT: CHAIN -->
   <div class="byoj-left">
     <div id="konva-container"></div>
   </div>
 
+  <!-- RIGHT: CHARMS -->
   <div class="byoj-right">
-    <h3>Select Charms</h3>
-    <div id="charms-list" class="charms-list"></div>
+
+    <!-- HEADER -->
+    <div class="byoj-header">
+      <div class="metal-options">
+        <span class="metal active" style="background:#D4AF37"></span>
+        <span class="metal" style="background:#E6C7C2"></span>
+        <span class="metal" style="background:#D9D9D9"></span>
+      </div>
+
+      <div class="selection-count">
+        <span id="selected-count">0</span>/5 SELECTED
+      </div>
+    </div>
+
+    <!-- CHARMS GRID -->
+    <div id="charms-list" class="charms-grid"></div>
+
+    <!-- FOOTER -->
+    <div class="byoj-footer">
+      PROCEED • ₹<span id="total-price">0</span>
+    </div>
+
   </div>
+
 </div>
 
-<!-- 3. INJECT CHARMS -->
+<!-- 2. CHARMS DATA -->
 <script>
-  window.byojCharms = [
-  {% for block in section.blocks %}
-    {% if block.settings.product != blank %}
-      {% assign product = block.settings.product %}
-      {
-        id: "{{ product.id }}",
-        title: {{ product.title | json }},
-        image: "{{ product.featured_image | image_url: width: 300 }}"
-      },
-    {% endif %}
-  {% endfor %}
-  ];
+window.byojCharms = [
+{% for block in section.blocks %}
+  {% if block.settings.product != blank %}
+    {% assign product = block.settings.product %}
+    {
+      id: "{{ product.id }}",
+      title: {{ product.title | json }},
+      image: "{{ product.featured_image | image_url: width: 300 }},
+      price: {{ product.price | money_without_currency | json }}
+    },
+  {% endif %}
+{% endfor %}
+];
 </script>
 
-<!-- 4. KONVA LOGIC -->
+<!-- 3. KONVA + LOGIC -->
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const size = 600;
+document.addEventListener("DOMContentLoaded", function () {
 
-    const stage = new Konva.Stage({
-      container: 'konva-container',
-      width: size,
-      height: size,
+  const size = 600;
+
+  const stage = new Konva.Stage({
+    container: 'konva-container',
+    width: size,
+    height: size
+  });
+
+  const layer = new Konva.Layer();
+  stage.add(layer);
+
+  const centerX = size / 2;
+
+  let chainWidth = 0;
+  let chainHeight = 0;
+  let centerY = 0;
+
+  let charms = [];
+  let slots = [];
+
+  let selectedCount = 0;
+  let totalPrice = 0;
+
+  const chainImg = new Image();
+  chainImg.src = localStorage.getItem("byoj_chain_image");
+
+  chainImg.onload = function () {
+
+    const scale = (size * 0.9) / chainImg.width;
+
+    chainWidth = chainImg.width * scale;
+    chainHeight = chainImg.height * scale;
+
+    const chainX = centerX - chainWidth / 2;
+    const chainY = (size - chainHeight) / 2;
+
+    centerY = chainY + (chainHeight / 2);
+
+    const chain = new Konva.Image({
+      image: chainImg,
+      x: chainX,
+      y: chainY,
+      width: chainWidth,
+      height: chainHeight
     });
 
-    const layer = new Konva.Layer();
-    stage.add(layer);
+    layer.add(chain);
 
-    const centerX = size / 2;
+    generateSlots();
+    initCharms();
 
-    let chainWidth = 0;
-    let chainHeight = 0;
-    let centerY = 0;
+    layer.draw();
+  };
 
-    let charms = [];
-    let slots = [];
+  function generateSlots() {
+    const step = 25;
+    for (let i = -4; i <= 4; i++) {
+      slots.push({ angle: 90 + (i * step), occupied: null });
+    }
+  }
 
-    // ===============================
-    // 🔥 LOAD CHAIN IMAGE
-    // ===============================
-    const chainImg = new Image();
-    chainImg.src = localStorage.getItem('byoj_chain_image');
+  function getPos(angleDeg) {
+    const a = chainWidth / 2;
+    const b = chainHeight / 2;
 
-    chainImg.onload = function () {
-      const scale = (size * 0.9) / chainImg.width;
+    const angle = angleDeg * Math.PI / 180;
 
-      chainWidth = chainImg.width * scale;
-      chainHeight = chainImg.height * scale;
+    return {
+      x: centerX + a * Math.cos(angle),
+      y: centerY + b * Math.sin(angle) - (b * 0.2)
+    };
+  }
 
-      const chainX = centerX - chainWidth / 2;
-      const chainY = (size - chainHeight) / 2;
+  function placeCharm(charm, slot) {
+    const pos = getPos(slot.angle);
+    charm.position(pos);
 
-      centerY = chainY + chainHeight / 2;
+    if (charm.slot) charm.slot.occupied = null;
 
-      const chain = new Konva.Image({
-        image: chainImg,
-        x: chainX,
-        y: chainY,
-        width: chainWidth,
-        height: chainHeight,
+    slot.occupied = charm;
+    charm.slot = slot;
+  }
+
+  function addCharm(data) {
+
+    if (selectedCount >= 5) return;
+
+    const img = new Image();
+    img.src = data.image;
+
+    img.onload = function () {
+
+      const slot = slots.find(s => !s.occupied);
+      if (!slot) return;
+
+      const pos = getPos(slot.angle);
+
+      const charm = new Konva.Image({
+        image: img,
+        x: pos.x,
+        y: pos.y,
+        width: 50,
+        height: 50,
+        offsetX: 25,
+        offsetY: 25,
+        draggable: true
       });
 
-      layer.add(chain);
+      placeCharm(charm, slot);
 
-      generateSlots();
-      initCharms();
+      charm.on('dragend', function () {
+        const nearest = slots.reduce((a, b) => {
+          return Math.hypot(getPos(a.angle).x - charm.x(), getPos(a.angle).y - charm.y()) <
+                 Math.hypot(getPos(b.angle).x - charm.x(), getPos(b.angle).y - charm.y()) ? a : b;
+        });
+
+        if (nearest.occupied && nearest.occupied !== charm) {
+          const other = nearest.occupied;
+          const current = charm.slot;
+
+          placeCharm(other, current);
+          placeCharm(charm, nearest);
+        } else {
+          placeCharm(charm, nearest);
+        }
+
+        layer.draw();
+      });
+
+      layer.add(charm);
+      charms.push(charm);
+
+      selectedCount++;
+      totalPrice += parseFloat(data.price);
+
+      updateUI();
 
       layer.draw();
     };
+  }
 
-    // ===============================
-    // 🔥 CREATE FIXED SLOTS
-    // ===============================
-    function generateSlots() {
-      const step = 25;
-      const max = 6; // number of slots per side
+  function updateUI() {
+    document.getElementById("selected-count").innerText = selectedCount;
+    document.getElementById("total-price").innerText = totalPrice.toLocaleString();
+  }
 
-      slots.push({ angle: 90, occupied: null });
+  function initCharms() {
 
-      for (let i = 1; i <= max; i++) {
-        slots.push({ angle: 90 + i * step, occupied: null }); // left
-        slots.push({ angle: 90 - i * step, occupied: null }); // right
-      }
-    }
+    const list = document.getElementById("charms-list");
 
-    // ===============================
-    // 🔥 ANGLE → POSITION
-    // ===============================
-    function getPos(angleDeg) {
-      const a = chainWidth / 2;
-      const b = chainHeight / 2;
+    window.byojCharms.forEach(c => {
 
-      const angle = angleDeg * (Math.PI / 180);
+      const div = document.createElement("div");
+      div.className = "charm-card";
 
-      const x = centerX + a * Math.cos(angle);
-      const y = centerY + b * Math.sin(angle) - b * 0.2;
-
-      return { x, y };
-    }
-
-    // ===============================
-    // 🔥 FIND NEAREST SLOT
-    // ===============================
-    function getNearestSlot(x, y) {
-      let minDist = Infinity;
-      let closest = null;
-
-      slots.forEach((slot) => {
-        const pos = getPos(slot.angle);
-
-        const dist = Math.hypot(pos.x - x, pos.y - y);
-
-        if (dist < minDist) {
-          minDist = dist;
-          closest = slot;
-        }
-      });
-
-      return closest;
-    }
-
-    // ===============================
-    // 🔥 PLACE IN SLOT
-    // ===============================
-    function placeCharm(charm, slot) {
-      const pos = getPos(slot.angle);
-
-      charm.position(pos);
-
-      if (charm.slot) {
-        charm.slot.occupied = null;
-      }
-
-      slot.occupied = charm;
-      charm.slot = slot;
-    }
-
-    // ===============================
-    // 🔥 ADD CHARM
-    // ===============================
-    function addCharm(data) {
-      const img = new Image();
-      img.src = data.image;
-
-      img.onload = function () {
-        const emptySlot = slots.find((s) => !s.occupied);
-        if (!emptySlot) return;
-
-        const pos = getPos(emptySlot.angle);
-
-        const charm = new Konva.Image({
-          image: img,
-          x: pos.x,
-          y: pos.y,
-          width: 50,
-          height: 50,
-          offsetX: 25,
-          offsetY: 25,
-          draggable: true,
-        });
-
-        placeCharm(charm, emptySlot);
-
-        // ===============================
-        // 🔥 DRAG SWAP LOGIC
-        // ===============================
-        charm.on('dragend', function () {
-          const targetSlot = getNearestSlot(charm.x(), charm.y());
-
-          if (!targetSlot) return;
-
-          if (targetSlot.occupied && targetSlot.occupied !== charm) {
-            // swap
-            const other = targetSlot.occupied;
-            const currentSlot = charm.slot;
-
-            placeCharm(other, currentSlot);
-            placeCharm(charm, targetSlot);
-          } else {
-            placeCharm(charm, targetSlot);
-          }
-
-          layer.draw();
-        });
-
-        // remove
-        charm.on('dblclick', function () {
-          if (charm.slot) charm.slot.occupied = null;
-          charm.destroy();
-          layer.draw();
-        });
-
-        layer.add(charm);
-        charms.push(charm);
-        layer.draw();
-      };
-    }
-
-    // ===============================
-    // 🔥 RENDER LIST
-    // ===============================
-    function initCharms() {
-      const list = document.getElementById('charms-list');
-
-      window.byojCharms.forEach((c) => {
-        const div = document.createElement('div');
-        div.className = 'charm-item';
-
-        div.innerHTML = `
+      div.innerHTML = `
         <img src="${c.image}" />
-        <p>${c.title}</p>
+        <p class="title">${c.title}</p>
+        <p class="price">₹${c.price}</p>
+        <div class="qty">
+          <button class="minus">-</button>
+          <span>0</span>
+          <button class="plus">+</button>
+        </div>
       `;
 
-        div.onclick = () => addCharm(c);
+      const qtySpan = div.querySelector("span");
 
-        list.appendChild(div);
-      });
-    }
-  });
+      div.querySelector(".plus").onclick = () => {
+        addCharm(c);
+        qtySpan.innerText = parseInt(qtySpan.innerText) + 1;
+      };
+
+      div.querySelector(".minus").onclick = () => {
+        // optional remove logic
+      };
+
+      list.appendChild(div);
+    });
+  }
+
+});
 </script>
 
-<!-- 5. CSS -->
+<!-- 4. CSS -->
 <style>
-  .byoj-wrapper {
-    display: flex;
-    gap: 40px;
-  }
 
-  #konva-container {
-    width: 100%;
-    max-width: 600px;
-    aspect-ratio: 1 / 1;
-    background: #fff;
-    border: 1px solid #eee;
-  }
+.byoj-container {
+  display: flex;
+  height: 100vh;
+}
 
-  .charms-list {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 15px;
-  }
+/* LEFT */
+.byoj-left {
+  width: 60%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 
-  .charm-item {
-    text-align: center;
-    cursor: pointer;
-  }
+/* REMOVE BORDER */
+#konva-container {
+  width: 100%;
+  max-width: 650px;
+  aspect-ratio: 1/1;
+  background: #fff;
+}
 
-  .charm-item img {
-    max-width: 80px;
-  }
+/* RIGHT */
+.byoj-right {
+  width: 40%;
+  background: #f7f2f2;
+  display: flex;
+  flex-direction: column;
+}
+
+/* HEADER */
+.byoj-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 20px;
+}
+
+.metal {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 8px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+}
+
+.metal.active {
+  border: 2px solid black;
+}
+
+/* GRID */
+.charms-grid {
+  flex: 1;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.charm-card {
+  background: #fff;
+  padding: 15px;
+  text-align: center;
+  border-radius: 8px;
+}
+
+.charm-card img {
+  width: 100%;
+}
+
+.title {
+  font-size: 13px;
+  margin: 10px 0;
+}
+
+.price {
+  font-weight: bold;
+}
+
+.qty {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* FOOTER */
+.byoj-footer {
+  padding: 20px;
+  text-align: center;
+  background: #b98c8c;
+  color: white;
+  font-weight: bold;
+}
+
 </style>
 <!-- 6. SCHEMA -->
 {% schema %}
