@@ -53,6 +53,8 @@ document.addEventListener("DOMContentLoaded", function () {
   let centerY = 0;
 
   let charmCount = 0;
+  let charms = [];
+  let selectedCharm = null;
 
   // ===============================
   // 🔥 LOAD CHAIN IMAGE
@@ -88,7 +90,7 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 
   // ===============================
-  // 🔥 ANGLE → POSITION (ELLIPSE)
+  // 🔥 ANGLE → POSITION
   // ===============================
   function getPositionFromAngle(angleDeg) {
 
@@ -108,7 +110,7 @@ document.addEventListener("DOMContentLoaded", function () {
   // ===============================
   function getNextAngle() {
 
-    const step = 25; // spacing
+    const step = 25;
 
     if (charmCount === 0) return 90;
 
@@ -121,7 +123,19 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   }
 
-  let charms = [];
+  // ===============================
+  // 🔥 SWAP FUNCTION
+  // ===============================
+  function swapCharms(charm1, charm2) {
+
+    const pos1 = { x: charm1.x(), y: charm1.y() };
+    const pos2 = { x: charm2.x(), y: charm2.y() };
+
+    charm1.position(pos2);
+    charm2.position(pos1);
+
+    layer.draw();
+  }
 
   // ===============================
   // 🔥 ADD CHARM
@@ -143,33 +157,40 @@ document.addEventListener("DOMContentLoaded", function () {
         width: 50,
         height: 50,
         offsetX: 25,
-        offsetY: 25,
-        draggable: true
+        offsetY: 25
       });
 
-      // slight natural tilt
       charm.rotation((Math.random() * 6) - 3);
 
-      // 🔥 DRAG ALONG CHAIN
-      charm.on('dragmove', function () {
+      // ===============================
+      // 🔥 CLICK TO SELECT / SWAP
+      // ===============================
+      charm.on('click', function () {
 
-        let newX = charm.x();
+        if (!selectedCharm) {
+          selectedCharm = charm;
 
-        const minX = centerX - chainWidth / 2 + 20;
-        const maxX = centerX + chainWidth / 2 - 20;
+          // highlight
+          charm.stroke('gold');
+          charm.strokeWidth(2);
 
-        newX = Math.max(minX, Math.min(maxX, newX));
+        } else if (selectedCharm === charm) {
 
-        // convert X → closest angle
-        const dx = (newX - centerX) / (chainWidth / 2);
-        const angle = Math.acos(dx);
+          // deselect same
+          charm.stroke(null);
+          selectedCharm = null;
 
-        const finalAngle = angle * (180 / Math.PI);
+        } else {
 
-        const pos = getPositionFromAngle(finalAngle);
+          // swap positions
+          swapCharms(selectedCharm, charm);
 
-        charm.x(pos.x);
-        charm.y(pos.y);
+          // remove highlight
+          selectedCharm.stroke(null);
+          selectedCharm = null;
+        }
+
+        layer.draw();
       });
 
       // remove on double click
@@ -182,8 +203,7 @@ document.addEventListener("DOMContentLoaded", function () {
       layer.draw();
 
       charms.push(charm);
-
-      charmCount++; // 🔥 increment
+      charmCount++;
     };
   }
 
@@ -225,7 +245,7 @@ document.addEventListener("DOMContentLoaded", function () {
   width: 60%;
 }
 
-/* ✅ WHITE CANVAS */
+/* WHITE CANVAS */
 #konva-container {
   width: 100%;
   max-width: 600px;
@@ -252,11 +272,6 @@ document.addEventListener("DOMContentLoaded", function () {
 .charm-item {
   text-align: center;
   cursor: pointer;
-  transition: 0.3s;
-}
-
-.charm-item:hover {
-  transform: scale(1.05);
 }
 
 .charm-item img {
