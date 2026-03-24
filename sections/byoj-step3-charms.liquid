@@ -1,4 +1,5 @@
 <!-- 1. LOAD KONVA -->
+<!-- 1. LOAD KONVA -->
 <script src="https://cdn.jsdelivr.net/npm/konva@9/konva.min.js"></script>
 
 <!-- 2. HTML -->
@@ -8,7 +9,7 @@
   </div>
 
   <div class="byoj-right">
-    <h3 class="charms-heading">Select Charms</h3>
+    <h3>Select Charms</h3>
     <div id="charms-list" class="charms-list"></div>
   </div>
 </div>
@@ -46,26 +47,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const centerX = size / 2;
 
-  const chainImageSrc = localStorage.getItem("byoj_chain_image");
-
   let chainWidth = 0;
   let chainHeight = 0;
   let centerY = 0;
 
-  let charmCount = 0;
   let charms = [];
-  let selectedCharm = null;
+  let slots = [];
 
   // ===============================
   // 🔥 LOAD CHAIN IMAGE
   // ===============================
   const chainImg = new Image();
-  chainImg.src = chainImageSrc;
+  chainImg.src = localStorage.getItem("byoj_chain_image");
 
   chainImg.onload = function () {
 
-    const maxWidth = size * 0.9;
-    const scale = maxWidth / chainImg.width;
+    const scale = (size * 0.9) / chainImg.width;
 
     chainWidth = chainImg.width * scale;
     chainHeight = chainImg.height * scale;
@@ -84,15 +81,33 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 
     layer.add(chain);
-    layer.draw();
 
+    generateSlots();
     initCharms();
+
+    layer.draw();
   };
+
+  // ===============================
+  // 🔥 CREATE FIXED SLOTS
+  // ===============================
+  function generateSlots() {
+
+    const step = 25;
+    const max = 6; // number of slots per side
+
+    slots.push({ angle: 90, occupied: null });
+
+    for (let i = 1; i <= max; i++) {
+      slots.push({ angle: 90 + (i * step), occupied: null }); // left
+      slots.push({ angle: 90 - (i * step), occupied: null }); // right
+    }
+  }
 
   // ===============================
   // 🔥 ANGLE → POSITION
   // ===============================
-  function getPositionFromAngle(angleDeg) {
+  function getPos(angleDeg) {
 
     const a = chainWidth / 2;
     const b = chainHeight / 2;
@@ -106,49 +121,58 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // ===============================
-  // 🔥 AUTO POSITION LOGIC
+  // 🔥 FIND NEAREST SLOT
   // ===============================
-  function getNextAngle() {
+  function getNearestSlot(x, y) {
 
-    const step = 25;
+    let minDist = Infinity;
+    let closest = null;
 
-    if (charmCount === 0) return 90;
+    slots.forEach(slot => {
+      const pos = getPos(slot.angle);
 
-    const index = Math.floor((charmCount + 1) / 2);
+      const dist = Math.hypot(pos.x - x, pos.y - y);
 
-    if (charmCount % 2 === 1) {
-      return 90 + (index * step); // LEFT
-    } else {
-      return 90 - (index * step); // RIGHT
-    }
+      if (dist < minDist) {
+        minDist = dist;
+        closest = slot;
+      }
+    });
+
+    return closest;
   }
 
   // ===============================
-  // 🔥 SWAP FUNCTION
+  // 🔥 PLACE IN SLOT
   // ===============================
-  function swapCharms(charm1, charm2) {
+  function placeCharm(charm, slot) {
 
-    const pos1 = { x: charm1.x(), y: charm1.y() };
-    const pos2 = { x: charm2.x(), y: charm2.y() };
+    const pos = getPos(slot.angle);
 
-    charm1.position(pos2);
-    charm2.position(pos1);
+    charm.position(pos);
 
-    layer.draw();
+    if (charm.slot) {
+      charm.slot.occupied = null;
+    }
+
+    slot.occupied = charm;
+    charm.slot = slot;
   }
 
   // ===============================
   // 🔥 ADD CHARM
   // ===============================
-  function addCharm(charmData) {
+  function addCharm(data) {
 
     const img = new Image();
-    img.src = charmData.image;
+    img.src = data.image;
 
     img.onload = function () {
 
-      const angle = getNextAngle();
-      const pos = getPositionFromAngle(angle);
+      const emptySlot = slots.find(s => !s.occupied);
+      if (!emptySlot) return;
+
+      const pos = getPos(emptySlot.angle);
 
       const charm = new Konva.Image({
         image: img,
@@ -157,76 +181,71 @@ document.addEventListener("DOMContentLoaded", function () {
         width: 50,
         height: 50,
         offsetX: 25,
-        offsetY: 25
+        offsetY: 25,
+        draggable: true
       });
 
-      charm.rotation((Math.random() * 6) - 3);
+      placeCharm(charm, emptySlot);
 
       // ===============================
-      // 🔥 CLICK TO SELECT / SWAP
+      // 🔥 DRAG SWAP LOGIC
       // ===============================
-      charm.on('click', function () {
+      charm.on('dragend', function () {
 
-        if (!selectedCharm) {
-          selectedCharm = charm;
+        const targetSlot = getNearestSlot(charm.x(), charm.y());
 
-          // highlight
-          charm.stroke('gold');
-          charm.strokeWidth(2);
+        if (!targetSlot) return;
 
-        } else if (selectedCharm === charm) {
+        if (targetSlot.occupied && targetSlot.occupied !== charm) {
 
-          // deselect same
-          charm.stroke(null);
-          selectedCharm = null;
+          // swap
+          const other = targetSlot.occupied;
+          const currentSlot = charm.slot;
+
+          placeCharm(other, currentSlot);
+          placeCharm(charm, targetSlot);
 
         } else {
 
-          // swap positions
-          swapCharms(selectedCharm, charm);
-
-          // remove highlight
-          selectedCharm.stroke(null);
-          selectedCharm = null;
+          placeCharm(charm, targetSlot);
         }
 
         layer.draw();
       });
 
-      // remove on double click
+      // remove
       charm.on('dblclick', function () {
+        if (charm.slot) charm.slot.occupied = null;
         charm.destroy();
         layer.draw();
       });
 
       layer.add(charm);
-      layer.draw();
-
       charms.push(charm);
-      charmCount++;
+      layer.draw();
     };
   }
 
   // ===============================
-  // 🔥 RENDER CHARMS LIST
+  // 🔥 RENDER LIST
   // ===============================
   function initCharms() {
 
-    const charmsList = document.getElementById("charms-list");
+    const list = document.getElementById("charms-list");
 
-    window.byojCharms.forEach(charm => {
+    window.byojCharms.forEach(c => {
 
       const div = document.createElement("div");
       div.className = "charm-item";
 
       div.innerHTML = `
-        <img src="${charm.image}" />
-        <p>${charm.title}</p>
+        <img src="${c.image}" />
+        <p>${c.title}</p>
       `;
 
-      div.onclick = () => addCharm(charm);
+      div.onclick = () => addCharm(c);
 
-      charmsList.appendChild(div);
+      list.appendChild(div);
     });
   }
 
@@ -241,26 +260,12 @@ document.addEventListener("DOMContentLoaded", function () {
   gap: 40px;
 }
 
-.byoj-left {
-  width: 60%;
-}
-
-/* WHITE CANVAS */
 #konva-container {
   width: 100%;
   max-width: 600px;
   aspect-ratio: 1 / 1;
-  margin: auto;
+  background: #fff;
   border: 1px solid #eee;
-  background: #ffffff;
-}
-
-.byoj-right {
-  width: 40%;
-}
-
-.charms-heading {
-  margin-bottom: 20px;
 }
 
 .charms-list {
@@ -279,7 +284,6 @@ document.addEventListener("DOMContentLoaded", function () {
 }
 
 </style>
-
 <!-- 6. SCHEMA -->
 {% schema %}
 {
