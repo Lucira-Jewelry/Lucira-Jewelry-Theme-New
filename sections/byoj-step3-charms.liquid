@@ -42,12 +42,22 @@ window.byojCharms = [
 {% for block in section.blocks %}
   {% if block.settings.product != blank %}
     {% assign product = block.settings.product %}
+
     {
       id: "{{ product.id }}",
       title: {{ product.title | json }},
-      image: "{{ product.featured_image | image_url: width: 300 }}",
-      price: {{ product.price | money_without_currency | json }}
-    },
+      price: {{ product.price | money_without_currency | json }},
+
+      variants: [
+        {% for variant in product.variants %}
+        {
+          title: {{ variant.title | json }},
+          image: "{{ variant.featured_image | image_url: width: 300 }}"
+        }{% unless forloop.last %},{% endunless %}
+        {% endfor %}
+      ]
+    }{% unless forloop.last %},{% endunless %}
+
   {% endif %}
 {% endfor %}
 ];
@@ -79,7 +89,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
   let selectedCount = 0;
   let totalPrice = 0;
-
+  let selectedMetal = "gold";
+  
   const chainImg = new Image();
   chainImg.src = localStorage.getItem("byoj_chain_image");
 
@@ -145,7 +156,7 @@ document.addEventListener("DOMContentLoaded", function () {
     if (selectedCount >= 5) return;
 
     const img = new Image();
-    img.src = data.image;
+    img.src = getImageByMetal(data);
 
     img.onload = function () {
 
@@ -203,6 +214,21 @@ document.addEventListener("DOMContentLoaded", function () {
     document.getElementById("total-price").innerText = totalPrice.toLocaleString();
   }
 
+  function getImageByMetal(charm) {
+
+  let keyword = "";
+
+  if (selectedMetal === "gold") keyword = "Yellow";
+  if (selectedMetal === "rose") keyword = "Rose";
+  if (selectedMetal === "silver") keyword = "White";
+
+  const match = charm.variants.find(v =>
+    v.title.toLowerCase().includes(keyword.toLowerCase())
+  );
+
+  return match ? match.image : charm.variants[0].image;
+}
+
   function initCharms() {
 
     const list = document.getElementById("charms-list");
@@ -213,7 +239,7 @@ document.addEventListener("DOMContentLoaded", function () {
       div.className = "charm-card";
 
       div.innerHTML = `
-        <img src="${c.image}" />
+        <img src="${getImageByMetal(c)}" />
         <p class="title">${c.title}</p>
         <p class="price">₹${c.price}</p>
         <div class="qty">
