@@ -48,13 +48,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const chainImageSrc = localStorage.getItem("byoj_chain_image");
 
-  let chainTop = 0;
-  let chainHeight = 0;
   let chainWidth = 0;
+  let chainHeight = 0;
   let centerY = 0;
 
+  let charmCount = 0;
+
   // ===============================
-  // 🔥 LOAD CHAIN IMAGE (FIXED)
+  // 🔥 LOAD CHAIN IMAGE
   // ===============================
   const chainImg = new Image();
   chainImg.src = chainImageSrc;
@@ -70,8 +71,7 @@ document.addEventListener("DOMContentLoaded", function () {
     const chainX = centerX - chainWidth / 2;
     const chainY = (size - chainHeight) / 2;
 
-    chainTop = chainY;
-    centerY = chainTop + (chainHeight / 2);
+    centerY = chainY + (chainHeight / 2);
 
     const chain = new Konva.Image({
       image: chainImg,
@@ -88,22 +88,37 @@ document.addEventListener("DOMContentLoaded", function () {
   };
 
   // ===============================
-  // 🔥 MATCH IMAGE CURVE
+  // 🔥 ANGLE → POSITION (ELLIPSE)
   // ===============================
-  function getChainY(x) {
+  function getPositionFromAngle(angleDeg) {
 
     const a = chainWidth / 2;
     const b = chainHeight / 2;
 
-    const dx = x - centerX;
+    const angle = angleDeg * (Math.PI / 180);
 
-    const inside = 1 - (dx * dx) / (a * a);
+    const x = centerX + a * Math.cos(angle);
+    const y = centerY + b * Math.sin(angle) - (b * 0.2);
 
-    if (inside <= 0) return centerY;
+    return { x, y };
+  }
 
-    const y = b * Math.sqrt(inside);
+  // ===============================
+  // 🔥 AUTO POSITION LOGIC
+  // ===============================
+  function getNextAngle() {
 
-    return centerY + y - (b * 0.2); // fine-tuned offset
+    const step = 25; // spacing
+
+    if (charmCount === 0) return 90;
+
+    const index = Math.floor((charmCount + 1) / 2);
+
+    if (charmCount % 2 === 1) {
+      return 90 + (index * step); // LEFT
+    } else {
+      return 90 - (index * step); // RIGHT
+    }
   }
 
   let charms = [];
@@ -118,12 +133,13 @@ document.addEventListener("DOMContentLoaded", function () {
 
     img.onload = function () {
 
-      const startX = centerX;
+      const angle = getNextAngle();
+      const pos = getPositionFromAngle(angle);
 
       const charm = new Konva.Image({
         image: img,
-        x: startX,
-        y: getChainY(startX),
+        x: pos.x,
+        y: pos.y,
         width: 50,
         height: 50,
         offsetX: 25,
@@ -131,8 +147,10 @@ document.addEventListener("DOMContentLoaded", function () {
         draggable: true
       });
 
+      // slight natural tilt
       charm.rotation((Math.random() * 6) - 3);
 
+      // 🔥 DRAG ALONG CHAIN
       charm.on('dragmove', function () {
 
         let newX = charm.x();
@@ -142,12 +160,19 @@ document.addEventListener("DOMContentLoaded", function () {
 
         newX = Math.max(minX, Math.min(maxX, newX));
 
-        const newY = getChainY(newX);
+        // convert X → closest angle
+        const dx = (newX - centerX) / (chainWidth / 2);
+        const angle = Math.acos(dx);
 
-        charm.x(newX);
-        charm.y(newY);
+        const finalAngle = angle * (180 / Math.PI);
+
+        const pos = getPositionFromAngle(finalAngle);
+
+        charm.x(pos.x);
+        charm.y(pos.y);
       });
 
+      // remove on double click
       charm.on('dblclick', function () {
         charm.destroy();
         layer.draw();
@@ -157,11 +182,13 @@ document.addEventListener("DOMContentLoaded", function () {
       layer.draw();
 
       charms.push(charm);
+
+      charmCount++; // 🔥 increment
     };
   }
 
   // ===============================
-  // 🔥 RENDER CHARMS
+  // 🔥 RENDER CHARMS LIST
   // ===============================
   function initCharms() {
 
@@ -198,7 +225,7 @@ document.addEventListener("DOMContentLoaded", function () {
   width: 60%;
 }
 
-/* ✅ WHITE BACKGROUND + SQUARE */
+/* ✅ WHITE CANVAS */
 #konva-container {
   width: 100%;
   max-width: 600px;
@@ -212,6 +239,10 @@ document.addEventListener("DOMContentLoaded", function () {
   width: 40%;
 }
 
+.charms-heading {
+  margin-bottom: 20px;
+}
+
 .charms-list {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -221,6 +252,11 @@ document.addEventListener("DOMContentLoaded", function () {
 .charm-item {
   text-align: center;
   cursor: pointer;
+  transition: 0.3s;
+}
+
+.charm-item:hover {
+  transform: scale(1.05);
 }
 
 .charm-item img {
