@@ -670,9 +670,12 @@ if (!popup) return;
 
 const path = window.location.pathname.toLowerCase();
 
+if (path.startsWith('/account')) return;
+
 if (/\/[a-z-]+-silver-rate-today\/?$/.test(path)) return;
 
 if (hasLuciraSessionPopup()) return;
+
 if (document.body.classList.contains('customer-logged-in')) return;
 
 setTimeout(() => {

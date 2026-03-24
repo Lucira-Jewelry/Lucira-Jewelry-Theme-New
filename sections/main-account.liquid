@@ -20,17 +20,21 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <path d="M15 18l-6-6 6-6"/>
     </svg>
-    <span id="mobileBreadcrumbText">My Orders</span>
+    <span id="mobileBreadcrumbText">Your Rewards Here</span>
   </a>
 </div>
 
 <div class="drawer-overlay" id="drawerOverlay"></div>
 
 <div class="customer account section-{{ section.id }}-padding">
-  <input type="radio" name="customer_tabs" id="tab_my_orders" class="customer_tab_input" hidden checked>
+  <input type="radio" name="customer_tabs" id="tab_my_orders" class="customer_tab_input" hidden >
   <input type="radio" name="customer_tabs" id="tab_personal_info" class="customer_tab_input" hidden>
   <input type="radio" name="customer_tabs" id="tab_wishlist" class="customer_tab_input" hidden>
   <input type="radio" name="customer_tabs" id="tab_refer_earn" class="customer_tab_input" hidden>
+  <input type="radio" name="customer_tabs" id="tab_offers" class="customer_tab_input" hidden>
+  <input type="radio" name="customer_tabs" id="tab_earn_rewards" class="customer_tab_input" hidden checked>
+  <input type="radio" name="customer_tabs" id="tab_education" class="customer_tab_input" hidden>
+  <input type="radio" name="customer_tabs" id="tab_schemes" class="customer_tab_input" hidden>
   <div class="customer__tabs" id="accountDrawer">
     <button class="drawer-close" id="drawerClose" aria-label="Close menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -48,6 +52,9 @@
         <span
           ><strong>{{ customer.name | upcase }}</strong></span
         >
+        <div id="customCoinsBox">
+          <div>Coins Earned: <span class="earned">0</span></div>
+        </div>
       </div>
     </div>
 
@@ -65,44 +72,47 @@
         <span class="customer_tab_logo">
           {{- 'icon-account-details.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Personal Information</span></span>
+        <span class="customer_tab_option">
+          <span>Personal Information</span>
+          <span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span>
+        </span>
       </label>
       <label class="customer_tab" for="tab_wishlist">
         <span class="customer_tab_logo">
           {{- 'icon-wishlist.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Wishlist</span></span>
+        <span class="customer_tab_option"><span>Wishlist</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
       <label class="customer_tab" for="tab_refer_earn">
         <span class="customer_tab_logo">
           {{- 'icon-refer-earn.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Refer and Earn</span></span>
+        <span class="customer_tab_option"><span>Refer and Earn</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
       <label class="customer_tab" for="tab_offers">
         <span class="customer_tab_logo">
           {{- 'icon-offers.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Offers</span></span>
+        <span class="customer_tab_option"><span>Offers</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
       <label class="customer_tab" for="tab_earn_rewards">
         <span class="customer_tab_logo">
           {{- 'icon-earn-rewards.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Earn Rewards</span></span>
+        <span class="customer_tab_option"><span>Earn Rewards</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
       <label class="customer_tab" for="tab_education">
         <span class="customer_tab_logo">
           {{- 'icon-education.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Education</span></span>
+        <span class="customer_tab_option"><span>Education</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
 
       <label class="customer_tab" for="tab_schemes">
         <span class="customer_tab_logo">
           {{- 'icon-scheme.svg' | inline_asset_content -}}
         </span>
-        <span class="customer_tab_option"><span>Schemes</span></span>
+        <span class="customer_tab_option"><span>Schemes</span><span class="angle-arrow">{{- 'icon-angle-right.svg' | inline_asset_content -}}</span></span>
       </label>
     </div>
 
@@ -1050,9 +1060,12 @@
       drawerOverlay.addEventListener('click', closeDrawer);
     }
 
+    
+
     tabLabels.forEach((label) => {
       label.addEventListener('click', function () {
         const tabText = label.querySelector('.customer_tab_option span');
+
         if (tabText) {
           currentActiveTab = tabText.textContent.trim();
           if (breadcrumbText) {
@@ -1061,7 +1074,9 @@
         }
 
         if (window.innerWidth < 750) {
-          setTimeout(closeDrawer, 300);
+          setTimeout(() => {
+            closeDrawer();
+          }, 100);
         }
       });
     });
@@ -1124,6 +1139,8 @@
       }
     });
   });
+
+  
 </script>
 
 <script>
@@ -1409,3 +1426,35 @@
   "max_blocks": 10
 }
 {% endschema %}
+
+<script>
+(function () {
+  const endpoint = "https://refer-earn-385594025448.asia-south1.run.app";
+  const customerId = "shopify-{{ customer.id }}";
+
+  const box = document.getElementById('customCoinsBox');
+  if (!box) return;
+
+  const earnedEl = box.querySelector('.earned');
+  const balanceEl = box.querySelector('.balance');
+
+  // Optional loading state
+  if (earnedEl) earnedEl.innerText = '...';
+  if (balanceEl) balanceEl.innerText = '...';
+
+  fetch(`${endpoint}?customer_id=${encodeURIComponent(customerId)}`)
+    .then(res => res.json())
+    .then(data => {
+      if (!data.status) return;
+
+      if (earnedEl) earnedEl.innerText = data.coins_earned || 0;
+      if (balanceEl) balanceEl.innerText = data.coins_balance || 0;
+    })
+    .catch(err => {
+      console.error('Coins fetch failed:', err);
+
+      if (earnedEl) earnedEl.innerText = '0';
+      if (balanceEl) balanceEl.innerText = '0';
+    });
+})();
+</script>
