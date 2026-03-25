@@ -119,6 +119,15 @@
       assign body_font_bold_italic = body_font_bold | font_modify: 'style', 'italic'
     %}
     {% style %}
+      @font-face {
+        font-family: "Futura-Fallback";
+        src: local("Arial");
+        ascent-override: 90%;
+        descent-override: 20%;
+        line-gap-override: 0%;
+        size-adjust: 100%;
+      }
+
       {{ settings.type_body_font | font_face: font_display: 'swap' }}
       {{ body_font_bold | font_face: font_display: 'swap' }}
       {{ body_font_italic | font_face: font_display: 'swap' }}
@@ -168,11 +177,11 @@
         background-color: rgb(var(--color-background));
       }
       :root {
-        --font-body-family: {{ settings.type_body_font.family }}, {{ settings.type_body_font.fallback_families }};
+        --font-body-family: {{ settings.type_body_font.family }}, "Futura-Fallback", {{ settings.type_body_font.fallback_families }};
         --font-body-style: {{ settings.type_body_font.style }};
         --font-body-weight: {{ settings.type_body_font.weight }};
         --font-body-weight-bold: {{ settings.type_body_font.weight | plus: 300 | at_most: 1000 }};
-        --font-heading-family: {{ settings.type_header_font.family }}, {{ settings.type_header_font.fallback_families }};
+        --font-heading-family: {{ settings.type_header_font.family }}, "Futura-Fallback", {{ settings.type_header_font.fallback_families }};
         --font-heading-style: {{ settings.type_header_font.style }};
         --font-heading-weight: {{ settings.type_header_font.weight }};
         --font-body-scale: {{ settings.body_scale | divided_by: 100.0 }};
@@ -281,7 +290,11 @@
        body{font-size:1.6rem}
       }
     {% endstyle %}
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://connect.facebook.net">
+    <link rel="dns-prefetch" href="https://www.googletagmanager.com">
+    <link rel="dns-prefetch" href="https://www.google-analytics.com">
+    
+    <link rel="preconnect" href="https://cdn.shopify.com" crossorigin>
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
       href="https://fonts.googleapis.com/css2?family=Tangerine:wght@400;700&display=swap"
@@ -678,13 +691,10 @@
       </script>
     {% endif %}
 
-    <script src="{{ 'jquery.min.js' | asset_url }}" defer="defer"></script>
+    <script src="{{ 'swiper-bundle.min.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'header-main.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'data-layer-event.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'gtm-data-layer-event.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'owl.carousel.min.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'slick.min.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'swiper-bundle.min.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'similar-drawer.min.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'similar-items-drawer.min.js' | asset_url }}" defer></script>
     <template id="delayed-scripts-template">
@@ -703,26 +713,33 @@
           var container = document.createElement('div');
           container.appendChild(template.content.cloneNode(true));
           
-          // 1. Re-inject Scripts to force execution
+          // 1. Re-inject Scripts with Staggered Execution (Prevents Network Stampede)
           var scripts = container.querySelectorAll('script');
-          scripts.forEach(function(oldScript) {
-            var newScript = document.createElement('script');
-            Array.from(oldScript.attributes).forEach(function(attr) {
-              newScript.setAttribute(attr.name, attr.value);
-            });
-            if (oldScript.src) {
-              newScript.src = oldScript.src;
-            } else {
-              newScript.textContent = oldScript.textContent;
-            }
-            document.body.appendChild(newScript);
-            oldScript.remove(); // Remove from temporary container
+          scripts.forEach(function(oldScript, index) {
+            setTimeout(function() {
+              var newScript = document.createElement('script');
+              Array.from(oldScript.attributes).forEach(function(attr) {
+                newScript.setAttribute(attr.name, attr.value);
+              });
+              if (oldScript.src) {
+                newScript.src = oldScript.src;
+              } else {
+                newScript.textContent = oldScript.textContent;
+              }
+              document.body.appendChild(newScript);
+            }, index * 100); // 100ms stagger between each script
           });
 
-          // 2. Move remaining elements (styles, divs, etc.) to body
-          while (container.firstChild) {
-            document.body.appendChild(container.firstChild);
-          }
+          // 2. Move remaining elements (styles, divs, etc.) immediately
+          setTimeout(function() {
+            while (container.firstChild) {
+              if (container.firstChild.tagName !== 'SCRIPT') {
+                document.body.appendChild(container.firstChild);
+              } else {
+                container.removeChild(container.firstChild);
+              }
+            }
+          }, 10);
           
           console.log('⚡ Apps hydrated safely');
         }
