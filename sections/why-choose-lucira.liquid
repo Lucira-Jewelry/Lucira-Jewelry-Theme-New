@@ -52,6 +52,13 @@
           "id": "card_subtitle",
           "label": "Card Subtitle",
           "default": "Feature subtitle"
+        },
+        {
+          "type": "checkbox",
+          "id": "enable_sso_link",
+          "label": "Enable SSO Link (Scheme Enrollment)",
+          "default": false,
+          "info": "When enabled: logged-in users go to SSO enrollment URL, logged-out users go to https://schemes.lucirajewelry.com/"
         }
       ]
     }
@@ -65,181 +72,210 @@
 }
 {% endschema %}
 
+{% comment %} ── Pre-process phone in Liquid ── {% endcomment %}
+{% assign _raw = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+{% if _raw.size == 12 %}
+  {% assign _prefix = _raw | slice: 0, 2 %}
+  {% if _prefix == "91" %}
+    {% assign _clean_phone = _raw | slice: 2, 10 %}
+  {% else %}
+    {% assign _clean_phone = _raw %}
+  {% endif %}
+{% else %}
+  {% assign _clean_phone = _raw %}
+{% endif %}
+
+{% comment %} ── HMAC signature on "phone|timestamp" ── {% endcomment %}
+{% assign _ts = 'now' | date: '%s' %}
+{% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
+{% assign _sig = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
 <section class="lucira-wc-section">
-<div class="page-width">
-  <div class="page-width-wc-section">
-    <div class="lucira-wc-container">
-      <h2 class="lucira-wc-header">{{ section.settings.header }}</h2>
-      <p class="lucira-wc-subheader">{{ section.settings.subheader }}</p>
-      <div class="lucira-wc-grid swiper">
-        <div class="swiper-wrapper">
-          {% for block in section.blocks %}
-            <div class="lucira-wc-column swiper-slide" {{ block.shopify_attributes }}>
-              <a 
-                href="{{ block.settings.card_link }}" 
-                class="lucira-wc-card why-choose-tile"
-                data-info="tile-{{ forloop.index }}"
-                data-desktop-img="{{ block.settings.card_image | img_url: '800x' }}"
-                aria-label="{{ block.settings.card_title }}: {{ block.settings.card_subtitle }}" 
-                data-mobile-img="{{ block.settings.card_image_mobile | img_url: '800x' }}"
-              >
-                <div class="lucira-wc-card-content">
-                  <h3 class="lucira-wc-card-title">{{ block.settings.card_title }}</h3>
-                  <p class="lucira-wc-card-subtitle">{{ block.settings.card_subtitle }}</p>
-                </div>
-              </a>
-            </div>
-          {% endfor %}
+  <div class="page-width">
+    <div class="page-width-wc-section">
+      <div class="lucira-wc-container">
+        <h2 class="lucira-wc-header">{{ section.settings.header }}</h2>
+        <p class="lucira-wc-subheader">{{ section.settings.subheader }}</p>
+        <div class="lucira-wc-grid swiper">
+          <div class="swiper-wrapper">
+            {% for block in section.blocks %}
+
+              {%- comment -%} Build the href for this block {%- endcomment -%}
+              {% if block.settings.enable_sso_link %}
+                {% if customer %}
+                  {%- assign _card_href = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p=' | append: _clean_phone | append: '&ts=' | append: _ts | append: '&sig=' | append: _sig -%}
+                {% else %}
+                  {%- assign _card_href = 'https://schemes.lucirajewelry.com/' -%}
+                {% endif %}
+              {% else %}
+                {%- assign _card_href = block.settings.card_link -%}
+              {% endif %}
+
+              <div class="lucira-wc-column swiper-slide" {{ block.shopify_attributes }}>
+                <a 
+                  href="{{ _card_href }}" 
+                  class="lucira-wc-card why-choose-tile"
+                  data-info="tile-{{ forloop.index }}"
+                  data-desktop-img="{{ block.settings.card_image | img_url: '800x' }}"
+                  aria-label="{{ block.settings.card_title }}: {{ block.settings.card_subtitle }}" 
+                  data-mobile-img="{{ block.settings.card_image_mobile | img_url: '800x' }}"
+                  target="_blank" rel="noopener noreferrer"
+
+                >
+                  <div class="lucira-wc-card-content">
+                    <h3 class="lucira-wc-card-title">{{ block.settings.card_title }}</h3>
+                    <p class="lucira-wc-card-subtitle">{{ block.settings.card_subtitle }}</p>
+                    <span class="lucira-wc-card-button">Explore Now</span>
+                  </div>
+                </a>
+              </div>
+            {% endfor %}
+          </div>
+          <div class="swiper-pagination"></div>
         </div>
-        <div class="swiper-pagination"></div>
       </div>
     </div>
   </div>
-</div>
 </section>
 
 <script>
-(function(){
-  const prefix = '{{ section.settings.gtm-prefix }}';
-  let s=null,desktopListenersAttached=false,imgObserver=null;
-  
-  // Lazy load images with Intersection Observer
-  function lazyLoadImages(){
-    const cards=document.querySelectorAll('.lucira-wc-card:not([data-loaded])');
-    if(!cards.length)return;
+  (function(){
+    const prefix = '{{ section.settings.gtm-prefix }}';
+    let s=null,desktopListenersAttached=false,imgObserver=null;
     
-    if(imgObserver)imgObserver.disconnect();
-    
-    imgObserver=new IntersectionObserver((entries)=>{
-      entries.forEach(entry=>{
-        if(entry.isIntersecting){
-          const c=entry.target;
-          const m=window.innerWidth<=768;
-          const d=c.getAttribute('data-desktop-img');
-          const i=c.getAttribute('data-mobile-img');
-          const url=m&&i?i:d;
-          
-          if(url){
-            const img=new Image();
-            img.onload=()=>{
-              c.style.backgroundImage=`url('${url}')`;
-              c.style.backgroundRepeat='no-repeat';
-              c.style.backgroundSize='cover';
-              c.style.backgroundPosition='center';
-              c.setAttribute('data-loaded','true');
-            };
-            img.src=url;
+    // Lazy load images with Intersection Observer
+    function lazyLoadImages(){
+      const cards=document.querySelectorAll('.lucira-wc-card:not([data-loaded])');
+      if(!cards.length)return;
+      
+      if(imgObserver)imgObserver.disconnect();
+      
+      imgObserver=new IntersectionObserver((entries)=>{
+        entries.forEach(entry=>{
+          if(entry.isIntersecting){
+            const c=entry.target;
+            const m=window.innerWidth<=768;
+            const d=c.getAttribute('data-desktop-img');
+            const i=c.getAttribute('data-mobile-img');
+            const url=m&&i?i:d;
+            
+            if(url){
+              const img=new Image();
+              img.onload=()=>{
+                c.style.backgroundImage=`url('${url}')`;
+                c.style.backgroundRepeat='no-repeat';
+                c.style.backgroundSize='cover';
+                c.style.backgroundPosition='center';
+                c.setAttribute('data-loaded','true');
+              };
+              img.src=url;
+            }
+            imgObserver.unobserve(c);
           }
-          imgObserver.unobserve(c);
+        });
+      },{rootMargin:'50px'});
+      
+      cards.forEach(c=>imgObserver.observe(c));
+    }
+    
+    function trackGTM(tile){
+      const tileIndex=tile.getAttribute('data-info');
+      const title=tile.querySelector('.lucira-wc-card-title')?.textContent.trim()||'Unknown Feature';
+      window.dataLayer=window.dataLayer||[];
+      window.dataLayer.push({
+        event:'promoClick',
+        promoClick:{
+          promo_id:`${prefix}-${tileIndex}`,
+          creative_name:'Why Choose Lucira',
+          promo_name:title,
+          location_id:'Homepage'
         }
       });
-    },{rootMargin:'50px'});
+    }
     
-    cards.forEach(c=>imgObserver.observe(c));
-  }
-  
-  function trackGTM(tile){
-    const tileIndex=tile.getAttribute('data-info');
-    const title=tile.querySelector('.lucira-wc-card-title')?.textContent.trim()||'Unknown Feature';
-    window.dataLayer=window.dataLayer||[];
-    window.dataLayer.push({
-      event:'promoClick',
-      promoClick:{
-        promo_id:`${prefix}-${tileIndex}`,
-        creative_name:'Why Choose Lucira',
-        promo_name:title,
-        location_id:'Homepage'
-      }
-    });
-  }
-  
-  function attachDesktopListeners(){
-    if(desktopListenersAttached)return;
-    document.querySelectorAll('.why-choose-tile').forEach(tile=>{
-      tile.addEventListener('click',function(){trackGTM(this)},{passive:true});
-    });
-    desktopListenersAttached=true;
-  }
-  
-  function init(){
-    if(window.innerWidth<=768){
-      if(!s){
-        s=new Swiper('.lucira-wc-section .swiper',{
-          slidesPerView:'auto',
-          spaceBetween:15,
-          loop:true,
-          centeredSlides:false,
-          pagination:{el:'.swiper-pagination',clickable:true},
-          speed:300,
-          touchRatio:1,
-          threshold:5,
-          lazy:{loadPrevNext:true},
-          on:{
-            tap:function(swiper,event){
-              const tile=event.target.closest('.why-choose-tile');
-              if(tile){
-                event.preventDefault();
-                trackGTM(tile);
-                const link=tile.getAttribute('href');
-                if(link&&link!=='#'){
-                  setTimeout(()=>window.location.href=link,100);
+    function attachDesktopListeners(){
+      if(desktopListenersAttached)return;
+      document.querySelectorAll('.why-choose-tile').forEach(tile=>{
+        tile.addEventListener('click',function(){trackGTM(this)},{passive:true});
+      });
+      desktopListenersAttached=true;
+    }
+    
+    function init(){
+      if(window.innerWidth<=768){
+        if(!s){
+          s=new Swiper('.lucira-wc-section .swiper',{
+            slidesPerView:'auto',
+            spaceBetween:15,
+            loop:true,
+            centeredSlides:false,
+            pagination:{el:'.swiper-pagination',clickable:true},
+            speed:300,
+            touchRatio:1,
+            threshold:5,
+            lazy:{loadPrevNext:true},
+            on:{
+              tap:function(swiper,event){
+                const tile=event.target.closest('.why-choose-tile');
+                if(tile){
+                  event.preventDefault();
+                  trackGTM(tile);
+                  const link=tile.getAttribute('href');
+                  if(link&&link!=='#'){
+                    setTimeout(()=>window.location.href=link,100);
+                  }
                 }
               }
             }
-          }
-        });
+          });
+        }
+      }else{
+        if(s){
+          s.destroy(true,true);
+          s=null;
+        }
+        attachDesktopListeners();
       }
-    }else{
-      if(s){
-        s.destroy(true,true);
-        s=null;
-      }
-      attachDesktopListeners();
+      lazyLoadImages();
     }
-    lazyLoadImages();
-  }
-  
-  if(document.readyState==='loading'){
-    document.addEventListener('DOMContentLoaded',init);
-  }else{
-    init();
-  }
-  
-  let t;
-  window.addEventListener('resize',()=>{
-    clearTimeout(t);
-    t=setTimeout(()=>{
-      document.querySelectorAll('.lucira-wc-card').forEach(c=>c.removeAttribute('data-loaded'));
+    
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded',init);
+    }else{
       init();
-    },250);
-  },{passive:true});
-})();
+    }
+    
+    let t;
+    window.addEventListener('resize',()=>{
+      clearTimeout(t);
+      t=setTimeout(()=>{
+        document.querySelectorAll('.lucira-wc-card').forEach(c=>c.removeAttribute('data-loaded'));
+        init();
+      },250);
+    },{passive:true});
+  })();
 </script>
 
 <style>
-/* Prevent CLS by reserving space */
-.lucira-wc-card{
-  display:block;
-  min-height:200px;
-  background-color:#f5f5f5;
-  transition:opacity .3s ease;
-}
-.lucira-wc-card:not([data-loaded]){
-  opacity:.7;
-}
-.lucira-wc-card[data-loaded]{
-  opacity:1;
-}
-@media(max-width:400px){
-  .lucira-wc-card{
-    min-height:150px;
+  .lucira-wc-card{display:block;min-height:200px;background-color:#f5f5f5;transition:opacity .3s ease}
+  .lucira-wc-card:not([data-loaded]){opacity:.7}
+  .lucira-wc-card[data-loaded]{opacity:1}
+  .lucira-wc-card-button{border:1px solid #fff; background: #fff; color: #000;display:block;max-width:max-content;padding:6px 24px;font-size:14px;border-radius:12px;margin-top:12px;transition:.3s}
+  .lucira-wc-card-button:hover{background:transparent;color:#fff;}
+  @media(max-width:500px){
+    .lucira-wc-section .lucira-wc-card{height:405px!important}
+    .lucira-wc-card-button {border-radius:8px;}
   }
-  .lucira-wc-section .lucira-wc-grid .lucira-wc-column .lucira-wc-card-content { bottom: 5px !important; left: 10px !important; right: 8px !important; top: auto !important; }
-}
+  @media(max-width:400px){
+    .lucira-wc-card{min-height:150px}
+    .lucira-wc-section .lucira-wc-grid .lucira-wc-column .lucira-wc-card-content{bottom:20px !important;left:18px !important;right:8px!important;top:auto!important}
+    .lucira-wc-section .lucira-wc-card{height:385px!important}
+  }
+  @media(max-width:370px){
+    .lucira-wc-section .lucira-wc-card{height:355px!important}
+  }
 
-@media(min-width:769px){
-  .lucira-wc-card{
-    min-height:300px;
+  @media(min-width:769px){
+  .lucira-wc-card{height:300px!important}
   }
-}
 </style>

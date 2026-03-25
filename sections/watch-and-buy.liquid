@@ -228,47 +228,54 @@
         return;
       }
 
-      if (iframeSrc) {
-        const iframe = document.createElement('iframe');
-        iframe.className = 'carousel-iframe';
-        iframe.src = iframeSrc;
-        iframe.frameBorder = '0';
-        iframe.allow = 'autoplay; fullscreen; picture-in-picture';
-        iframe.allowFullscreen = true;
-        iframe.loading = 'lazy';
-        container.innerHTML = '';
-        container.appendChild(iframe);
-        const playButton = document.createElement('div');
-        playButton.className = 'play-button';
-        playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        container.appendChild(playButton);
-      } else if (videoSrc) {
-        const video = document.createElement('video');
-        video.loop = true;
-        video.muted = true; // Keep muted in carousel
-        video.autoplay = true;
-        video.playsInline = true;
-        const source = document.createElement('source');
-        source.src = videoSrc;
-        source.type = 'video/mp4';
-        source.className = 'lazy-video';
-        video.appendChild(source);
-        container.innerHTML = '';
-        container.appendChild(video);
-        const playButton = document.createElement('div');
-        playButton.className = 'play-button';
-        playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        container.appendChild(playButton);
-      } else if (imgSrc) {
-        const img = document.createElement('img');
-        img.src = imgSrc;
-        img.loading = 'lazy';
-        img.alt = container.querySelector('.media-placeholder')?.alt || '';
-        container.innerHTML = '';
-        container.appendChild(img);
-      }
+      // Use requestIdleCallback for heavy DOM operations
+      const injectMedia = () => {
+        if (iframeSrc) {
+          const iframe = document.createElement('iframe');
+          iframe.className = 'carousel-iframe';
+          iframe.src = iframeSrc;
+          iframe.frameBorder = '0';
+          iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+          iframe.allowFullscreen = true;
+          iframe.loading = 'lazy';
+          container.innerHTML = '';
+          container.appendChild(iframe);
+          const playButton = document.createElement('div');
+          playButton.className = 'play-button';
+          playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          container.appendChild(playButton);
+        } else if (videoSrc) {
+          const video = document.createElement('video');
+          video.loop = true;
+          video.muted = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          const source = document.createElement('source');
+          source.src = videoSrc;
+          source.type = 'video/mp4';
+          video.appendChild(source);
+          container.innerHTML = '';
+          container.appendChild(video);
+          const playButton = document.createElement('div');
+          playButton.className = 'play-button';
+          playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          container.appendChild(playButton);
+        } else if (imgSrc) {
+          const img = document.createElement('img');
+          img.src = imgSrc;
+          img.loading = 'lazy';
+          img.alt = container.querySelector('.media-placeholder')?.alt || '';
+          container.innerHTML = '';
+          container.appendChild(img);
+        }
+        loadedMedia.add(mediaId + container.closest('.item').innerHTML);
+      };
 
-      loadedMedia.add(mediaId + container.closest('.item').innerHTML);
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(injectMedia, { timeout: 2000 });
+      } else {
+        setTimeout(injectMedia, 1);
+      }
     }
 
     function observeMediaContainers() {
@@ -1381,319 +1388,55 @@
 </script>
 
 <style>
-  /* Carousel iframe styles */
-  .carousel-iframe {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 8px;
-    transition: opacity 0.3s ease;
-  }
-
-  .watch-buy-item {
-    position: relative;
-    overflow: hidden;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .watch-buy-item .carousel-iframe,
-  .watch-buy-item video {
-    display: block;
-    width: 100%;
-    height: 200px;
-    object-fit: cover;
-  }
-
-  /* Play button overlay for both videos and iframes */
-  .watch-buy-item .play-button {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0, 0, 0, 0.6);
-    border-radius: 50%;
-    width: 60px;
-    height: 60px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: white;
-    font-size: 18px;
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-    z-index: 2;
-  }
-
-  .watch-buy-item:hover .play-button {
-    opacity: 1;
-  }
-
-  /* Enhanced popup iframe styles */
-  .popup-iframe {
-    width: 100%;
-    height: 90vh;
-    border-radius: 8px;
-  }
-
-  .mobile-popup-iframe {
-    width: 100%;
-    height: 90vh;
-    border-radius: 0;
-  }
-
-  /* Swipe indicator styles - exact match from image */
-  .swipe-indicator-container {
-    position: absolute;
-    bottom: 190px;
-    left: 0;
-    right: 0;
-    z-index: 1000;
-    display: flex;
-    justify-content: center;
-    padding-top: 20px;
-    opacity: 0;
-    transform: translateY(-20px);
-    transition: all 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
-    pointer-events: none;
-    cursor: none;
-  }
-
-  .swipe-indicator-container.show {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  .swipe-indicator-container.hide {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-
-  .swipe-indicator-container.touched {
-    transform: translateY(-5px);
-  }
-
-  .swipe-indicator-bg {
-    padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: white;
-    color: #fffffff;
-    font-weight: 400;
-    font-size: 14px;
-    line-height: 21px;
-    vertical-align: middle;
-  }
-
-  .swipe-text {
-    white-space: nowrap;
-  }
-
-  .swipe-arrow-wrapper {
-    display: flex;
-    align-items: center;
-    animation: floatUp 2s ease-in-out infinite;
-  }
-
-  .swipe-arrow {
-    color: white;
-  }
-
-  @keyframes floatUp {
-    0%, 100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(3px);
-    }
-  }
-
-  /* Mobile Video Swiper Styles */
-  .mobile-video-swiper {
-    width: 100%;
-    height: 100vh;
-    position: relative;
-  }
-
-  .mobile-video-swiper .swiper-slide {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    position: relative;
-    background: #000;
-  }
-
-  .mobile-video-container {
-    width: 100%;
-    height: 90vh;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .mobile-popup-video {
-    width: 100%;
-    height: 90vh;
-    object-fit: cover;
-    border-radius: 0;
-  }
-
-  .mobile-video-progress {
-    position: absolute;
-    top: 30px;
-    left: 0;
-    right: 0;
-    height: 4px;
-    width: 90%;
-    background: rgba(255, 255, 255, 0.3);
-    margin: 0 auto;
-  }
-
-  .mobile-progress-fill {
-    height: 100%;
-    background: #fff;
-    width: 0%;
-    transition: width 0.1s linear;
-  }
-
-  .mobile-product-card {
-    width: 100%;
-    background: white;
-    padding: 16px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    min-height: auto;
-    position: absolute;
-    bottom: 70px;
-    max-width: 80%;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  .mobile-product-image {
-    width: 80px;
-    height: 80px;
-    object-fit: cover;
-    border-radius: 8px;
-    flex-shrink: 0;
-  }
-
-  .mobile-product-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .mobile-product-title {
-    margin: 0;
-    color: #1A1A1A;
-    font-family: 'Futura';
-    font-weight: 400;
-    font-size: 14px;
-    line-height: 21px;
-    vertical-align: middle;
-  }
-
-  .mobile-product-actions {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .mobile-price-wrapper {
-    display: flex;
-    flex-direction: row;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .mobile-product-price {
-    color: #1A1A1A;
-    font-family: 'Futura', sans-serif;
-    font-weight: 600;
-    font-size: 16px;
-    line-height: 150%;
-    vertical-align: middle;
-  }
-
-  .mobile-compare-price {
-    font-size: 14px;
-    color: #666666;
-    text-decoration: line-through;
-  }
-
-  /* Hide desktop elements on mobile */
-  @media (max-width: 768px) {
-    .popup-slider-nav {
-      display: none !important;
-    }
-
-    .popup-video-container.desktop-only {
-      display: none !important;
-    }
-
-    .popup-product-card.desktop-only {
-      display: none !important;
-    }
-  }
-
-  /* Swiper override styles */
-  .mobile-video-swiper .swiper-wrapper {
-    transition-timing-function: cubic-bezier(0.25, 0.8, 0.25, 1);
-  }
-
-  .mobile-video-swiper .swiper-slide-active .mobile-popup-video,
-  .mobile-video-swiper .swiper-slide-active .mobile-popup-iframe {
-    opacity: 1;
-  }
-
-  .mobile-video-swiper .swiper-slide:not(.swiper-slide-active) .mobile-popup-video,
-  .mobile-video-swiper .swiper-slide:not(.swiper-slide-active) .mobile-popup-iframe {
-    opacity: 0.7;
-  }
-
-  /* Smooth transitions */
-  .mobile-popup-video,
-  .mobile-popup-iframe {
-    transition: opacity 0.3s ease;
-  }
-
-  .mobile-product-card {
-    transition: transform 0.3s ease;
-  }
-
-  .swiper-slide-active .mobile-product-card {
-    transform: translateY(0);
-  }
-
-  .swiper-slide:not(.swiper-slide-active) .mobile-product-card {
-    transform: translateY(10px);
-  }
-
-  /* Additional iframe-specific styles */
-  .popup-video-container {
-    width: 100%;
-    height: 90vh;
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  /* Ensure iframes are responsive */
-  @media (max-width: 768px) {
-    .popup-iframe,
-    .mobile-popup-iframe {
-      width: 100%;
-      height: 70vh;
-    }
-  }
+.carousel-iframe{width:100%;height:100%;object-fit:cover;border-radius:8px;transition:opacity .3s ease}
+.watch-buy-item{position:relative;overflow:hidden;border-radius:8px;cursor:pointer}
+.watch-buy-item .carousel-iframe,.watch-buy-item video{display:block;width:100%;height:200px;object-fit:cover}
+.watch-buy-item .play-button{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,.6);border-radius:50%;width:60px;height:60px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;opacity:0;transition:opacity .3s ease;pointer-events:none;z-index:2}
+.watch-buy-item:hover .play-button{opacity:1}
+.popup-iframe{width:100%;height:90vh;border-radius:8px}
+.mobile-popup-iframe{width:100%;height:90vh;border-radius:0}
+.swipe-indicator-container{position:absolute;bottom:190px;left:0;right:0;z-index:1000;display:flex;justify-content:center;padding-top:20px;opacity:0;transform:translateY(-20px);transition:all .6s cubic-bezier(.25,.8,.25,1);pointer-events:none;cursor:none}
+.swipe-indicator-container.show{opacity:1;transform:translateY(0)}
+.swipe-indicator-container.hide{opacity:0;transform:translateY(-20px)}
+.swipe-indicator-container.touched{transform:translateY(-5px)}
+.swipe-indicator-bg{padding:12px 20px;display:flex;align-items:center;gap:8px;color:#fff;color:#fffffff;font-weight:400;font-size:14px;line-height:21px;vertical-align:middle}
+.swipe-text{white-space:nowrap}
+.swipe-arrow-wrapper{display:flex;align-items:center;animation:floatUp 2s ease-in-out infinite}
+.swipe-arrow{color:#fff}
+@keyframes floatUp{
+0%,100%{transform:translateY(0)}
+50%{transform:translateY(3px)}
+}
+.mobile-video-swiper{width:100%;height:100vh;position:relative}
+.mobile-video-swiper .swiper-slide{display:flex;flex-direction:column;justify-content:center;align-items:center;position:relative;background:#000}
+.mobile-video-container{width:100%;height:90vh;position:relative;display:flex;align-items:center;justify-content:center}
+.mobile-popup-video{width:100%;height:90vh;object-fit:cover;border-radius:0}
+.mobile-video-progress{position:absolute;top:30px;left:0;right:0;height:4px;width:90%;background:rgba(255,255,255,.3);margin:0 auto}
+.mobile-progress-fill{height:100%;background:#fff;width:0%;transition:width .1s linear}
+.mobile-product-card{width:100%;background:#fff;padding:16px;display:flex;align-items:center;gap:15px;min-height:auto;position:absolute;bottom:70px;max-width:80%;border-radius:8px;cursor:pointer}
+.mobile-product-image{width:80px;height:80px;object-fit:cover;border-radius:8px;flex-shrink:0}
+.mobile-product-info{flex:1;display:flex;flex-direction:column;gap:6px}
+.mobile-product-title{margin:0;color:#1a1a1a;font-family:Futura;font-weight:400;font-size:14px;line-height:21px;vertical-align:middle}
+.mobile-product-actions{display:flex;justify-content:space-between;align-items:center}
+.mobile-price-wrapper{display:flex;flex-direction:row;gap:10px;align-items:center}
+.mobile-product-price{color:#1a1a1a;font-family:Futura,sans-serif;font-weight:600;font-size:16px;line-height:150%;vertical-align:middle}
+.mobile-compare-price{font-size:14px;color:#666;text-decoration:line-through}
+@media (max-width:768px){
+.popup-slider-nav{display:none!important}
+.popup-video-container.desktop-only{display:none!important}
+.popup-product-card.desktop-only{display:none!important}
+}
+.mobile-video-swiper .swiper-wrapper{transition-timing-function:cubic-bezier(.25,.8,.25,1)}
+.mobile-video-swiper .swiper-slide-active .mobile-popup-iframe,.mobile-video-swiper .swiper-slide-active .mobile-popup-video{opacity:1}
+.mobile-video-swiper .swiper-slide:not(.swiper-slide-active) .mobile-popup-iframe,.mobile-video-swiper .swiper-slide:not(.swiper-slide-active) .mobile-popup-video{opacity:.7}
+.mobile-popup-iframe,.mobile-popup-video{transition:opacity .3s ease}
+.mobile-product-card{transition:transform .3s ease}
+.swiper-slide-active .mobile-product-card{transform:translateY(0)}
+.swiper-slide:not(.swiper-slide-active) .mobile-product-card{transform:translateY(10px)}
+.popup-video-container{width:100%;height:90vh;position:relative;display:flex;align-items:center;justify-content:center}
+@media (max-width:768px){
+.mobile-popup-iframe,.popup-iframe{width:100%;height:70vh}
+}
 </style>
 
 {% schema %}

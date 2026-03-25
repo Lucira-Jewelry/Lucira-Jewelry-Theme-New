@@ -97,171 +97,171 @@ function switchMenu(newMenu) {
 }
 
 
-let popupTimer;
-let progressTimer;
+// let popupTimer;
+// let progressTimer;
 
-let hasShownPopup = sessionStorage.getItem('popupShown') === 'true';
-let hasBeenManuallyOpened = sessionStorage.getItem('popupManuallyOpened') === 'true';
-let hasShownAutoPopupInSession = sessionStorage.getItem('autoPopupShownInSession') === 'true';
+// let hasShownPopup = sessionStorage.getItem('popupShown') === 'true';
+// let hasBeenManuallyOpened = sessionStorage.getItem('popupManuallyOpened') === 'true';
+// let hasShownAutoPopupInSession = sessionStorage.getItem('autoPopupShownInSession') === 'true';
 
-function isHomePage() {
-  const path = window.location.pathname;
-  return path === '/' || path === '/index.html' || path === '/home' || path === '';
-}
+// function isHomePage() {
+//   const path = window.location.pathname;
+//   return path === '/' || path === '/index.html' || path === '/home' || path === '';
+// }
 
-function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition = false) {
-  const overlay = document.getElementById('popupOverlay');
-  const progressBar = document.getElementById('progressBar');
-  const progressContainer = document.querySelector('.progress-container');
-  const iconButton = document.getElementById('popupIconButton');
-  const popup = overlay.querySelector('.popup-container');
+// function showPopup(withTimer = true, isHeaderClick = false, forceHeaderPosition = false) {
+//   const overlay = document.getElementById('popupOverlay');
+//   const progressBar = document.getElementById('progressBar');
+//   const progressContainer = document.querySelector('.progress-container');
+//   const iconButton = document.getElementById('popupIconButton');
+//   const popup = overlay.querySelector('.popup-container');
 
-  const isMobile = window.innerWidth < 768;
-  const useTopRight = forceHeaderPosition && !isMobile;
+//   const isMobile = window.innerWidth < 768;
+//   const useTopRight = forceHeaderPosition && !isMobile;
 
-  if (forceHeaderPosition) {
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'promoClick',
-      promoClick: {
-        creative_name: 'Annocement Clicked'
-      }
-    });
-  }
+//   if (forceHeaderPosition) {
+//     window.dataLayer = window.dataLayer || [];
+//     window.dataLayer.push({
+//       event: 'promoClick',
+//       promoClick: {
+//         creative_name: 'Annocement Clicked'
+//       }
+//     });
+//   }
 
-  if (useTopRight && popup) {
-    popup.style.position = 'fixed';
-    popup.style.top = '115px';
-    popup.style.right = '80px';
-    popup.style.left = 'auto';
-    popup.style.transform = 'none';
-    popup.style.margin = '0';
-    popup.style.zIndex = '9999';
-  } else if (popup) {
-    popup.style.position = '';
-    popup.style.top = '';
-    popup.style.left = '';
-    popup.style.right = '';
-    popup.style.transform = '';
-    popup.style.margin = '';
-    popup.style.zIndex = '';
-  }
+//   if (useTopRight && popup) {
+//     popup.style.position = 'fixed';
+//     popup.style.top = '115px';
+//     popup.style.right = '80px';
+//     popup.style.left = 'auto';
+//     popup.style.transform = 'none';
+//     popup.style.margin = '0';
+//     popup.style.zIndex = '9999';
+//   } else if (popup) {
+//     popup.style.position = '';
+//     popup.style.top = '';
+//     popup.style.left = '';
+//     popup.style.right = '';
+//     popup.style.transform = '';
+//     popup.style.margin = '';
+//     popup.style.zIndex = '';
+//   }
 
-  overlay.classList.add('active');
-  document.body.classList.add('no-scroll'); // Disable background scroll
+//   overlay.classList.add('active');
+//   document.body.classList.add('no-scroll'); // Disable background scroll
 
-  if (iconButton) {
-    iconButton.classList.add('active');
-    iconButton.classList.add('opened'); // Add opened class
-  }
+//   if (iconButton) {
+//     iconButton.classList.add('active');
+//     iconButton.classList.add('opened'); // Add opened class
+//   }
 
-  if (withTimer) {
-    if (progressContainer) progressContainer.style.display = 'flex';
-    progressBar.style.width = '0%';
+//   if (withTimer) {
+//     if (progressContainer) progressContainer.style.display = 'flex';
+//     progressBar.style.width = '0%';
 
-    let progress = 0;
-    const duration = 5000;
-    const interval = 50;
-    const increment = 100 / (duration / interval);
+//     let progress = 0;
+//     const duration = 5000;
+//     const interval = 50;
+//     const increment = 100 / (duration / interval);
 
-    progressTimer = setInterval(() => {
-      progress += increment;
-      progressBar.style.width = progress + '%';
-      if (progress >= 100) {
-        clearInterval(progressTimer);
-        setTimeout(() => closePopup(), 200);
-      }
-    }, interval);
-  } else {
-    if (progressContainer) progressContainer.style.display = 'none';
-    progressBar.style.width = '0%';
-  }
-}
+//     progressTimer = setInterval(() => {
+//       progress += increment;
+//       progressBar.style.width = progress + '%';
+//       if (progress >= 100) {
+//         clearInterval(progressTimer);
+//         setTimeout(() => closePopup(), 200);
+//       }
+//     }, interval);
+//   } else {
+//     if (progressContainer) progressContainer.style.display = 'none';
+//     progressBar.style.width = '0%';
+//   }
+// }
 
-function closePopup() {
-  const overlay = document.getElementById('popupOverlay');
-  const iconButton = document.getElementById('popupIconButton');
-  overlay.classList.remove('active');
-  document.body.classList.remove('no-scroll'); // Re-enable scroll
+// function closePopup() {
+//   const overlay = document.getElementById('popupOverlay');
+//   const iconButton = document.getElementById('popupIconButton');
+//   overlay.classList.remove('active');
+//   document.body.classList.remove('no-scroll'); // Re-enable scroll
 
-  if (iconButton) {
-    iconButton.classList.remove('active');
-    iconButton.classList.remove('opened'); // Remove opened class
-  }
+//   if (iconButton) {
+//     iconButton.classList.remove('active');
+//     iconButton.classList.remove('opened'); // Remove opened class
+//   }
 
-  clearTimeout(popupTimer);
-  clearInterval(progressTimer);
-}
+//   clearTimeout(popupTimer);
+//   clearInterval(progressTimer);
+// }
 
-function togglePopup() {
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: "promoClick",
-    promoClick: {
-      creative_name: "Announcement Popup Clicked",
-      promo_position: "Header Announcement"
-    }
-  });
+// function togglePopup() {
+//   window.dataLayer = window.dataLayer || [];
+//   window.dataLayer.push({
+//     event: "promoClick",
+//     promoClick: {
+//       creative_name: "Announcement Popup Clicked",
+//       promo_position: "Header Announcement"
+//     }
+//   });
 
-  const overlay = document.getElementById('popupOverlay');
-  const isActive = overlay.classList.contains('active');
+//   const overlay = document.getElementById('popupOverlay');
+//   const isActive = overlay.classList.contains('active');
 
-  if (isActive) {
-    closePopup();
-  } else {
-    hasBeenManuallyOpened = true;
-    sessionStorage.setItem('popupManuallyOpened', 'true');
-    hasShownPopup = true;
-    sessionStorage.setItem('popupShown', 'true');
+//   if (isActive) {
+//     closePopup();
+//   } else {
+//     hasBeenManuallyOpened = true;
+//     sessionStorage.setItem('popupManuallyOpened', 'true');
+//     hasShownPopup = true;
+//     sessionStorage.setItem('popupShown', 'true');
 
-    showPopup(false);
-  }
-}
+//     showPopup(false);
+//   }
+// }
 
-document.addEventListener('DOMContentLoaded', function () {
-  const iconButton = document.getElementById('popupIconButton');
+// document.addEventListener('DOMContentLoaded', function () {
+//   const iconButton = document.getElementById('popupIconButton');
 
-  if (iconButton) {
-    iconButton.style.display = 'none';
-    iconButton.style.visibility = 'hidden';
-    iconButton.style.opacity = '0';
-  }
+//   if (iconButton) {
+//     iconButton.style.display = 'none';
+//     iconButton.style.visibility = 'hidden';
+//     iconButton.style.opacity = '0';
+//   }
 
-  const popupOverlay = document.getElementById('popupOverlay');
-  if (popupOverlay) {
-    popupOverlay.addEventListener('click', function (e) {
-      if (e.target === this) closePopup();
-    });
-  }
+//   const popupOverlay = document.getElementById('popupOverlay');
+//   if (popupOverlay) {
+//     popupOverlay.addEventListener('click', function (e) {
+//       if (e.target === this) closePopup();
+//     });
+//   }
 
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') closePopup();
-  });
+//   document.addEventListener('keydown', function (e) {
+//     if (e.key === 'Escape') closePopup();
+//   });
 
-  window.addEventListener('scroll', function () {
-    const scrollY = window.pageYOffset || document.documentElement.scrollTop;
-    const isPopupActive = document.getElementById('popupOverlay')?.classList.contains('active');
+//   window.addEventListener('scroll', function () {
+//     const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+//     const isPopupActive = document.getElementById('popupOverlay')?.classList.contains('active');
 
-    if (scrollY >= 2000) {
-      if (iconButton) {
-        iconButton.style.display = 'flex';
-        iconButton.style.visibility = 'visible';
-        iconButton.style.opacity = '1';
-      }
+//     if (scrollY >= 2000) {
+//       if (iconButton) {
+//         iconButton.style.display = 'flex';
+//         iconButton.style.visibility = 'visible';
+//         iconButton.style.opacity = '1';
+//       }
 
-      // autopopup on scroll removed per request:
-      // no automatic showPopup here anymore
-    } else {
-      if (iconButton) {
-        iconButton.style.display = 'none';
-        iconButton.style.visibility = 'hidden';
-        iconButton.style.opacity = '0';
-      }
+//       // autopopup on scroll removed per request:
+//       // no automatic showPopup here anymore
+//     } else {
+//       if (iconButton) {
+//         iconButton.style.display = 'none';
+//         iconButton.style.visibility = 'hidden';
+//         iconButton.style.opacity = '0';
+//       }
 
-      // nothing related to lottie or auto-popup
-    }
-  });
-});
+//       // nothing related to lottie or auto-popup
+//     }
+//   });
+// });
 
 document.addEventListener("DOMContentLoaded", function () {
   const stickyHeader = document.querySelector("sticky-header");
