@@ -228,47 +228,54 @@
         return;
       }
 
-      if (iframeSrc) {
-        const iframe = document.createElement('iframe');
-        iframe.className = 'carousel-iframe';
-        iframe.src = iframeSrc;
-        iframe.frameBorder = '0';
-        iframe.allow = 'autoplay; fullscreen; picture-in-picture';
-        iframe.allowFullscreen = true;
-        iframe.loading = 'lazy';
-        container.innerHTML = '';
-        container.appendChild(iframe);
-        const playButton = document.createElement('div');
-        playButton.className = 'play-button';
-        playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        container.appendChild(playButton);
-      } else if (videoSrc) {
-        const video = document.createElement('video');
-        video.loop = true;
-        video.muted = true; // Keep muted in carousel
-        video.autoplay = true;
-        video.playsInline = true;
-        const source = document.createElement('source');
-        source.src = videoSrc;
-        source.type = 'video/mp4';
-        source.className = 'lazy-video';
-        video.appendChild(source);
-        container.innerHTML = '';
-        container.appendChild(video);
-        const playButton = document.createElement('div');
-        playButton.className = 'play-button';
-        playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-        container.appendChild(playButton);
-      } else if (imgSrc) {
-        const img = document.createElement('img');
-        img.src = imgSrc;
-        img.loading = 'lazy';
-        img.alt = container.querySelector('.media-placeholder')?.alt || '';
-        container.innerHTML = '';
-        container.appendChild(img);
-      }
+      // Use requestIdleCallback for heavy DOM operations
+      const injectMedia = () => {
+        if (iframeSrc) {
+          const iframe = document.createElement('iframe');
+          iframe.className = 'carousel-iframe';
+          iframe.src = iframeSrc;
+          iframe.frameBorder = '0';
+          iframe.allow = 'autoplay; fullscreen; picture-in-picture';
+          iframe.allowFullscreen = true;
+          iframe.loading = 'lazy';
+          container.innerHTML = '';
+          container.appendChild(iframe);
+          const playButton = document.createElement('div');
+          playButton.className = 'play-button';
+          playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          container.appendChild(playButton);
+        } else if (videoSrc) {
+          const video = document.createElement('video');
+          video.loop = true;
+          video.muted = true;
+          video.autoplay = true;
+          video.playsInline = true;
+          const source = document.createElement('source');
+          source.src = videoSrc;
+          source.type = 'video/mp4';
+          video.appendChild(source);
+          container.innerHTML = '';
+          container.appendChild(video);
+          const playButton = document.createElement('div');
+          playButton.className = 'play-button';
+          playButton.innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M6 3L20 12L6 21V3Z" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+          container.appendChild(playButton);
+        } else if (imgSrc) {
+          const img = document.createElement('img');
+          img.src = imgSrc;
+          img.loading = 'lazy';
+          img.alt = container.querySelector('.media-placeholder')?.alt || '';
+          container.innerHTML = '';
+          container.appendChild(img);
+        }
+        loadedMedia.add(mediaId + container.closest('.item').innerHTML);
+      };
 
-      loadedMedia.add(mediaId + container.closest('.item').innerHTML);
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(injectMedia, { timeout: 2000 });
+      } else {
+        setTimeout(injectMedia, 1);
+      }
     }
 
     function observeMediaContainers() {
