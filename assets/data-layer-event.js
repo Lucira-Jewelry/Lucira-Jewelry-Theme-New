@@ -59,16 +59,67 @@
   //   requestAnimationFrame(() => { window.location.href = target.href; });
   // };
 
-  // Add to cart (stub)
-  window.handleGTMAddToCartSubmit = function () {
-    const productData = dataLayer.find(i => i.event === "productView");
-    if (!productData) return;
 
-    dataLayer.push({
-      event: "addToCart",
-      products: { ...productData, quantity: 1 }
-    });
-  };
+
+
+
+
+
+
+  // Add to cart (stub) do not delete
+  // window.handleGTMAddToCartSubmit = function () {
+  //   const productData = dataLayer.find(i => i.event === "productView");
+  //   if (!productData) return;
+
+  //   dataLayer.push({
+  //     event: "addToCart",
+  //     products: { ...productData, quantity: 1 }
+  //   });
+  // };
+
+
+  window.handleGTMAddToCartSubmit = function () {
+  // Find the productView entry and destructure only the products object
+  const productEntry = dataLayer.find(i => i.event === "productView");
+  if (!productEntry?.products) {
+    console.warn("GTM: productView not found in dataLayer");
+    return;
+  }
+
+  const { products } = productEntry;
+
+  dataLayer.push({
+    event: "addToCart",
+    products: {
+      productId:           products.productId        || null,
+      variantId:           products.variantId        || null,
+      sku:                 products.sku              || null,
+      productName:         products.productName      || null,
+      productType:         products.productType      || null,
+      productCategory:     products.productCategory  || null,
+      category:            products.category         || null,
+      subCategory:         products.subCategory      || null,
+      productUrl:          products.productUrl       || null,
+      thumbnailImage:      products.thumbnailImage   || null,
+      purity:              products.purity           || null,
+      price:               products.price            || null,
+      offerPrice:          products.offerPrice       || null,
+      expectedDeliveryDate:products.expectedDeliveryDate || null,
+      couponCode:          products.couponCode       || null,
+      makingCharges:       products.makingCharges    || null,
+      numberOfReview:      products.numberOfReview   || null,
+      rating:              products.rating           || null,
+      indexPosition:       products.indexPosition    || null,
+      quantity:            1
+    }
+  });
+};
+
+
+
+
+
+
 
   // View cart
   window.handleGTMViewCart = function () {
