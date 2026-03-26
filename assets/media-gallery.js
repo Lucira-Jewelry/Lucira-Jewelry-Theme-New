@@ -157,25 +157,8 @@ if (!customElements.get('media-gallery')) {
     return "";
   }
 
-  function isColorMatch(itemColor, targetColor) {
-    if (!itemColor || !targetColor) return false;
-
-    // combo (yellow-white)
-    if (targetColor.includes("-")) {
-      const parts = targetColor.split("-");
-      return parts.includes(itemColor);
-    }
-
-    // single
-    return itemColor === targetColor;
-  }
-
   function classifyItemsByColor(targetColor) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
-
-    items.forEach(item => {
-      item.style.display = 'block';
-    });
     const buckets = {
       color: [],
       codes: { mv: [], "mq-ai": [], mq: [], "mh-ai": [], mh: [], "ci-ai": [], ci: [], v360: [] },
@@ -187,7 +170,7 @@ if (!customElements.get('media-gallery')) {
       const img = item.querySelector("img");
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
-      const isAnyColor = itemColor !== "";
+      const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
 
       // ✅ CERT detection (only classification, no reordering logic)
       if (alt.includes("cert")) {
@@ -195,7 +178,7 @@ if (!customElements.get('media-gallery')) {
         return;
       }
 
-      if (isColorMatch(itemColor, targetColor) || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
+      if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("mq-ai")) buckets.codes["mq-ai"].push(item);
         else if (alt.includes("mq")) buckets.codes.mq.push(item);
@@ -204,9 +187,9 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("ci-ai")) buckets.codes["ci-ai"].push(item);
         else if (alt.includes("ci")) buckets.codes.ci.push(item);
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
-        else if (isColorMatch(itemColor, targetColor)) buckets.color.push(item);
+        else if (itemColor === targetColor) buckets.color.push(item);
       } else {
-        item.style.display = '';
+        item.style.display = 'none';
       }
     });
 
@@ -556,10 +539,7 @@ if (!customElements.get('media-gallery')) {
     );
     for (const input of colorInputs) {
       if (input.checked || input.tagName === 'SELECT') {
-        const raw = (input.value || "").toLowerCase().trim();
-        if (raw.includes("-")) return raw;
-
-        const color = getColorFromAlt(raw);
+        const color = getColorFromAlt(input.value);
         if (color) return color;
       }
     }
@@ -568,10 +548,7 @@ if (!customElements.get('media-gallery')) {
     );
     for (const element of selectedVariants) {
       const text = element.textContent || element.getAttribute('data-value') || element.getAttribute('data-selected-value');
-      const raw = (text || "").toLowerCase().trim();
-      if (raw.includes("-")) return raw;
-
-      const color = getColorFromAlt(raw);
+      const color = getColorFromAlt(text);
       if (color) return color;
     }
     const urlParams = new URLSearchParams(window.location.search);
