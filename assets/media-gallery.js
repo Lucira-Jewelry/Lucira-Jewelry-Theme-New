@@ -181,7 +181,8 @@ if (!customElements.get('media-gallery')) {
       const isMatch =
       itemColor === targetColor ||
       (
-        targetColor.includes("-") && 
+        targetColor.includes("-") &&
+        itemColor &&
         targetColor.split("-").includes(itemColor)
       );
 
