@@ -762,26 +762,23 @@
           document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
         }
 
-        function pushToDataLayer(pincode, status) {
+        function pushEvent(pincode, status) {
           window.dataLayer = window.dataLayer || [];
 
-          // Push in next tick so GTM catches it
+          // Store data
+          window.dataLayer.push({
+            pincode: pincode || null,
+            status: status
+          });
+
+          // 🔥 IMPORTANT: separate event trigger
           setTimeout(() => {
-            window.dataLayer.push({
-              event: "pincode_detected",
-              pincode: pincode || null,
-              status: status,
-              event_time: new Date().toISOString()
-            });
-
-            console.log("GTM Event:", status, pincode);
-
-            // 🔥 Secondary guaranteed event (fixes GTM miss issue)
             window.dataLayer.push({
               event: "pincode_ready"
             });
+          }, 200);
 
-          }, 0);
+          console.log("GTM Ready Event:", status, pincode);
         }
 
         function fetchPincode(lat, lng) {
@@ -792,20 +789,19 @@
 
               if (pincode) {
                 setCookie(COOKIE_NAME, pincode);
-                pushToDataLayer(pincode, "detected");
-                console.log("✅ Pincode:", pincode);
+                pushEvent(pincode, "detected");
               } else {
-                pushToDataLayer(null, "denied");
+                pushEvent(null, "denied");
               }
             })
             .catch(() => {
-              pushToDataLayer(null, "denied");
+              pushEvent(null, "denied");
             });
         }
 
         function getLocationAndFetch() {
           if (!navigator.geolocation) {
-            pushToDataLayer(null, "denied");
+            pushEvent(null, "denied");
             return;
           }
 
@@ -813,52 +809,29 @@
             pos => {
               const { latitude, longitude } = pos.coords;
 
-              // 🔥 Delay after permission to stabilize GTM
+              // wait after permission click
               setTimeout(() => {
                 fetchPincode(latitude, longitude);
-              }, 500);
+              }, 700); // 👈 important
             },
             () => {
-              pushToDataLayer(null, "denied");
+              pushEvent(null, "denied");
             },
             {
               enableHighAccuracy: true,
               maximumAge: 0
-              // ❌ no timeout (as per your requirement)
             }
           );
         }
 
-        function waitForGTM(callback) {
-          let tries = 0;
-
-          const interval = setInterval(() => {
-            if (window.dataLayer && window.google_tag_manager) {
-              clearInterval(interval);
-              callback();
-            }
-
-            tries++;
-            if (tries > 20) {
-              clearInterval(interval);
-              callback(); // still run
-            }
-          }, 100);
-        }
-
         document.addEventListener("DOMContentLoaded", function () {
-          waitForGTM(() => {
+          const existing = getCookie(COOKIE_NAME);
 
-            const existing = getCookie(COOKIE_NAME);
-
-            if (existing) {
-              pushToDataLayer(existing, "detected");
-              console.log("📦 Existing:", existing);
-            } else {
-              getLocationAndFetch();
-            }
-
-          });
+          if (existing) {
+            pushEvent(existing, "detected");
+          } else {
+            getLocationAndFetch();
+          }
         });
 
       })();
