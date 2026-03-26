@@ -178,11 +178,7 @@ if (!customElements.get('media-gallery')) {
         return;
       }
 
-      const isMatch =
-          itemColor === targetColor ||
-          (targetColor.includes(itemColor) && itemColor !== "");
-
-        if (isMatch || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code))))
+      if (itemColor === targetColor || (!isAnyColor && ALWAYS_SHOW_CODES.some(code => alt.includes(code)))) {
         if (alt.includes("mv")) buckets.codes.mv.push(item);
         else if (alt.includes("mq-ai")) buckets.codes["mq-ai"].push(item);
         else if (alt.includes("mq")) buckets.codes.mq.push(item);
