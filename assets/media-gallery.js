@@ -172,6 +172,10 @@ if (!customElements.get('media-gallery')) {
 
   function classifyItemsByColor(targetColor) {
     const items = Array.from(document.querySelectorAll(".product__media-item"));
+
+    items.forEach(item => {
+      item.style.display = 'block';
+    });
     const buckets = {
       color: [],
       codes: { mv: [], "mq-ai": [], mq: [], "mh-ai": [], mh: [], "ci-ai": [], ci: [], v360: [] },
