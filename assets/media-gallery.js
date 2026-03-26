@@ -206,7 +206,7 @@ if (!customElements.get('media-gallery')) {
         else if (alt.includes("360v") || alt.includes("360°")) buckets.codes.v360.push(item);
         else if (isColorMatch(itemColor, targetColor)) buckets.color.push(item);
       } else {
-        item.style.display = 'none';
+        item.style.display = '';
       }
     });
 
