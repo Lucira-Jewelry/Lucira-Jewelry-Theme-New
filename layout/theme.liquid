@@ -762,23 +762,17 @@
           document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
         }
 
-        function pushEvent(pincode, status) {
+        function pushToDataLayer(pincode, status) {
           window.dataLayer = window.dataLayer || [];
 
-          // Store data
           window.dataLayer.push({
+            event: "pincode_detected",
             pincode: pincode || null,
-            status: status
+            status: status,
+            event_time: new Date().toISOString()
           });
 
-          // 🔥 IMPORTANT: separate event trigger
-          setTimeout(() => {
-            window.dataLayer.push({
-              event: "pincode_ready"
-            });
-          }, 200);
-
-          console.log("GTM Ready Event:", status, pincode);
+          console.log("GTM Event:", status, pincode);
         }
 
         function fetchPincode(lat, lng) {
@@ -789,52 +783,58 @@
 
               if (pincode) {
                 setCookie(COOKIE_NAME, pincode);
-                pushEvent(pincode, "detected");
+
+                pushToDataLayer(pincode, "detected");
+
+                console.log("✅ Auto-detected pincode:", pincode);
               } else {
-                pushEvent(null, "denied");
+                pushToDataLayer(null, "not_found");
+                console.warn("⚠️ Pincode not found");
               }
             })
-            .catch(() => {
-              pushEvent(null, "denied");
+            .catch(err => {
+              pushToDataLayer(null, "error");
+              console.error("❌ Geocode error:", err);
             });
         }
 
         function getLocationAndFetch() {
           if (!navigator.geolocation) {
-            pushEvent(null, "denied");
+            pushToDataLayer(null, "geolocation_not_supported");
             return;
           }
 
           navigator.geolocation.getCurrentPosition(
             pos => {
               const { latitude, longitude } = pos.coords;
-
-              // wait after permission click
-              setTimeout(() => {
-                fetchPincode(latitude, longitude);
-              }, 700); // 👈 important
+              fetchPincode(latitude, longitude);
             },
-            () => {
-              pushEvent(null, "denied");
+            err => {
+              pushToDataLayer(null, "denied");
+              console.warn("❌ Location denied/skipped");
             },
             {
-              enableHighAccuracy: true,
+              timeout: 5000,
               maximumAge: 0
             }
           );
         }
 
         document.addEventListener("DOMContentLoaded", function () {
+          // 🔥 IMPORTANT: fire init event immediately
+          pushToDataLayer(null, "init");
+
           const existing = getCookie(COOKIE_NAME);
 
           if (existing) {
-            pushEvent(existing, "detected");
+            pushToDataLayer(existing, "existing");
+            console.log("📦 Existing pincode:", existing);
           } else {
-            getLocationAndFetch();
+            // slight delay so GTM fully loads
+            setTimeout(getLocationAndFetch, 800);
           }
         });
-
       })();
-    </script>
+      </script>
 </body>
 </html>
