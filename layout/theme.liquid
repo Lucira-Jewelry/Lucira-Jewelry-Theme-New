@@ -751,8 +751,6 @@
 <script>
 (function () {
   const COOKIE_NAME = "user_pincode";
-  const SESSION_FLAG = "pincode_event_fired";
-  let resolved = false;
 
   function getCookie(name) {
     const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -764,27 +762,6 @@
     document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
   }
 
-  function hasFired() {
-    return sessionStorage.getItem(SESSION_FLAG);
-  }
-
-  function markFired() {
-    sessionStorage.setItem(SESSION_FLAG, "1");
-  }
-
-  function pushToDataLayer(pincode, status) {
-    if (hasFired()) return; // 🚫 prevent repeat firing
-
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: "pincode_detected",
-      pincode,
-      status
-    });
-
-    markFired();
-  }
-
   function fetchPincode(lat, lng) {
     fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
       .then(res => res.json())
@@ -793,39 +770,24 @@
 
         if (pincode) {
           setCookie(COOKIE_NAME, pincode);
-          pushToDataLayer(pincode, "detected");
+          console.log("Pincode saved:", pincode);
         } else {
-          pushToDataLayer(null, "not_found");
+          console.warn("Pincode not found");
         }
       })
-      .catch(() => pushToDataLayer(null, "error"));
+      .catch(err => console.error("Geocode error:", err));
   }
 
   function getLocationAndFetch() {
-    if (!navigator.geolocation) {
-      pushToDataLayer(null, "not_supported");
-      return;
-    }
+    if (!navigator.geolocation) return;
 
     navigator.geolocation.getCurrentPosition(
       pos => {
-        if (resolved) return;
-        resolved = true;
-
         const { latitude, longitude } = pos.coords;
         fetchPincode(latitude, longitude);
       },
       err => {
-        if (resolved) return;
-        resolved = true;
-
-        if (err.code === 1) {
-          pushToDataLayer(null, "denied");
-        } else if (err.code === 2) {
-          pushToDataLayer(null, "unavailable");
-        } else {
-          pushToDataLayer(null, "error");
-        }
+        console.warn("Location denied or unavailable:", err);
       },
       {
         enableHighAccuracy: false,
@@ -837,10 +799,11 @@
   document.addEventListener("DOMContentLoaded", function () {
     const existing = getCookie(COOKIE_NAME);
 
+    // Only run if no pincode already saved
     if (!existing) {
       setTimeout(getLocationAndFetch, 800);
     } else {
-      pushToDataLayer(existing, "existing"); // will fire only once per session
+      console.log("Pincode already exists:", existing);
     }
   });
 })();
