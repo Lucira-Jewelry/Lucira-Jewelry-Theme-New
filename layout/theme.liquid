@@ -777,14 +777,19 @@
       .then(res => res.json())
       .then(data => {
         const pincode = data?.address?.postcode;
+
         if (pincode) {
           setCookie(COOKIE_NAME, pincode);
           pushToDataLayer(pincode, "detected");
+          console.log("Auto-detected pincode:", pincode);
         } else {
           pushToDataLayer(null, "not_found");
         }
       })
-      .catch(() => pushToDataLayer(null, "error"));
+      .catch(err => {
+        pushToDataLayer(null, "error");
+        console.error("Geocode error:", err);
+      });
   }
 
   function getLocationAndFetch() {
@@ -797,6 +802,7 @@
       pos => {
         if (resolved) return;
         resolved = true;
+
         const { latitude, longitude } = pos.coords;
         fetchPincode(latitude, longitude);
       },
@@ -805,17 +811,19 @@
         resolved = true;
 
         if (err.code === 1) {
-          pushToDataLayer(null, "denied"); // actual deny
+          pushToDataLayer(null, "denied"); // user clicked block
         } else if (err.code === 2) {
           pushToDataLayer(null, "unavailable");
-        } else if (err.code === 3) {
-          pushToDataLayer(null, "timeout");
+        } else {
+          pushToDataLayer(null, "error");
         }
+
+        console.warn("Geolocation error:", err);
       },
       {
         enableHighAccuracy: false,
-        timeout: 20000, // let browser handle timeout
         maximumAge: 0
+        // ✅ timeout removed
       }
     );
   }
@@ -827,6 +835,7 @@
       setTimeout(getLocationAndFetch, 800);
     } else {
       pushToDataLayer(existing, "existing");
+      console.log("Existing pincode:", existing);
     }
   });
 })();
