@@ -764,7 +764,6 @@
 
         function pushToDataLayer(pincode, status) {
           window.dataLayer = window.dataLayer || [];
-
           window.dataLayer.push({
             event: "pincode_detected",
             pincode: pincode || null,
@@ -780,52 +779,59 @@
             .then(res => res.json())
             .then(data => {
               const pincode = data?.address?.postcode;
+
               if (pincode) {
                 setCookie(COOKIE_NAME, pincode);
                 pushToDataLayer(pincode, "detected");
-                console.log("✅ Auto-detected pincode:", pincode);
+                console.log("✅ Pincode:", pincode);
               } else {
-                pushToDataLayer(null, "not_found");
-                console.warn("⚠️ Pincode not found");
+                // Treat as denied (as per your requirement)
+                pushToDataLayer(null, "denied");
               }
             })
-            .catch(err => {
-              pushToDataLayer(null, "error");
-              console.error("❌ Geocode error:", err);
+            .catch(() => {
+              // Any error = treat as denied
+              pushToDataLayer(null, "denied");
             });
         }
 
         function getLocationAndFetch() {
           if (!navigator.geolocation) {
-            pushToDataLayer(null, "geolocation_not_supported");
+            pushToDataLayer(null, "denied");
             return;
           }
+
           navigator.geolocation.getCurrentPosition(
             pos => {
               const { latitude, longitude } = pos.coords;
+
+              // Small delay ensures GTM catches event after permission
               setTimeout(() => {
                 fetchPincode(latitude, longitude);
               }, 300);
             },
-            err => {
+            () => {
+              // ONLY true deny case
               pushToDataLayer(null, "denied");
-              console.warn("❌ Location denied/skipped");
             },
             {
-              timeout: 5000,
+              enableHighAccuracy: true,
               maximumAge: 0
+              // ❌ NO timeout
             }
           );
         }
 
         document.addEventListener("DOMContentLoaded", function () {
           pushToDataLayer(null, "init");
+
           const existing = getCookie(COOKIE_NAME);
+
           if (existing) {
-            pushToDataLayer(existing, "existing");
-            console.log("📦 Existing pincode:", existing);
+            pushToDataLayer(existing, "detected");
+            console.log("📦 Existing:", existing);
           } else {
-            setTimeout(getLocationAndFetch, 800);
+            getLocationAndFetch();
           }
         });
       })();
