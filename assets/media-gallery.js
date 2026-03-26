@@ -181,7 +181,7 @@ if (!customElements.get('media-gallery')) {
       const img = item.querySelector("img");
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
-      const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
+      const isAnyColor = itemColor !== "";
 
       // ✅ CERT detection (only classification, no reordering logic)
       if (alt.includes("cert")) {
