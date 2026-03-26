@@ -751,6 +751,7 @@
 <script>
 (function () {
   const COOKIE_NAME = "user_pincode";
+  const SESSION_FLAG = "pincode_event_fired";
   let resolved = false;
 
   function getCookie(name) {
@@ -763,13 +764,25 @@
     document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
   }
 
+  function hasFired() {
+    return sessionStorage.getItem(SESSION_FLAG);
+  }
+
+  function markFired() {
+    sessionStorage.setItem(SESSION_FLAG, "1");
+  }
+
   function pushToDataLayer(pincode, status) {
+    if (hasFired()) return; // 🚫 prevent repeat firing
+
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: "pincode_detected",
       pincode,
       status
     });
+
+    markFired();
   }
 
   function fetchPincode(lat, lng) {
@@ -781,15 +794,11 @@
         if (pincode) {
           setCookie(COOKIE_NAME, pincode);
           pushToDataLayer(pincode, "detected");
-          console.log("Auto-detected pincode:", pincode);
         } else {
           pushToDataLayer(null, "not_found");
         }
       })
-      .catch(err => {
-        pushToDataLayer(null, "error");
-        console.error("Geocode error:", err);
-      });
+      .catch(() => pushToDataLayer(null, "error"));
   }
 
   function getLocationAndFetch() {
@@ -811,19 +820,16 @@
         resolved = true;
 
         if (err.code === 1) {
-          pushToDataLayer(null, "denied"); // user clicked block
+          pushToDataLayer(null, "denied");
         } else if (err.code === 2) {
           pushToDataLayer(null, "unavailable");
         } else {
           pushToDataLayer(null, "error");
         }
-
-        console.warn("Geolocation error:", err);
       },
       {
         enableHighAccuracy: false,
         maximumAge: 0
-        // ✅ timeout removed
       }
     );
   }
@@ -834,8 +840,7 @@
     if (!existing) {
       setTimeout(getLocationAndFetch, 800);
     } else {
-      pushToDataLayer(existing, "existing");
-      console.log("Existing pincode:", existing);
+      pushToDataLayer(existing, "existing"); // will fire only once per session
     }
   });
 })();
