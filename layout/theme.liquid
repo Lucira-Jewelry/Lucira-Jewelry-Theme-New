@@ -764,14 +764,24 @@
 
         function pushToDataLayer(pincode, status) {
           window.dataLayer = window.dataLayer || [];
-          window.dataLayer.push({
-            event: "pincode_detected",
-            pincode: pincode || null,
-            status: status,
-            event_time: new Date().toISOString()
-          });
 
-          console.log("GTM Event:", status, pincode);
+          // Push in next tick so GTM catches it
+          setTimeout(() => {
+            window.dataLayer.push({
+              event: "pincode_detected",
+              pincode: pincode || null,
+              status: status,
+              event_time: new Date().toISOString()
+            });
+
+            console.log("GTM Event:", status, pincode);
+
+            // 🔥 Secondary guaranteed event (fixes GTM miss issue)
+            window.dataLayer.push({
+              event: "pincode_ready"
+            });
+
+          }, 0);
         }
 
         function fetchPincode(lat, lng) {
@@ -785,12 +795,10 @@
                 pushToDataLayer(pincode, "detected");
                 console.log("✅ Pincode:", pincode);
               } else {
-                // Treat as denied (as per your requirement)
                 pushToDataLayer(null, "denied");
               }
             })
             .catch(() => {
-              // Any error = treat as denied
               pushToDataLayer(null, "denied");
             });
         }
@@ -805,34 +813,54 @@
             pos => {
               const { latitude, longitude } = pos.coords;
 
+              // 🔥 Delay after permission to stabilize GTM
               setTimeout(() => {
                 fetchPincode(latitude, longitude);
-              }, 500); // 👈 increased delay
+              }, 500);
             },
             () => {
-              // ONLY true deny case
               pushToDataLayer(null, "denied");
             },
             {
               enableHighAccuracy: true,
               maximumAge: 0
-              // ❌ NO timeout
+              // ❌ no timeout (as per your requirement)
             }
           );
         }
 
+        function waitForGTM(callback) {
+          let tries = 0;
+
+          const interval = setInterval(() => {
+            if (window.dataLayer && window.google_tag_manager) {
+              clearInterval(interval);
+              callback();
+            }
+
+            tries++;
+            if (tries > 20) {
+              clearInterval(interval);
+              callback(); // still run
+            }
+          }, 100);
+        }
+
         document.addEventListener("DOMContentLoaded", function () {
-          pushToDataLayer(null, "init");
+          waitForGTM(() => {
 
-          const existing = getCookie(COOKIE_NAME);
+            const existing = getCookie(COOKIE_NAME);
 
-          if (existing) {
-            pushToDataLayer(existing, "detected");
-            console.log("📦 Existing:", existing);
-          } else {
-            getLocationAndFetch();
-          }
+            if (existing) {
+              pushToDataLayer(existing, "detected");
+              console.log("📦 Existing:", existing);
+            } else {
+              getLocationAndFetch();
+            }
+
+          });
         });
+
       })();
     </script>
 </body>
