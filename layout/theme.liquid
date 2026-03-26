@@ -751,27 +751,22 @@
     <script>
       (function () {
         const COOKIE_NAME = "user_pincode";
-
         function getCookie(name) {
           const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
           return match ? match[2] : null;
         }
-
         function setCookie(name, value, days = 30) {
           const maxAge = days * 24 * 60 * 60;
           document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
         }
-
         function pushToDataLayer(pincode, status) {
           window.dataLayer = window.dataLayer || [];
-
           window.dataLayer.push({
             event: "pincode_detected",
             pincode: pincode || null,
             status: status,
             event_time: new Date().toISOString()
           });
-
           console.log("GTM Event:", status, pincode);
         }
 
@@ -780,12 +775,9 @@
             .then(res => res.json())
             .then(data => {
               const pincode = data?.address?.postcode;
-
               if (pincode) {
                 setCookie(COOKIE_NAME, pincode);
-
                 pushToDataLayer(pincode, "detected");
-
                 console.log("✅ Auto-detected pincode:", pincode);
               } else {
                 pushToDataLayer(null, "not_found");
@@ -803,13 +795,17 @@
             pushToDataLayer(null, "geolocation_not_supported");
             return;
           }
-
           navigator.geolocation.getCurrentPosition(
             pos => {
+              // 🔥 NEW: Fires immediately when user allows permission
+              pushToDataLayer(null, "permission_allowed");
+              console.log("✅ Location permission granted");
+
               const { latitude, longitude } = pos.coords;
               fetchPincode(latitude, longitude);
             },
             err => {
+              // This handles if they click "Block" or if it times out
               pushToDataLayer(null, "denied");
               console.warn("❌ Location denied/skipped");
             },
@@ -823,9 +819,7 @@
         document.addEventListener("DOMContentLoaded", function () {
           // 🔥 IMPORTANT: fire init event immediately
           pushToDataLayer(null, "init");
-
           const existing = getCookie(COOKIE_NAME);
-
           if (existing) {
             pushToDataLayer(existing, "existing");
             console.log("📦 Existing pincode:", existing);
