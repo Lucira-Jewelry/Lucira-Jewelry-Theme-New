@@ -224,7 +224,6 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Escape key support
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && engravingDrawer.classList.contains('active')) {
     closeEngravingDrawer();
@@ -234,14 +233,12 @@ document.addEventListener('keydown', function(e) {
 
 const drawer = document.getElementById('variant-drawer');
 const overlay = document.getElementById('drawer-overlay');
-// Open drawer button
 document.addEventListener('click', function(e) {
   if (e.target.closest('#product_variant_drawer')) {
     openDrawer();
   }
 });
 
-// Close drawer buttons (X button or Customize button inside)
 document.addEventListener('click', function(e) {
   if (
     e.target.closest('#close-drawer') ||
