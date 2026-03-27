@@ -103,6 +103,17 @@
 
   var lastSavedPincode = null;
 
+  // ✅ SAFELY GET CUSTOMER ID (fix for all cases)
+  function getCustomerId() {
+    try {
+      if (!window.customerId || window.customerId === 'null') return null;
+
+      return String(window.customerId).replace('gid://shopify/Customer/', '');
+    } catch (e) {
+      return null;
+    }
+  }
+
   function setCookie(name, value, days = 30) {
     var expires = "";
     if (days) {
@@ -174,28 +185,45 @@
     });
   }
 
-  // ✅ API CALL
+  // ✅ FIXED API CALL
   function savePincodeToServer(pincode) {
     try {
-      if (!window.customerId || window.customerId === 'null') return;
-      if (pincode === lastSavedPincode) return;
+      var customerId = getCustomerId();
 
+      if (!customerId) {
+        console.log('❌ No customer ID — skipping API');
+        return;
+      }
+
+      if (!/^\d{6}$/.test(pincode)) return;
+
+      if (pincode === lastSavedPincode) return;
       lastSavedPincode = pincode;
 
-      fetch('https://api.lucirajewelry.com/customers/pinocde.php', {
+      console.log('📡 Sending to API:', { customerId, pincode });
+
+      fetch('https://api.lucirajewelry.com/customers/pincode.php', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          customer_id: window.customerId,
+          customer_id: customerId,
           pincode: pincode
         })
       })
-      .then(res => res.text())
-      .then(data => console.log('API success:', data))
-      .catch(err => console.log('API error:', err));
+      .then(res => res.json())
+      .then(data => {
+        console.log('✅ API response:', data);
+
+        if (!data || data.status === false) {
+          console.warn('⚠️ API returned error:', data);
+        }
+      })
+      .catch(err => {
+        console.error('❌ API error:', err);
+      });
 
     } catch (e) {
-      console.log('API exception:', e);
+      console.error('❌ API exception:', e);
     }
   }
 
@@ -239,7 +267,7 @@
 
               setCookie('user_pincode', val);
               pushPromoClick(val);
-              savePincodeToServer(val); // ✅ API
+              savePincodeToServer(val); // ✅ FIXED
 
               toggleButtonState(true);
 
@@ -272,7 +300,7 @@
 
               setCookie('user_pincode', pin);
               pushPromoClick(pin);
-              savePincodeToServer(pin); // ✅ API
+              savePincodeToServer(pin); // ✅ FIXED
 
               toggleButtonState(true);
 
@@ -289,9 +317,13 @@
     });
 
     var saved = getCookie('user_pincode');
+
     if (saved && /^\d{6}$/.test(saved)) {
       input.value = saved;
       toggleButtonState(true);
+
+      // ✅ ALSO SYNC ON LOAD (important fix)
+      savePincodeToServer(saved);
     } else {
       toggleButtonState(false);
     }
