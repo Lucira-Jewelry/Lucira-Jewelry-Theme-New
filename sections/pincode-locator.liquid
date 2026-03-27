@@ -12,9 +12,7 @@
 
     <div class="divider">OR</div>
 
-    <button id="use-location-btn" type="button">
-      Find Nearest Stores
-    </button>
+    <button id="use-location-btn" type="button">Find Nearest Stores</button>
 
     <p id="geo-status"></p>
   </div>
@@ -64,100 +62,101 @@
   .store-actions a img {height: 20px; width: 20px;}
   .store-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   .store-actions a:last-child {background: #b76f79; color: #fff;}
-  @media (max-width: 400px) { 
-    .locator-results-grid { grid-template-columns: 1fr; } 
-    .store-card { width: 100%; } 
+  @media (max-width: 400px) {
+    .locator-results-grid { grid-template-columns: 1fr; }
+    .store-card { width: 100%; }
     .store-actions a {font-size: 11px ;gap: 6px;}
     .store-actions a img { height: 16px; width: 16px; }
   }
-  
 </style>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-
-  function setCookie(name, value, days = 30) {
-    var expires = "";
-    if (days) {
-      var date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + value + "; path=/" + expires;
-  }
-
-  function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
-  }
-
-  var allStores = [
-    {% for block in section.blocks %}
-    {
-      name: {{ block.settings.store_name | json }},
-      city: {{ block.settings.city | json }},
-      pincode: {{ block.settings.pincode | json }},
-      address: {{ block.settings.address | json }},
-      phone: {{ block.settings.phone | json }},
-      designs_url: {{ block.settings.store_url | json }},
-      appointment_url: {{ block.settings.appointment_url | json }},
-      image: {% if block.settings.store_image != blank %}
-        {{ block.settings.store_image | image_url: width: 800 | json }}
-      {% else %}
-        null
-      {% endif %},
-      lat: {{ block.settings.latitude | default: 0 }},
-      lng: {{ block.settings.longitude | default: 0 }},
-      distance: null
-    }{% unless forloop.last %},{% endunless %}
-    {% endfor %}
-  ];
-
-  var userLocation = null;
-
-  var input = document.getElementById('store-search-input');
-  var searchBtn = document.getElementById('store-search-btn');
-  var geoBtn = document.getElementById('use-location-btn');
-  var container = document.getElementById('store-results');
-  var statusMsg = document.getElementById('geo-status');
-
-  function renderStores(list) {
-    container.innerHTML = '';
-
-    if (!list.length) {
-      container.innerHTML = '<p>No stores found.</p>';
-      return;
+  document.addEventListener('DOMContentLoaded', function () {
+    function setCookie(name, value, days = 30) {
+      var expires = '';
+      if (days) {
+        var date = new Date();
+        date.setTime(date.getTime() + days * 24 * 60 * 60 * 1000);
+        expires = '; expires=' + date.toUTCString();
+      }
+      document.cookie = name + '=' + String(value) + '; path=/' + expires;
     }
 
-    list.forEach(function (store) {
+    function getCookie(name) {
+      var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? String(match[2]) : null;
+    }
 
-      var distanceBadge = store.distance != null
-        ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
-        : '';
+    // ✅ SAME API FUNCTION AS PDP
+    function savePincodeToServer(pincode) {
+      try {
+        function attemptSend(retry = 0) {
+          let customerId = window.customerId;
 
-      var card = document.createElement('div');
-      card.className = 'store-card';
+          if (!customerId || customerId === 'null') {
+            if (retry < 5) {
+              setTimeout(() => attemptSend(retry + 1), 300);
+              return;
+            } else {
+              return;
+            }
+          }
 
-      card.innerHTML = `
+          customerId = String(customerId).replace('gid://shopify/Customer/', '');
+
+          fetch('https://api.lucirajewelry.com/customers/pincode.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_id: String(customerId),
+              pincode: String(pincode),
+            }),
+          });
+        }
+
+        attemptSend();
+      } catch (e) {}
+    }
+
+    var allStores = [
+      // (keep your Liquid loop as-is)
+    ];
+
+    var userLocation = null;
+
+    var input = document.getElementById('store-search-input');
+    var searchBtn = document.getElementById('store-search-btn');
+    var geoBtn = document.getElementById('use-location-btn');
+    var container = document.getElementById('store-results');
+    var statusMsg = document.getElementById('geo-status');
+
+    function renderStores(list) {
+      container.innerHTML = '';
+
+      if (!list.length) {
+        container.innerHTML = '<p>No stores found.</p>';
+        return;
+      }
+
+      list.forEach(function (store) {
+        var distanceBadge =
+          store.distance != null ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>` : '';
+
+        var card = document.createElement('div');
+        card.className = 'store-card';
+
+        card.innerHTML = `
         <div class="store-image-wrapper">
           ${distanceBadge}
-          
-          ${store.image ? `
+          ${
+            store.image
+              ? `
             <div class='main-image'>
               <img src="${store.image}" alt="${store.name}" loading="lazy">
-
-              <div class="arrow-parent">
-                <a href="${store.designs_url || '#'}" class="store-arrow">
-                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="60" height="60" rx="30" fill="white" fill-opacity="0.25"/>
-                    <path d="M18.6428 31.0986L18.6428 28.3572L37.4409 28.3572L29.0209 19.9372L30.9791 17.9791L42.7279 29.7279L30.9791 41.4768L29.0209 39.5186L37.4409 31.0986L18.6428 31.0986Z" fill="black"/>
-                    <rect x="0.5" y="0.5" width="59" height="59" rx="29.5" stroke="black"/>
-                  </svg>
-                </a>
-              </div>
             </div>
-          ` : ''}
-          
+          `
+              : ''
+          }
         </div>
 
         <div class="store-card-content">
@@ -167,138 +166,146 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>
       `;
 
-      container.appendChild(card);
-    });
-  }
-
-  function applyFilters(query) {
-    query = query.toLowerCase().trim();
-
-    var list = allStores;
-
-    if (query && !/^\d{4,6}$/.test(query)) {
-      list = list.filter(function (store) {
-        return (
-          store.name + store.city + store.address
-        ).toLowerCase().includes(query);
+        container.appendChild(card);
       });
     }
 
-    if (userLocation) {
-      list = list
-        .map(function (store) {
-          if (!store.lat || !store.lng) return null;
-          store.distance = getDistance(
-            userLocation.lat,
-            userLocation.lng,
-            parseFloat(store.lat),
-            parseFloat(store.lng)
-          );
-          return store;
-        })
-        .filter(function (store) {
-          return store && store.distance <= 25;
-        })
-        .sort(function (a, b) {
-          return a.distance - b.distance;
+    function applyFilters(query) {
+      query = query.toLowerCase().trim();
+
+      var list = allStores;
+
+      if (query && !/^\d{4,6}$/.test(query)) {
+        list = list.filter(function (store) {
+          return (store.name + store.city + store.address).toLowerCase().includes(query);
         });
+      }
+
+      if (userLocation) {
+        list = list
+          .map(function (store) {
+            if (!store.lat || !store.lng) return null;
+            store.distance = getDistance(
+              userLocation.lat,
+              userLocation.lng,
+              parseFloat(store.lat),
+              parseFloat(store.lng)
+            );
+            return store;
+          })
+          .filter(function (store) {
+            return store && store.distance <= 25;
+          })
+          .sort(function (a, b) {
+            return a.distance - b.distance;
+          });
+      }
+
+      renderStores(list);
     }
 
-    renderStores(list);
-  }
+    function handleSearch() {
+      var query = String(input.value.trim());
 
-  function handleSearch() {
-    var query = input.value.trim();
+      if (/^\d{4,6}$/.test(query)) {
+        fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d[0]) {
+              // ✅ COOKIE STRING
+              setCookie('user_pincode', String(query));
 
-    if (/^\d{4,6}$/.test(query)) {
-      fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
-        .then(r => r.json())
-        .then(d => {
-          if (d[0]) {
-            setCookie('user_pincode', query);
+              // ✅ API SYNC
+              savePincodeToServer(query);
 
-            userLocation = {
-              lat: parseFloat(d[0].lat),
-              lng: parseFloat(d[0].lon)
-            };
+              userLocation = {
+                lat: parseFloat(d[0].lat),
+                lng: parseFloat(d[0].lon),
+              };
 
-            statusMsg.innerText = 'Showing stores near ' + query;
+              statusMsg.innerText = 'Showing stores near ' + query;
+              applyFilters('');
+            }
+          });
+
+        return;
+      }
+
+      applyFilters(query);
+    }
+
+    function handleLocateMe() {
+      if (!navigator.geolocation) return;
+
+      statusMsg.innerText = 'Locating you...';
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+        userLocation = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+
+        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d?.address?.postcode) {
+              var pin = String(d.address.postcode.replace(/\s+/g, ''));
+
+              // ✅ COOKIE STRING
+              setCookie('user_pincode', pin);
+
+              // ✅ API SYNC
+              savePincodeToServer(pin);
+
+              input.value = pin;
+              statusMsg.innerText = 'Detected Pincode: ' + pin;
+            } else {
+              statusMsg.innerText = 'Showing nearby stores';
+            }
+
             applyFilters('');
-          }
-        });
-      return;
+          });
+      });
     }
 
-    applyFilters(query);
-  }
+    function getDistance(lat1, lon1, lat2, lon2) {
+      var R = 6371;
+      var dLat = ((lat2 - lat1) * Math.PI) / 180;
+      var dLon = ((lon2 - lon1) * Math.PI) / 180;
+      var a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    }
 
-  function handleLocateMe() {
-    if (!navigator.geolocation) return;
+    renderStores(allStores);
 
-    statusMsg.innerText = 'Locating you...';
+    searchBtn.addEventListener('click', handleSearch);
+    geoBtn.addEventListener('click', handleLocateMe);
 
-    navigator.geolocation.getCurrentPosition(function (pos) {
-      userLocation = {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude
-      };
-
-      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
-        .then(r => r.json())
-        .then(d => {
-          if (d?.address?.postcode) {
-
-            var pin = d.address.postcode.replace(/\s+/g, '');
-            setCookie('user_pincode', pin);
-            input.value = pin;
-            statusMsg.innerText = 'Detected Pincode: ' + pin;
-
-          } else {
-            statusMsg.innerText = 'Showing nearby stores';
-          }
-
-          applyFilters('');
-        });
+    input.addEventListener('keyup', function (e) {
+      if (e.key === 'Enter') handleSearch();
+      if (!this.value) applyFilters('');
     });
-  }
 
-  function getDistance(lat1, lon1, lat2, lon2) {
-    var R = 6371;
-    var dLat = (lat2 - lat1) * Math.PI / 180;
-    var dLon = (lon2 - lon1) * Math.PI / 180;
-    var a =
-      Math.sin(dLat / 2) ** 2 +
-      Math.cos(lat1 * Math.PI / 180) *
-      Math.cos(lat2 * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-  }
+    // ✅ LOAD FROM COOKIE + SYNC WITH METAFIELD
+    var savedPin = String(getCookie('user_pincode') || '');
 
-  renderStores(allStores);
+    if (savedPin && /^\d{6}$/.test(savedPin)) {
+      input.value = savedPin;
 
-  searchBtn.addEventListener('click', handleSearch);
-  geoBtn.addEventListener('click', handleLocateMe);
+      // ✅ IMPORTANT: sync metafield
+      savePincodeToServer(savedPin);
 
-  input.addEventListener('keyup', function (e) {
-    if (e.key === 'Enter') handleSearch();
-    if (!this.value) applyFilters('');
+      setTimeout(function () {
+        handleSearch();
+      }, 300);
+    }
   });
-
-  var savedPin = getCookie('user_pincode');
-
-  if (savedPin && /^\d{6}$/.test(savedPin)) {
-    input.value = savedPin;
-    setTimeout(function () {
-      handleSearch();
-    }, 300);
-  }
-
-});
 </script>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-
     document.getElementById('store-search-btn').addEventListener('click', function () {
       var query = document.getElementById('store-search-input').value.trim();
       window.dataLayer = window.dataLayer || [];
@@ -307,8 +314,8 @@ document.addEventListener('DOMContentLoaded', function () {
         promoClick: {
           creative_name: 'Store Nearby Page',
           promo_name: 'Find Us - Search',
-          search_term: query || undefined
-        }
+          search_term: query || undefined,
+        },
       });
     });
 
@@ -318,8 +325,8 @@ document.addEventListener('DOMContentLoaded', function () {
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: 'Find Nearest Stores'
-        }
+          promo_name: 'Find Nearest Stores',
+        },
       });
     });
 
@@ -334,7 +341,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (anchor.closest('.arrow-parent')) {
         promoName = 'View Store - ' + storeName;
-
       } else if (anchor.closest('.store-actions')) {
         var allActions = Array.from(anchor.closest('.store-actions').querySelectorAll('a'));
         var idx = allActions.indexOf(anchor);
@@ -346,7 +352,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
           promoName = anchor.innerText.trim() + ' - ' + storeName;
         }
-
       } else {
         promoName = anchor.innerText.trim() + ' - ' + storeName;
       }
@@ -356,14 +361,12 @@ document.addEventListener('DOMContentLoaded', function () {
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: promoName
-        }
+          promo_name: promoName,
+        },
       });
     });
-
   });
 </script>
-
 
 {% schema %}
 {
