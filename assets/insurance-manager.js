@@ -794,7 +794,7 @@
           state.handlingLastProductRemoval = false;
         }
       } else {
-        setTimeout(() => syncInsuranceWithProducts(), 600);
+        setTimeout(() => syncInsuranceWithProducts(), 100);
       }
       
     }, true);
