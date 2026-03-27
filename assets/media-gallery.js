@@ -150,10 +150,17 @@ if (!customElements.get('media-gallery')) {
 
   function getColorFromAlt(text) {
     const lower = (text || "").toLowerCase();
-    if (lower.includes("white")) return "white";
-    if (lower.includes("yellow")) return "yellow";
-    if (lower.includes("rose")) return "rose";
-    if (lower.includes("plt") || lower.includes("platinum")) return "plt";
+
+    // Handle combos like "yellow-white", "white-yellow"
+    const match = lower.match(/(yellow|white|rose|plt|platinum)[\s-]?(yellow|white|rose|plt|platinum)?/);
+
+    if (match && match[1]) {
+      const firstColor = match[1];
+
+      if (firstColor === "platinum") return "plt";
+      return firstColor;
+    }
+
     return "";
   }
 

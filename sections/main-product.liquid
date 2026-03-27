@@ -162,7 +162,7 @@
                       <div class="trace-icon new_modal">TRACE</div>
                     </div>
                   {% endcomment %}
-                  {% assign hide_trace_badge = false %}
+                  {% comment %} {% assign hide_trace_badge = false %}
 
                   {% for tag in product.tags %}
                     {% if tag == 'Gold Jewelry' %}
@@ -176,7 +176,7 @@
                     </div>
                   {% endunless %}
 
-                  {% render 'trace-datalayer' %}
+                  {% render 'trace-datalayer' %} {% endcomment %}
                 </div>
               {%- when 'price' -%}
                 <div id="price-{{ section.id }}" role="status" {{ block.shopify_attributes }}>
@@ -192,7 +192,7 @@
                     <span>{{ 'products.product.volume_pricing.note' | t }}</span>
                   </div>
                 {%- endif -%}
-                {%- if cart.taxes_included or cart.duties_included or shop.shipping_policy.body != blank -%}
+                {% comment %} {%- if cart.taxes_included or cart.duties_included or shop.shipping_policy.body != blank -%}
                   <div class="product__tax caption rte">
                     {%- if cart.duties_included and cart.taxes_included -%}
                       {{ 'products.product.duties_and_taxes_included' | t }}
@@ -205,7 +205,7 @@
                       {{ 'products.product.shipping_policy_html' | t: link: shop.shipping_policy.url }}
                     {%- endif -%}
                   </div>
-                {%- endif -%}
+                {%- endif -%} {% endcomment %}
                 <div {{ block.shopify_attributes }}>
                   {%- assign product_form_installment_id = 'product-form-installment-' | append: section.id -%}
                   {%- form 'product', product, id: product_form_installment_id, class: 'installment caption-large' -%}
@@ -1459,15 +1459,12 @@
             ? (variant.price / 100).toFixed(2)
             : '{{ product.price | money_without_trailing_zeros }}',
 
-          productUrl: '{{ product.url }}',
-          image: '{{ product.featured_image | image_url }}',
-
+          productUrl: {{ shop.url | append: product.url | json }},
+          image: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }}, 
+          offerPrice: {{ product.compare_at_price }}/100,          
           category: '{{ product.metafields.custom.category.value }}',
           subCategory: '{{ product.metafields.custom.sub_category_1.value }}',
           productPersona: '{{ product.metafields.custom.persona.value }}',
-          option1: variant?.option1 || null,
-          option2: variant?.option2 || null,
-          option3: variant?.option3 || null,
         };
 
         console.log('✅ dataLayer.push → addToCart', productData);
@@ -1575,7 +1572,7 @@
           offer_price: selectedVariant ? selectedVariant.price / 100 : 0,
           price: selectedVariant && selectedVariant.compare_at_price ? selectedVariant.compare_at_price / 100 : 0,
           making_charges: '{{ product.metafields.custom.making_charges }}',
-          image: '{{ product.featured_image | image_url: width: 800 }}',
+          image: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }}, 
           currency: '{{ shop.currency }}',
           product_persona: '{{ product.metafields.custom.persona }}',
         };
@@ -1596,7 +1593,7 @@
 
 
 
-<script>
+{% comment %} <script>
 document.addEventListener('DOMContentLoaded', function () {
 
   window.dataLayer = window.dataLayer || [];
@@ -1619,10 +1616,52 @@ document.addEventListener('DOMContentLoaded', function () {
       thumbnailImage: {{ product.featured_image | image_url: width: 800 | json }},
       image: {{ product.featured_image | image_url: width: 800 | json }},
 
-      price: "{{ product.price | divided_by: 100}}",
-      offerPrice: "{{ product.compare_at_price | divided_by: 100}}",
+      price: {{ product.price | divided_by: 100 | json }},
+      offerPrice: {{ product.compare_at_price | divided_by: 100 | json }},
 
       productPersona: {{ product.metafields.custom.persona.value | json }}
+    }
+  });
+
+});
+</script> {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  function pushProductView(variant) {
+    window.dataLayer = window.dataLayer || [];
+
+    window.dataLayer.push({
+      event: 'productView',
+      products: {
+        productId: {{ product.id | json }},
+        sku: variant.sku,
+        variantId: variant.id,
+        vendorCode: {{ product.vendor | json }},
+        productName: {{ product.title | json }},
+        productType: {{ product.type | json }},
+        category: {{ product.metafields.custom.category.value | json }},
+        subCategory: {{ product.metafields.custom.sub_category_1.value | json }},
+        productUrl: {{ shop.url | append: product.url | json }},
+        productUrlw: {{ product.url | json }},
+        thumbnailImage: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }},      
+        image: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }}, 
+        price: variant.price / 100,
+        offerPrice: variant.compare_at_price ? variant.compare_at_price / 100 : null,
+        productPersona: {{ product.metafields.custom.persona.value | json }}
+      }
+    });
+  }
+
+  // Initial load
+  var initialVariant = {{ product.selected_or_first_available_variant | json }};
+  pushProductView(initialVariant);
+
+  // Listen for variant change (Shopify standard event)
+  document.addEventListener('variant:change', function (event) {
+    if (event.detail && event.detail.variant) {
+      pushProductView(event.detail.variant);
     }
   });
 

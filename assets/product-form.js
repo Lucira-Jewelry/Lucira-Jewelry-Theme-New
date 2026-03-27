@@ -224,7 +224,6 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Escape key support
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && engravingDrawer.classList.contains('active')) {
     closeEngravingDrawer();
@@ -234,14 +233,12 @@ document.addEventListener('keydown', function(e) {
 
 const drawer = document.getElementById('variant-drawer');
 const overlay = document.getElementById('drawer-overlay');
-// Open drawer button
 document.addEventListener('click', function(e) {
   if (e.target.closest('#product_variant_drawer')) {
     openDrawer();
   }
 });
 
-// Close drawer buttons (X button or Customize button inside)
 document.addEventListener('click', function(e) {
   if (
     e.target.closest('#close-drawer') ||
@@ -420,36 +417,6 @@ document.addEventListener('click', function(e) {
   }
 
   document.addEventListener('DOMContentLoaded', () => setTimeout(initCarousels, 50));
-})();
-
-(function() {
-  const passportDrawer = document.getElementById('product-passport-drawer');
-  const passportOverlay = document.getElementById('passport-overlay');
-  const passportOpenBtn = document.getElementById('trace-badge');
-  const passportCloseBtn = passportDrawer.querySelector('.close-drawer');
-
-  function openPassportDrawer() {
-    passportDrawer.classList.add('active');
-    passportOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closePassportDrawer() {
-    passportDrawer.classList.remove('active');
-    passportOverlay.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-
-  passportOpenBtn.addEventListener('click', openPassportDrawer);
-
-  passportCloseBtn.addEventListener('click', closePassportDrawer);
-  passportOverlay.addEventListener('click', closePassportDrawer);
-
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && passportDrawer.classList.contains('active')) {
-      closePassportDrawer();
-    }
-  });
 })();
 
 document.addEventListener("DOMContentLoaded", function () {

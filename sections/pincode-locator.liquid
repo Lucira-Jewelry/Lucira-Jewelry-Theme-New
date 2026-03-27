@@ -12,9 +12,7 @@
 
     <div class="divider">OR</div>
 
-    <button id="use-location-btn" type="button">
-      Find Nearest Stores
-    </button>
+    <button id="use-location-btn" type="button">Find Nearest Stores</button>
 
     <p id="geo-status"></p>
   </div>
@@ -64,212 +62,272 @@
   .store-actions a img {height: 20px; width: 20px;}
   .store-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   .store-actions a:last-child {background: #b76f79; color: #fff;}
-  @media (max-width: 400px) { 
-    .locator-results-grid { grid-template-columns: 1fr; } 
-    .store-card { width: 100%; } 
+  @media (max-width: 400px) {
+    .locator-results-grid { grid-template-columns: 1fr; }
+    .store-card { width: 100%; }
     .store-actions a {font-size: 11px ;gap: 6px;}
     .store-actions a img { height: 16px; width: 16px; }
   }
-  
 </style>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function () {
 
-    var allStores = [
-      {% for block in section.blocks %}
-      {
-        name: {{ block.settings.store_name | json }},
-        city: {{ block.settings.city | json }},
-        pincode: {{ block.settings.pincode | json }},
-        address: {{ block.settings.address | json }},
-        phone: {{ block.settings.phone | json }},
-        designs_url: {{ block.settings.store_url | json }},
-        appointment_url: {{ block.settings.appointment_url | json }},
-        image: {% if block.settings.store_image != blank %}
-          {{ block.settings.store_image | image_url: width: 800 | json }}
-        {% else %}
-          null
-        {% endif %},
-        lat: {{ block.settings.latitude | default: 0 }},
-        lng: {{ block.settings.longitude | default: 0 }},
-        distance: null
-      }{% unless forloop.last %},{% endunless %}
-      {% endfor %}
-    ];
+  function setCookie(name, value, days = 30) {
+    var expires = "";
+    if (days) {
+      var date = new Date();
+      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+      expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + String(value) + "; path=/" + expires;
+  }
 
-    var userLocation = null;
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+  }
 
-    var input = document.getElementById('store-search-input');
-    var searchBtn = document.getElementById('store-search-btn');
-    var geoBtn = document.getElementById('use-location-btn');
-    var container = document.getElementById('store-results');
-    var statusMsg = document.getElementById('geo-status');
+  var allStores = [
+    {% for block in section.blocks %}
+    {
+      name: {{ block.settings.store_name | json }},
+      city: {{ block.settings.city | json }},
+      pincode: {{ block.settings.pincode | json }},
+      address: {{ block.settings.address | json }},
+      phone: {{ block.settings.phone | json }},
+      designs_url: {{ block.settings.store_url | json }},
+      appointment_url: {{ block.settings.appointment_url | json }},
+      image: {% if block.settings.store_image != blank %}
+        {{ block.settings.store_image | image_url: width: 800 | json }}
+      {% else %}
+        null
+      {% endif %},
+      lat: {{ block.settings.latitude | default: 0 }},
+      lng: {{ block.settings.longitude | default: 0 }},
+      distance: null
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  ];
 
-    function renderStores(list) {
-      container.innerHTML = '';
+  var userLocation = null;
 
-      if (!list.length) {
-        container.innerHTML = '<p>No stores found.</p>';
-        return;
-      }
+  var input = document.getElementById('store-search-input');
+  var searchBtn = document.getElementById('store-search-btn');
+  var geoBtn = document.getElementById('use-location-btn');
+  var container = document.getElementById('store-results');
+  var statusMsg = document.getElementById('geo-status');
 
-      list.forEach(function (store) {
+  function renderStores(list) {
+    container.innerHTML = '';
 
-        var distanceBadge = store.distance != null
-          ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
-          : '';
+    if (!list.length) {
+      container.innerHTML = '<p>No stores found.</p>';
+      return;
+    }
 
-        var card = document.createElement('div');
-        card.className = 'store-card';
+    list.forEach(function (store) {
 
-        card.innerHTML = `
-          <div class="store-image-wrapper">
-            ${distanceBadge}
-            ${store.image ? `<div class='main-image'><img src="${store.image}" alt="${store.name}" loading="lazy"><div class="arrow-parent"> <a href="${store.designs_url}"> <div class="store-arrow"> <svg xmlns="http://www.w3.org/2000/svg" width="60" height="60" viewBox="0 0 60 60" fill="none"> <mask id="mask0_5069_1727" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="60" height="60"> <rect width="60" height="60" fill="#D9D9D9"></rect> </mask> <g mask="url(#mask0_5069_1727)"> <path d="M18.6428 31.0986L18.6428 28.3572L37.4409 28.3572L29.0209 19.9372L30.9791 17.9791L42.7279 29.7279L30.9791 41.4768L29.0209 39.5186L37.4409 31.0986L18.6428 31.0986Z" fill="black"></path> </g> </svg> </div> </a> </div></div>` : ''}
-          </div>
+      var distanceBadge = store.distance != null
+        ? `<span class="distance-badge">${store.distance.toFixed(1)} km away</span>`
+        : '';
 
-          <div class="store-card-content">
-            <span class="city-pill">${store.city}</span>
-            <h3>${store.name}</h3>
-            <p class="store-address"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><mask id="mask0_4677_1228" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24"><rect width="24" height="24" fill="#D9D9D9"/></mask><g mask="url(#mask0_4677_1228)">
-            <path d="M12.0011 19.5135C13.9575 17.7622 15.4545 16.0823 16.4924 14.474C17.5302 12.8657 18.0491 11.457 18.0491 10.248C18.0491 8.425 17.47 6.92633 16.3116 5.752C15.1533 4.57767 13.7165 3.9905 12.0011 3.9905C10.2858 3.9905 8.84896 4.57767 7.69062 5.752C6.53229 6.92633 5.95312 8.425 5.95312 10.248C5.95312 11.457 6.47204 12.8657 7.50988 14.474C8.54771 16.0823 10.0448 17.7622 12.0011 19.5135ZM12.0011 20.9403C11.8063 20.9403 11.6115 20.9067 11.4166 20.8395C11.2216 20.7722 11.0453 20.668 10.8876 20.527C9.99029 19.7 9.15054 18.8483 8.36838 17.972C7.58637 17.0958 6.90662 16.2199 6.32912 15.3443C5.75146 14.4686 5.29438 13.6007 4.95788 12.7405C4.62138 11.8802 4.45312 11.0493 4.45312 10.248C4.45312 7.94033 5.19954 6.07208 6.69237 4.64325C8.18537 3.21442 9.95496 2.5 12.0011 2.5C14.0473 2.5 15.8169 3.21442 17.3099 4.64325C18.8027 6.07208 19.5491 7.94033 19.5491 10.248C19.5491 11.0493 19.3809 11.8785 19.0444 12.7355C18.7079 13.5927 18.2525 14.4607 17.6781 15.3395C17.1036 16.2183 16.4254 17.0942 15.6434 17.9672C14.8614 18.8404 14.0216 19.6904 13.1241 20.5173C12.9688 20.6583 12.7922 20.764 12.5944 20.8345C12.3967 20.905 12.199 20.9403 12.0011 20.9403ZM12.0029 11.8652C12.5004 11.8652 12.9257 11.6881 13.2789 11.3338C13.6322 10.9794 13.8089 10.5535 13.8089 10.056C13.8089 9.5585 13.6317 9.13308 13.2774 8.77975C12.923 8.42658 12.497 8.25 11.9994 8.25C11.5019 8.25 11.0765 8.42717 10.7234 8.7815C10.37 9.13583 10.1934 9.56183 10.1934 10.0595C10.1934 10.557 10.3705 10.9823 10.7249 11.3355C11.0792 11.6887 11.5052 11.8652 12.0029 11.8652Z" fill="#1A1A1A"/>
-            </g></svg>${store.address}</p>
-            <p class="store-pincode"><strong>Pincode:</strong> ${store.pincode}</p>
-            <div class="store-phone-time grid-row">
-              <div class="grid-column">
-                <p class="store-phone"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M20.9994 16.4765V19.1862C21.0005 19.4377 20.9488 19.6867 20.8479 19.9172C20.7469 20.1477 20.5988 20.3546 20.413 20.5247C20.2273 20.6947 20.008 20.8242 19.7693 20.9048C19.5305 20.9854 19.2775 21.0153 19.0265 20.9927C16.2415 20.6907 13.5664 19.7409 11.216 18.2197C9.02929 16.8329 7.17534 14.9827 5.7858 12.8003C4.25627 10.4439 3.30442 7.76107 3.00735 4.96915C2.98473 4.71938 3.01447 4.46764 3.09468 4.22996C3.17489 3.99229 3.30381 3.77389 3.47323 3.58866C3.64265 3.40343 3.84885 3.25544 4.07872 3.15411C4.30858 3.05278 4.55707 3.00032 4.80837 3.00009H7.52347C7.96269 2.99577 8.3885 3.151 8.72152 3.43683C9.05455 3.72267 9.27207 4.11961 9.33354 4.55366C9.44814 5.42084 9.66067 6.27229 9.96707 7.09177C10.0888 7.41507 10.1152 7.76642 10.043 8.1042C9.97082 8.44198 9.80313 8.75203 9.5598 8.99761L8.41041 10.1447C9.69877 12.406 11.5748 14.2784 13.8406 15.5642L14.99 14.4171C15.2361 14.1742 15.5467 14.0069 15.8852 13.9348C16.2236 13.8628 16.5757 13.8891 16.8996 14.0106C17.7207 14.3164 18.5739 14.5285 19.4428 14.6429C19.8824 14.7048 20.2839 14.9258 20.5709 15.2639C20.858 15.6019 21.0105 16.0335 20.9994 16.4765Z" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg> ${store.phone}</p>
-              </div>
-              <div class="grid-column">
-                <p class="store-time"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"> <path d="M12 21C16.4183 21 20 17.4183 20 13C20 8.58172 16.4183 5 12 5C7.58172 5 4 8.58172 4 13C4 17.4183 7.58172 21 12 21Z" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M12 9V13L14 15" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M5 3L2 6" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M22 6L19 3" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M6.38 18.7L4 21" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> <path d="M17.6406 18.67L20.0006 21" stroke="#1A1A1A" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/> </svg> 10:30 AM - 10:00 PM</p>
+      var card = document.createElement('div');
+      card.className = 'store-card';
+
+      card.innerHTML = `
+        <div class="store-image-wrapper">
+          ${distanceBadge}
+          
+          ${store.image ? `
+            <div class='main-image'>
+              <img src="${store.image}" alt="${store.name}" loading="lazy">
+
+              <div class="arrow-parent">
+                <a href="${store.designs_url || '#'}" class="store-arrow">
+                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="60" height="60" rx="30" fill="white" fill-opacity="0.25"/>
+                    <path d="M18.6428 31.0986L18.6428 28.3572L37.4409 28.3572L29.0209 19.9372L30.9791 17.9791L42.7279 29.7279L30.9791 41.4768L29.0209 39.5186L37.4409 31.0986L18.6428 31.0986Z" fill="black"/>
+                    <rect x="0.5" y="0.5" width="59" height="59" rx="29.5" stroke="black"/>
+                  </svg>
+                </a>
               </div>
             </div>
-            <div class="store-actions">
-              <a href="${store.appointment_url}" target="_blank"><img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/whatsapp.png?v=1768894162" alt="whatsapp icon" width="40" height="40">  Connect with us</a>
-              <a href="${store.designs_url}" target="_blank">View All Designs</a>
-            </div>
-          </div>
-        `;
+          ` : ''}
+          
+        </div>
 
-        container.appendChild(card);
-      });
-    }
+        <div class="store-card-content">
+          <span class="city-pill">${store.city}</span>
+          <h3>${store.name}</h3>
+          <p class="store-address">${store.address}</p>
+        </div>
+      `;
 
-    function applyFilters(query) {
-      query = query.toLowerCase().trim();
-
-      var list = allStores;
-
-      if (query && !/^\d{4,6}$/.test(query)) {
-        list = list.filter(function (store) {
-          return (
-            store.name + store.city + store.address
-          ).toLowerCase().includes(query);
-        });
-      }
-
-      if (userLocation) {
-        list = list
-          .map(function (store) {
-            if (!store.lat || !store.lng) return null;
-            store.distance = getDistance(
-              userLocation.lat,
-              userLocation.lng,
-              parseFloat(store.lat),
-              parseFloat(store.lng)
-            );
-            return store;
-          })
-          .filter(function (store) {
-            return store && store.distance <= 25;
-          })
-          .sort(function (a, b) {
-            return a.distance - b.distance;
-          });
-      }
-
-      renderStores(list);
-    }
-
-    function handleSearch() {
-      var query = input.value.trim();
-
-      if (/^\d{4,6}$/.test(query)) {
-        fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
-          .then(r => r.json())
-          .then(d => {
-            if (d[0]) {
-              userLocation = {
-                lat: parseFloat(d[0].lat),
-                lng: parseFloat(d[0].lon)
-              };
-              statusMsg.innerText = 'Showing stores near ' + query;
-              applyFilters('');
-            }
-          });
-        return;
-      }
-
-      applyFilters(query);
-    }
-
-    function handleLocateMe() {
-      if (!navigator.geolocation) return;
-
-      statusMsg.innerText = 'Locating you...';
-
-      navigator.geolocation.getCurrentPosition(function (pos) {
-        userLocation = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        };
-
-        fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
-          .then(r => r.json())
-          .then(d => {
-            if (d?.address?.postcode) {
-              input.value = d.address.postcode;
-              statusMsg.innerText = 'Detected Pincode: ' + d.address.postcode;
-            } else {
-              statusMsg.innerText = 'Showing nearby stores';
-            }
-            applyFilters('');
-          });
-      });
-    }
-
-    function getDistance(lat1, lon1, lat2, lon2) {
-      var R = 6371;
-      var dLat = (lat2 - lat1) * Math.PI / 180;
-      var dLon = (lon2 - lon1) * Math.PI / 180;
-      var a =
-        Math.sin(dLat / 2) ** 2 +
-        Math.cos(lat1 * Math.PI / 180) *
-        Math.cos(lat2 * Math.PI / 180) *
-        Math.sin(dLon / 2) ** 2;
-      return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-    }
-
-    renderStores(allStores);
-
-    searchBtn.addEventListener('click', handleSearch);
-    geoBtn.addEventListener('click', handleLocateMe);
-
-    input.addEventListener('keyup', function (e) {
-      if (e.key === 'Enter') handleSearch();
-      if (!this.value) applyFilters('');
+      container.appendChild(card);
     });
+  }
 
+  function applyFilters(query) {
+    query = query.toLowerCase().trim();
+
+    var list = allStores;
+
+    if (query && !/^\d{4,6}$/.test(query)) {
+      list = list.filter(function (store) {
+        return (
+          store.name + store.city + store.address
+        ).toLowerCase().includes(query);
+      });
+    }
+
+    if (userLocation) {
+      list = list
+        .map(function (store) {
+          if (!store.lat || !store.lng) return null;
+          store.distance = getDistance(
+            userLocation.lat,
+            userLocation.lng,
+            parseFloat(store.lat),
+            parseFloat(store.lng)
+          );
+          return store;
+        })
+        .filter(function (store) {
+          return store && store.distance <= 25;
+        })
+        .sort(function (a, b) {
+          return a.distance - b.distance;
+        });
+    }
+
+    renderStores(list);
+  }
+
+  function savePincodeToServer(pincode) {
+  try {
+    function attemptSend(retry = 0) {
+      let customerId = window.customerId;
+
+      if (!customerId || customerId === 'null') {
+        if (retry < 5) {
+          setTimeout(() => attemptSend(retry + 1), 300);
+          return;
+        } else {
+          return;
+        }
+      }
+
+      customerId = String(customerId)
+        .replace('gid://shopify/Customer/', '');
+
+      fetch('https://api.lucirajewelry.com/customers/pincode.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: String(customerId),
+          pincode: String(pincode)
+        })
+      });
+    }
+
+    attemptSend();
+  } catch (e) {}
+}
+
+  function handleSearch() {
+    var query = input.value.trim();
+
+    if (/^\d{4,6}$/.test(query)) {
+      fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          if (d[0]) {
+            setCookie('user_pincode', String(query));
+            savePincodeToServer(query);
+
+            userLocation = {
+              lat: parseFloat(d[0].lat),
+              lng: parseFloat(d[0].lon)
+            };
+
+            statusMsg.innerText = 'Showing stores near ' + query;
+            applyFilters('');
+          }
+        });
+      return;
+    }
+
+    applyFilters(query);
+  }
+
+  function handleLocateMe() {
+    if (!navigator.geolocation) return;
+
+    statusMsg.innerText = 'Locating you...';
+
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      userLocation = {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
+
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${userLocation.lat}&lon=${userLocation.lng}&format=json`)
+        .then(r => r.json())
+        .then(d => {
+          if (d?.address?.postcode) {
+
+            var pin = d.address.postcode.replace(/\s+/g, '');
+            setCookie('user_pincode', String(pin));
+            savePincodeToServer(savedPin);
+            input.value = pin;
+            statusMsg.innerText = 'Detected Pincode: ' + pin;
+
+          } else {
+            statusMsg.innerText = 'Showing nearby stores';
+          }
+
+          applyFilters('');
+        });
+    });
+  }
+
+  function getDistance(lat1, lon1, lat2, lon2) {
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLon = (lon2 - lon1) * Math.PI / 180;
+    var a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * Math.PI / 180) *
+      Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) ** 2;
+    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+  }
+
+  renderStores(allStores);
+
+  searchBtn.addEventListener('click', handleSearch);
+  geoBtn.addEventListener('click', handleLocateMe);
+
+  input.addEventListener('keyup', function (e) {
+    if (e.key === 'Enter') handleSearch();
+    if (!this.value) applyFilters('');
   });
-</script>
 
-{% comment %} datalayer for store nearby page {% endcomment %}
+  var savedPin = String(getCookie('user_pincode') || '');
+
+  if (savedPin && /^\d{6}$/.test(savedPin)) {
+    input.value = savedPin;
+    setTimeout(function () {
+      handleSearch();
+    }, 300);
+  }
+
+});
+</script>
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-
-    // ── 1. Static CTAs ───────────────────────────────────────────────
-
     document.getElementById('store-search-btn').addEventListener('click', function () {
       var query = document.getElementById('store-search-input').value.trim();
       window.dataLayer = window.dataLayer || [];
@@ -278,8 +336,8 @@
         promoClick: {
           creative_name: 'Store Nearby Page',
           promo_name: 'Find Us - Search',
-          search_term: query || undefined
-        }
+          search_term: query || undefined,
+        },
       });
     });
 
@@ -289,20 +347,15 @@
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: 'Find Nearest Stores'
-        }
+          promo_name: 'Find Nearest Stores',
+        },
       });
     });
-
-    // ── 2. Dynamic Card CTAs (event delegation) ──────────────────────
-    // Fires for: "Connect with us", "View All Designs", store arrow link
-    // All anchors inside #store-results are captured here.
 
     document.getElementById('store-results').addEventListener('click', function (e) {
       var anchor = e.target.closest('a');
       if (!anchor) return;
 
-      // Get store name from the closest card
       var card = anchor.closest('.store-card');
       var storeName = card ? (card.querySelector('h3') ? card.querySelector('h3').innerText.trim() : '') : '';
 
@@ -310,21 +363,18 @@
 
       if (anchor.closest('.arrow-parent')) {
         promoName = 'View Store - ' + storeName;
-
       } else if (anchor.closest('.store-actions')) {
         var allActions = Array.from(anchor.closest('.store-actions').querySelectorAll('a'));
         var idx = allActions.indexOf(anchor);
 
         if (idx === 0) {
-          promoName = 'Connect With Us - ' + storeName;   // WhatsApp / appointment
+          promoName = 'Connect With Us - ' + storeName;
         } else if (idx === 1) {
           promoName = 'View All Designs - ' + storeName;
         } else {
           promoName = anchor.innerText.trim() + ' - ' + storeName;
         }
-
       } else {
-        // Fallback for any future anchor added inside a card
         promoName = anchor.innerText.trim() + ' - ' + storeName;
       }
 
@@ -333,14 +383,12 @@
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: promoName
-        }
+          promo_name: promoName,
+        },
       });
     });
-
   });
 </script>
-
 
 {% schema %}
 {
