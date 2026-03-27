@@ -27,7 +27,6 @@ window.handleGTMProductCardClick = function(event) {
   const productData = {
     event: "productClick",
     products:{
-    productId: target.dataset.productId,
     variantId: target.dataset.variantId,
     sku: target.dataset.sku,
     productName: target.dataset.productName,
