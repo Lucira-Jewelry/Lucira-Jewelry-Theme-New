@@ -29,6 +29,14 @@
   const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
   const formatMoney = (cents) => '₹' + Math.round(cents / 100).toLocaleString('en-IN');
   
+  const debounce = (fn, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => fn(...args), delay);
+    };
+  };
+  
   const getElements = () => ({
     checkbox: document.getElementById(CONFIG.CHECKBOX_ID),
     loader: document.getElementById(CONFIG.LOADER_ID),
@@ -820,7 +828,6 @@
               if (node.matches?.('cart-drawer-items') || node.querySelector?.('cart-drawer-items')) {
                 setTimeout(() => {
                   attachEventListeners();
-                  syncCheckboxState();
                 }, 100);
               }
             }
@@ -832,7 +839,6 @@
           if (target.tagName === 'CART-DRAWER' && target.hasAttribute('open')) {
             setTimeout(() => {
               attachEventListeners();
-              syncCheckboxState();
             }, 100);
           }
         }
@@ -849,11 +855,17 @@
   
   function listenToCartEvents() {
     if (typeof subscribe === 'function' && typeof PUB_SUB_EVENTS !== 'undefined') {
+      const debouncedCartSync = debounce(async () => {
+        const cartData = await getCart();
+        if (!cartData) return;
+
+        setCheckbox(hasInsurance(cartData), true);
+        await updateGrandTotalUI(cartData);
+        await syncInsuranceWithProducts();
+      }, 100);
+
       subscribe(PUB_SUB_EVENTS.cartUpdate, () => {
-        setTimeout(() => {
-          syncCheckboxState();
-          syncInsuranceWithProducts();
-        }, 100);
+        debouncedCartSync();
       });
     }
   }
