@@ -341,7 +341,7 @@
   .home-stl-heading { font-size: 28px; }
 }
 </style>
-
+{% comment %} 
 <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
@@ -446,6 +446,120 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   });
+
+});
+</script> {% endcomment %}
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  // ── 1. Mobile Swiper init ──────────────────────────────
+  if (window.innerWidth < 768) {
+    const grid = document.getElementById('stl-grid');
+    if (grid) {
+      const items = Array.from(grid.querySelectorAll('.home-stl-item'));
+
+      const swiperEl  = document.createElement('div');
+      swiperEl.classList.add('swiper', 'home-stl-swiper');
+
+      const wrapperEl = document.createElement('div');
+      wrapperEl.classList.add('swiper-wrapper');
+
+      items.forEach(item => {
+        item.classList.add('swiper-slide');
+        wrapperEl.appendChild(item);
+      });
+
+      swiperEl.appendChild(wrapperEl);
+      grid.appendChild(swiperEl);
+
+      new Swiper('.home-stl-swiper', {
+        slidesPerView       : 'auto',
+        spaceBetween        : 12,
+        centeredSlides      : true,
+        centeredSlidesBounds: true,
+        loop                : true,
+        grabCursor          : true,
+        initialSlide        : 0,
+      });
+    }
+  }
+
+  // ── 2. Pin toggle ──────────────────────────────────────
+  const section = document.querySelector('.home-shop-the-look');
+  if (!section) return;
+
+  let activeProduct = null;
+
+  function pushPromoClick(el) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        promo_id      : el.dataset.promoId       || '',
+        creative_name : el.dataset.creativeName  || 'Shop_the_look_banner_image',
+        promo_position: el.dataset.promoPosition || 'homepage_shop_the_look'
+      }
+    });
+  }
+
+  function closeActive() {
+    if (activeProduct) {
+      activeProduct.classList.remove('is-visible');
+      const btn = activeProduct.closest('.home-stl-pin-group')?.querySelector('.home-stl-pin');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      activeProduct = null;
+    }
+  }
+
+  function openProduct(product, btn) {
+    if (activeProduct === product) { closeActive(); return; }
+    closeActive();
+    product.classList.add('is-visible');
+    btn.setAttribute('aria-expanded', 'true');
+    activeProduct = product;
+  }
+
+  const isHoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  section.querySelectorAll('.home-stl-pin-group').forEach(group => {
+    const btn     = group.querySelector('.home-stl-pin');
+    const product = group.querySelector('.home-stl-pin-product');
+    if (!btn || !product) return;
+
+    // Desktop only: hover to open/close
+    if (isHoverCapable) {
+      group.addEventListener('mouseenter', () => openProduct(product, btn));
+      group.addEventListener('mouseleave', () => closeActive());
+    }
+
+    // ── Pin button click ───────────────────────────────────
+    // stopPropagation blocks bubbling, so fire dataLayer HERE directly
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openProduct(product, btn);
+
+      // Fire GTM on pin click — use the product card as the source element
+      // so dataset attributes from the <a> are available if set
+      pushPromoClick(product);
+    });
+
+    // ── Product card click ─────────────────────────────────
+    // stopPropagation blocks bubbling, so fire dataLayer HERE directly
+    // Navigation (href) still fires after this since we don't preventDefault
+    product.addEventListener('click', (e) => {
+      e.stopPropagation();
+      pushPromoClick(product);
+      // href navigation proceeds naturally
+    });
+  });
+
+  // Tap anywhere else → close
+  document.addEventListener('click', closeActive);
+
+  // NOTE: Removed the section-level GTM delegation listener — it was dead code
+  // because both btn and product card call stopPropagation(), preventing bubbling.
 
 });
 </script>
