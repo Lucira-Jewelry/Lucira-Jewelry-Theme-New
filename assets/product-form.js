@@ -437,12 +437,10 @@ function initEngraving() {
     return;
   }
 
-  // Get main product form
   const mainForm = document.querySelector('form[data-type="add-to-cart-form"]') || 
                    document.querySelector('form[action*="/cart/add"]') ||
                    engravingInput.closest('form');
 
-  // Create or get hidden inputs
   let fontInput = mainForm?.querySelector('input[name="properties[EngravingFont]"]');
   let textInput = mainForm?.querySelector('input[name="properties[EngravingText]"]');
 
@@ -464,7 +462,6 @@ function initEngraving() {
 
   const allowedChars = /^[A-Za-z0-9❤∞]*$/;
 
-  // Set default font from active option
   const activeOption = document.querySelector(".lucira_engraving_font_option.active");
   if (activeOption) {
     const defaultFont = activeOption.dataset.font;
@@ -472,7 +469,6 @@ function initEngraving() {
     if (fontInput) fontInput.value = defaultFont;
   }
 
-  // Update save button state
   function toggleSaveButton() {
     const engravingValue = engravingInput?.value.trim();
     const selectedFont = document.querySelector(".lucira_engraving_font_option.active")?.dataset.font || "";
@@ -483,7 +479,6 @@ function initEngraving() {
     }
   }
 
-  // Update preview & hidden inputs on input
   engravingInput.addEventListener("input", function () {
     if (!allowedChars.test(this.value)) {
       this.value = this.value.split('').filter(c => allowedChars.test(c)).join('');
@@ -494,7 +489,6 @@ function initEngraving() {
     toggleSaveButton();
   });
 
-  // Symbol insertion
   function insertAtCursor(input, text) {
     const start = input.selectionStart;
     const end = input.selectionEnd;
@@ -513,7 +507,6 @@ function initEngraving() {
   };
   window.ProductEngravAddSymbol = window.EngravingAddSymbol;
 
-  // Font selection
   fontOptions.forEach(option => {
     option.addEventListener("click", () => {
       fontOptions.forEach(opt => opt.classList.remove("active"));
@@ -525,7 +518,6 @@ function initEngraving() {
     });
   });
 
-  // Save button functionality
   if (saveButton) {
     saveButton.addEventListener("click", e => {
       e.preventDefault();
@@ -558,7 +550,6 @@ function initEngraving() {
     });
   }
 
-  // Drawer open/close
   window.openEngravingDrawer = function() {
     const drawer = document.getElementById("engraving-drawer");
     if (drawer && overlay) {
@@ -578,7 +569,6 @@ function initEngraving() {
   if (closeButton) closeButton.addEventListener("click", closeEngravingDrawer);
   if (overlay) overlay.addEventListener("click", closeEngravingDrawer);
 
-  // Load existing engraving if present
   function loadExistingEngraving() {
     if (textInput && textInput.value) {
       engravingInput.value = textInput.value;
@@ -597,7 +587,6 @@ function initEngraving() {
 
   loadExistingEngraving();
 
-  // DEBUG helper
   window.debugEngravingInputs = function() {
     console.log('=== ENGRAVING DEBUG ===');
     console.log('Visible Text:', engravingInput.value);
@@ -608,7 +597,7 @@ function initEngraving() {
     console.log('=====================');
   };
 }
-//customise button clicked datalayer
+
 document.addEventListener("DOMContentLoaded", function () {
   var customizeBtn = document.getElementById("product_variant_drawer");
 
@@ -627,18 +616,14 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 });
 
-
-// pdp-delivery-details
 function luciraLocateMe() {
   const submitBtn = document.querySelector("#pdp-delivery-check .submitButton");
   const pincodeInput = document.getElementById("lucira-delivery-zipcode");
 
-  // Show loading state
   submitBtn.innerHTML = "Locating...";
   submitBtn.disabled = true;
 
   if (navigator.geolocation) {
-    // Force fresh and accurate location
     const geoOptions = {
       enableHighAccuracy: true,
       timeout: 10000,
@@ -657,11 +642,8 @@ function luciraLocateMe() {
           .then((data) => {
             if (data.address && data.address.postcode) {
               pincodeInput.value = data.address.postcode;
-
-              // Trigger input event to update button to Submit
               pincodeInput.dispatchEvent(new Event("input", { bubbles: true }));
 
-              // Push GA4 event
               window.dataLayer = window.dataLayer || [];
               window.dataLayer.push({
                 event: "promoClick",
@@ -693,7 +675,6 @@ function luciraLocateMe() {
     resetToLocateMe();
   }
 
-  // helper function to reset button back to "Locate Me"
   function resetToLocateMe() {
     submitBtn.innerHTML = `
       <svg width="16" height="16" class="icon icon-locate">
@@ -707,7 +688,6 @@ function luciraLocateMe() {
 document.addEventListener("DOMContentLoaded", function () {
   const content = document.getElementById("readMoreContent");
   const btn = document.getElementById("readMoreBtn");
-
   if (!content || !btn) return;
 
   const lineHeight = parseFloat(window.getComputedStyle(content).lineHeight);
@@ -722,7 +702,6 @@ document.addEventListener("DOMContentLoaded", function () {
   
   const fullHeight = clone.offsetHeight;
   content.parentElement.removeChild(clone);
-
   if (fullHeight <= maxHeight) {
     btn.style.display = 'none';
     content.classList.remove('collapsed');
@@ -732,7 +711,6 @@ document.addEventListener("DOMContentLoaded", function () {
   btn.addEventListener("click", function () {
     const isCollapsed = content.classList.toggle("collapsed");
     btn.textContent = isCollapsed ? "Read More" : "Read Less";
-    
     if (!isCollapsed) {
       btn.style.display = 'inline-block';
       btn.style.marginLeft = '0';
@@ -748,22 +726,13 @@ document.addEventListener("DOMContentLoaded", function () {
 document.addEventListener('DOMContentLoaded', function() {
   const copyButton = document.getElementById('sku-copy-button');
   const skuContent = document.getElementById('sku-content');
-  
   copyButton.addEventListener('click', function() {
-    // Get the SKU text (remove "SKU: " prefix)
-    const skuText = skuContent.textContent.replace('SKU: ', '');
-    
-    // Copy to clipboard
+    const skuText = skuContent.textContent.replace('SKU: ', ''); 
     navigator.clipboard.writeText(skuText).then(function() {
-      // Get both SVG icons
       const copyIcon = copyButton.querySelector('svg:not(.check-icon)');
       const checkIcon = copyButton.querySelector('.check-icon');
-      
-      // Hide copy icon, show check icon
       copyIcon.style.display = 'none';
       checkIcon.style.display = 'block';
-      
-      // Revert back to copy icon after 2 seconds
       setTimeout(function() {
         copyIcon.style.display = 'block';
         checkIcon.style.display = 'none';
@@ -777,19 +746,12 @@ document.addEventListener('DOMContentLoaded', function() {
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
     const animatedButton = document.querySelector('.animated-cart-btn');
-
     if (!animatedButton) return;
-
     const form = animatedButton.closest('form');
-
     if (form) {
       form.addEventListener('submit', function (e) {
         if (animatedButton.disabled || animatedButton.classList.contains('cart-animating')) return;
-
-        // Add animation class - CSS will handle showing/hiding icons
         animatedButton.classList.add('cart-animating');
-
-        // Reset animation after complete
         setTimeout(function () {
           animatedButton.classList.remove('cart-animating');
         }, 2000);
