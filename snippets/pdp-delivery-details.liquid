@@ -101,6 +101,23 @@
 (function () {
   'use strict';
 
+  /* ---------------- COOKIE HELPERS ---------------- */
+  function setCookie(name, value, days = 30) {
+    var expires = "";
+    if (days) {
+      var date = new Date();
+      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+      expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + value + "; path=/" + expires;
+  }
+
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return match ? match[2] : null;
+  }
+
+  /* ---------------- UI HELPERS ---------------- */
   function showError(msg) {
     var el = document.getElementById('lucira-pincode-error');
     if (!el) return;
@@ -116,30 +133,30 @@
     if (label) label.textContent = loading ? 'Locating...' : 'Locate Me';
   }
 
-  {% comment %} function pushPromoClick(pincode) {
-    var container    = document.getElementById('pdp-delivery-check');
-    var productSku   = container ? container.dataset.productSku   : '';
-    var productTitle = container ? container.dataset.productTitle : '';
+  function toggleButtonState() {
+    var pincodeInput = document.getElementById('lucira-delivery-zipcode');
+    var locateBtn    = document.getElementById('lucira-locate-btn');
 
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'promoClick',
-      promoClick: {
-        promo_id:       productSku,
-        promo_name:     productTitle,
-        creative_name:  'pincodeEntered',
-        promo_position: pincode,
-        location_id:    'pdp'
-      }
-    });
-  } {% endcomment %}
+    if (!pincodeInput || !locateBtn) return;
 
-    function pushPromoClick(pincode) {
+    var val   = pincodeInput.value.replace(/\s+/g, '').trim();
+    var label = locateBtn.querySelector('.locate-btn-label');
+
+    if (/^\d{6}$/.test(val)) {
+      label.textContent = "Submit";
+      locateBtn.dataset.mode = "manual";
+    } else {
+      label.textContent = "Locate Me";
+      locateBtn.dataset.mode = "geo";
+    }
+  }
+
+  /* ---------------- GTM ---------------- */
+  function pushPromoClick(pincode) {
     var container = document.getElementById('pdp-delivery-check');
     var productSku = container ? container.dataset.productSku : '';
     var productTitle = container ? container.dataset.productTitle : '';
 
-    // Get selected variant ID
     var variantId = window.ShopifyAnalytics && 
                     ShopifyAnalytics.meta && 
                     ShopifyAnalytics.meta.selectedVariantId 
@@ -159,101 +176,132 @@
     });
   }
 
-  // Retry wrapper
+  /* ---------------- API RETRY ---------------- */
   function fetchWithRetry(url, retries = 1) {
     return fetch(url)
       .then(r => r.json())
       .catch(err => {
-        if (retries > 0) {
-          return fetchWithRetry(url, retries - 1);
-        }
+        if (retries > 0) return fetchWithRetry(url, retries - 1);
         throw err;
       });
   }
 
+  /* ---------------- MAIN INIT ---------------- */
   function initDeliveryWidget() {
     var locateBtn    = document.getElementById('lucira-locate-btn');
     var pincodeInput = document.getElementById('lucira-delivery-zipcode');
 
-    function handleManualSearch() {
-      var val = pincodeInput.value.replace(/\s+/g, '').trim();
-      if (/^\d{6}$/.test(val)) {
-        showError('');
+    if (!locateBtn || !pincodeInput) return;
+
+    /* --- INPUT LISTENER --- */
+    pincodeInput.addEventListener('input', toggleButtonState);
+
+    /* --- ENTER KEY SUPPORT --- */
+    pincodeInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        locateBtn.click();
+      }
+    });
+
+    /* --- BUTTON CLICK --- */
+    locateBtn.addEventListener('click', function () {
+      showError('');
+
+      var mode = locateBtn.dataset.mode;
+      var val  = pincodeInput.value.replace(/\s+/g, '').trim();
+
+      /* ========= MANUAL MODE ========= */
+      if (mode === "manual") {
+
+        if (!/^\d{6}$/.test(val)) {
+          showError('Please enter a valid 6-digit pincode.');
+          return;
+        }
+
         fetchWithRetry('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json', 1)
           .then(function(data) {
             if (data && data.length > 0) {
+
+              /* SAVE COOKIE */
+              setCookie('user_pincode', val);
+
+              /* PUSH GTM */
               pushPromoClick(val);
+
             } else {
               showError('Pincode not found. Please check and try again.');
             }
           })
           .catch(function() {
-            showError('Service currently unavailable. Please try again later.');
+            showError('Service unavailable. Try again.');
           });
-      } else {
-        showError('Please enter a valid 6-digit pincode.');
+
+        return;
       }
-    }
 
-    if (locateBtn) {
-      locateBtn.addEventListener('click', function () {
-        showError('');
-        if (!navigator.geolocation) {
-          showError('Geolocation is not supported by your browser.');
-          return;
+      /* ========= GEO MODE ========= */
+      if (!navigator.geolocation) {
+        showError('Geolocation not supported.');
+        return;
+      }
+
+      setLocateBtnState(true);
+
+      navigator.geolocation.getCurrentPosition(
+        function (position) {
+          var lat = position.coords.latitude;
+          var lon = position.coords.longitude;
+
+          fetchWithRetry('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json', 1)
+            .then(function(data) {
+              var pincode = data && data.address && data.address.postcode;
+
+              if (pincode) pincode = pincode.replace(/\s+/g, '');
+
+              if (pincode && /^\d{6}$/.test(pincode)) {
+
+                pincodeInput.value = pincode;
+
+                /* SAVE COOKIE */
+                setCookie('user_pincode', pincode);
+
+                /* PUSH GTM */
+                pushPromoClick(pincode);
+
+                toggleButtonState();
+
+              } else {
+                showError('Could not detect valid pincode.');
+              }
+            })
+            .catch(function() {
+              showError('Location lookup failed.');
+            })
+            .finally(function() {
+              setLocateBtnState(false);
+            });
+        },
+        function () {
+          setLocateBtnState(false);
+          showError('Permission denied. Enter manually.');
+        },
+        {
+          maximumAge: Infinity,
+          enableHighAccuracy: false
         }
+      );
+    });
 
-        setLocateBtnState(true);
-
-        navigator.geolocation.getCurrentPosition(
-          function (position) {
-            var lat = position.coords.latitude;
-            var lon = position.coords.longitude;
-
-            fetchWithRetry('https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json', 1)
-              .then(function(data) {
-                var pincode = data && data.address && data.address.postcode;
-                if (pincode) pincode = pincode.replace(/\s+/g, '');
-                if (pincode && /^\d{6}$/.test(pincode)) {
-                  pincodeInput.value = pincode;
-                  showError('');
-                  pushPromoClick(pincode);
-                } else {
-                  showError('Could not detect a valid pincode. Please enter manually.');
-                }
-              })
-              .catch(function() {
-                showError('Location lookup failed. Please enter pincode manually.');
-              })
-              .finally(function() {
-                setLocateBtnState(false);
-              });
-          },
-          function (err) {
-            setLocateBtnState(false);
-            var messages = {
-              1: 'Permission denied. Please enter manually.',
-              2: 'Location unavailable. Please enter manually.'
-            };
-            showError(messages[err.code] || 'Could not detect location. Please enter manually.');
-          },
-          {
-            maximumAge: Infinity,
-            enableHighAccuracy: false
-          }
-        );
-      });
+    /* --- AUTO-FILL FROM COOKIE --- */
+    var saved = getCookie('user_pincode');
+    if (saved && /^\d{6}$/.test(saved)) {
+      pincodeInput.value = saved;
     }
 
-    if (pincodeInput) {
-      pincodeInput.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter') {
-          handleManualSearch();
-        }
-      });
-    }
+    toggleButtonState();
   }
 
+  /* ---------------- INIT ---------------- */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initDeliveryWidget);
   } else {
