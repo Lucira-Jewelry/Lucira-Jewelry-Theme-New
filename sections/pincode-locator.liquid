@@ -12,9 +12,7 @@
 
     <div class="divider">OR</div>
 
-    <button id="use-location-btn" type="button">
-      Find Nearest Stores
-    </button>
+    <button id="use-location-btn" type="button">Find Nearest Stores</button>
 
     <p id="geo-status"></p>
   </div>
@@ -64,13 +62,12 @@
   .store-actions a img {height: 20px; width: 20px;}
   .store-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
   .store-actions a:last-child {background: #b76f79; color: #fff;}
-  @media (max-width: 400px) { 
-    .locator-results-grid { grid-template-columns: 1fr; } 
-    .store-card { width: 100%; } 
+  @media (max-width: 400px) {
+    .locator-results-grid { grid-template-columns: 1fr; }
+    .store-card { width: 100%; }
     .store-actions a {font-size: 11px ;gap: 6px;}
     .store-actions a img { height: 16px; width: 16px; }
   }
-  
 </style>
 
 <script>
@@ -83,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function () {
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
       expires = "; expires=" + date.toUTCString();
     }
-    document.cookie = name + "=" + value + "; path=/" + expires;
+    document.cookie = name + "=" + String(value) + "; path=/" + expires;
   }
 
   function getCookie(name) {
@@ -207,6 +204,37 @@ document.addEventListener('DOMContentLoaded', function () {
     renderStores(list);
   }
 
+  function savePincodeToServer(pincode) {
+  try {
+    function attemptSend(retry = 0) {
+      let customerId = window.customerId;
+
+      if (!customerId || customerId === 'null') {
+        if (retry < 5) {
+          setTimeout(() => attemptSend(retry + 1), 300);
+          return;
+        } else {
+          return;
+        }
+      }
+
+      customerId = String(customerId)
+        .replace('gid://shopify/Customer/', '');
+
+      fetch('https://api.lucirajewelry.com/customers/pincode.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: String(customerId),
+          pincode: String(pincode)
+        })
+      });
+    }
+
+    attemptSend();
+  } catch (e) {}
+}
+
   function handleSearch() {
     var query = input.value.trim();
 
@@ -215,7 +243,8 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(r => r.json())
         .then(d => {
           if (d[0]) {
-            setCookie('user_pincode', query);
+            setCookie('user_pincode', String(query));
+            savePincodeToServer(query);
 
             userLocation = {
               lat: parseFloat(d[0].lat),
@@ -249,7 +278,8 @@ document.addEventListener('DOMContentLoaded', function () {
           if (d?.address?.postcode) {
 
             var pin = d.address.postcode.replace(/\s+/g, '');
-            setCookie('user_pincode', pin);
+            setCookie('user_pincode', String(pin));
+            savePincodeToServer(savedPin);
             input.value = pin;
             statusMsg.innerText = 'Detected Pincode: ' + pin;
 
@@ -284,7 +314,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!this.value) applyFilters('');
   });
 
-  var savedPin = getCookie('user_pincode');
+  var savedPin = String(getCookie('user_pincode') || '');
 
   if (savedPin && /^\d{6}$/.test(savedPin)) {
     input.value = savedPin;
@@ -298,7 +328,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <script>
   document.addEventListener('DOMContentLoaded', function () {
-
     document.getElementById('store-search-btn').addEventListener('click', function () {
       var query = document.getElementById('store-search-input').value.trim();
       window.dataLayer = window.dataLayer || [];
@@ -307,8 +336,8 @@ document.addEventListener('DOMContentLoaded', function () {
         promoClick: {
           creative_name: 'Store Nearby Page',
           promo_name: 'Find Us - Search',
-          search_term: query || undefined
-        }
+          search_term: query || undefined,
+        },
       });
     });
 
@@ -318,8 +347,8 @@ document.addEventListener('DOMContentLoaded', function () {
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: 'Find Nearest Stores'
-        }
+          promo_name: 'Find Nearest Stores',
+        },
       });
     });
 
@@ -334,7 +363,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
       if (anchor.closest('.arrow-parent')) {
         promoName = 'View Store - ' + storeName;
-
       } else if (anchor.closest('.store-actions')) {
         var allActions = Array.from(anchor.closest('.store-actions').querySelectorAll('a'));
         var idx = allActions.indexOf(anchor);
@@ -346,7 +374,6 @@ document.addEventListener('DOMContentLoaded', function () {
         } else {
           promoName = anchor.innerText.trim() + ' - ' + storeName;
         }
-
       } else {
         promoName = anchor.innerText.trim() + ' - ' + storeName;
       }
@@ -356,14 +383,12 @@ document.addEventListener('DOMContentLoaded', function () {
         event: 'promoClick',
         promoClick: {
           creative_name: 'Store Nearby Page',
-          promo_name: promoName
-        }
+          promo_name: promoName,
+        },
       });
     });
-
   });
 </script>
-
 
 {% schema %}
 {
