@@ -747,5 +747,98 @@
         setTimeout(loadDelayedScripts, 5000);
       })();
     </script>
+
+<script>
+  (function () {
+    const COOKIE_NAME = "user_pincode";
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+      return match ? String(match[2]) : null; // ✅ force string
+    }
+
+    function setCookie(name, value, days = 30) {
+      const maxAge = days * 24 * 60 * 60;
+      document.cookie = `${name}=${String(value)}; path=/; max-age=${maxAge}`; // ✅ force string
+    }
+
+    // ✅ NEW: SAVE TO METAFIELD (ONLY IF LOGGED IN)
+    function savePincodeToServer(pincode) {
+      try {
+        let customerId = window.customerId;
+
+        if (!customerId || customerId === 'null') return; // ❌ not logged in
+
+        customerId = String(customerId).replace('gid://shopify/Customer/', '');
+
+        fetch('https://api.lucirajewelry.com/customers/pincode.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: String(customerId),
+            pincode: String(pincode)
+          })
+        })
+        .then(res => res.json())
+        .then(data => console.log("Metafield saved:", data))
+        .catch(err => console.error("API error:", err));
+
+      } catch (e) {
+        console.error("Exception:", e);
+      }
+    }
+
+    function fetchPincode(lat, lng) {
+      fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+        .then(res => res.json())
+        .then(data => {
+          const pincode = data?.address?.postcode?.replace(/\s+/g, '');
+
+          if (pincode) {
+            setCookie(COOKIE_NAME, pincode);
+            console.log("Pincode saved:", pincode);
+
+            // ✅ NEW: SAVE TO METAFIELD
+            savePincodeToServer(pincode);
+
+          } else {
+            console.warn("Pincode not found");
+          }
+        })
+        .catch(err => console.error("Geocode error:", err));
+    }
+
+    function getLocationAndFetch() {
+      if (!navigator.geolocation) return;
+
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const { latitude, longitude } = pos.coords;
+          fetchPincode(latitude, longitude);
+        },
+        err => {
+          console.warn("Location denied or unavailable:", err);
+        },
+        {
+          enableHighAccuracy: false,
+          maximumAge: 0
+        }
+      );
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+      const existing = getCookie(COOKIE_NAME);
+
+      if (!existing) {
+        setTimeout(getLocationAndFetch, 800);
+      } else {
+        console.log("Pincode already exists:", existing);
+
+        // ✅ OPTIONAL: ALSO SYNC EXISTING COOKIE TO METAFIELD
+        savePincodeToServer(existing);
+      }
+    });
+  })();
+</script>
 </body>
 </html>
