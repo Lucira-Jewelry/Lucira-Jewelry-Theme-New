@@ -332,6 +332,9 @@
 
   /* Swiper slide sizing for peek effect */
   .swiper-slide.home-stl-item { width: 80vw; }
+
+   .home-shop-the-look { overflow: visible; }
+  .home-stl-swiper    { overflow: visible; }
 }
 
 @media only screen and (min-width: 1600px) and (max-width: 2100px) {
@@ -364,22 +367,24 @@ document.addEventListener('DOMContentLoaded', function () {
       grid.appendChild(swiperEl);
 
       new Swiper('.home-stl-swiper', {
-        slidesPerView : 'auto',
-        spaceBetween  : 12,
-        centeredSlides: true,
-        loop          : true,
-        grabCursor    : true,
+        slidesPerView   : 'auto',
+        spaceBetween    : 12,
+        centeredSlides  : true,
+        centeredSlidesBounds: true,   // ← prevents first/last slide snapping to edge
+        loop            : true,
+        grabCursor      : true,
+        initialSlide    : 0,
       });
     }
   }
 
-  // ── 2. Pin toggle (hover = desktop, tap = mobile) ──────
+  // ── 2. Pin toggle ──────────────────────────────────────
   const section = document.querySelector('.home-shop-the-look');
   if (!section) return;
 
-  let activeProduct = null;   // track currently open popup
+  let activeProduct = null;
 
-  function closeActive () {
+  function closeActive() {
     if (activeProduct) {
       activeProduct.classList.remove('is-visible');
       const btn = activeProduct.closest('.home-stl-pin-group')?.querySelector('.home-stl-pin');
@@ -388,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   }
 
-  function openProduct (product, btn) {
+  function openProduct(product, btn) {
     if (activeProduct === product) { closeActive(); return; }
     closeActive();
     product.classList.add('is-visible');
@@ -396,24 +401,30 @@ document.addEventListener('DOMContentLoaded', function () {
     activeProduct = product;
   }
 
-  // Desktop: mouseenter / mouseleave on the pin-group
+  // Detect touch-only devices (no hover capability)
+  // On touch devices, mouseenter fires before click — causing double-toggle.
+  // We skip hover listeners entirely for touch devices.
+  const isHoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
   section.querySelectorAll('.home-stl-pin-group').forEach(group => {
     const btn     = group.querySelector('.home-stl-pin');
     const product = group.querySelector('.home-stl-pin-product');
     if (!btn || !product) return;
 
-    // Desktop hover
-    group.addEventListener('mouseenter', () => openProduct(product, btn));
-    group.addEventListener('mouseleave', () => closeActive());
+    // Desktop only: hover to open/close
+    if (isHoverCapable) {
+      group.addEventListener('mouseenter', () => openProduct(product, btn));
+      group.addEventListener('mouseleave', () => closeActive());
+    }
 
-    // Mobile / touch tap
+    // Mobile + Desktop: click/tap to toggle
+    // On desktop this is a fallback; on mobile this is the sole trigger
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       openProduct(product, btn);
     });
 
-    // Clicking the product card itself should navigate (default <a> behaviour)
-    // but should NOT close it immediately on touch
+    // Prevent card click from bubbling up and closing the popup
     product.addEventListener('click', (e) => e.stopPropagation());
   });
 
