@@ -107,11 +107,9 @@
 
   var lastSavedPincode = null;
 
-  // ✅ SAFELY GET CUSTOMER ID (fix for all cases)
   function getCustomerId() {
     try {
       if (!window.customerId || window.customerId === 'null') return null;
-
       return String(window.customerId).replace('gid://shopify/Customer/', '');
     } catch (e) {
       return null;
@@ -125,12 +123,14 @@
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
       expires = "; expires=" + date.toUTCString();
     }
-    document.cookie = name + "=" + value + "; path=/" + expires;
+    // ✅ FORCE STRING
+    document.cookie = name + "=" + String(value) + "; path=/" + expires;
   }
 
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? match[2] : null;
+    // ✅ FORCE STRING
+    return match ? String(match[2]) : null;
   }
 
   function deleteCookie(name) {
@@ -184,25 +184,21 @@
       event: 'promoClick',
       promoClick: {
         creative_name: 'pincodeEntered',
-        promo_position: pincode
+        promo_position: String(pincode) // ✅ FORCE STRING
       }
     });
   }
 
   function savePincodeToServer(pincode) {
     try {
-      console.log("👉 Trying API call...");
-
       function attemptSend(retry = 0) {
         let customerId = window.customerId;
 
         if (!customerId || customerId === 'null') {
           if (retry < 5) {
-            console.log("⏳ Waiting for customerId...");
             setTimeout(() => attemptSend(retry + 1), 300);
             return;
           } else {
-            console.log("❌ customerId not found after retry");
             return;
           }
         }
@@ -210,31 +206,18 @@
         customerId = String(customerId)
           .replace('gid://shopify/Customer/', '');
 
-        console.log("✅ Customer ID:", customerId);
-        console.log("📦 Pincode:", pincode);
-
         fetch('https://api.lucirajewelry.com/customers/pincode.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            customer_id: customerId,
-            pincode: pincode
+            customer_id: String(customerId), // ✅ STRING
+            pincode: String(pincode)         // ✅ STRING
           })
-        })
-        .then(res => res.json())
-        .then(data => {
-          console.log("✅ API SUCCESS:", data);
-        })
-        .catch(err => {
-          console.error("❌ API ERROR:", err);
         });
       }
 
       attemptSend();
-
-    } catch (e) {
-      console.error("❌ EXCEPTION:", e);
-    }
+    } catch (e) {}
   }
 
   function fetchWithRetry(url) {
@@ -275,9 +258,9 @@
           .then(data => {
             if (data && data.length) {
 
-              setCookie('user_pincode', String(val));
+              setCookie('user_pincode', String(val)); // ✅ STRING
               pushPromoClick(val);
-              savePincodeToServer(val); // ✅ FIXED
+              savePincodeToServer(val);
 
               toggleButtonState(true);
 
@@ -308,9 +291,9 @@
 
               input.value = pin;
 
-              setCookie('user_pincode', String(pin));
+              setCookie('user_pincode', String(pin)); // ✅ STRING
               pushPromoClick(pin);
-              savePincodeToServer(pin); // ✅ FIXED
+              savePincodeToServer(pin);
 
               toggleButtonState(true);
 
@@ -326,14 +309,14 @@
       });
     });
 
-    var saved = getCookie('user_pincode');
+    // ✅ LOAD COOKIE AS STRING
+    var saved = String(getCookie('user_pincode') || '');
 
     if (saved && /^\d{6}$/.test(saved)) {
       input.value = saved;
       toggleButtonState(true);
 
-      // ✅ ALSO SYNC ON LOAD (important fix)
-      savePincodeToServer(saved);
+      savePincodeToServer(saved); // sync
     } else {
       toggleButtonState(false);
     }
