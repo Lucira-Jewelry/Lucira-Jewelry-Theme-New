@@ -483,39 +483,6 @@ document.addEventListener('click', function(e) {
 //   }
 // });
 
-(function() {
-  const passportDrawer = document.getElementById('product-passport-drawer');
-  const passportOverlay = document.getElementById('passport-overlay');
-  const passportOpenBtn = document.getElementById('trace-badge');
-  const passportCloseBtn = passportDrawer.querySelector('.close-drawer');
-
-  function openPassportDrawer() {
-    passportDrawer.classList.add('active');
-    passportOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden'; // prevent background scroll
-  }
-
-  function closePassportDrawer() {
-    passportDrawer.classList.remove('active');
-    passportOverlay.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-
-  // open
-  passportOpenBtn.addEventListener('click', openPassportDrawer);
-
-  // close
-  passportCloseBtn.addEventListener('click', closePassportDrawer);
-  passportOverlay.addEventListener('click', closePassportDrawer);
-
-  // escape key
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && passportDrawer.classList.contains('active')) {
-      closePassportDrawer();
-    }
-  });
-})();
-
 document.addEventListener("DOMContentLoaded", function () {
   initEngraving();
 });
