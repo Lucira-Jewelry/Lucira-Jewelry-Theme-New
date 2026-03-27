@@ -40,6 +40,9 @@ class CartItems extends HTMLElement {
       if (event.source === 'cart-items') {
         return;
       }
+      if (this.tagName === 'CART-DRAWER-ITEMS' && event.cartData?.sections?.['cart-drawer']) {
+        return;
+      }
       return this.onCartUpdate();
     });
   }
