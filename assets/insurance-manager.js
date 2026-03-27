@@ -878,7 +878,7 @@
   
   // ==================== CONFIGURATION ====================
   const CONFIG = {
-    VARIANT_ID: '47220042989786',
+    VARIANT_ID: '47709366026458',
     CHECKBOX_ID: 'insuranceCheckbox',
     LOADER_ID: 'insuranceLoader',
     BOX_ID: 'insuranceBox',
