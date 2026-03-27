@@ -83,48 +83,34 @@ document.addEventListener('DOMContentLoaded', function () {
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
       expires = "; expires=" + date.toUTCString();
     }
-    document.cookie = name + "=" + String(value) + "; path=/" + expires;
+    document.cookie = name + "=" + value + "; path=/" + expires;
   }
 
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? String(match[2]) : null;
-  }
-
-  // ✅ SAME API FUNCTION AS PDP
-  function savePincodeToServer(pincode) {
-    try {
-      function attemptSend(retry = 0) {
-        let customerId = window.customerId;
-
-        if (!customerId || customerId === 'null') {
-          if (retry < 5) {
-            setTimeout(() => attemptSend(retry + 1), 300);
-            return;
-          } else {
-            return;
-          }
-        }
-
-        customerId = String(customerId)
-          .replace('gid://shopify/Customer/', '');
-
-        fetch('https://api.lucirajewelry.com/customers/pincode.php', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: String(customerId),
-            pincode: String(pincode)
-          })
-        });
-      }
-
-      attemptSend();
-    } catch (e) {}
+    return match ? match[2] : null;
   }
 
   var allStores = [
-    // (keep your Liquid loop as-is)
+    {% for block in section.blocks %}
+    {
+      name: {{ block.settings.store_name | json }},
+      city: {{ block.settings.city | json }},
+      pincode: {{ block.settings.pincode | json }},
+      address: {{ block.settings.address | json }},
+      phone: {{ block.settings.phone | json }},
+      designs_url: {{ block.settings.store_url | json }},
+      appointment_url: {{ block.settings.appointment_url | json }},
+      image: {% if block.settings.store_image != blank %}
+        {{ block.settings.store_image | image_url: width: 800 | json }}
+      {% else %}
+        null
+      {% endif %},
+      lat: {{ block.settings.latitude | default: 0 }},
+      lng: {{ block.settings.longitude | default: 0 }},
+      distance: null
+    }{% unless forloop.last %},{% endunless %}
+    {% endfor %}
   ];
 
   var userLocation = null;
@@ -155,11 +141,23 @@ document.addEventListener('DOMContentLoaded', function () {
       card.innerHTML = `
         <div class="store-image-wrapper">
           ${distanceBadge}
+          
           ${store.image ? `
             <div class='main-image'>
               <img src="${store.image}" alt="${store.name}" loading="lazy">
+
+              <div class="arrow-parent">
+                <a href="${store.designs_url || '#'}" class="store-arrow">
+                  <svg width="60" height="60" viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="60" height="60" rx="30" fill="white" fill-opacity="0.25"/>
+                    <path d="M18.6428 31.0986L18.6428 28.3572L37.4409 28.3572L29.0209 19.9372L30.9791 17.9791L42.7279 29.7279L30.9791 41.4768L29.0209 39.5186L37.4409 31.0986L18.6428 31.0986Z" fill="black"/>
+                    <rect x="0.5" y="0.5" width="59" height="59" rx="29.5" stroke="black"/>
+                  </svg>
+                </a>
+              </div>
             </div>
           ` : ''}
+          
         </div>
 
         <div class="store-card-content">
@@ -210,20 +208,14 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function handleSearch() {
-    var query = String(input.value.trim());
+    var query = input.value.trim();
 
     if (/^\d{4,6}$/.test(query)) {
-
       fetch(`https://nominatim.openstreetmap.org/search?postalcode=${query}&country=India&format=json`)
         .then(r => r.json())
         .then(d => {
           if (d[0]) {
-
-            // ✅ COOKIE STRING
-            setCookie('user_pincode', String(query));
-
-            // ✅ API SYNC
-            savePincodeToServer(query);
+            setCookie('user_pincode', query);
 
             userLocation = {
               lat: parseFloat(d[0].lat),
@@ -234,7 +226,6 @@ document.addEventListener('DOMContentLoaded', function () {
             applyFilters('');
           }
         });
-
       return;
     }
 
@@ -257,14 +248,8 @@ document.addEventListener('DOMContentLoaded', function () {
         .then(d => {
           if (d?.address?.postcode) {
 
-            var pin = String(d.address.postcode.replace(/\s+/g, ''));
-
-            // ✅ COOKIE STRING
+            var pin = d.address.postcode.replace(/\s+/g, '');
             setCookie('user_pincode', pin);
-
-            // ✅ API SYNC
-            savePincodeToServer(pin);
-
             input.value = pin;
             statusMsg.innerText = 'Detected Pincode: ' + pin;
 
@@ -299,15 +284,10 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!this.value) applyFilters('');
   });
 
-  // ✅ LOAD FROM COOKIE + SYNC WITH METAFIELD
-  var savedPin = String(getCookie('user_pincode') || '');
+  var savedPin = getCookie('user_pincode');
 
   if (savedPin && /^\d{6}$/.test(savedPin)) {
     input.value = savedPin;
-
-    // ✅ IMPORTANT: sync metafield
-    savePincodeToServer(savedPin);
-
     setTimeout(function () {
       handleSearch();
     }, 300);
