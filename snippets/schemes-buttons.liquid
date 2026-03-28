@@ -91,6 +91,8 @@
   data-scheme-wrapper
   data-variant-prices='{{ _variant_prices_json }}'
   data-scheme-url="{{ scheme_url }}"
+  data-product-title="{{ product.title | escape }}"
+  data-current-variant="{{ product.selected_or_first_available_variant.id }}"
 >
   <!-- ── Toggle header ── -->
   <button
@@ -414,7 +416,7 @@
   }
 </style>
 
-<script>
+{% comment %} <script>
 (function () {
   // ── Avoid registering multiple listeners if snippet renders twice ──
   if (window.__luciraSchemeInit) return;
@@ -508,6 +510,35 @@
     });
   }
 
+
+  // ── Keep data-current-variant in sync ─────────────────────────────
+  function syncCurrentVariant(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      wrapper.setAttribute('data-current-variant', variantId);
+    });
+  }
+
+  // ── dataLayer push on Enroll Now click ───────────────────────────
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-scheme-link]');
+    if (!link) return;
+
+    var wrapper     = link.closest('[data-scheme-wrapper]');
+    var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
+    var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name: 'Schemes Pdp',
+        promo_name:    productName,
+        promo_position: variantId,
+        location_id:   'pdp'
+      }
+    });
+  });
+
   // ── Event listeners for variant change ────────────────────────────
 
   // 1. Shopify native variant:change (most custom themes)
@@ -545,6 +576,170 @@
     mainForm.addEventListener('change', function (e) {
       if (e.target.name === 'id' && e.target.value) {
         updateAllWrappers(e.target.value);
+      }
+    });
+  });
+})();
+</script> {% endcomment %}
+
+<script>
+(function () {
+  if (window.__luciraSchemeInit) return;
+  window.__luciraSchemeInit = true;
+
+  function calcScheme(pricePaise) {
+    var priceRupees = Math.floor(pricePaise / 100);
+    var rawMonthly  = Math.floor(priceRupees / 10);
+    var remainder   = rawMonthly % 500;
+    var monthly     = rawMonthly - remainder;
+    return {
+      productPrice: priceRupees,
+      monthly:      monthly,
+      pay9:         monthly * 9,
+      schemePrice:  priceRupees - monthly,
+      save:         monthly
+    };
+  }
+
+  function formatINR(amount) {
+    return amount.toLocaleString('en-IN');
+  }
+
+  function rupees(n) {
+    return '₹' + formatINR(n);
+  }
+
+  // ── Accordion toggle ──────────────────────────────────────────────
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-scheme-toggle]');
+    if (!btn) return;
+    if (btn.closest('#md-sticky-atc')) return;
+
+    var wrapper = btn.closest('[data-scheme-wrapper]');
+    if (!wrapper) return;
+
+    var panel  = wrapper.querySelector('[data-scheme-panel]');
+    if (!panel) return;
+
+    var isOpen = btn.getAttribute('aria-expanded') === 'true';
+    btn.setAttribute('aria-expanded', String(!isOpen));
+    panel.hidden = isOpen;
+  });
+
+  // ── Update all wrappers when variant changes ──────────────────────
+  function updateAllWrappers(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      var prices     = JSON.parse(wrapper.dataset.variantPrices || '{}');
+      var pricePaise = prices[variantId];
+      if (pricePaise === undefined) return;
+
+      var r = calcScheme(pricePaise);
+
+      var priceEl = wrapper.querySelector('[data-scheme-price]');
+      if (priceEl) priceEl.textContent = rupees(r.schemePrice);
+
+      var productPriceEl = wrapper.querySelector('[data-scheme-product-price]');
+      if (productPriceEl) productPriceEl.textContent = rupees(r.productPrice);
+
+      var monthlyLabelEl = wrapper.querySelector('[data-scheme-monthly-label]');
+      if (monthlyLabelEl) monthlyLabelEl.textContent = rupees(r.monthly) + ' x 9 Months';
+
+      var pay9El = wrapper.querySelector('[data-scheme-pay9]');
+      if (pay9El) pay9El.textContent = rupees(r.pay9);
+
+      var tenthEl = wrapper.querySelector('[data-scheme-10th]');
+      if (tenthEl) tenthEl.textContent = rupees(r.monthly);
+
+      var effectiveEl = wrapper.querySelector('[data-scheme-effective]');
+      if (effectiveEl) effectiveEl.textContent = rupees(r.schemePrice);
+
+      var saveEl = wrapper.querySelector('[data-scheme-save]');
+      if (saveEl) saveEl.textContent = rupees(r.save);
+
+      var link = wrapper.querySelector('[data-scheme-link]');
+      if (link) {
+        var currentHref = link.getAttribute('href') || '';
+        var baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+        var separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+        link.href       = baseUrl + separator + 'amount=' + r.monthly;
+      }
+    });
+  }
+
+  // ── Keep data-current-variant fresh on every wrapper ─────────────
+  function syncCurrentVariant(variantId) {
+    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
+      wrapper.setAttribute('data-current-variant', variantId);
+    });
+  }
+
+  // ── dataLayer push on Enroll Now click ───────────────────────────
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest('[data-scheme-link]');
+    if (!link) return;
+
+    var wrapper     = link.closest('[data-scheme-wrapper]');
+    var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
+    var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
+
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name:  'Schemes Pdp',
+        promo_name:     productName,
+        promo_position: variantId,
+        location_id:    'pdp'
+      }
+    });
+  });
+
+  // ── Variant change listeners ──────────────────────────────────────
+
+  // 1. Shopify native
+  document.addEventListener('variant:change', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+      syncCurrentVariant(String(variant.id));  // ✅ was missing
+    }
+  });
+
+  // 2. Dawn / Prestige
+  document.addEventListener('variant:changed', function (e) {
+    var variant = e.detail && e.detail.variant;
+    if (variant && variant.id && variant.price !== undefined) {
+      updateAllWrappers(String(variant.id));
+      syncCurrentVariant(String(variant.id));  // ✅ was missing
+    }
+  });
+
+  // 3. Fallback — MutationObserver on hidden input
+  document.addEventListener('DOMContentLoaded', function () {
+    var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
+    if (!mainForm) return;
+
+    var variantInput = mainForm.querySelector('input[name="id"]');
+    if (!variantInput) return;
+
+    new MutationObserver(function () {
+      if (variantInput.value) {
+        updateAllWrappers(variantInput.value);
+        syncCurrentVariant(variantInput.value);  // ✅ was missing
+      }
+    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+    variantInput.addEventListener('change', function () {
+      if (this.value) {
+        updateAllWrappers(this.value);
+        syncCurrentVariant(this.value);          // ✅ was missing
+      }
+    });
+
+    mainForm.addEventListener('change', function (e) {
+      if (e.target.name === 'id' && e.target.value) {
+        updateAllWrappers(e.target.value);
+        syncCurrentVariant(e.target.value);      // ✅ was missing
       }
     });
   });
