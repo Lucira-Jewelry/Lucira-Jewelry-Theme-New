@@ -310,3 +310,53 @@ if (!customElements.get('cart-note')) {
     }
   );
 }
+
+
+class CartRemoveButton extends HTMLElement {
+  constructor() {
+    super();
+
+    this.addEventListener('click', (event) => {
+      event.preventDefault();
+
+      const cartItems = this.closest('cart-items') || this.closest('cart-drawer-items');
+
+      const {
+        index,
+        id,
+        sku,
+        variantId,
+        productName,
+        productType,
+        category,
+        subCategory,
+        price,
+        offerPrice,
+        quantity,
+        thumbnailImage,
+      } = this.dataset;
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'removeFromCart',
+        cart: {
+          id: id,
+          sku: sku,
+          variant_id: variantId,
+          product_name: productName,
+          product_type: productType,
+          category: category,
+          sub_category: subCategory,
+          price: parseFloat(price),
+          offer_price: parseFloat(offerPrice),
+          quantity: parseInt(quantity, 10),
+          thumbnail_image: thumbnailImage,
+        },
+      });
+
+      cartItems.updateQuantity(index, 0, event);
+    });
+  }
+}
+
+customElements.define('cart-remove-button', CartRemoveButton);
