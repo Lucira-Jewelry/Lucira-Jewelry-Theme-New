@@ -6,52 +6,159 @@
     assign img_size = section.settings.img_width | append: 'x' | append: section.settings.img_height
   %}
 
+  {% comment %}
+    ── Scheme price calculation (FLOOR to previous ₹500, same as scheme-button.liquid) ──
+    current_variant.price is in paise → ÷ 100 → rupees
+    monthly × 10 may be <= product price → always FLOOR
+    Multiply × 100 before money_without_currency to avoid double-division
+  {% endcomment %}
+  {% assign _sticky_raw_price        = current_variant.price %}
+  {% assign _sticky_price_rupees     = _sticky_raw_price   | divided_by: 100 %}
+  {% assign _sticky_raw_monthly      = _sticky_price_rupees | divided_by: 10 %}
+  {% assign _sticky_remainder        = _sticky_raw_monthly  | modulo: 500 %}
+  {% assign _sticky_monthly          = _sticky_raw_monthly  | minus: _sticky_remainder %}
+  {% assign _sticky_scheme_price       = _sticky_price_rupees | minus: _sticky_monthly %}
+  {% assign _sticky_scheme_price_paise = _sticky_scheme_price | times: 100 %}
+
+  {% comment %}
+    ── Scheme URL builder ────────────────────────────────────────────────
+    _sticky_monthly is now resolved above (e.g. ₹3,500 = free 10th month saving).
+    Logged-in  → full SSO URL with phone, HMAC signature + &amount=_sticky_monthly
+    Logged-out → base URL with &amount=_sticky_monthly only
+  {% endcomment %}
+
+  {% comment %} ── Step A: Clean & normalise customer phone ── {% endcomment %}
+  {% assign _sticky_raw_phone    = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+  {% if _sticky_raw_phone.size == 12 %}
+    {% assign _sticky_phone_prefix = _sticky_raw_phone | slice: 0, 2 %}
+    {% if _sticky_phone_prefix == "91" %}
+      {% assign _sticky_clean_phone = _sticky_raw_phone | slice: 2, 10 %}
+    {% else %}
+      {% assign _sticky_clean_phone = _sticky_raw_phone %}
+    {% endif %}
+  {% else %}
+    {% assign _sticky_clean_phone = _sticky_raw_phone %}
+  {% endif %}
+
+  {% comment %} ── Step B: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
+  {% assign _sticky_ts        = 'now' | date: '%s' %}
+  {% assign _sticky_hmac_data = _sticky_clean_phone | append: "|" | append: _sticky_ts %}
+  {% assign _sticky_sig       = _sticky_hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+  {% comment %} ── Step C: Compose scheme_url with _sticky_monthly as amount ── {% endcomment %}
+  {% if customer %}
+    {% assign scheme_url = 'https://schemes.lucirajewelry.com/api/auth/shopify-sso?p='
+      | append: _sticky_clean_phone
+      | append: '&ts='
+      | append: _sticky_ts
+      | append: '&sig='
+      | append: _sticky_sig
+      | append: '&amount='
+      | append: _sticky_monthly %}
+  {% else %}
+    {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _sticky_monthly %}
+  {% endif %}
+
+  {% comment %}
+    Build variant prices JSON map for JS recalculation on variant switch
+    Same pattern as scheme-button.liquid — { "variant_id": price_in_paise }
+  {% endcomment %}
+  {% capture _sticky_variant_prices_json %}{
+    {% for v in product.variants %}
+      "{{ v.id }}": {{ v.price }}{% unless forloop.last %},{% endunless %}
+    {% endfor %}
+  }{% endcapture %}
+
   <style>
-    #md-sticky-atc{
-      position:fixed;
-      top:0;
-      left:0;
-      width:100%;
-      z-index:99;
-      padding-top:{{ section.settings.pt }}rem;
-      padding-bottom:{{ section.settings.pb }}rem;
-      visibility:hidden;
-      opacity:0;
-      transform:translateY(-100%);
-      transition:all .15s ease-out;
-      border-bottom:.1rem solid rgba(var(--color-foreground),.08);
-      background:rgb(var(--color-background))
+    /* ── Base sticky bar styles ── */
+    #md-sticky-atc {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      z-index: 99;
+      padding-top: {{ section.settings.pt }}rem;
+      padding-bottom: {{ section.settings.pb }}rem;
+      visibility: hidden;
+      opacity: 0;
+      transform: translateY(-100%);
+      transition: all .15s ease-out;
+      border-bottom: .1rem solid rgba(var(--color-foreground), .08);
+      background: rgb(var(--color-background));
     }
-    #md-sticky-atc.show{visibility:visible;opacity:1;transform:translateY(0); box-shadow: rgba(0, 0, 0, 0.04) 0px 3px 5px;}
-    #md-sticky-atc button.product-form__submit {width: 260px;}
+    #md-sticky-atc.show {
+      visibility: visible;
+      opacity: 1;
+      transform: translateY(0);
+      box-shadow: rgba(0, 0, 0, 0.04) 0px 3px 5px;
+    }
+    #md-sticky-atc button.product-form__submit { width: 260px; }
     #md-sticky-atc .product__title { word-break: break-word; margin-top: 0; margin-bottom: 6px; }
-    #md-sticky-atc .try-at-home-button, #md-sticky-atc .visit-store-home-button {max-width: max-content; padding: 0; border: 0; background: transparent; font-family: 'Futura Std', sans-serif;}
-    #md-sticky-atc .visit-store-home-button {display: block;}
-    #md-sticky-atc .product-form form {margin-right: 0;}
+    #md-sticky-atc .try-at-home-button,
+    #md-sticky-atc .visit-store-home-button { max-width: max-content; padding: 0; border: 0; background: transparent; font-family: 'Futura Std', sans-serif; }
+    #md-sticky-atc .visit-store-home-button { display: block; }
+    #md-sticky-atc .product-form form { margin-right: 0; }
 
-    @media(min-width:990px){
-      #md-sticky-atc .page-width-inner{
-        display:grid;
-        grid-template-columns:1fr auto;
-        align-items:center
+    @media (min-width: 990px) {
+      #md-sticky-atc .page-width-inner {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
       }
     }
-    #md-sticky-atc .product-content{display:flex;align-items:center}
-    #md-sticky-atc .product-content img{margin-right:.75rem}
-    #md-sticky-atc .price-mirror .price{justify-content:flex-start}
-    #md-sticky-atc .price__regular {display: none;}
-    #md-sticky-atc .price__sale {display: block;}
-    #md-sticky-atc .price__sale .price-item--regular {font-size: 14px; font-weight: 500;display:none;}
-    #md-sticky-atc .try-at-home-button, #md-sticky-atc .visit-store-home-button{position:relative}
-    #md-sticky-atc .try-at-home-button::after, #md-sticky-atc .visit-store-home-button::after{content:attr(data-tooltip);position:absolute;top:110%;left:50%;transform:translateX(-50%);background:#000;color:#fff;font-size:12px;padding:6px 10px;border-radius:6px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .2s ease,transform .2s ease;z-index:10;line-height: 1.3; font-size: 12px !important;}
-    #md-sticky-atc .try-at-home-button::before, #md-sticky-atc .visit-store-home-button::before{content:"";position:absolute;top:90%;left:50%;transform:translateX(-50%);border:6px solid transparent;border-bottom-color:#000;opacity:0;transition:opacity .2s ease}
-    #md-sticky-atc .try-at-home-button:hover::after, #md-sticky-atc .try-at-home-button:hover::before,#md-sticky-atc .visit-store-home-button:hover::after, #md-sticky-atc .visit-store-home-button:hover::before{opacity:1}
-    #md-sticky-atc .visit-store-home-button svg {display: block;}
+    #md-sticky-atc .product-content { display: flex; align-items: center; }
+    #md-sticky-atc .product-content img { margin-right: .75rem; }
+    #md-sticky-atc .price-mirror .price { justify-content: flex-start; }
+    #md-sticky-atc .price__regular { display: none; }
+    #md-sticky-atc .price__sale { display: block; }
+    #md-sticky-atc .price__sale .price-item--regular { font-size: 14px; font-weight: 500; display: none; }
+    #md-sticky-atc .try-at-home-button,
+    #md-sticky-atc .visit-store-home-button { position: relative; }
+    #md-sticky-atc .try-at-home-button::after,
+    #md-sticky-atc .visit-store-home-button::after { content: attr(data-tooltip); position: absolute; top: 110%; left: 50%; transform: translateX(-50%); background: #000; color: #fff; font-size: 12px !important; padding: 6px 10px; border-radius: 6px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .2s ease, transform .2s ease; z-index: 10; line-height: 1.3; }
+    #md-sticky-atc .try-at-home-button::before,
+    #md-sticky-atc .visit-store-home-button::before { content: ""; position: absolute; top: 90%; left: 50%; transform: translateX(-50%); border: 6px solid transparent; border-bottom-color: #000; opacity: 0; transition: opacity .2s ease; }
+    #md-sticky-atc .try-at-home-button:hover::after,
+    #md-sticky-atc .try-at-home-button:hover::before,
+    #md-sticky-atc .visit-store-home-button:hover::after,
+    #md-sticky-atc .visit-store-home-button:hover::before { opacity: 1; }
+    #md-sticky-atc .visit-store-home-button svg { display: block; }
 
-    @media(max-width:749px){
-      #md-sticky-atc{
-        display:none !important;
-      }
+    /* ── product-form row: scheme btn + ATC btn + icons all inline ── */
+    #md-sticky-atc product-form.product-form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: nowrap;
+    }
+    #md-sticky-atc .product-form form {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-right: 0;
+    }
+    #md-sticky-atc .product-form__error-message-wrapper {
+      display: none;
+    }
+
+    /* ── Scheme button overrides (scoped to #md-sticky-atc + lucira classes) ──
+       These ONLY apply inside the sticky bar and override the full-width
+       block style set by .lucira-scheme-wrapper in scheme-button.liquid     */
+    #md-sticky-atc .lucira-scheme-wrapper {
+      margin-top: 0;
+      width: auto;
+      flex-shrink: 0;
+    }
+    #md-sticky-atc .lucira-scheme-wrapper .lucira-scheme-btn {
+      width: auto;
+      white-space: nowrap;
+      padding: 12px 16px;
+      font-size: 11px;
+      border-radius: 12px;
+    }
+
+    @media (max-width: 749px) {
+      #md-sticky-atc { display: none !important; }
     }
   </style>
 
@@ -60,24 +167,23 @@
       const stickyATC = document.querySelector('#md-sticky-atc');
       if (!stickyATC) return;
 
-      const stickyImg = stickyATC.querySelector('.product-content img');
+      const stickyImg            = stickyATC.querySelector('.product-content img');
       const stickyPriceContainer = stickyATC.querySelector('.price-mirror');
-      const stickyForm = stickyATC.querySelector('form');
+      const stickyForm           = stickyATC.querySelector('form');
+      const mainAtcBtn           = document.querySelector('button[name="add"]');
 
-      const mainAtcBtn = document.querySelector('button[name="add"]');
-      
+      // ── Show/hide on scroll ──────────────────────────────────────────
       let threshold = 300;
-      
+
       const updateThreshold = () => {
         const offset = Number(stickyATC.dataset.offset) || 0;
-        
         if (mainAtcBtn) {
-          const rect = mainAtcBtn.getBoundingClientRect();
+          const rect      = mainAtcBtn.getBoundingClientRect();
           const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-          threshold = rect.top + scrollTop + rect.height + offset;
+          threshold       = rect.top + scrollTop + rect.height + offset;
         }
       };
-      
+
       updateThreshold();
 
       let ticking = false;
@@ -91,65 +197,112 @@
         }
       });
 
-      window.addEventListener('resize', () => {
-        updateThreshold();
-      });
+      window.addEventListener('resize', updateThreshold);
 
-      if (window.MutationObserver) {
-        const observer = new MutationObserver(() => {
-          updateThreshold();
-        });
-        observer.observe(stickyATC, { attributes: true, attributeFilter: ['data-offset'] });
-      }
+      new MutationObserver(updateThreshold)
+        .observe(stickyATC, { attributes: true, attributeFilter: ['data-offset'] });
 
-      // Sync variant selection from main form to sticky form
+      // ── Sync variant ID from main form → sticky form ─────────────────
       const mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
       if (mainForm && stickyForm) {
-        const mainVariantInput = mainForm.querySelector('input[name="id"], select[name="id"]');
+        const mainVariantInput   = mainForm.querySelector('input[name="id"], select[name="id"]');
         const stickyVariantInput = stickyForm.querySelector('input[name="id"]');
-        
+
         if (mainVariantInput && stickyVariantInput) {
-          // Listen for changes on main form
           mainForm.addEventListener('change', (e) => {
-            if (e.target.name === 'id') {
-              stickyVariantInput.value = e.target.value;
-            }
+            if (e.target.name === 'id') stickyVariantInput.value = e.target.value;
           });
-          
-          // Listen for variant:change event (Shopify theme specific)
           document.addEventListener('variant:change', (e) => {
-            if (e.detail?.variant?.id) {
-              stickyVariantInput.value = e.detail.variant.id;
-            }
+            if (e.detail?.variant?.id) stickyVariantInput.value = e.detail.variant.id;
           });
         }
       }
 
+      // ── Mirror price display from main PDP ───────────────────────────
       const mainPriceRoot =
         document.querySelector('.product__info-container .no-js-hidden[role="status"]') ||
         document.querySelector('.product__info-container .price');
 
-      const getMainImage = () => {
-        const img =
-          document.querySelector('.product__media-item.is-active img') ||
-          document.querySelector('.product__media-list img');
-        return img?.src || null;
-      };
+      const getMainImage = () =>
+        document.querySelector('.product__media-item.is-active img')?.src ||
+        document.querySelector('.product__media-list img')?.src || null;
 
       if (mainPriceRoot && stickyPriceContainer) {
-        const sync = () => {
+        const syncPrice = () => {
           stickyPriceContainer.innerHTML = mainPriceRoot.innerHTML;
-          stickyPriceContainer.querySelectorAll('[id]').forEach((el) => el.removeAttribute('id'));
+          stickyPriceContainer.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
           const newImg = getMainImage();
           if (newImg && stickyImg) stickyImg.src = newImg;
         };
-        sync();
-        new MutationObserver(sync).observe(mainPriceRoot, {
-          childList: true,
-          subtree: true,
-          attributes: true,
-          characterData: true,
+        syncPrice();
+        new MutationObserver(syncPrice).observe(mainPriceRoot, {
+          childList: true, subtree: true, attributes: true, characterData: true,
         });
+      }
+
+      // ── Scheme button: update price + href on variant change ──────────
+      // mirrors calcScheme() from scheme-button.liquid exactly
+      function calcScheme(pricePaise) {
+        const priceRupees = Math.floor(pricePaise / 100);
+        const rawMonthly  = Math.floor(priceRupees / 10);
+        const remainder   = rawMonthly % 500;
+        const monthly     = rawMonthly - remainder;           // FLOOR to lower ₹500 slab
+        return {
+          schemePrice: priceRupees - monthly,  // displayed on button CTA
+          monthly                               // passed as &amount= in URL
+        };
+      }
+
+      function formatINR(n) {
+        return n.toLocaleString('en-IN');
+      }
+
+      function updateSchemeButtons(variantId) {
+        const stickyWrapper = stickyATC.querySelector('.lucira-scheme-wrapper');
+        if (!stickyWrapper) return;
+
+        const prices     = JSON.parse(stickyWrapper.dataset.variantPrices || '{}');
+        const pricePaise = prices[String(variantId)];
+        if (pricePaise === undefined) return;
+
+        const { schemePrice, monthly } = calcScheme(pricePaise);
+
+        // ── Update displayed scheme price ──
+        const priceEl = stickyWrapper.querySelector('[data-scheme-price]');
+        if (priceEl) priceEl.textContent = '₹' + formatINR(schemePrice);
+
+        // ── Update href: replace &amount= (or ?amount=) with new monthly ──
+        const link = stickyWrapper.querySelector('[data-scheme-link]');
+        if (link) {
+          const currentHref = link.getAttribute('href') || '';
+          const baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+          const separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+          link.href         = baseUrl + separator + 'amount=' + monthly;
+        }
+      }
+
+      // Layer 1 — custom theme event
+      document.addEventListener('variant:change', (e) => {
+        if (e.detail?.variant?.id) updateSchemeButtons(e.detail.variant.id);
+      });
+
+      // Layer 2 — Dawn / Prestige / Debut
+      document.addEventListener('variant:changed', (e) => {
+        if (e.detail?.variant?.id) updateSchemeButtons(e.detail.variant.id);
+      });
+
+      // Layer 3 — MutationObserver on hidden input as fallback
+      if (mainForm) {
+        const variantInput = mainForm.querySelector('input[name="id"]');
+        if (variantInput) {
+          new MutationObserver(() => {
+            if (variantInput.value) updateSchemeButtons(variantInput.value);
+          }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+          variantInput.addEventListener('change', function () {
+            if (this.value) updateSchemeButtons(this.value);
+          });
+        }
       }
     });
   </script>
@@ -161,6 +314,7 @@
   >
     <div class="page-width">
       <div class="page-width-inner">
+
         <div class="product-content">
           {% if section.settings.show_img %}
             <img
@@ -189,6 +343,7 @@
             </svg>
             <span class="product-form__error-message"></span>
           </div>
+
           {%- form 'product',
             product,
             id: product_form_id,
@@ -211,7 +366,7 @@
                 assign metal_color = 'White'
                 endif
                 assign purity_key = config.purity | downcase | prepend: 'gold_price_'
-                assign gold_rate = metal_rates[purity_key] | times: 100 
+                assign gold_rate = metal_rates[purity_key] | times: 100
                 assign metal_cost = gold_rate | times: config.metal_weight
                 assign diamond_final = 0.0
                 assign diamond_pcs = 0
@@ -250,6 +405,7 @@
                     assign gemstone_final = gemstone_final | plus: item_final_cost
                 endif
                 endfor
+
                 assign mc_rate_original = config.making_charges | default: 0 | times: 100
                 assign mc_discount_percent = config.making_charges_discount | default: 0
                 assign mc_rate_disc_amt = mc_rate_original | times: mc_discount_percent | divided_by: 100.0
@@ -286,37 +442,54 @@
                 assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
             -%}
 
-            <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date" value="{{ shipping_date }}">
-            <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
-            <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
-            <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
-
+            <input type="hidden" name="properties[_Shipping Date]"      id="prop-shipping-date"       value="{{ shipping_date }}">
+            <input type="hidden" name="properties[EngravingText]"                                      value="{{ engraving_text | default: '' }}">
+            <input type="hidden" name="properties[EngravingFont]"                                      value="{{ engraving_font | default: '' }}">
+            <input type="hidden" name="properties[GiftText]"                                           value="{{ gift_text | default: '' }}">
             <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="{{ val_gold_rate }}">
-            <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
-            <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
-            <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="{{ val_mc_cost }}">
-            <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges" value="{{ val_diamond_cost }}">
-            <input type="hidden" name="properties[_GST]" id="prop-gst" value="{{ val_tax }}">
-            <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="{{ val_total }}">
-            <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs" value="{{ diamond_pcs }}">
+            <input type="hidden" name="properties[_Gold Weight]"         id="prop-gold-weight"         value="{{ config.metal_weight }}">
+            <input type="hidden" name="properties[_Gold Price]"          id="prop-gold-price"          value="{{ val_metal_cost }}">
+            <input type="hidden" name="properties[_Making Charges]"      id="prop-making-charges"      value="{{ val_mc_cost }}">
+            <input type="hidden" name="properties[_Diamond Charges]"     id="prop-diamond-charges"     value="{{ val_diamond_cost }}">
+            <input type="hidden" name="properties[_GST]"                 id="prop-gst"                 value="{{ val_tax }}">
+            <input type="hidden" name="properties[_Final Price]"         id="prop-final-price"         value="{{ val_total }}">
+            <input type="hidden" name="properties[_Diamond Total Pcs]"   id="prop-diamond-total-pcs"   value="{{ diamond_pcs }}">
 
             <input
-            type="hidden"
-            name="id"
-            value="{{ product.selected_or_first_available_variant.id }}"
-            {% if product.selected_or_first_available_variant.available == false
-                or quantity_rule_soldout
-                or product.selected_or_first_available_variant == null
-            %}
-                disabled
-            {% endif %}
-            
+              type="hidden"
+              name="id"
+              value="{{ product.selected_or_first_available_variant.id }}"
+              {% if product.selected_or_first_available_variant.available == false
+                  or quantity_rule_soldout
+                  or product.selected_or_first_available_variant == null
+              %}disabled{% endif %}
             >
+
+            {% if _sticky_price_rupees >= 18000 %}
+              <div
+                class="lucira-scheme-wrapper"
+                data-scheme-wrapper
+                data-variant-prices='{{ _sticky_variant_prices_json }}'
+                data-scheme-url="{{ scheme_url }}"
+              >
+                <a href="{{ scheme_url }}" class="lucira-scheme-btn" data-scheme-link target="_blank" rel="noopener noreferrer">
+                  <span class="lucira-scheme-btn__text">
+                    BUY AT
+                    <strong
+                      class="lucira-scheme-btn__price"
+                      data-scheme-price
+                    >&#8377;{{ _sticky_scheme_price_paise | money_without_currency | replace: '.00', '' }}</strong>
+                    WITH SCHEME
+                  </span>
+                </a>
+              </div>
+            {% endif %}
+
             <button
               type="submit"
               name="add"
               class="product-form__submit button button--{{ section.settings.btn_style }} product-variant-id"
-              {% unless current_variant.available %}disabled{% endunless %} 
+              {% unless current_variant.available %}disabled{% endunless %}
             >
               <span>
                 {% if current_variant.available %}
@@ -332,7 +505,7 @@
               </div>
             </button>
           {% endform %}
-          
+
           {% assign has_instock_variant = false %}
           {% for v in product.variants %}
             {% if v.inventory_management and v.inventory_quantity > 0 %}
@@ -366,6 +539,7 @@
             </button>
           {% endif %}
         </product-form>
+
       </div>
     </div>
   </div>
