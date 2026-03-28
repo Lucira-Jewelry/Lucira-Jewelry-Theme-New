@@ -58,7 +58,9 @@ class CartRemoveButton extends HTMLElement {
           price: parseFloat(price),
           offer_price: parseFloat(offerPrice),
           quantity: parseInt(quantity, 10),
-          thumbnail_image: thumbnailImage,
+          thumbnail_image: thumbnailImage | image_url: width: 800 | prepend: 'https:',
+                  // thumbnailImage: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }},      
+
         },
       });
 
