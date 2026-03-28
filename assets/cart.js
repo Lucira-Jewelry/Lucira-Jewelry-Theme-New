@@ -1,25 +1,3 @@
-// class CartRemoveButton extends HTMLElement {
-//   constructor() {
-//     super();
-
-//     this.addEventListener('click', (event) => {
-//       event.preventDefault();
-//       const cartItems = this.closest('cart-items') || this.closest('cart-drawer-items');
-//       window.dataLayer = window.dataLayer || [];
-//       window.dataLayer.push({
-//         event: 'removeFromCart',
-//         'products':{
-//         ...this.dataset,
-//         }
-//       })
-
-//       cartItems.updateQuantity(this.dataset.index, 0, event);
-//     });
-//   }
-// }
-
-// customElements.define('cart-remove-button', CartRemoveButton);
-
 class CartRemoveButton extends HTMLElement {
   constructor() {
     super();
