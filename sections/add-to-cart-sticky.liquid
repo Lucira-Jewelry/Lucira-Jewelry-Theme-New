@@ -258,28 +258,52 @@
       }
 
       function updateSchemeButtons(variantId) {
-        const stickyWrapper = stickyATC.querySelector('.lucira-scheme-wrapper');
-        if (!stickyWrapper) return;
+      const stickyWrapper = stickyATC.querySelector('.lucira-scheme-wrapper');
+      if (!stickyWrapper) return;
 
-        const prices     = JSON.parse(stickyWrapper.dataset.variantPrices || '{}');
-        const pricePaise = prices[String(variantId)];
-        if (pricePaise === undefined) return;
+      const prices     = JSON.parse(stickyWrapper.dataset.variantPrices || '{}');
+      const pricePaise = prices[String(variantId)];
+      if (pricePaise === undefined) return;
 
-        const { schemePrice, monthly } = calcScheme(pricePaise);
+      const { schemePrice, monthly } = calcScheme(pricePaise);
 
-        // ── Update displayed scheme price ──
-        const priceEl = stickyWrapper.querySelector('[data-scheme-price]');
-        if (priceEl) priceEl.textContent = '₹' + formatINR(schemePrice);
+      // Keep data-current-variant fresh for dataLayer reads
+      stickyWrapper.setAttribute('data-current-variant', String(variantId)); // ← add
 
-        // ── Update href: replace &amount= (or ?amount=) with new monthly ──
-        const link = stickyWrapper.querySelector('[data-scheme-link]');
-        if (link) {
-          const currentHref = link.getAttribute('href') || '';
-          const baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
-          const separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
-          link.href         = baseUrl + separator + 'amount=' + monthly;
-        }
+      const priceEl = stickyWrapper.querySelector('[data-scheme-price]');
+      if (priceEl) priceEl.textContent = '₹' + formatINR(schemePrice);
+
+      const link = stickyWrapper.querySelector('[data-scheme-link]');
+      if (link) {
+        const currentHref = link.getAttribute('href') || '';
+        const baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
+        const separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
+        link.href         = baseUrl + separator + 'amount=' + monthly;
       }
+    }
+
+
+    // ── dataLayer push on Sticky ATC Enroll Now click ────────────────
+    document.addEventListener('click', function (e) {
+      var link = e.target.closest('[data-scheme-link]');
+      if (!link) return;
+      if (!link.closest('#md-sticky-atc')) return; // scoped to sticky ATC only
+
+      var wrapper     = link.closest('[data-scheme-wrapper]');
+      var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
+      var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
+
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'promoClick',
+        promoClick: {
+          creative_name:  'Schemes Enroll Sticky Atc',
+          promo_name:     productName,
+          promo_position: variantId,
+          location_id:    'sticky_atc'
+        }
+      });
+    });
 
       // Layer 1 — custom theme event
       document.addEventListener('variant:change', (e) => {
@@ -466,12 +490,14 @@
             >
 
             {% if _sticky_price_rupees >= 18000 %}
-              <div
-                class="lucira-scheme-wrapper"
-                data-scheme-wrapper
-                data-variant-prices='{{ _sticky_variant_prices_json }}'
-                data-scheme-url="{{ scheme_url }}"
-              >
+                <div
+                  class="lucira-scheme-wrapper"
+                  data-scheme-wrapper
+                  data-variant-prices='{{ _sticky_variant_prices_json }}'
+                  data-scheme-url="{{ scheme_url }}"
+                  data-product-title="{{ product.title | escape }}"
+                  data-current-variant="{{ current_variant.id }}"
+                >
                 <a href="{{ scheme_url }}" class="lucira-scheme-btn" data-scheme-link target="_blank" rel="noopener noreferrer">
                   <span class="lucira-scheme-btn__text">
                     BUY AT
