@@ -532,9 +532,10 @@
   window.__luciraStickyBarInit = true;
 
   /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
-  var SCHEME_URL      = {{ scheme_url | json }};
-  var SHOW_SCHEME_BTN = {{ _show_scheme_btn }};
-
+  var SCHEME_URL         = {{ scheme_url | json }};
+  var SHOW_SCHEME_BTN    = {{ _show_scheme_btn }};
+  var PRODUCT_TITLE      = {{ product.title | json }};
+  var currentVariantId   = '{{ product.selected_or_first_available_variant.id }}';
   /* ── Build the sticky bar by CLONING the real button row ── */
   function buildBar() {
     var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
@@ -587,6 +588,19 @@
     schemeBtn.target = '_blank';
     schemeBtn.rel = 'noopener noreferrer';
     schemeBtn.textContent = ' 9=10 SAVING';
+
+    schemeBtn.addEventListener('click', function () {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'promoClick',
+        promoClick: {
+          creative_name:  'Scheme Button Mobile Sticky',
+          promo_name:     PRODUCT_TITLE,
+          promo_position: currentVariantId,
+          location_id:    'mobile_sticky_atc'
+        }
+      });
+    });
 
     /* Order: [WA icon] [SCHEME btn] [ATC btn] */
     if (SHOW_SCHEME_BTN) {
@@ -641,6 +655,13 @@
   /* ── Variant change → sync ATC state only ── */
   function onVariantChange() {
     requestAnimationFrame(syncATC);
+
+    // Keep currentVariantId fresh for dataLayer reads
+    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+    if (variantInput && variantInput.value) {
+      currentVariantId = variantInput.value;
+    }
   }
 
   document.addEventListener('variant:change',  function () { onVariantChange(); });
