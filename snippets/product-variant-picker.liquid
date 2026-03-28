@@ -1,15 +1,3 @@
-{% comment %}
-  Renders product variant-picker
-
-  Accepts:
-  - product: {Object} product object.
-  - block: {Object} passing the block information.
-  - product_form_id: {String} Id of the product form to which the variant picker is associated.
-  Usage:
-  {% render 'product-variant-picker', product: product, block: block, product_form_id: product_form_id %}
-{% endcomment %}
-
-
 {% assign variant_parts = product.selected_or_first_available_variant.title |
   split: '/' %}
 <div class="size-and-customization-section"  id="variant-selects-{{ section.id }}" data-section="{{ section.id }}">
@@ -107,7 +95,7 @@
 
 
 
-<script>
+{% comment %} <script>
 document.addEventListener('DOMContentLoaded', function () {
   window.dataLayer = window.dataLayer || [];
 
@@ -136,6 +124,60 @@ document.addEventListener('DOMContentLoaded', function () {
         shopify_sku: variant.sku
       }
     });
+  });
+
+  observer.observe(idInput, { 
+    attributes: true, 
+    attributeFilter: ['value'] 
+  });
+});
+</script> {% endcomment %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  window.dataLayer = window.dataLayer || [];
+
+  const drawer = document.getElementById('variant-drawer');
+  if (!drawer) return;
+
+  const variants = {{ product.variants | json }};
+  let lastFiredVariantId = null;
+
+  const idInput = document.querySelector('form[action*="/cart/add"] input[name="id"]');
+  if (!idInput) return;
+
+  function pushProductView(variant) {
+    window.dataLayer.push({
+      event: 'productView',
+      products: {
+        productId: {{ product.id | json }},
+        sku: variant.sku,
+        variantId: variant.id,
+        vendorCode: {{ product.vendor | json }},
+        productName: {{ product.title | json }},
+        productType: {{ product.type | json }},
+        category: {{ product.metafields.custom.category.value | json }},
+        subCategory: {{ product.metafields.custom.sub_category_1.value | json }},
+        productUrl: {{ shop.url | append: product.url | json }},
+        productUrlw: {{ product.url | json }},
+        thumbnailImage: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }},
+        image: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }},
+        price: variant.price / 100,
+        offerPrice: variant.compare_at_price ? variant.compare_at_price / 100 : null,
+        productPersona: {{ product.metafields.custom.persona.value | json }}
+      }
+    });
+  }
+
+  const observer = new MutationObserver(function() {
+    const variantId = Number(idInput.value);
+    const variant = variants.find(v => v.id === variantId);
+    
+    if (!variant || variant.id === lastFiredVariantId) return;
+    
+    lastFiredVariantId = variant.id;
+
+    pushProductView(variant);
   });
 
   observer.observe(idInput, { 
