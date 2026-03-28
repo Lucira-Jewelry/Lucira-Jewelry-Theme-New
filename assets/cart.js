@@ -4,21 +4,56 @@ class CartRemoveButton extends HTMLElement {
 
     this.addEventListener('click', (event) => {
       event.preventDefault();
+
       const cartItems = this.closest('cart-items') || this.closest('cart-drawer-items');
+
+      const {
+        index,
+        id,
+        sku,
+        variantId,
+        productName,
+        productType,
+        category,
+        subCategory,
+        price,
+        offerPrice,
+        quantity,
+        thumbnailImage,
+      } = this.dataset;
+
+      // Normalize protocol-relative URL to https
+      const thumbnailUrl = thumbnailImage
+        ? thumbnailImage.startsWith('//')
+          ? 'https:' + thumbnailImage
+          : thumbnailImage
+        : null;
+
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({
         event: 'removeFromCart',
-        'products':{
-        ...this.dataset,
-        }
-      })
+        cart: {
+          productId: id || null,
+          sku: sku || null,
+          variantId: variantId || null,
+          productName: productName || null,
+          productType: productType || null,
+          category: category || null,
+          sub_category: subCategory || null,
+          price: price ? parseFloat(price) : null,
+          offerPrice: offerPrice ? parseFloat(offerPrice) : null,
+          quantity: quantity ? parseInt(quantity, 10) : null,
+          thumbnail_image: thumbnailUrl,
+        },
+      });
 
-      cartItems.updateQuantity(this.dataset.index, 0, event);
+      cartItems.updateQuantity(index, 0, event);
     });
   }
 }
 
 customElements.define('cart-remove-button', CartRemoveButton);
+
 
 class CartItems extends HTMLElement {
   constructor() {
@@ -310,3 +345,5 @@ if (!customElements.get('cart-note')) {
     }
   );
 }
+
+

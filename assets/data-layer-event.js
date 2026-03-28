@@ -59,7 +59,14 @@
   //   requestAnimationFrame(() => { window.location.href = target.href; });
   // };
 
-  // Add to cart (stub)
+
+
+
+
+
+
+
+  // Add to cart (stub) do not delete
   window.handleGTMAddToCartSubmit = function () {
     const productData = dataLayer.find(i => i.event === "productView");
     if (!productData) return;
@@ -69,6 +76,13 @@
       products: { ...productData, quantity: 1 }
     });
   };
+
+
+
+
+
+
+  
 
   // View cart
   window.handleGTMViewCart = function () {

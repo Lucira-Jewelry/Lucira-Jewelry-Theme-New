@@ -106,46 +106,55 @@
             clicked = false;
         })
 
-        const targetElement = document.querySelector("body");
-          function debounce(func, delay) {
-            let timeoutId;
-            return function () {
-              const context = this;
-              const args = arguments;
-              clearTimeout(timeoutId);
-              timeoutId = setTimeout(function () {
-                func.apply(context, args);
-              }, delay);
-            };
-          }
+      // Surgical MutationObserver targeting only relevant containers
+      const cartDrawer = document.querySelector('cart-drawer');
+      const productForm = document.querySelector('product-form');
+      const targetElement = cartDrawer || productForm || document.querySelector("body");
+      
+      function debounce(func, delay) {
+        let timeoutId;
+        return function () {
+          const context = this;
+          const args = arguments;
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(function () {
+            func.apply(context, args);
+          }, delay);
+        };
+      }
 
-          const observer = new MutationObserver(() => {
-        const addToCartButton = document.querySelector("button[name='add']");
-    const gokwikBuyNowButton = document.getElementById('gokwik-buy-now');
-
-    if (addToCartButton && addToCartButton.disabled) {
-        gokwikBuyNowButton?.setAttribute('disabled', 'disabled');
-    } else {
-        gokwikBuyNowButton?.removeAttribute('disabled');
-    }
-            debouncedMyTimer();
-          });
-
-          const debouncedMyTimer = debounce(() => {
-            observer.disconnect();
-            //Do Not Touch this function
+      const observer = new MutationObserver((mutations) => {
+        // Only trigger if relevant elements changed
+        const isRelevant = mutations.some(mutation => 
+          mutation.target.closest('cart-drawer') || 
+          mutation.target.closest('product-form') ||
+          mutation.target.classList.contains('gokwik-checkout')
+        );
         
-            gokwikCheckoutEnable(["#gokwik-buy-now",".gokwik-checkout button"])
-            var gokwikCheckoutButtons = document.querySelectorAll('.gokwik-checkout button');
-    gokwikCheckoutButtons.forEach(function(button) {
-        button.disabled = false;
-        button.classList.remove('disabled');
-    });
-        observer.observe(targetElement, { childList: true, subtree: true });
-      }, 700);
+        if (!isRelevant) return;
 
-      const config = { childList: true, subtree: true };
-      observer.observe(targetElement, config);
+        const addToCartButton = document.querySelector("button[name='add']");
+        const gokwikBuyNowButton = document.getElementById('gokwik-buy-now');
+
+        if (addToCartButton && addToCartButton.disabled) {
+            gokwikBuyNowButton?.setAttribute('disabled', 'disabled');
+        } else {
+            gokwikBuyNowButton?.removeAttribute('disabled');
+        }
+        debouncedMyTimer();
+      });
+
+      const debouncedMyTimer = debounce(() => {
+        observer.disconnect();
+        gokwikCheckoutEnable(["#gokwik-buy-now",".gokwik-checkout button"])
+        var gokwikCheckoutButtons = document.querySelectorAll('.gokwik-checkout button');
+        gokwikCheckoutButtons.forEach(function(button) {
+            button.disabled = false;
+            button.classList.remove('disabled');
+        });
+        observer.observe(targetElement, { childList: true, subtree: true });
+      }, 100);
+      observer.observe(targetElement, { childList: true, subtree: true });
   });
 </script>
 {% endif %}
@@ -153,7 +162,7 @@
 <style>
   {% if settings.goEnable %}
     .gokwik-checkout {width: 90%; margin: 0 auto; display: flex ; justify-content: center; gap:12px; flex-direction: row; align-items: end;overflow: hidden;}
-    .gokwik-checkout button { max-width:100%; width: 100%; border: none; display: flex; justify-content: center; align-items: center; background: {{ settings.priClr }}; position: relative; cursor: pointer; border-radius: 12px; height:50px; font:inherit; transition:box-shadow .3s ease; }
+    .gokwik-checkout button { max-width:100%; width: 100%; border: none; display: flex; justify-content: center; align-items: center; background: #a05a64; position: relative; cursor: pointer; border-radius: 12px; height:50px; font:inherit; transition:box-shadow .3s ease; }
     #gokwik-buy-now.disabled,.gokwik-disabled{opacity:.5;cursor:not-allowed}
     .gokwik-checkout button:focus{outline:0}
     .gokwik-checkout button>span{display:flex}

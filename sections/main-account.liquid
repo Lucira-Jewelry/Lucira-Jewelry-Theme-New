@@ -53,7 +53,7 @@
           ><strong>{{ customer.name | upcase }}</strong></span
         >
         <div id="customCoinsBox">
-          <div>Coins Earned: <span class="earned">0</span></div>
+          <div>Coins Earned: <span class="balance">0</span></div>
         </div>
       </div>
     </div>
@@ -117,7 +117,9 @@
     </div>
 
     <div class="logout-button-wrapper">
-      <a href="{{ routes.account_logout_url }}" class="customer_account_logout">
+      <a href="{{ routes.account_logout_url }}" 
+        class="customer_account_logout" 
+        id="logout-btn">
         <span class="svg-wrapper">{{- 'icon-logout.svg' | inline_asset_content -}}</span>
         {{ 'customer.log_out' | t }}
       </a>
@@ -569,6 +571,37 @@
   {% assign _ts = 'now' | date: '%s' %}
   {% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
   {% assign _sig = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+
+    <script>
+      (function () {
+        var logoutBtn = document.getElementById('logout-btn');
+        if (!logoutBtn) return;
+
+        var customerEmail = {{ customer.email | json }};
+        var customerPhone = {{ _clean_phone | json }}; // already cleaned via your existing Liquid above
+
+        logoutBtn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var href = this.href;
+
+          window.dataLayer = window.dataLayer || [];
+          window.dataLayer.push({
+            'event': 'logout',
+            'User': {
+              'email': customerEmail || '',
+              'mobile': customerPhone || ''
+            }
+          });
+
+          setTimeout(function () {
+            window.location.href = href;
+          }, 300);
+        });
+      })();
+    </script>
+
+
+
 
   <script>
     (function () {
@@ -1435,11 +1468,9 @@
   const box = document.getElementById('customCoinsBox');
   if (!box) return;
 
-  const earnedEl = box.querySelector('.earned');
   const balanceEl = box.querySelector('.balance');
 
-  // Optional loading state
-  if (earnedEl) earnedEl.innerText = '...';
+  // loading state
   if (balanceEl) balanceEl.innerText = '...';
 
   fetch(`${endpoint}?customer_id=${encodeURIComponent(customerId)}`)
@@ -1447,13 +1478,10 @@
     .then(data => {
       if (!data.status) return;
 
-      if (earnedEl) earnedEl.innerText = data.coins_earned || 0;
       if (balanceEl) balanceEl.innerText = data.coins_balance || 0;
     })
     .catch(err => {
       console.error('Coins fetch failed:', err);
-
-      if (earnedEl) earnedEl.innerText = '0';
       if (balanceEl) balanceEl.innerText = '0';
     });
 })();
