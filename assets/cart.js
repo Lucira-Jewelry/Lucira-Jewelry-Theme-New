@@ -22,23 +22,28 @@ class CartRemoveButton extends HTMLElement {
         thumbnailImage,
       } = this.dataset;
 
+      // Normalize protocol-relative URL to https
+      const thumbnailUrl = thumbnailImage
+        ? thumbnailImage.startsWith('//')
+          ? 'https:' + thumbnailImage
+          : thumbnailImage
+        : null;
+
       window.dataLayer = window.dataLayer || [];
       window.dataLayer.push({
         event: 'removeFromCart',
         cart: {
-          id: id,
-          sku: sku,
-          variant_id: variantId,
-          product_name: productName,
-          product_type: productType,
-          category: category,
-          sub_category: subCategory,
-          price: parseFloat(price),
-          offer_price: parseFloat(offerPrice),
-          quantity: parseInt(quantity, 10),
-          thumbnail_image: thumbnailImage | image_url: width: 800 | prepend: 'https:',
-                  // thumbnailImage: {{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }},      
-
+          id: id || null,
+          sku: sku || null,
+          variant_id: variantId || null,
+          product_name: productName || null,
+          product_type: productType || null,
+          category: category || null,
+          sub_category: subCategory || null,
+          price: price ? parseFloat(price) : null,
+          offer_price: offerPrice ? parseFloat(offerPrice) : null,
+          quantity: quantity ? parseInt(quantity, 10) : null,
+          thumbnail_image: thumbnailUrl,
         },
       });
 
@@ -48,6 +53,7 @@ class CartRemoveButton extends HTMLElement {
 }
 
 customElements.define('cart-remove-button', CartRemoveButton);
+
 
 class CartItems extends HTMLElement {
   constructor() {
