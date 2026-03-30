@@ -1,0 +1,343 @@
+{% comment %}
+  ============================================================
+  LUCIRA JEWELRY — SOCIAL PROOF PURCHASE POPUP
+  Rendered only on homepage (template == 'index').
+  - Fetches real product images via Shopify AJAX /products/{handle}.js
+  - No repeat of same entry per session (sessionStorage tracking)
+  - Randomised "X minutes ago" time strings
+  - 20-second initial delay, cycles every 9 seconds
+  ============================================================
+{% endcomment %}
+
+{% if template == 'index' %}
+
+<style id="lj-sp-css">
+  #lj-sp-popup {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 99999;
+    background: #ffffff;
+    border-left: 3px solid #c8956c;
+    border-radius: 6px;
+    padding: 14px 36px 14px 14px;
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    max-width: 320px;
+    width: calc(100vw - 32px);
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.07);
+    transform: translateX(calc(-100% - 30px));
+    opacity: 0;
+    transition: transform 0.5s cubic-bezier(0.34,1.2,0.64,1), opacity 0.38s ease;
+    font-family: 'Jost', 'Helvetica Neue', Arial, sans-serif;
+    pointer-events: all;
+    cursor: default;
+    box-sizing: border-box;
+  }
+  @media (min-width: 480px) {
+    #lj-sp-popup { width: 320px; }
+  }
+  #lj-sp-popup.lj-sp-show {
+    transform: translateX(0);
+    opacity: 1;
+  }
+  #lj-sp-popup .lj-sp-img-wrap {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    border: 1.5px solid #e8d5c4;
+    background: #f9f2ec;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  #lj-sp-popup .lj-sp-img-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+    display: block;
+  }
+  #lj-sp-popup .lj-sp-img-wrap svg {
+    width: 28px;
+    height: 28px;
+    opacity: 0.5;
+    flex-shrink: 0;
+  }
+  #lj-sp-popup .lj-sp-body {
+    flex: 1;
+    min-width: 0;
+    line-height: 1.3;
+  }
+  #lj-sp-popup .lj-sp-location {
+    font-size: 11.5px;
+    color: #999;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    margin-bottom: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #lj-sp-popup .lj-sp-product {
+    font-size: 13px;
+    color: #1a1a1a;
+    font-weight: 500;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  #lj-sp-popup .lj-sp-product strong {
+    color: #b87340;
+  }
+  #lj-sp-popup .lj-sp-time {
+    font-size: 10.5px;
+    color: #bbb;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  #lj-sp-popup .lj-sp-dot {
+    width: 6px;
+    height: 6px;
+    background: #4caf7d;
+    border-radius: 50%;
+    flex-shrink: 0;
+    animation: lj-sp-pulse 1.8s infinite;
+  }
+  #lj-sp-popup .lj-sp-close {
+    position: absolute;
+    top: 7px;
+    right: 9px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ccc;
+    font-size: 18px;
+    line-height: 1;
+    padding: 2px 4px;
+    transition: color 0.2s;
+    font-family: Arial, sans-serif;
+  }
+  #lj-sp-popup .lj-sp-close:hover { color: #888; }
+  #lj-sp-popup .lj-sp-badge {
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    width: 14px;
+    height: 14px;
+    background: #4caf7d;
+    border-radius: 50%;
+    border: 2px solid #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #lj-sp-popup .lj-sp-badge svg {
+    width: 7px;
+    height: 7px;
+    opacity: 1;
+  }
+  @keyframes lj-sp-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.35; transform: scale(0.65); }
+  }
+  @media (max-width: 360px) {
+    #lj-sp-popup { bottom: 12px; left: 12px; width: calc(100vw - 24px); }
+  }
+</style>
+
+<div id="lj-sp-popup" role="status" aria-live="polite" aria-atomic="true">
+  <div class="lj-sp-img-wrap" id="lj-sp-img-wrap">
+    <div class="lj-sp-badge" aria-hidden="true">
+      <svg viewBox="0 0 10 8" fill="none"><path d="M1 4l2.5 2.5L9 1.5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <!-- Default jewelry SVG icon -->
+    <svg id="lj-sp-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M12 2L8 7H16L12 2Z" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M4 7H8M16 7H20" stroke="#c8956c" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M4 7L12 22L20 7" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M8 7L12 22L16 7" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="lj-sp-body">
+    <div class="lj-sp-location" id="lj-sp-location">Priya in Mumbai</div>
+    <div class="lj-sp-product">purchased <strong id="lj-sp-product-name">Rose Gold Solitaire Ring</strong></div>
+    <div class="lj-sp-time"><span class="lj-sp-dot"></span><span id="lj-sp-time">Just now</span></div>
+  </div>
+  <button class="lj-sp-close" id="lj-sp-close-btn" aria-label="Close notification">&times;</button>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ─── CONFIG ─────────────────────────────────────────── */
+  var INITIAL_DELAY    = 20000;  // 20s before first popup
+  var DISPLAY_DURATION = 7000;   // how long each popup stays
+  var BETWEEN_DELAY    = 10000;  // gap between popups
+  var SESSION_KEY      = 'lj_sp_shown';
+  /* ───────────────────────────────────────────────────── */
+
+  /* Curated purchases — use real Lucira product handles so
+     images load from Shopify. Set handle to null to skip image fetch. */
+  var PURCHASES = [
+    { name: 'Priya',    city: 'Mumbai',    product: 'Rose Gold Solitaire Ring',         handle: 'rose-gold-solitaire-ring' },
+    { name: 'Ananya',   city: 'Delhi',     product: 'Lab Diamond Stud Earrings',         handle: 'lab-diamond-stud-earrings' },
+    { name: 'Riya',     city: 'Bangalore', product: '18KT Yellow Gold Tennis Bracelet',  handle: '18kt-yellow-gold-tennis-bracelet' },
+    { name: 'Meera',    city: 'Hyderabad', product: 'Pear Shape Diamond Pendant',        handle: 'pear-shape-diamond-pendant' },
+    { name: 'Sneha',    city: 'Pune',      product: 'Emerald Cut Engagement Ring',       handle: 'emerald-cut-engagement-ring' },
+    { name: 'Divya',    city: 'Chennai',   product: 'Rose Gold Kids Fairytale Bracelet', handle: 'rose-gold-kids-fairytale-bracelet' },
+    { name: 'Kavya',    city: 'Jaipur',    product: 'Marquise Halo Diamond Ring',        handle: 'marquise-halo-diamond-ring' },
+    { name: 'Ishaan',   city: 'Kolkata',   product: 'Couple Gold Band Set',              handle: 'couple-gold-band-set' },
+    { name: 'Aisha',    city: 'Surat',     product: 'Lab Grown Diamond Mangalsutra',     handle: 'lab-grown-diamond-mangalsutra' },
+    { name: 'Nisha',    city: 'Ahmedabad', product: 'Diamond Cluster Earrings',          handle: 'diamond-cluster-earrings' },
+    { name: 'Pooja',    city: 'Lucknow',   product: 'Infinity Diamond Bracelet',         handle: 'infinity-diamond-bracelet' },
+    { name: 'Shreya',   city: 'Nagpur',    product: 'Heart Diamond Pendant Necklace',    handle: 'heart-diamond-pendant-necklace' },
+  ];
+
+  /* Time strings pool — randomised each display */
+  var TIME_STRINGS = [
+    'Just now', '1 minute ago', '2 minutes ago', '3 minutes ago',
+    '4 minutes ago', '5 minutes ago', '7 minutes ago', '9 minutes ago',
+    '11 minutes ago', '14 minutes ago', '18 minutes ago', '22 minutes ago',
+    '27 minutes ago', '34 minutes ago', '41 minutes ago', '48 minutes ago',
+    '55 minutes ago', '1 hour ago',
+  ];
+
+  /* DOM refs */
+  var popup    = document.getElementById('lj-sp-popup');
+  var locEl    = document.getElementById('lj-sp-location');
+  var prodEl   = document.getElementById('lj-sp-product-name');
+  var timeEl   = document.getElementById('lj-sp-time');
+  var imgWrap  = document.getElementById('lj-sp-img-wrap');
+  var closeBtn = document.getElementById('lj-sp-close-btn');
+
+  if (!popup) return;
+
+  /* ── Session tracking: avoid showing same entry twice ── */
+  function getShownSet() {
+    try {
+      var raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch (e) { return []; }
+  }
+  function markShown(idx) {
+    try {
+      var arr = getShownSet();
+      if (arr.indexOf(idx) === -1) arr.push(idx);
+      /* Reset when all have been shown */
+      if (arr.length >= PURCHASES.length) arr = [idx];
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(arr));
+    } catch (e) {}
+  }
+  function pickNext() {
+    var shown = getShownSet();
+    var available = [];
+    for (var i = 0; i < PURCHASES.length; i++) {
+      if (shown.indexOf(i) === -1) available.push(i);
+    }
+    /* If all shown, reset and pick from all */
+    if (available.length === 0) {
+      try { sessionStorage.removeItem(SESSION_KEY); } catch(e){}
+      available = PURCHASES.map(function(_, i){ return i; });
+    }
+    return available[Math.floor(Math.random() * available.length)];
+  }
+
+  /* ── Image fetching via Shopify AJAX API ────────────── */
+  var imgCache = {};
+  function fetchProductImage(handle, cb) {
+    if (!handle) { cb(null); return; }
+    if (imgCache[handle] !== undefined) { cb(imgCache[handle]); return; }
+    fetch('/products/' + handle + '.js')
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(data) {
+        var url = (data && data.images && data.images[0]) ? data.images[0] : null;
+        imgCache[handle] = url;
+        cb(url);
+      })
+      .catch(function(){ imgCache[handle] = null; cb(null); });
+  }
+
+  /* ── Render image in the avatar circle ─────────────── */
+  var defaultIconHTML = document.getElementById('lj-sp-icon')
+    ? document.getElementById('lj-sp-icon').outerHTML
+    : '<svg viewBox="0 0 24 24" fill="none"><path d="M12 2L8 7H16L12 2Z" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/><path d="M4 7H8M16 7H20" stroke="#c8956c" stroke-width="1.5" stroke-linecap="round"/><path d="M4 7L12 22L20 7" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 7L12 22L16 7" stroke="#c8956c" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+  function setAvatar(imgUrl, productName) {
+    /* Keep the badge */
+    var badge = imgWrap.querySelector('.lj-sp-badge');
+    var badgeHTML = badge ? badge.outerHTML : '';
+    if (imgUrl) {
+      imgWrap.innerHTML = badgeHTML + '<img src="' + imgUrl + '" alt="' + productName + '" loading="lazy">';
+    } else {
+      imgWrap.innerHTML = badgeHTML + defaultIconHTML;
+    }
+  }
+
+  /* ── Random time string ─────────────────────────────── */
+  function randomTime() {
+    return TIME_STRINGS[Math.floor(Math.random() * TIME_STRINGS.length)];
+  }
+
+  /* ── Show / hide logic ──────────────────────────────── */
+  var hideTimer = null;
+  var nextTimer = null;
+  var isVisible = false;
+
+  function showNext() {
+    var idx  = pickNext();
+    var item = PURCHASES[idx];
+    markShown(idx);
+
+    /* Update text immediately */
+    locEl.textContent  = item.name + ' in ' + item.city;
+    prodEl.textContent = item.product;
+    timeEl.textContent = randomTime();
+
+    /* Reset avatar then fetch image */
+    setAvatar(null, item.product);
+    fetchProductImage(item.handle, function(url) {
+      setAvatar(url, item.product);
+    });
+
+    /* Slide in */
+    popup.classList.add('lj-sp-show');
+    isVisible = true;
+
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      hidePopup(true);
+    }, DISPLAY_DURATION);
+  }
+
+  function hidePopup(scheduleNext) {
+    popup.classList.remove('lj-sp-show');
+    isVisible = false;
+    clearTimeout(hideTimer);
+    if (scheduleNext) {
+      clearTimeout(nextTimer);
+      nextTimer = setTimeout(showNext, BETWEEN_DELAY);
+    }
+  }
+
+  /* ── Close button ───────────────────────────────────── */
+  closeBtn.addEventListener('click', function () {
+    hidePopup(true); /* will show next one after delay */
+  });
+
+  /* ── Start after initial delay ──────────────────────── */
+  setTimeout(showNext, INITIAL_DELAY);
+
+})();
+</script>
+
+{% endif %}
