@@ -379,7 +379,6 @@
       };
     }
 
-    // ── Single item ADD ──
     document.querySelectorAll('#luciraPopup form[action="/cart/add"]').forEach((form) => {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -388,17 +387,21 @@
         const btn       = form.querySelector('.lucira-add-btn');
         if (!variantId) return;
 
-        const now         = Date.now();
+        const now          = Date.now();
         const originalText = btn.textContent;
 
-        // ── dataLayer push (exact same format as PDP) ──
+        // 🟢 Build product data
+        const productData = buildProductData(btn);
+
+        // 🟢 FIX: Always send as ARRAY for GTM
         window.dataLayer = window.dataLayer || [];
         window.dataLayer.push({
-          event:     'addToCart',
-          eventId:   'atc_' + now,
-          products:  buildProductData(btn),
+          event: 'addToCart',
+          eventId: 'atc_' + now,
+          products: [productData], // ✅ FIXED
         });
-        console.log('✅ dataLayer.push → addToCart (lucira single)', buildProductData(btn));
+
+        console.log('✅ dataLayer.push → addToCart (lucira single)', [productData]);
 
         try {
           btn.textContent = 'Adding...';
@@ -406,19 +409,22 @@
 
           const response = await addToCartAjax(variantId);
 
-          btn.textContent  = '✓ Added';
+          btn.textContent   = '✓ Added';
           btn.style.opacity = '0.7';
 
           const drawer = document.querySelector('cart-drawer');
           if (drawer) {
             if (typeof drawer.renderContents === 'function') drawer.renderContents(response);
             drawer.classList.remove('is-empty');
+
             const drawerInner = drawer.querySelector('.drawer__inner');
             if (drawerInner) drawerInner.classList.remove('is-empty');
+
             drawer.open();
           }
 
           setTimeout(() => closePopup(), 200);
+
           setTimeout(() => {
             btn.textContent   = originalText;
             btn.disabled      = false;
@@ -428,7 +434,11 @@
         } catch (err) {
           console.error('[Lucira] add failed', err);
           btn.textContent = 'Error';
-          setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
+
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled    = false;
+          }, 2000);
         }
       });
     });
