@@ -133,7 +133,23 @@
                           </div>
                           <form action="/cart/add" method="post">
                             <input type="hidden" name="id" value="{{ current_variant.id }}">
-                            <button type="submit" class="lucira-add-btn">ADD</button>
+                            <button
+                              type="submit"
+                              class="lucira-add-btn"
+                              data-product-id="{{ product.id }}"
+                              data-variant-id="{{ current_variant.id }}"
+                              data-sku="{{ current_variant.sku | escape }}"
+                              data-product-name="{{ product.title | json }}"
+                              data-product-type="{{ product.type | escape }}"
+                              data-vendor="{{ product.vendor | escape }}"
+                              data-price="{{ current_variant.price | divided_by: 100.0 }}"
+                              data-product-url="{{ shop.url | append: product.url | json }}"
+                              data-image="{{ product.featured_image | image_url: width: 800 | prepend: 'https:' | json }}"
+                              data-offer-price="{{ current_variant.compare_at_price | divided_by: 100.0 }}"
+                              data-category="{{ product.metafields.custom.category.value | escape }}"
+                              data-sub-category="{{ product.metafields.custom.sub_category_1.value | escape }}"
+                              data-persona="{{ product.metafields.custom.persona.value | escape }}"
+                            >ADD</button>
                           </form>
                         </div>
                       {% endfor %}
@@ -345,117 +361,133 @@
       });
     }
 
-    // Single item Add to Cart logic
+    function buildProductData(btn) {
+      return {
+        productId:       btn.dataset.productId       || null,
+        variantId:       btn.dataset.variantId       || null,
+        sku:             btn.dataset.sku             || null,
+        productName:     btn.dataset.productName     || null,
+        productType:     btn.dataset.productType     || null,
+        vendor:          btn.dataset.vendor          || null,
+        price:           parseFloat(btn.dataset.price)      || 0,
+        productUrl:      btn.dataset.productUrl      || null,
+        image:           btn.dataset.image           || null,
+        offerPrice:      parseFloat(btn.dataset.offerPrice) || 0,
+        category:        btn.dataset.category        || null,
+        subCategory:     btn.dataset.subCategory     || null,
+        productPersona:  btn.dataset.persona         || null,
+      };
+    }
+
+    // ── Single item ADD ──
     document.querySelectorAll('#luciraPopup form[action="/cart/add"]').forEach((form) => {
       form.addEventListener('submit', async (e) => {
         e.preventDefault();
 
         const variantId = form.querySelector('input[name="id"]').value;
-        const btn = form.querySelector('.lucira-add-btn');
+        const btn       = form.querySelector('.lucira-add-btn');
         if (!variantId) return;
 
+        const now         = Date.now();
         const originalText = btn.textContent;
+
+        // ── dataLayer push (exact same format as PDP) ──
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event:     'addToCart',
+          eventId:   'atc_' + now,
+          products:  buildProductData(btn),
+        });
+        console.log('✅ dataLayer.push → addToCart (lucira single)', buildProductData(btn));
 
         try {
           btn.textContent = 'Adding...';
-          btn.disabled = true;
+          btn.disabled    = true;
 
-          // Fetch the response which now contains the updated sections HTML
           const response = await addToCartAjax(variantId);
 
-          btn.textContent = '✓ Added';
+          btn.textContent  = '✓ Added';
           btn.style.opacity = '0.7';
 
           const drawer = document.querySelector('cart-drawer');
           if (drawer) {
-            if (typeof drawer.renderContents === 'function') {
-              drawer.renderContents(response); // Pass Dawn the exact structure it expects
-            }
-            
-            // CRUCIAL: Remove the empty classes that hide the cart items
+            if (typeof drawer.renderContents === 'function') drawer.renderContents(response);
             drawer.classList.remove('is-empty');
             const drawerInner = drawer.querySelector('.drawer__inner');
             if (drawerInner) drawerInner.classList.remove('is-empty');
-            
             drawer.open();
           }
 
+          setTimeout(() => closePopup(), 200);
           setTimeout(() => {
-            closePopup(); 
-          }, 200);
-
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
+            btn.textContent   = originalText;
+            btn.disabled      = false;
             btn.style.opacity = '';
           }, 1500);
 
         } catch (err) {
           console.error('[Lucira] add failed', err);
-
           btn.textContent = 'Error';
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-          }, 2000);
+          setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
         }
       });
     });
 
-    // Add All to Cart logic
+    // ── ADD ALL ──
     document.querySelectorAll('.lucira-add-all-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {
-
         const ids = btn.dataset.variants
           ? btn.dataset.variants.split(',').map(id => id.trim()).filter(Boolean)
           : [];
-
         if (!ids.length) return;
 
+        const now          = Date.now();
         const originalText = btn.textContent;
+
+        // Collect per-product data from each ADD button in this slide
+        const slide        = btn.closest('.swiper-slide');
+        const allProducts  = slide
+          ? Array.from(slide.querySelectorAll('.lucira-add-btn')).map(buildProductData)
+          : ids.map(id => ({ variantId: id }));
+
+        // ── dataLayer push — one event, products as array ──
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event:     'addToCart',
+          eventId:   'atc_all_' + now,
+          products:  allProducts,          // array to match multi-item context
+        });
+        console.log('✅ dataLayer.push → addToCart (lucira add-all)', allProducts);
 
         try {
           btn.textContent = 'Adding...';
-          btn.disabled = true;
+          btn.disabled    = true;
 
-          // Fetch the response which now contains the updated sections HTML
           const response = await addAllToCartAjax(ids);
 
-          btn.textContent = '✓ All Added';
+          btn.textContent   = '✓ All Added';
           btn.style.opacity = '0.7';
 
           const drawer = document.querySelector('cart-drawer');
           if (drawer) {
-            if (typeof drawer.renderContents === 'function') {
-              drawer.renderContents(response);
-            }
-            
-            // CRUCIAL: Remove the empty classes that hide the cart items
+            if (typeof drawer.renderContents === 'function') drawer.renderContents(response);
             drawer.classList.remove('is-empty');
             const drawerInner = drawer.querySelector('.drawer__inner');
             if (drawerInner) drawerInner.classList.remove('is-empty');
-
             drawer.open();
           }
 
+          setTimeout(() => closePopup(), 200);
           setTimeout(() => {
-            closePopup();
-          }, 200);
-
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
+            btn.textContent   = originalText;
+            btn.disabled      = false;
             btn.style.opacity = '';
           }, 1500);
 
         } catch (err) {
           console.error('[Lucira] add-all failed', err);
-
           btn.textContent = 'Error';
-          setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-          }, 2000);
+          setTimeout(() => { btn.textContent = originalText; btn.disabled = false; }, 2000);
         }
       });
     });
