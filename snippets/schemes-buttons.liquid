@@ -35,6 +35,12 @@
 {% assign _price_paise        = _price_rupees  | times: 100 %}
 
 {% comment %}
+  STEP 6 — Total redeemable = You Pay (9 Months) + 10th Month We Pay = monthly × 10
+{% endcomment %}
+{% assign _monthly_x10       = _monthly     | times: 10 %}
+{% assign _monthly_x10_paise = _monthly_x10 | times: 100 %}
+
+{% comment %}
   ── Scheme URL builder ────────────────────────────────────────────────
   _monthly is now resolved above.
   Logged-in  → full SSO URL with phone, HMAC signature + &amount=_monthly
@@ -129,7 +135,7 @@
         </div>
         <div class="lucira-scheme-row">
           <span class="lucira-scheme-row__label">Monthly Installment</span>
-          <span class="lucira-scheme-row__value __value--bold">
+          <span class="lucira-scheme-row__value lucira-scheme-row__value--bold">
             <span data-scheme-monthly-label>
               &#8377;{{ _monthly_paise | money_without_currency | replace: '.00', '' }} x 9 Months
             </span>
@@ -153,20 +159,20 @@
 
       <div class="lucira-scheme-rows">
         <div class="lucira-scheme-row lucira-scheme-row--effective">
-          <span class="lucira-scheme-row__label lucira-scheme-row__label--bold">Effective Price</span>
+          <span class="lucira-scheme-row__label lucira-scheme-row__label--bold">Buy any jewelry worth</span>
           <span class="lucira-scheme-row__value lucira-scheme-row__value--bold" data-scheme-effective>
-            &#8377;{{ _scheme_price_paise | money_without_currency | replace: '.00', '' }}
+            &#8377;{{ _monthly_x10_paise | money_without_currency | replace: '.00', '' }}
           </span>
         </div>
-         <div class="lucira-scheme-row">
+        <div class="lucira-scheme-row">
           <span class="lucira-scheme-row__label">You Save</span>
           <span class="lucira-scheme-row__value" data-scheme-save>
             &#8377;{{ _monthly_paise | money_without_currency | replace: '.00', '' }}
           </span>
-        </div> 
+        </div>
       </div>
 
-      <a
+      
         href="{{ scheme_url }}"
         class="lucira-scheme-enroll"
         data-scheme-link
@@ -336,10 +342,10 @@
     margin: 14px 0;
   }
 
-  .lucira-scheme-rows:first-of-type .lucira-scheme-row:last-child{
-  border-bottom: 1px solid #1a1a1a;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
+  .lucira-scheme-rows:first-of-type .lucira-scheme-row:last-child {
+    border-bottom: 1px solid #1a1a1a;
+    margin-bottom: 8px;
+    padding-bottom: 8px;
   }
 
   /* ── Enroll button ── */
@@ -416,172 +422,6 @@
   }
 </style>
 
-{% comment %} <script>
-(function () {
-  // ── Avoid registering multiple listeners if snippet renders twice ──
-  if (window.__luciraSchemeInit) return;
-  window.__luciraSchemeInit = true;
-
-  // ── Core calculation (mirrors Liquid logic exactly) ───────────────
-  // pricePaise : number  — variant.price in paise (Shopify native unit)
-  // returns    : { schemePrice, monthly, pay9, productPrice, save } all in rupees
-  function calcScheme(pricePaise) {
-    var priceRupees = Math.floor(pricePaise / 100);
-    var rawMonthly  = Math.floor(priceRupees / 10);
-    var remainder   = rawMonthly % 500;
-    var monthly     = rawMonthly - remainder;           // FLOOR to lower ₹500 slab
-    return {
-      productPrice: priceRupees,
-      monthly:      monthly,
-      pay9:         monthly * 9,
-      schemePrice:  priceRupees - monthly,              // effective price on button
-      save:         monthly                             // = 10th month saving
-    };
-  }
-
-  // Format as en-IN  e.g. 62788 → "62,788"
-  function formatINR(amount) {
-    return amount.toLocaleString('en-IN');
-  }
-
-  function rupees(n) {
-    return '₹' + formatINR(n);
-  }
-
-  // ── Accordion toggle (only outside sticky ATC) ────────────────────
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-scheme-toggle]');
-    if (!btn) return;
-
-    // Disable accordion inside sticky ATC — treat as plain no-op there
-    if (btn.closest('#md-sticky-atc')) return;
-
-    var wrapper = btn.closest('[data-scheme-wrapper]');
-    if (!wrapper) return;
-
-    var panel   = wrapper.querySelector('[data-scheme-panel]');
-    if (!panel)  return;
-
-    var isOpen  = btn.getAttribute('aria-expanded') === 'true';
-    btn.setAttribute('aria-expanded', String(!isOpen));
-    panel.hidden = isOpen;
-  });
-
-  // ── Update every scheme wrapper on the page ───────────────────────
-  function updateAllWrappers(variantId) {
-    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
-      var prices     = JSON.parse(wrapper.dataset.variantPrices || '{}');
-      var pricePaise = prices[variantId];
-      if (pricePaise === undefined) return;
-
-      var r = calcScheme(pricePaise);
-
-      // Button header price
-      var priceEl = wrapper.querySelector('[data-scheme-price]');
-      if (priceEl) priceEl.textContent = rupees(r.schemePrice);
-
-      // Breakdown rows
-      var productPriceEl = wrapper.querySelector('[data-scheme-product-price]');
-      if (productPriceEl) productPriceEl.textContent = rupees(r.productPrice);
-
-      var monthlyLabelEl = wrapper.querySelector('[data-scheme-monthly-label]');
-      if (monthlyLabelEl) monthlyLabelEl.textContent = rupees(r.monthly) + ' x 9 Months';
-
-      var pay9El = wrapper.querySelector('[data-scheme-pay9]');
-      if (pay9El) pay9El.textContent = rupees(r.pay9);
-
-      var tenthEl = wrapper.querySelector('[data-scheme-10th]');
-      if (tenthEl) tenthEl.textContent = rupees(r.monthly);
-
-      var effectiveEl = wrapper.querySelector('[data-scheme-effective]');
-      if (effectiveEl) effectiveEl.textContent = rupees(r.schemePrice);
-
-      var saveEl = wrapper.querySelector('[data-scheme-save]');
-      if (saveEl) saveEl.textContent = rupees(r.save);
-
-      // ── Keep enroll href in sync with updated _monthly amount ──
-      var link = wrapper.querySelector('[data-scheme-link]');
-      if (link) {
-        var currentHref = link.getAttribute('href') || '';
-        var baseUrl     = currentHref.split('&amount=')[0].split('?amount=')[0];
-        var separator   = baseUrl.indexOf('?') !== -1 ? '&' : '?';
-        link.href       = baseUrl + separator + 'amount=' + r.monthly;
-      }
-    });
-  }
-
-
-  // ── Keep data-current-variant in sync ─────────────────────────────
-  function syncCurrentVariant(variantId) {
-    document.querySelectorAll('[data-scheme-wrapper]').forEach(function (wrapper) {
-      wrapper.setAttribute('data-current-variant', variantId);
-    });
-  }
-
-  // ── dataLayer push on Enroll Now click ───────────────────────────
-  document.addEventListener('click', function (e) {
-    var link = e.target.closest('[data-scheme-link]');
-    if (!link) return;
-
-    var wrapper     = link.closest('[data-scheme-wrapper]');
-    var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
-    var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
-
-    window.dataLayer = window.dataLayer || [];
-    window.dataLayer.push({
-      event: 'promoClick',
-      promoClick: {
-        creative_name: 'Schemes Pdp',
-        promo_name:    productName,
-        promo_position: variantId,
-        location_id:   'pdp'
-      }
-    });
-  });
-
-  // ── Event listeners for variant change ────────────────────────────
-
-  // 1. Shopify native variant:change (most custom themes)
-  document.addEventListener('variant:change', function (e) {
-    var variant = e.detail && e.detail.variant;
-    if (variant && variant.id && variant.price !== undefined) {
-      updateAllWrappers(String(variant.id));
-    }
-  });
-
-  // 2. Dawn / Prestige style
-  document.addEventListener('variant:changed', function (e) {
-    var variant = e.detail && e.detail.variant;
-    if (variant && variant.id && variant.price !== undefined) {
-      updateAllWrappers(String(variant.id));
-    }
-  });
-
-  // 3. Fallback — watch the hidden variant ID input in the main product form
-  document.addEventListener('DOMContentLoaded', function () {
-    var mainForm = document.querySelector('.product-form form[action*="/cart/add"]');
-    if (!mainForm) return;
-
-    var variantInput = mainForm.querySelector('input[name="id"]');
-    if (!variantInput) return;
-
-    new MutationObserver(function () {
-      if (variantInput.value) updateAllWrappers(variantInput.value);
-    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
-
-    variantInput.addEventListener('change', function () {
-      if (this.value) updateAllWrappers(this.value);
-    });
-
-    mainForm.addEventListener('change', function (e) {
-      if (e.target.name === 'id' && e.target.value) {
-        updateAllWrappers(e.target.value);
-      }
-    });
-  });
-})();
-</script> {% endcomment %}
-
 <script>
 (function () {
   if (window.__luciraSchemeInit) return;
@@ -651,7 +491,7 @@
       if (tenthEl) tenthEl.textContent = rupees(r.monthly);
 
       var effectiveEl = wrapper.querySelector('[data-scheme-effective]');
-      if (effectiveEl) effectiveEl.textContent = rupees(r.schemePrice);
+      if (effectiveEl) effectiveEl.textContent = rupees(r.monthly * 10);
 
       var saveEl = wrapper.querySelector('[data-scheme-save]');
       if (saveEl) saveEl.textContent = rupees(r.save);
@@ -696,25 +536,24 @@
   });
 
   document.addEventListener('click', function (e) {
-  var btn = e.target.closest('[data-scheme-toggle]');
-  if (!btn) return;
+    var btn = e.target.closest('[data-scheme-toggle]');
+    if (!btn) return;
 
-  var wrapper     = btn.closest('[data-scheme-wrapper]');
-  var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
-  var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
+    var wrapper     = btn.closest('[data-scheme-wrapper]');
+    var productName = wrapper ? (wrapper.dataset.productTitle || '') : '';
+    var variantId   = wrapper ? (wrapper.dataset.currentVariant || '') : '';
 
-  window.dataLayer = window.dataLayer || [];
-  window.dataLayer.push({
-    event: 'promoClick',
-    promoClick: {
-      creative_name:  'Scheme Button Pdp',
-      promo_name:     productName,
-      promo_position: variantId,
-      location_id:    'pdp'
-    }
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name:  'Scheme Button Pdp',
+        promo_name:     productName,
+        promo_position: variantId,
+        location_id:    'pdp'
+      }
+    });
   });
-});
-
 
   // ── Variant change listeners ──────────────────────────────────────
 
@@ -723,7 +562,7 @@
     var variant = e.detail && e.detail.variant;
     if (variant && variant.id && variant.price !== undefined) {
       updateAllWrappers(String(variant.id));
-      syncCurrentVariant(String(variant.id));  // ✅ was missing
+      syncCurrentVariant(String(variant.id));
     }
   });
 
@@ -732,7 +571,7 @@
     var variant = e.detail && e.detail.variant;
     if (variant && variant.id && variant.price !== undefined) {
       updateAllWrappers(String(variant.id));
-      syncCurrentVariant(String(variant.id));  // ✅ was missing
+      syncCurrentVariant(String(variant.id));
     }
   });
 
@@ -747,21 +586,21 @@
     new MutationObserver(function () {
       if (variantInput.value) {
         updateAllWrappers(variantInput.value);
-        syncCurrentVariant(variantInput.value);  // ✅ was missing
+        syncCurrentVariant(variantInput.value);
       }
     }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
 
     variantInput.addEventListener('change', function () {
       if (this.value) {
         updateAllWrappers(this.value);
-        syncCurrentVariant(this.value);          // ✅ was missing
+        syncCurrentVariant(this.value);
       }
     });
 
     mainForm.addEventListener('change', function (e) {
       if (e.target.name === 'id' && e.target.value) {
         updateAllWrappers(e.target.value);
-        syncCurrentVariant(e.target.value);      // ✅ was missing
+        syncCurrentVariant(e.target.value);
       }
     });
   });
@@ -769,4 +608,3 @@
 </script>
 
 {% endif %}
-
