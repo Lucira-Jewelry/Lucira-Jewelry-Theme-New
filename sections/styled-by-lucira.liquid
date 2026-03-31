@@ -477,22 +477,50 @@
     function loadSlideVideo(slide) {
       const inner = slide.querySelector('.lucira-popup-slide-inner');
       if (!inner || inner.querySelector('video')) return;
+
       const src    = slide.dataset.src    || slide.closest('[data-src]')?.dataset.src;
       const poster = slide.dataset.poster || slide.closest('[data-poster]')?.dataset.poster;
       if (!src) return;
+
+      // Poster image fallback — shown immediately, hidden once video is ready
+      if (poster && !inner.querySelector('.lucira-poster-fallback')) {
+        const img = document.createElement('img');
+        img.src = poster;
+        img.className = 'lucira-poster-fallback';
+        img.style.cssText = `
+          position:absolute;inset:0;width:100%;height:100%;
+          object-fit:cover;z-index:2;display:block;
+          transition:opacity 0.3s ease;
+        `;
+        inner.style.position = 'relative';
+        inner.appendChild(img);
+      }
+
       const video = document.createElement('video');
-      video.loop = true;
+      video.loop        = true;
       video.playsInline = true;
-      video.controls = true;
-      video.muted = false;
-      video.volume = 1;
+      video.controls    = true;
+      video.muted       = false;
+      video.volume      = 1;
       video.setAttribute('playsinline', '');
-      video.poster = poster || '';
+      video.poster      = poster || '';
       video.setAttribute('preload', 'auto');
+      video.style.cssText = 'position:relative;z-index:1;width:100%;height:100%;object-fit:cover;display:block;';
+
       const source = document.createElement('source');
       source.src  = src;
       source.type = 'video/mp4';
       video.appendChild(source);
+
+      // Hide poster once video has buffered enough to display a frame
+      video.addEventListener('canplay', () => {
+        const fallback = inner.querySelector('.lucira-poster-fallback');
+        if (fallback) {
+          fallback.style.opacity = '0';
+          setTimeout(() => fallback.remove(), 300);
+        }
+      }, { once: true });
+
       inner.appendChild(video);
       return video;
     }
