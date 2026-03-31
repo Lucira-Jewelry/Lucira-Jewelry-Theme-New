@@ -66,7 +66,7 @@
       </title>
       <meta
         name="description"
-        content="Check today's {{ page.metafields.custom.city_name }} Silver rate in {{ page.metafields.custom.state_name }}. Stay updated with live platinum prices from Lucira Jewelry for jewelry and investment decisions."
+        content="Check today's {{ page.metafields.custom.city_name }} Silver rate in {{ page.metafields.custom.state_name }}. Stay updated with live silver prices from Lucira Jewelry for jewelry and investment decisions."
       >
     {% else %}
       <title>{{ page_title }}</title>
@@ -749,5 +749,69 @@
       })();
     </script>
     <script src="{{ 'login-register.js' | asset_url }}" defer="defer"></script>
+
+    <script>
+      (function () {
+        const COOKIE_NAME = "user_pincode";
+
+        function getCookie(name) {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          return match ? match[2] : null;
+        }
+
+        function setCookie(name, value, days = 30) {
+          const maxAge = days * 24 * 60 * 60;
+          document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
+        }
+
+        function fetchPincode(lat, lng) {
+          fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+            .then(res => res.json())
+            .then(data => {
+              const pincode = data?.address?.postcode;
+
+              if (pincode) {
+                setCookie(COOKIE_NAME, pincode);
+                console.log("Pincode saved:", pincode);
+              } else {
+                console.warn("Pincode not found");
+              }
+            })
+            .catch(err => console.error("Geocode error:", err));
+        }
+
+        function getLocationAndFetch() {
+          if (!navigator.geolocation) return;
+
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              const { latitude, longitude } = pos.coords;
+              fetchPincode(latitude, longitude);
+            },
+            err => {
+              console.warn("Location denied or unavailable:", err);
+            },
+            {
+              enableHighAccuracy: false,
+              maximumAge: 0
+            }
+          );
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+          const existing = getCookie(COOKIE_NAME);
+
+          // Only run if no pincode already saved
+          if (!existing) {
+            setTimeout(getLocationAndFetch, 800);
+          } else {
+            console.log("Pincode already exists:", existing);
+          }
+        });
+      })();
+    </script>
+
+    {%- render 'social-proof-popup' -%}
+
 </body>
 </html>

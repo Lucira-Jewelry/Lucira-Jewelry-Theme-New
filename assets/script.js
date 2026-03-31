@@ -347,3 +347,4 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 15000); // 15 seconds delay
   });
 });
+
