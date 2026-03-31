@@ -10,10 +10,14 @@
   data-variant-count="{{ product.variants.size }}"
   data-is-in-stock="{{ is_in_stock }}"
 >
+
+  <!-- 🔥 VARIANT DATA -->
   <script>
-    window.variantDeliveryData = {{ variant_stock_json }};
+    window.productVariants = {{ product.variants | json }};
+    window.initialVariantId = {{ product.selected_or_first_available_variant.id }};
   </script>
 
+  <!-- 🔹 PINCODE INPUT (UNCHANGED) -->
   <div class="lucira-delivery-input-container">
     <div class="input-wrapper">
       <svg class="pin-beside-pincode" width="18" height="18">
@@ -35,20 +39,23 @@
       </button>
     </div>
   </div>
+
   <span
     class="lucira-pincode-error"
     id="lucira-pincode-error"
     style="display:none;color:red;font-size:12px;margin-top:5px;"
   ></span>
 
-  <div
-    id="store-availability-wrapper"
-    data-available="{{ product.selected_or_first_available_variant.available }}"
-  >
+  <!-- 🔥 STORE BAR (DEFAULT HIDDEN) -->
+  <div id="store-availability-wrapper" style="display:none;">
     <div class="store-availability-bar">
-      <p class="store-text">This Design is <span class="highlight">Available at Store</span></p>
+      <p class="store-text">
+        This Design is <span class="highlight">Available at Store</span>
+      </p>
 
-      <button class="store-cta" id="openPincodePopup">Find Nearest Store</button>
+      <button class="store-cta" id="openPincodePopup">
+        Find Nearest Store
+      </button>
     </div>
   </div>
 
@@ -61,23 +68,20 @@
       font-size: 14px;
     }
 
-    /* Left text */
     .store-text {
       margin: 0;
       color: #222;
     }
 
-    /* Green highlight */
     .store-text .highlight {
-      color: #2e7d32; /* green */
+      color: #2e7d32;
       font-weight: 500;
     }
 
-    /* Right CTA */
     .store-cta {
       background: none;
       border: none;
-      color: #7b3f2c; /* brown tone */
+      color: #7b3f2c;
       font-size: 14px;
       cursor: pointer;
       text-decoration: underline;
@@ -90,19 +94,71 @@
   </style>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const btn = document.getElementById('openPincodePopup');
+    document.addEventListener("DOMContentLoaded", function () {
 
+      const wrapper = document.getElementById("store-availability-wrapper");
+      const btn = document.getElementById("openPincodePopup");
+
+      if (!wrapper) return;
+
+      /* CTA */
       if (btn) {
-        btn.addEventListener('click', function () {
-          // Trigger your popup here
-          document.body.classList.add('pincode-popup-open');
-
-          // OR:
-          // document.getElementById('pincode-popup').style.display = 'block';
+        btn.addEventListener("click", function () {
+          document.body.classList.add("pincode-popup-open");
         });
       }
+
+      /* 🔥 STRICT INVENTORY CHECK */
+      function isVariantInStock(variant) {
+        if (!variant) return false;
+        return variant.inventory_quantity > 0;
+      }
+
+      /* 🔥 CORE FUNCTION */
+      function updateStoreAvailability(variantId) {
+        if (!variantId || !window.productVariants) return;
+
+        const variant = window.productVariants.find(v => v.id == variantId);
+        if (!variant) return;
+
+        if (isVariantInStock(variant)) {
+          wrapper.style.display = "block";
+        } else {
+          wrapper.style.display = "none";
+        }
+      }
+
+      /* GET VARIANT FROM URL */
+      function getVariantFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get("variant");
+      }
+
+      /* INITIAL LOAD */
+      const initialVariant = getVariantFromUrl() || window.initialVariantId;
+      updateStoreAvailability(initialVariant);
+
+      /* 🔥 LISTEN: VARIANT CHANGE (FORM INPUT) */
+      document.querySelectorAll('form[action*="/cart/add"] [name="id"]').forEach(input => {
+        input.addEventListener("change", function () {
+          updateStoreAvailability(this.value);
+        });
+      });
+
+      /* 🔥 LISTEN: URL CHANGE */
+      let lastUrl = location.href;
+
+      new MutationObserver(() => {
+        const currentUrl = location.href;
+
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          const variantId = getVariantFromUrl();
+          updateStoreAvailability(variantId);
+        }
+      }).observe(document, { subtree: true, childList: true });
+
     });
   </script>
-</div>
 
+</div>
