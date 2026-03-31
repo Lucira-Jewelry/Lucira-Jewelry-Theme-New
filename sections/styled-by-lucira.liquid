@@ -527,23 +527,54 @@
     function loadSlideVideo(slide) {
       const inner = slide.querySelector('.lucira-popup-slide-inner');
       if (!inner || inner.querySelector('video')) return;
-      const src = slide.dataset.src || slide.closest('[data-src]')?.dataset.src;
+
+      const src    = slide.dataset.src    || slide.closest('[data-src]')?.dataset.src;
       const poster = slide.dataset.poster || slide.closest('[data-poster]')?.dataset.poster;
       if (!src) return;
+
       const video = document.createElement('video');
-      video.loop = true;
+      video.loop        = true;
       video.playsInline = true;
-      video.controls = true;
-      video.muted = false;
-      video.volume = 1;
+      video.controls    = true;
+      video.muted       = false;
+      video.volume      = 1;
       video.setAttribute('playsinline', '');
-      video.poster = poster || '';
       video.setAttribute('preload', 'auto');
+      // keep native poster too as a secondary fallback
+      if (poster) video.poster = poster;
+
       const source = document.createElement('source');
-      source.src = src;
+      source.src  = src;
       source.type = 'video/mp4';
       video.appendChild(source);
       inner.appendChild(video);
+
+      // ── Poster fallback overlay ──────────────────────────────────────────────
+      // Sits on top of <video> (z-index:2) so blank frames / loading gaps are
+      // never visible. Fades out the moment the video actually starts playing.
+      if (poster) {
+        const img = document.createElement('img');
+        img.src       = poster;
+        img.className = 'lucira-poster-fallback';
+        img.setAttribute('aria-hidden', 'true');
+        img.setAttribute('loading', 'eager');
+        inner.appendChild(img); // appended AFTER video → sits on top in DOM stacking
+
+        const removePoster = () => {
+          img.style.opacity = '0';
+          img.addEventListener('transitionend', () => img.remove(), { once: true });
+        };
+
+        // `playing` fires only when actual frames are being rendered
+        video.addEventListener('playing', removePoster, { once: true });
+
+        // Safety net: if browser somehow never fires `playing`, clean up after 5s
+        setTimeout(() => {
+          if (img.parentNode) removePoster();
+        }, 5000);
+      }
+      // ────────────────────────────────────────────────────────────────────────
+
       return video;
     }
 
