@@ -301,18 +301,45 @@
           entries.forEach((entry) => {
             if (!entry.isIntersecting) return;
             section.querySelectorAll('.video-placeholder[data-src]').forEach((placeholder) => {
+              const existingImg = placeholder.querySelector('img');
+
               const video = document.createElement('video');
-              video.autoplay = true;
-              video.loop = true;
-              video.muted = true;
+              video.autoplay  = true;
+              video.loop      = true;
+              video.muted     = true;
               video.playsInline = true;
               video.setAttribute('playsinline', '');
-              video.poster = placeholder.dataset.poster;
-              const source = document.createElement('source');
-              source.src = placeholder.dataset.src;
-              source.type = 'video/mp4';
+              video.poster    = placeholder.dataset.poster;
+              video.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block;';
+
+              const source    = document.createElement('source');
+              source.src      = placeholder.dataset.src;
+              source.type     = 'video/mp4';
               video.appendChild(source);
-              placeholder.replaceWith(video);
+
+              // Make placeholder a relative container so img overlays the video
+              placeholder.style.cssText += 'position:relative;overflow:hidden;';
+
+              // Insert video BEFORE the img — img sits on top (z-index) until video plays
+              placeholder.insertBefore(video, existingImg);
+
+              if (existingImg) {
+                existingImg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:2;transition:opacity 0.35s ease;pointer-events:none;';
+
+                const fadeOutPoster = () => {
+                  existingImg.style.opacity = '0';
+                  existingImg.addEventListener('transitionend', () => existingImg.remove(), { once: true });
+                };
+
+                // Only remove poster once real frames are rendering
+                video.addEventListener('playing', fadeOutPoster, { once: true });
+
+                // Safety net — never get stuck black
+                setTimeout(() => {
+                  if (existingImg.parentNode) fadeOutPoster();
+                }, 5000);
+              }
+
               video.play().catch(() => {});
             });
             thumbObserver.disconnect();
