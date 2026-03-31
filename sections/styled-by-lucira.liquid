@@ -1,0 +1,718 @@
+<section class="styled-lucira-section">
+  <div class="styled-lucira-wrapper">
+    <div class="page-width">
+      <div class="heading-wrapper">
+        <h2 class="section-heading lucira-wc-header">{{ section.settings.styled_lucira_heading }}</h2>
+        <p class="lucira-wc-subheader">{{ section.settings.styled_lucira_subheading }}</p>
+      </div>
+    </div>
+
+    <div class="swiper lucira-swiper">
+      <div class="swiper-wrapper">
+        {% assign popup_index = -1 %}
+        {% for block in section.blocks %}
+          {% assign video_src = blank %}
+          {% if block.settings.video != blank %}
+            {% assign video_src = block.settings.video.sources | where: 'format', 'mp4' | first %}
+            {% assign popup_index = popup_index | plus: 1 %}
+          {% endif %}
+
+          <div class="swiper-slide">
+            <div
+              class="lucira-card"
+              {% if block.settings.video != blank %}
+                data-popup-index="{{ popup_index }}"
+              {% endif %}
+            >
+              {% if block.settings.video != blank %}
+                {% assign video_poster = block.settings.video.preview_image | image_url: width: 600 %}
+                <div
+                  class="video-placeholder"
+                  data-src="{{ video_src.url }}"
+                  data-poster="{{ video_poster }}"
+                >
+                  {{
+                    block.settings.video.preview_image
+                    | image_url: width: 600
+                    | image_tag: loading: 'lazy', alt: 'lucira poster'
+                  }}
+                </div>
+
+              {% elsif block.settings.image != blank %}
+                <img
+                  src="{{ block.settings.image | image_url: width: 600 }}"
+                  alt="lucira style"
+                  width="328"
+                  height="516"
+                  loading="lazy"
+                >
+              {% endif %}
+
+              {% if video_src %}
+                <div class="play-icon">{{ 'icon-video-play.svg' | inline_asset_content }}</div>
+              {% endif %}
+              <div class="video-cart-icon">{{ 'icon-video-cart.svg' | inline_asset_content }}</div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="lucira-popup-overlay" id="luciraPopup" role="dialog" aria-modal="true">
+  <button class="lucira-popup-close" id="luciraPopupClose" aria-label="Close">✕</button>
+  <div class="lucira-popup-counter" id="luciraPopupCounter"></div>
+  <button class="lucira-popup-arrow lucira-popup-prev" id="luciraPopupPrev" aria-label="Previous">
+    {{ 'icon-arrow.svg' | inline_asset_content }}
+  </button>
+  <button class="lucira-popup-arrow lucira-popup-next" id="luciraPopupNext" aria-label="Next">
+    {{ 'icon-arrow.svg' | inline_asset_content }}
+  </button>
+  <div class="lucira-swipe-hint" id="luciraSwipeHint" aria-hidden="true">
+    <div class="lucira-swipe-hint__track">
+      <div class="lucira-swipe-hint__thumb">{{ 'icon-swipe.svg' | inline_asset_content }}</div>
+    </div>
+    <span class="lucira-swipe-hint__label">Swipe Up</span>
+  </div>
+
+  <button class="lucira-share-btn" id="luciraShareBtn" aria-label="Share">
+    {{ 'share-icon.svg' | inline_asset_content }}
+  </button>
+
+  <div class="swiper lucira-popup-swiper" id="luciraPopupSwiper">
+    <div class="swiper-wrapper">
+      {% for block in section.blocks %}
+        {% if block.settings.video != blank %}
+          {% assign popup_src = block.settings.video.sources | where: 'format', 'mp4' | first %}
+          {% assign popup_poster = block.settings.video.preview_image | image_url: width: 600 %}
+
+          {% assign total_price = 0 %}
+          {% for product in block.settings.products %}
+            {% assign current_variant = product.selected_or_first_available_variant %}
+            {% assign total_price = total_price | plus: current_variant.price %}
+          {% endfor %}
+
+          <div class="swiper-slide" data-src="{{ popup_src.url }}" data-poster="{{ popup_poster }}">
+            <div class="lucira-popup-inner">
+              <div class="lucira-popup-wrapper">
+                <div class="lucira-popup-video-wrap">
+                  <div class="lucira-popup-slide-inner"></div>
+                </div>
+
+                {% if block.settings.products != blank %}
+                  <div class="lucira-popup-products">
+                    <div class="lucira-products-list">
+                      {% for product in block.settings.products %}
+                        {% assign current_variant = product.selected_or_first_available_variant %}
+                        <div class="lucira-product-item" data-url="{{ product.url }}">
+                          <div class="lucira-product-img">
+                            <img
+                              src="{{ product.featured_image | image_url: width: 120 }}"
+                              alt="{{ product.title }}"
+                              width="60"
+                              height="60"
+                              loading="lazy"
+                            >
+                          </div>
+                          <div class="lucira-product-info">
+                            <p class="lucira-product-title">{{ product.title }}</p>
+                            <div class="lucira-product-pricing">
+                              <span class="lucira-price">{{ current_variant.price | money }}</span>
+                              
+                              {% if current_variant.compare_at_price > current_variant.price %}
+                                <span class="lucira-compare-price">{{ current_variant.compare_at_price | money }}</span>
+                                {% assign discount = current_variant.compare_at_price
+                                  | minus: current_variant.price
+                                  | times: 100
+                                  | divided_by: current_variant.compare_at_price
+                                %}
+                                <span class="lucira-badge">{{ discount }}% OFF</span>
+                              {% endif %}
+                            </div>
+                          </div>
+                          <form action="/cart/add" method="post">
+                            <input type="hidden" name="id" value="{{ current_variant.id }}">
+                            <button type="submit" class="lucira-add-btn">ADD</button>
+                          </form>
+                        </div>
+                      {% endfor %}
+                    </div>
+
+                    <div class="lucira-add-all-wrap">
+                      <button
+                        class="lucira-add-all-btn"
+                        data-variants="{% for product in block.settings.products %}{{ product.selected_or_first_available_variant.id }}{% unless forloop.last %},{% endunless %}{% endfor %}"
+                      >
+                        ADD ALL PRODUCTS TO CART — {{ total_price | money }}
+                      </button>
+                    </div>
+                  </div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<style>
+  .styled-lucira-section{padding:30px 0}
+  .styled-lucira-section h2{text-align:center;margin-bottom:20px}
+  .styled-lucira-section .lucira-swiper{padding:20px 0}
+  .styled-lucira-section .swiper-slide{width:250px;border-radius:6px;overflow:hidden;position:relative;transition:transform .3s ease}
+  .styled-lucira-section .swiper-slide-active{transform:scale(1.05)}
+  .styled-lucira-section .lucira-card{position:relative;cursor:pointer}
+  .styled-lucira-section .lucira-card img,.styled-lucira-section .lucira-card video{width:100%;height:auto;object-fit:cover;display:block}
+  .styled-lucira-section .play-icon{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:70px;height:70px;background:rgba(34,34,34,.36);border-radius:50%;display:flex;align-items:center;justify-content:center}
+  .styled-lucira-section .video-cart-icon{position:absolute;top:10px;right:10px;background:#fff;border-radius:50%;padding:6px;width:20px;height:20px;display:flex;align-items:center;justify-content:center}
+  .styled-lucira-section .video-cart-icon svg{display:block;width:20px;height:20px}
+  .lucira-popup-overlay{position:fixed;inset:0;z-index:9999999;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .3s ease}
+  .lucira-popup-overlay.is-open{opacity:1;pointer-events:all}
+  .lucira-popup-overlay .lucira-popup-close{position:fixed;top:20px;right:20px;z-index:10001;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .2s}
+  .lucira-popup-overlay .lucira-popup-close:hover{background:rgba(255,255,255,.3)}
+  .lucira-popup-overlay .lucira-popup-counter{position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:10001;color:rgba(255,255,255,.6);font-size:12px;letter-spacing:.1em;pointer-events:none}
+  .lucira-popup-overlay .lucira-popup-arrow{display:none;position:fixed;top:50%;transform:translateY(-50%);z-index:10001;width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.12);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.2);color:#fff;font-size:22px;cursor:pointer;align-items:center;justify-content:center;transition:background .2s,transform .2s}
+  .lucira-popup-overlay .lucira-popup-arrow:hover{background:rgba(255,255,255,.25);transform:translateY(-50%) scale(1.08)}
+  .lucira-popup-overlay .lucira-popup-prev{left:20px}
+  .lucira-popup-overlay .lucira-popup-next{right:20px}
+  .lucira-popup-overlay .lucira-popup-prev svg{transform:rotate(180deg)}
+  .lucira-popup-arrow svg path{stroke:#fff}
+  .lucira-popup-overlay .lucira-popup-swiper{width:100%;height:100dvh}
+  .lucira-popup-overlay .lucira-popup-inner{display:flex;width:100%;height:100%}
+  .lucira-popup-overlay .lucira-popup-wrapper{display:flex;flex-direction:row;align-items:center;justify-content:center;gap:8px;box-sizing:border-box;background:#fff;height:auto;border-radius:4px}
+  .lucira-popup-overlay .lucira-badge{background:#efe5de;color:#000;padding:2px 8px;border-radius:3rem;font-family:Futura Std,sans-serif;font-weight:500;font-size:10px;line-height:160%}
+  .lucira-popup-overlay .lucira-product-img img{width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5}
+  .lucira-popup-overlay .lucira-product-info{flex:1;min-width:0}
+  .lucira-popup-overlay .lucira-product-title{font-size:12px;font-weight:600;color:#111;margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lucira-popup-overlay .lucira-product-pricing{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+  .lucira-popup-overlay .lucira-price{font-family:Futura Std,sans-serif;font-weight:500;font-size:14px;line-height:160%;color:#111}
+  .lucira-popup-overlay .lucira-compare-price{color:#909090;font-family:Futura Std,sans-serif;font-weight:400;font-size:12px;line-height:160%;text-decoration:line-through}
+  .lucira-popup-overlay .lucira-add-btn:hover{background:#5a413f}
+  .lucira-popup-overlay button.lucira-add-btn{font-family:Futura Std,sans-serif;font-weight:500;font-size:14px;line-height:100%;text-transform:uppercase;background:#5a413f;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;letter-spacing:.06em;white-space:nowrap;transition:background .2s}
+  .lucira-popup-overlay .lucira-share-btn{display:none}
+  .lucira-swipe-hint{display:none}
+  .lucira-popup-overlay .lucira-swipe-hint__track{width:4px;height:64px;background:rgba(255,255,255,.2);border-radius:4px;position:relative;overflow:hidden}
+  .lucira-popup-overlay .lucira-swipe-hint__thumb{position:absolute;bottom:0;left:0;width:100%;height:40%;background:rgba(255,255,255,.85);border-radius:4px;animation:swipeUpHint 1.6s ease-in-out infinite;display:block}
+  .lucira-popup-overlay .lucira-swipe-hint__label{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.65);writing-mode:vertical-rl;text-orientation:mixed;transform:rotate(180deg);font-family:sans-serif}
+  .lucira-popup-arrow svg path { fill: #fff; stroke: #252423; }
+  .styled-lucira-section h2 { margin: 0; font-size: 24px; font-weight: 500; line-height: normal; text-align: center; text-transform: uppercase; color: #1a1a1a; letter-spacing: 1px; }
+  .styled-lucira-section p.lucira-wc-subheader { padding: 0 15px; color: #535361; font-size: 16px; text-align: center; margin: 2px auto 30px; max-width: 600px; }
+
+  @keyframes swipeUpHint{
+  0%{bottom:0;opacity:1}
+  60%{bottom:60%;opacity:1}
+  80%{bottom:60%;opacity:0}
+  81%{bottom:0;opacity:0}
+  100%{bottom:0;opacity:1}
+  }
+  @keyframes luxuryLine{
+  0%{transform:translateX(-40px);opacity:0}
+  50%{opacity:1}
+  100%{transform:translateX(40px);opacity:0}
+  }
+  @media only screen and (max-width:767px){
+  .lucira-popup-overlay .lucira-share-btn{display:flex;align-items:center;justify-content:center;position:fixed;right:16px;bottom:135px;z-index:10002;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,.15);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25);color:#fff;cursor:pointer;transition:background .2s ease,transform .15s ease}
+  .lucira-popup-overlay .lucira-share-btn svg{position:relative;top:2px;left:-1px}
+  .lucira-popup-overlay .lucira-share-btn:active{transform:scale(.92);background:rgba(255,255,255,.25)}
+  .lucira-swipe-hint{display:flex;flex-direction:column;align-items:center;gap:4px;position:fixed;left:16px;top:50%;transform:translateY(-50%);z-index:10002;pointer-events:none}
+  .lucira-popup-overlay .lucira-popup-swiper .swiper-slide{width:100vw;height:100dvh;display:flex;align-items:stretch}
+  .lucira-popup-overlay .lucira-popup-inner{flex-direction:column}
+  .lucira-popup-overlay .lucira-popup-video-wrap{flex:1;position:relative;overflow:hidden}
+  .lucira-popup-overlay .lucira-popup-slide-inner{width:100%;height:100%}
+  .lucira-popup-overlay .lucira-popup-slide-inner video{width:100%;height:100vh;object-fit:cover;display:block}
+  .lucira-popup-overlay .lucira-popup-products{position:absolute;bottom:0;left:0px;right:0;z-index:10;background:linear-gradient(to top,rgba(0,0,0,.85) 0,transparent 100%);padding:24px 0px 24px 12px}
+  .lucira-popup-overlay .lucira-products-list{display:flex;gap:10px;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding:0 16px;scrollbar-width:none}
+  .lucira-popup-overlay .lucira-products-list::-webkit-scrollbar{display:none}
+  .lucira-popup-overlay .lucira-product-item{flex:0 0 auto;scroll-snap-align:start;display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.95);border-radius:12px;padding:10px 12px;min-width:270px;max-width:310px}
+  .lucira-popup-overlay .lucira-product-img img{width:52px;height:52px;object-fit:contain;border-radius:8px;background:#f5f5f5}
+  .lucira-popup-overlay .lucira-product-title{font-size:12px;font-weight:600;color:#111;margin:0 0 4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lucira-popup-overlay .lucira-add-all-wrap{display:none}
+  .lucira-popup-overlay button.lucira-add-btn{font-family:Futura Std,sans-serif;font-weight:500;font-size:14px;line-height:100%;text-transform:uppercase;background:#5a413f;color:#fff;border:none;border-radius:4px;padding:6px 12px;cursor:pointer;letter-spacing:.06em;white-space:nowrap;transition:background .2s}
+  .styled-lucira-section h2 { text-align: center; text-transform: uppercase; font-weight: 500; margin: 0 0 5px; color: #1a1a1a; font-size: 18px; }
+  .styled-lucira-section p.lucira-wc-subheader { font-size: 12px; margin-bottom: 20px; padding: 0 15px; text-align: center; margin-top: 0; }
+  }
+
+  @media (min-width:768px){
+  .lucira-popup-overlay .lucira-popup-arrow{display:flex}
+  .lucira-popup-overlay .lucira-popup-swiper .swiper-slide{width:100vw;height:100dvh;display:flex;align-items:center;justify-content:center}
+  .lucira-popup-overlay .lucira-popup-inner{flex-direction:row;align-items:center;justify-content:center;gap:32px;height:100%;padding:0;box-sizing:border-box}
+  .lucira-popup-overlay .lucira-popup-video-wrap{flex:0 0 auto;height:85dvh;aspect-ratio:9/16;border-radius:4px;overflow:hidden;background:#000}
+  .lucira-popup-overlay .lucira-popup-slide-inner{width:100%;height:100%}
+  .lucira-popup-overlay .lucira-popup-slide-inner video{width:100%;height:100%;object-fit:cover;display:block}
+  .lucira-popup-overlay .lucira-popup-products{flex:0 0 455px;background:#fff;border-radius:18px;padding:24px;max-height:85dvh;display:flex;flex-direction:column;overflow:hidden}
+  .lucira-popup-overlay .lucira-products-list{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:14px;scrollbar-width:thin;scrollbar-color:#ddd transparent;padding-right:4px}
+  .lucira-popup-overlay .lucira-product-item{display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid #f0f0f0}
+  .lucira-popup-overlay .lucira-product-item:last-child{border-bottom:none}
+  .lucira-popup-overlay .lucira-product-img img{width:64px;height:64px;object-fit:contain;border-radius:10px;background:#f8f5f0;padding:0}
+  .lucira-popup-overlay .lucira-product-title{color:#111;margin:0 0 5px;font-family:Futura Std,sans-serif;font-weight:500;font-size:16px;line-height:160%}
+  .lucira-popup-overlay .lucira-price{font-size:13px;font-weight:500;color:#111}
+  .lucira-popup-overlay .lucira-compare-price{font-size:12px;color:#aaa;text-decoration:line-through}
+  .lucira-popup-overlay .lucira-add-btn{font-size:12px;font-weight:500;background:#5a413f;color:#fff;border:none;border-radius:4px;padding:8px 16px;cursor:pointer;letter-spacing:.06em;white-space:nowrap;transition:background .2s}
+  .lucira-popup-overlay .lucira-add-btn:hover{background:#444}
+  .lucira-popup-overlay .lucira-add-all-wrap{margin-top:16px;padding-top:16px;border-top:1px solid #eee;flex-shrink:0}
+  .lucira-popup-overlay .lucira-add-all-btn{width: 100%; padding: 14px; background: 0 0; color: #5a413f; border: 1.4px solid #5a413f; border-radius: 4px; cursor: pointer; transition: background .2s, color .2s; font-family: 'Futura Std'; font-weight: 500; font-size: 14px; line-height: 140%; letter-spacing: 1px; text-transform: uppercase;}
+  .lucira-popup-overlay .lucira-add-all-btn:hover{background:#5a413f;color:#fff}
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+
+    /* ─── Swiper thumbnails ─── */
+    new Swiper('.lucira-swiper', {
+      slidesPerView: 'auto',
+      spaceBetween: 12,
+      centeredSlides: true,
+      loop: true,
+      breakpoints: {
+        768: { spaceBetween: 16 },
+        1024: { spaceBetween: 20 },
+      },
+    });
+
+    const section = document.querySelector('.styled-lucira-section');
+    if (section) {
+      const thumbObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            section.querySelectorAll('.video-placeholder[data-src]').forEach((placeholder) => {
+              const video = document.createElement('video');
+              video.autoplay = true;
+              video.loop = true;
+              video.muted = true;
+              video.playsInline = true;
+              video.setAttribute('playsinline', '');
+              video.poster = placeholder.dataset.poster;
+              const source = document.createElement('source');
+              source.src = placeholder.dataset.src;
+              source.type = 'video/mp4';
+              video.appendChild(source);
+              placeholder.replaceWith(video);
+              video.play().catch(() => {});
+            });
+            thumbObserver.disconnect();
+          });
+        },
+        { threshold: 0.2 }
+      );
+      thumbObserver.observe(section);
+    }
+
+    function addToCartAjax(variantId, quantity = 1) {
+      return fetch(window.Shopify?.routes?.root + 'cart/add.js' || '/cart/add.js', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          id: variantId,
+          quantity: quantity,
+          sections: 'cart-drawer,cart-icon-bubble', // Request sections directly in the add call
+          sections_url: window.location.pathname
+        })
+      }).then((res) => {
+        if (!res.ok) return res.json().then(err => Promise.reject(err));
+        return res.json();
+      });
+    }
+
+    function addAllToCartAjax(variantIds) {
+      const items = variantIds.map(id => ({
+        id: Number(id),
+        quantity: 1
+      }));
+
+      return fetch(window.Shopify?.routes?.root + 'cart/add.js' || '/cart/add.js', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({
+          items: items,
+          sections: 'cart-drawer,cart-icon-bubble', // Request sections directly in the add call
+          sections_url: window.location.pathname
+        })
+      }).then((res) => {
+        if (!res.ok) return res.json().then(err => Promise.reject(err));
+        return res.json();
+      });
+    }
+
+    // Single item Add to Cart logic
+    document.querySelectorAll('#luciraPopup form[action="/cart/add"]').forEach((form) => {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const variantId = form.querySelector('input[name="id"]').value;
+        const btn = form.querySelector('.lucira-add-btn');
+        if (!variantId) return;
+
+        const originalText = btn.textContent;
+
+        try {
+          btn.textContent = 'Adding...';
+          btn.disabled = true;
+
+          // Fetch the response which now contains the updated sections HTML
+          const response = await addToCartAjax(variantId);
+
+          btn.textContent = '✓ Added';
+          btn.style.opacity = '0.7';
+
+          const drawer = document.querySelector('cart-drawer');
+          if (drawer) {
+            if (typeof drawer.renderContents === 'function') {
+              drawer.renderContents(response); // Pass Dawn the exact structure it expects
+            }
+            
+            // CRUCIAL: Remove the empty classes that hide the cart items
+            drawer.classList.remove('is-empty');
+            const drawerInner = drawer.querySelector('.drawer__inner');
+            if (drawerInner) drawerInner.classList.remove('is-empty');
+            
+            drawer.open();
+          }
+
+          setTimeout(() => {
+            closePopup(); 
+          }, 200);
+
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            btn.style.opacity = '';
+          }, 1500);
+
+        } catch (err) {
+          console.error('[Lucira] add failed', err);
+
+          btn.textContent = 'Error';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+        }
+      });
+    });
+
+    // Add All to Cart logic
+    document.querySelectorAll('.lucira-add-all-btn').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+
+        const ids = btn.dataset.variants
+          ? btn.dataset.variants.split(',').map(id => id.trim()).filter(Boolean)
+          : [];
+
+        if (!ids.length) return;
+
+        const originalText = btn.textContent;
+
+        try {
+          btn.textContent = 'Adding...';
+          btn.disabled = true;
+
+          // Fetch the response which now contains the updated sections HTML
+          const response = await addAllToCartAjax(ids);
+
+          btn.textContent = '✓ All Added';
+          btn.style.opacity = '0.7';
+
+          const drawer = document.querySelector('cart-drawer');
+          if (drawer) {
+            if (typeof drawer.renderContents === 'function') {
+              drawer.renderContents(response);
+            }
+            
+            // CRUCIAL: Remove the empty classes that hide the cart items
+            drawer.classList.remove('is-empty');
+            const drawerInner = drawer.querySelector('.drawer__inner');
+            if (drawerInner) drawerInner.classList.remove('is-empty');
+
+            drawer.open();
+          }
+
+          setTimeout(() => {
+            closePopup();
+          }, 200);
+
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+            btn.style.opacity = '';
+          }, 1500);
+
+        } catch (err) {
+          console.error('[Lucira] add-all failed', err);
+
+          btn.textContent = 'Error';
+          setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+          }, 2000);
+        }
+      });
+    });
+
+    /* ─── Popup open / close ─── */
+    const overlay     = document.getElementById('luciraPopup');
+    const closeBtn    = document.getElementById('luciraPopupClose');
+    const counter     = document.getElementById('luciraPopupCounter');
+    const prevBtn     = document.getElementById('luciraPopupPrev');
+    const nextBtn     = document.getElementById('luciraPopupNext');
+    const popupSlides = document.querySelectorAll('#luciraPopupSwiper .swiper-slide');
+    let popupSwiper   = null;
+    let isMuted       = true;
+    let arrowsBound   = false;
+    let isPopupOpen   = false;
+
+    const isMobile = () => window.innerWidth < 768;
+
+    function loadSlideVideo(slide) {
+      const inner = slide.querySelector('.lucira-popup-slide-inner');
+      if (!inner || inner.querySelector('video')) return;
+      const src    = slide.dataset.src    || slide.closest('[data-src]')?.dataset.src;
+      const poster = slide.dataset.poster || slide.closest('[data-poster]')?.dataset.poster;
+      if (!src) return;
+      const video = document.createElement('video');
+      video.loop = true;
+      video.playsInline = true;
+      video.controls = true;
+      video.muted = false;
+      video.volume = 1;
+      video.setAttribute('playsinline', '');
+      video.poster = poster || '';
+      video.setAttribute('preload', 'auto');
+      const source = document.createElement('source');
+      source.src  = src;
+      source.type = 'video/mp4';
+      video.appendChild(source);
+      inner.appendChild(video);
+      return video;
+    }
+
+    function loadCloneVideos() {
+      if (!popupSwiper) return;
+      popupSwiper.slides.forEach((slide) => {
+        if (slide.classList.contains('swiper-slide-duplicate')) {
+          const origIndex = parseInt(slide.dataset.swiperSlideIndex, 10);
+          const original  = popupSlides[origIndex];
+          if (original && !slide.dataset.src) {
+            slide.dataset.src    = original.dataset.src;
+            slide.dataset.poster = original.dataset.poster;
+          }
+          loadSlideVideo(slide);
+        }
+      });
+    }
+
+    function stopAllVideos() {
+      document.querySelectorAll('#luciraPopup video').forEach((v) => {
+        v.pause();
+        v.muted = true;
+        v.currentTime = 0;
+      });
+    }
+
+    function playActiveSlide(swiper) {
+      if (!isPopupOpen) return;
+      if (!swiper || swiper.destroyed) return;
+      const activeReal = swiper.realIndex;
+      swiper.slides.forEach((slide) => {
+        const video = slide.querySelector('video');
+        if (!video) return;
+        const isActive = slide.classList.contains('swiper-slide-active');
+        if (isActive) {
+          video.muted = false;
+          video.currentTime = 0;
+          const p = video.play();
+          if (p !== undefined) {
+            p.catch(() => {
+              if (!isPopupOpen) return;
+              setTimeout(() => video.play().catch(() => {}), 200);
+            });
+          }
+        } else {
+          video.pause();
+          video.currentTime = 0;
+        }
+      });
+      counter.textContent = `${activeReal + 1} / ${popupSlides.length}`;
+    }
+
+    function openPopup(startIndex) {
+      isPopupOpen = true;
+      overlay.classList.add('is-open');
+      document.body.style.overflow = 'hidden';
+      isMuted = false;
+
+      [startIndex - 1, startIndex, startIndex + 1].forEach((i) => {
+        const slide = popupSlides[(i + popupSlides.length) % popupSlides.length];
+        if (slide) loadSlideVideo(slide);
+      });
+
+      if (!popupSwiper) {
+        popupSwiper = new Swiper('#luciraPopupSwiper', {
+          direction: isMobile() ? 'vertical' : 'horizontal',
+          slidesPerView: isMobile() ? 1 : 'auto',
+          centeredSlides: true,
+          spaceBetween: isMobile() ? 0 : 32,
+          initialSlide: startIndex,
+          speed: 380,
+          loop: true,
+          keyboard: { enabled: true },
+          on: {
+            afterInit: function () {
+              loadCloneVideos();
+              setTimeout(() => playActiveSlide(this), 100);
+            },
+            slideChange: function () {
+              if (!isPopupOpen) return;
+              const idx  = this.realIndex;
+              const next = popupSlides[(idx + 1) % popupSlides.length];
+              if (next) loadSlideVideo(next);
+              loadCloneVideos();
+              this.slides.forEach((slide) => {
+                const video = slide.querySelector('video');
+                if (video && !slide.classList.contains('swiper-slide-active')) video.pause();
+              });
+            },
+            transitionEnd: function () {
+              if (!isPopupOpen) return;
+              playActiveSlide(this);
+            },
+          },
+        });
+
+        if (!arrowsBound) {
+          prevBtn.addEventListener('click', () => popupSwiper && popupSwiper.slidePrev());
+          nextBtn.addEventListener('click', () => popupSwiper && popupSwiper.slideNext());
+          arrowsBound = true;
+        }
+      } else {
+        stopAllVideos();
+        popupSwiper.slideToLoop(startIndex, 0);
+        setTimeout(() => playActiveSlide(popupSwiper), 100);
+      }
+    }
+
+    function closePopup() {
+      isPopupOpen = false;
+      stopAllVideos();
+      if (popupSwiper) { popupSwiper.destroy(true, true); popupSwiper = null; }
+      overlay.classList.remove('is-open');
+      document.body.style.overflow = '';
+      isMuted = true;
+    }
+
+    document.querySelectorAll('.lucira-card[data-popup-index]').forEach((card) => {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => openPopup(parseInt(card.dataset.popupIndex, 10)));
+    });
+
+    closeBtn.addEventListener('click', closePopup);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closePopup(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closePopup(); });
+
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        if (popupSwiper) { popupSwiper.destroy(true, true); popupSwiper = null; }
+      }, 300);
+    });
+
+    /* ─── Share button ─── */
+    const shareBtn = document.getElementById('luciraShareBtn');
+    if (shareBtn) {
+      shareBtn.addEventListener('click', async () => {
+        try {
+          const activeSlide = popupSwiper ? popupSwiper.slides[popupSwiper.activeIndex] : null;
+          const realIndex   = popupSwiper ? popupSwiper.realIndex : 0;
+          const shareUrl    = `${window.location.origin}${window.location.pathname}#look-${realIndex + 1}`;
+          const products    = [];
+          if (activeSlide) {
+            activeSlide.querySelectorAll('.lucira-product-item').forEach((item) => {
+              const title = item.querySelector('.lucira-product-title')?.textContent.trim();
+              const url   = item.dataset.url ? `${window.location.origin}${item.dataset.url}` : null;
+              if (title) products.push({ title, url });
+            });
+          }
+          const productLines = products.map((p) => p.url ? `• ${p.title}\n  ${p.url}` : `• ${p.title}`).join('\n');
+          const shareTitle   = products.length ? 'Shop this look' : 'Check out this look';
+          const shareText    = products.length ? `✨ Styled by Lucira\n\n${productLines}\n\nShop the full look 👇` : 'Styled by Lucira';
+          if (navigator.share) {
+            await navigator.share({ title: shareTitle, text: shareText, url: shareUrl });
+          } else {
+            await navigator.clipboard.writeText(`${shareTitle}\n${shareUrl}`);
+            const orig = shareBtn.innerHTML;
+            shareBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+            shareBtn.title = 'Link copied!';
+            setTimeout(() => { shareBtn.innerHTML = orig; shareBtn.title = ''; }, 2000);
+          }
+        } catch (err) {}
+      });
+    }
+
+    /* ─── Swipe hint ─── */
+    let swipeHintDismissed = false;
+    overlay.addEventListener('touchstart', () => {
+      if (!swipeHintDismissed) { swipeHintDismissed = true; overlay.classList.add('swiped'); }
+    }, { passive: true, once: true });
+
+  });
+</script>
+
+{% schema %}
+{
+  "name": "Styled by Lucira",
+  "settings": [
+    {
+      "type": "text",
+      "id": "styled_lucira_heading",
+      "label": "Heading",
+      "default": "Styled By Lucira"
+    },
+    {
+      "type": "text",
+      "id": "styled_lucira_subheading",
+      "label": "Paragraph",
+      "default": "Styled By Lucira"
+    }
+  ],
+  "blocks": [
+    {
+      "type": "slide",
+      "name": "Slide",
+      "settings": [
+        {
+          "type": "image_picker",
+          "id": "image",
+          "label": "Thumbnail Image"
+        },
+        {
+          "type": "video",
+          "id": "video",
+          "label": "Video (optional)"
+        },
+        {
+          "type": "product_list",
+          "id": "products",
+          "label": "Tagged Products",
+          "limit": 5
+        }
+      ]
+    }
+  ],
+  "presets": [
+    {
+      "name": "Styled by Lucira"
+    }
+  ]
+}
+{% endschema %}
