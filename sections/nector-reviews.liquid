@@ -386,27 +386,10 @@
 
   function parseResponse(json) {
     const d = json && json.data ? json.data : {};
-    
-    // Create a map of uploads by review_id for easy lookup
-    const uploadsMap = {};
-    if (Array.isArray(d.uploads)) {
-      d.uploads.forEach(uploadGroup => {
-        if (uploadGroup.review_id && Array.isArray(uploadGroup.uploads)) {
-          uploadsMap[uploadGroup.review_id] = uploadGroup.uploads;
-        }
-      });
-    }
-    
-    // Attach uploads to their respective reviews
-    const items = Array.isArray(d.items) ? d.items.map(item => ({
-      ...item,
-      uploads: uploadsMap[item._id] || item.uploads || []
-    })) : [];
-    
     return {
-      items: items,
-      count: typeof d.count === 'number' ? d.count : (parseInt(d.count) || 0),
-      stats: Array.isArray(d.stats) ? d.stats : [],
+      items : Array.isArray(d.items)  ? d.items  : [],
+      count : typeof d.count === 'number' ? d.count : (parseInt(d.count) || 0),
+      stats : Array.isArray(d.stats)  ? d.stats  : [],
     };
   }
 
@@ -498,20 +481,19 @@
     const photos = [];
 
     items.forEach(r => {
-      // Uploads are now attached to each review item from parseResponse
       if (Array.isArray(r.uploads)) {
         r.uploads.forEach(u => {
-          if (u && u.link && u.type === 'image') {
-            photos.push(u.link);
-          }
+          if (u && u.link && u.type === 'image') photos.push(u.link);
+        });
+      }
+      else if (Array.isArray(r.uploads && r.uploads.uploads)) {
+        r.uploads.uploads.forEach(u => {
+          if (u && u.link) photos.push(u.link);
         });
       }
     });
 
-    if (!photos.length) { 
-      strip.style.display = 'none'; 
-      return; 
-    }
+    if (!photos.length) { strip.style.display = 'none'; return; }
 
     el('nr-photos-inner').innerHTML = photos.map(src =>
       `<img src="${esc(src)}" alt="Review photo" loading="lazy" onclick="NectorReviews.openLightbox(this.src)">`
@@ -586,7 +568,6 @@
     const verified = r.is_verified === true;
     const product  = (r.reference_product_name || '').trim();
 
-    // Uploads are now directly on the review object from parseResponse
     const uploads  = Array.isArray(r.uploads) ? r.uploads : [];
     const imgs     = uploads.filter(u => u && u.type === 'image' && u.link);
     const firstImg = imgs.length ? imgs[0].link : '';
