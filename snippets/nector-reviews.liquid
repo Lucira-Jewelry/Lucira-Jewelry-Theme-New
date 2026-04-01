@@ -261,49 +261,22 @@
   let allReviews      = [];
   let filteredReviews = [];
   let renderedCount   = 0;
+  let lastParsedData  = null;
 
   /* ── Helpers ─────────────────────────────────────────────────────────── */
   function $(id) { return document.getElementById(id + '-' + PID); }
 
-  function starsHtml(rating, score) {
-    let s = '';
-    for (let i = 1; i <= 5; i++)
-      s += `<span style="color:${i <= Math.round(rating) ? 'var(--nr-star-fill)' : 'var(--nr-star-empty)'}">&#9733;</span>`;
-    if (score !== undefined)
-      s += `<span class="nr-card-score">(${parseFloat(score).toFixed(1)})</span>`;
-    return s;
-  }
-
-  function initials(name) {
-    if (!name) return '?';
-    const p = name.trim().split(/\s+/);
-    return (p.length >= 2 ? p[0][0] + p[p.length - 1][0] : p[0][0]).toUpperCase();
-  }
-
-  function timeAgo(dateStr) {
-    if (!dateStr) return '';
-    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
-    if (days === 0) return 'Today';
-    if (days < 30)  return `${days} day${days > 1 ? 's' : ''} ago`;
-    const m = Math.floor(days / 30);
-    if (m < 12) return `${m} month${m > 1 ? 's' : ''} ago`;
-    const y = Math.floor(m / 12);
-    return `${y} year${y > 1 ? 's' : ''} ago`;
-  }
-
-  function esc(str) {
-    return String(str || '')
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
-      .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
-  }
-
   function extract(data) {
     if (!data) return [];
-    if (Array.isArray(data)) return data;
+    // Robust extraction from various possible API response shapes
+    const d = data && data.data ? data.data : data;
+    if (Array.isArray(d.items)) return d.items;
+    if (Array.isArray(d.reviews)) return d.reviews;
     if (Array.isArray(data.reviews)) return data.reviews;
     if (Array.isArray(data.data)) return data.data;
     if (data.data && Array.isArray(data.data.reviews)) return data.data.reviews;
     if (data.result && Array.isArray(data.result)) return data.result;
+    if (Array.isArray(data)) return data;
     return [];
   }
 
@@ -332,15 +305,23 @@
       // 2. Fallback: all reviews
       if (!data) data = await apiFetch(BASE);
 
+      lastParsedData = data;
       allReviews = extract(data);
-      buildSummary(allReviews);
-      buildPhotoStrip(allReviews);
-      applyFilter();
+      renderAllUI();
     } catch (err) {
       console.error('[NectorReviews]', err);
-      document.getElementById('nr-grid-' + PID).innerHTML =
-        '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
+      const grid = document.getElementById('nr-grid-' + PID);
+      if (grid) {
+        grid.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
+      }
     }
+  }
+
+  function renderAllUI() {
+    if (!lastParsedData) return;
+    buildSummary(allReviews);
+    buildPhotoStrip(allReviews);
+    applyFilter();
   }
 
   /* ── Summary ──────────────────────────────────────────────────────────── */
@@ -519,12 +500,32 @@
     }
   };
 
-  /* ── Init ─────────────────────────────────────────────────────────────── */
+  /* ── Init & Auto-Recovery ─────────────────────────────────────────────── */
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => { loadReviews(); initStarPicker(); });
   } else {
     loadReviews();
     initStarPicker();
   }
+
+  // Watchdog: If theme wipes the grid (e.g. on variant change), re-render cached data
+  let recoveryTimer;
+  const themeObserver = new MutationObserver(() => {
+    const grid = document.getElementById('nr-grid-' + PID);
+    const isWiped = !grid || grid.innerHTML.trim() === '' || grid.querySelector('.nr-loading');
+    
+    if (isWiped && lastParsedData) {
+      clearTimeout(recoveryTimer);
+      recoveryTimer = setTimeout(() => {
+        const currentGrid = document.getElementById('nr-grid-' + PID);
+        if (currentGrid && (currentGrid.innerHTML.trim() === '' || currentGrid.querySelector('.nr-loading'))) {
+          console.log('[NectorReviews] Theme wiped snippet grid. Auto-recovering...');
+          renderAllUI();
+        }
+      }, 50);
+    }
+  });
+  themeObserver.observe(document.body, { childList: true, subtree: true });
+
 })();
 </script>
