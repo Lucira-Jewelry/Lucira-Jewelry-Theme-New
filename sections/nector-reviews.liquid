@@ -385,18 +385,11 @@
   }
 
   function parseResponse(json) {
-    // Robust extraction from various possible API response shapes
-    const d = json && json.data ? json.data : (json || {});
-    const items = Array.isArray(d.items) ? d.items : 
-                  Array.isArray(d.reviews) ? d.reviews : 
-                  Array.isArray(json.reviews) ? json.reviews :
-                  Array.isArray(json.result) ? json.result :
-                  Array.isArray(json.data) ? json.data : [];
-                  
+    const d = json && json.data ? json.data : {};
     return {
-      items : items,
-      count : typeof d.count === 'number' ? d.count : (parseInt(d.count) || items.length),
-      stats : Array.isArray(d.stats) ? d.stats : (Array.isArray(json.stats) ? json.stats : []),
+      items : Array.isArray(d.items)  ? d.items  : [],
+      count : typeof d.count === 'number' ? d.count : (parseInt(d.count) || 0),
+      stats : Array.isArray(d.stats)  ? d.stats  : [],
     };
   }
 
@@ -405,25 +398,9 @@
     try {
       let parsed = null;
 
-      // 1. Try product-specific reviews first
-      if (CONFIG.productId) {
-        try {
-          const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
-          const json = await apiFetch(productUrl);
-          const p = parseResponse(json);
-          if (p.items && p.items.length > 0) {
-            parsed = p;
-            isProductView = true;
-          }
-        } catch (e) {
-          console.warn('[NectorReviews] Product-specific fetch failed, falling back.', e);
-        }
-      }
-
-      // 2. Fallback to all merchant reviews
       if (!parsed) {
         const json = await apiFetch(CONFIG.baseUrl);
-        parsed = parseResponse(json);
+        parsed        = parseResponse(json);
         isProductView = false;
       }
 
@@ -749,18 +726,13 @@
   const themeObserver = new MutationObserver(() => {
     const grid = el('nr-grid');
     
-    // Improved detection: Check if grid is missing, empty, or reset to "Loading..."
-    const isMissingOrReset = !grid || grid.innerHTML.trim() === '' || grid.querySelector('.nr-loading');
-    
-    if (isMissingOrReset && lastParsedData && lastParsedData.items.length > 0) {
+    // Check if the grid was emptied out by the theme, but we already successfully loaded data
+    if (grid && grid.innerHTML.trim() === '' && lastParsedData && lastParsedData.items.length > 0) {
       clearTimeout(recoveryTimer);
       recoveryTimer = setTimeout(() => {
-        const currentGrid = el('nr-grid');
-        if (currentGrid && (currentGrid.innerHTML.trim() === '' || currentGrid.querySelector('.nr-loading'))) {
-          console.log('[NectorReviews] Theme wiped or reset the grid. Auto-recovering UI...');
-          renderAllUI();
-        }
-      }, 60); 
+        console.log('[NectorReviews] Theme wiped the grid. Auto-recovering UI...');
+        renderAllUI(); 
+      }, 100); 
     }
   });
 
