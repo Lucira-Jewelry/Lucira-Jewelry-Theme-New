@@ -364,13 +364,14 @@
   let filteredReviews = [];
   let renderedCount   = 0;
   let isProductView   = false;
-  let lastParsedData  = null; // Saves the API data so we can recover it if the theme wipes the DOM
+  let lastParsedData  = null;
+  let usedFallback    = false; // Track if we're using fallback reviews
 
   /* ── DOM ─────────────────────────────────────────────────────────────── */
   const el = id => document.getElementById(id);
 
   // Global cache to survive theme re-renders
-  window.NectorCache = window.NectorCache || { data: null, isProduct: false };
+  window.NectorCache = window.NectorCache || { data: null, isProduct: false, usedFallback: false };
 
   /* ── API ─────────────────────────────────────────────────────────────── */
   async function apiFetch(url) {
@@ -396,45 +397,83 @@
     };
   }
 
-  /* ── Load reviews ────────────────────────────────────────────────────── */
+  /* ── Load reviews with fallback ────────────────────────────────────── */
   async function loadReviews() {
-    // 0. Use cache if available (very fast)
+    // Check cache first
     if (window.NectorCache.data) {
       console.log('[NectorReviews] Using cached data');
       lastParsedData = window.NectorCache.data;
       allReviews = lastParsedData.items;
-      isProductView = true;
+      isProductView = window.NectorCache.isProduct;
+      usedFallback = window.NectorCache.usedFallback;
+      
+      // Add a subtle indicator if showing fallback reviews
+      if (usedFallback && CONFIG.showWrite) {
+        showFallbackNotice();
+      }
+      
       renderAllUI();
       return;
     }
 
     try {
-      let parsed = null;
-
-      if (!parsed) {
-        // ✅ FIX: Add reference_product_id parameter (matching your curl request)
-        const url = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
-        console.log('[NectorReviews] Fetching reviews for product ID:', CONFIG.productId);
-        console.log('[NectorReviews] URL:', url);
-        
-        const json = await apiFetch(url);
-        parsed = parseResponse(json);
+      // First try: Fetch reviews for specific product
+      console.log('[NectorReviews] Fetching reviews for product ID:', CONFIG.productId);
+      const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
+      console.log('[NectorReviews] Product URL:', productUrl);
+      
+      let productResponse = await apiFetch(productUrl);
+      let parsed = parseResponse(productResponse);
+      
+      // Check if we got any reviews for this product
+      if (parsed.items && parsed.items.length > 0) {
+        console.log(`[NectorReviews] Found ${parsed.items.length} reviews for this product`);
         isProductView = true;
+        usedFallback = false;
+        
+        // Save data globally
+        window.NectorCache.data = parsed;
+        window.NectorCache.isProduct = isProductView;
+        window.NectorCache.usedFallback = usedFallback;
+        
+        lastParsedData = parsed;
+        allReviews = parsed.items;
+        renderAllUI();
+        return;
       }
-
-      if (!parsed || !Array.isArray(parsed.items)) {
-        throw new Error('Unexpected API response shape');
+      
+      // No reviews found for this product - use fallback (all reviews)
+      console.log('[NectorReviews] No reviews found for this product. Loading all reviews as fallback...');
+      
+      const allReviewsUrl = CONFIG.baseUrl;
+      console.log('[NectorReviews] Fallback URL:', allReviewsUrl);
+      
+      let allResponse = await apiFetch(allReviewsUrl);
+      let fallbackParsed = parseResponse(allResponse);
+      
+      if (fallbackParsed.items && fallbackParsed.items.length > 0) {
+        console.log(`[NectorReviews] Fallback: Loaded ${fallbackParsed.items.length} total reviews`);
+        isProductView = false; // Show product names since these are from various products
+        usedFallback = true;
+        
+        // Save fallback data globally
+        window.NectorCache.data = fallbackParsed;
+        window.NectorCache.isProduct = isProductView;
+        window.NectorCache.usedFallback = usedFallback;
+        
+        lastParsedData = fallbackParsed;
+        allReviews = fallbackParsed.items;
+        
+        // Show notice that we're displaying general reviews
+        showFallbackNotice();
+        
+        renderAllUI();
+        return;
       }
-
-      // Save data globally
-      window.NectorCache.data = parsed;
-      window.NectorCache.isProduct = isProductView;
       
-      lastParsedData = parsed;
-      allReviews = parsed.items;
+      // No reviews at all
+      throw new Error('No reviews found in fallback either');
       
-      renderAllUI();
-
     } catch (err) {
       console.error('[NectorReviews]', err);
       const grid = el('nr-grid');
@@ -443,6 +482,25 @@
       }
     }
   }
+  
+  /* ── Show fallback notice ──────────────────────────────────────────── */
+  function showFallbackNotice() {
+    // Check if notice already exists
+    if (document.querySelector('.nr-fallback-notice')) return;
+    
+    const summary = el('nr-summary');
+    if (summary) {
+      const notice = document.createElement('div');
+      notice.className = 'nr-fallback-notice';
+      notice.innerHTML = `
+        <div style="background: #f5f0ea; border-left: 3px solid var(--nr-accent); padding: 10px 16px; margin: 0 auto 20px; max-width: 820px; font-size: 12px; color: var(--nr-text-muted);">
+          ℹ️ No reviews yet for this product. Showing reviews from other products instead.
+        </div>
+      `;
+      summary.parentNode.insertBefore(notice, summary.nextSibling);
+    }
+  }
+
   // Extracted this so the Auto-Recovery observer can call it again
   function renderAllUI() {
     if (!lastParsedData) return;
@@ -562,7 +620,10 @@
     const batch  = filteredReviews.slice(renderedCount, renderedCount + CONFIG.pageSize);
 
     if (renderedCount === 0 && !batch.length) {
-      grid.innerHTML = '<div class="nr-empty">No reviews found.</div>';
+      const message = usedFallback 
+        ? '<div class="nr-empty">No reviews available. Be the first to write a review!</div>'
+        : '<div class="nr-empty">No reviews found for this product.</div>';
+      grid.innerHTML = message;
       if (lmWrap) lmWrap.style.display = 'none';
       return;
     }
@@ -593,6 +654,7 @@
     const imgs     = uploads.filter(u => u && u.type === 'image' && u.link);
     const firstImg = imgs.length ? imgs[0].link : '';
 
+    // Show product name only if we're in fallback mode (showing reviews from other products)
     const productTag = (!isProductView && product)
       ? `<div class="nr-card__product">${esc(product)}</div>`
       : '';
@@ -741,13 +803,10 @@
   }
 
   // 2. The Auto-Recovery Watchdog
-  // This watches the webpage. If your theme deletes the #nr-grid element
-  // (which causes the "flash and disappear"), this will detect it and immediately put the reviews back.
   let recoveryTimer;
   const themeObserver = new MutationObserver(() => {
     const grid = el('nr-grid');
     
-    // Check if the grid was emptied out by the theme, but we already successfully loaded data
     if (grid && grid.innerHTML.trim() === '' && lastParsedData && lastParsedData.items.length > 0) {
       clearTimeout(recoveryTimer);
       recoveryTimer = setTimeout(() => {
@@ -757,7 +816,6 @@
     }
   });
 
-  // Start watching the page body for changes
   themeObserver.observe(document.body, { childList: true, subtree: true });
 
 })();
