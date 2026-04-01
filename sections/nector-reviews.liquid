@@ -376,9 +376,6 @@
         'x-apikey'      : CONFIG.apiKey,
         'x-source'      : 'mobile',
         'x-workspaceid' : CONFIG.workspaceId,
-        /* ── FIX 1: Content-Type was missing; some CORS preflight setups
-           need this explicit. More importantly we now also pass
-           Accept so the server knows we want JSON. ── */
         'Accept'        : 'application/json',
       }
     });
@@ -386,24 +383,6 @@
     return res.json();
   }
 
-  /*
-    Actual Nector response structure:
-    {
-      "meta": { ... },
-      "data": {
-        "items"  : [ { _id, name, rating, description, is_verified, posted_at, uploads:[{link}], ... } ],
-        "count"  : 479,
-        "stats"  : [ { "rating": 5, "count": "346" }, ... ],
-        "uploads": [ ... ]   // top-level uploads array — IGNORED here, we use item-level uploads
-      }
-    }
-
-    ── FIX 2: The old code read `d.uploads` for the photo strip from the
-       top-level data.uploads array, which has a DIFFERENT shape:
-         data.uploads[i].uploads[j].link   (nested one extra level)
-       but items[i].uploads[j].link        (flat — this is what we want)
-       buildPhotoStrip() now correctly reads from items[].uploads directly.
-  */
   function parseResponse(json) {
     const d = json && json.data ? json.data : {};
     return {
@@ -418,31 +397,6 @@
     try {
       let parsed = null;
 
-      // ── FIX 3: The product-specific endpoint uses a query param that
-      //    Nector may not support or may return 0 items for. We now
-      //    ALWAYS fetch the general endpoint and filter client-side when
-      //    a productId is present. This avoids a silent empty-result
-      //    cascade that left the spinner stuck on screen.
-      //
-      //    If you DO want server-side product filtering, keep the block
-      //    below but ensure the param name matches the Nector docs exactly.
-      //    The confirmed working param is: reference_product_id
-      //    Uncomment and test if needed:
-      /*
-      if (CONFIG.productId) {
-        try {
-          const json   = await apiFetch(`${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`);
-          const result = parseResponse(json);
-          if (result.items.length > 0) {
-            parsed        = result;
-            isProductView = true;
-          }
-        } catch (e) {
-          console.warn('[NectorReviews] Product fetch failed, falling back.', e);
-        }
-      }
-      */
-
       // Always fetch all reviews (works reliably; filter client-side if needed)
       if (!parsed) {
         const json = await apiFetch(CONFIG.baseUrl);
@@ -450,9 +404,6 @@
         isProductView = false;
       }
 
-      // ── FIX 4: Guard against a completely empty response before
-      //    trying to build the summary, which would previously crash on
-      //    items[0] access and leave the grid in loading state forever.
       if (!parsed || !Array.isArray(parsed.items)) {
         throw new Error('Unexpected API response shape');
       }
@@ -464,9 +415,6 @@
 
     } catch (err) {
       console.error('[NectorReviews]', err);
-      // ── FIX 5: Previously the catch block set innerHTML on #nr-grid
-      //    but the spinner was INSIDE the grid. The new error message
-      //    now correctly replaces the entire grid content including spinner.
       const grid = el('nr-grid');
       if (grid) {
         grid.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
@@ -476,8 +424,6 @@
 
   /* ── Summary ─────────────────────────────────────────────────────────── */
   function buildSummary(items, totalCount, stats) {
-    // ── FIX 6: Guard — if both items and stats are empty, skip rather
-    //    than rendering "—" over whatever was previously shown.
     if (!items.length && !stats.length) return;
 
     const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -486,15 +432,12 @@
       if (dist[r] !== undefined) dist[r] = parseInt(s.count, 10) || 0;
     });
 
-    // Weighted avg from stats (more accurate than raw items since API paginates)
     let wSum = 0, dTotal = 0;
     Object.entries(dist).forEach(([star, cnt]) => {
       wSum   += parseInt(star, 10) * cnt;
       dTotal += cnt;
     });
 
-    // ── FIX 7: Fallback avg calculation now also guards against NaN
-    //    when items is empty (e.g. stats-only response).
     const avg = dTotal > 0
       ? (wSum / dTotal).toFixed(1)
       : items.length > 0
@@ -502,10 +445,12 @@
         : '0.0';
 
     const displayTotal = totalCount > 0 ? totalCount : items.length;
-    el('nr-overall-score').textContent = avg;
-    el('nr-overall-stars').innerHTML   = starsHtml(parseFloat(avg), false);
-    el('nr-review-count').textContent  = `${displayTotal} reviews`;
-    el('nr-total-label').textContent   = `${displayTotal} reviews`;
+    
+    // Safety checks added here
+    if (el('nr-overall-score')) el('nr-overall-score').textContent = avg;
+    if (el('nr-overall-stars')) el('nr-overall-stars').innerHTML   = starsHtml(parseFloat(avg), false);
+    if (el('nr-review-count')) el('nr-review-count').textContent  = `${displayTotal} reviews`;
+    if (el('nr-total-label')) el('nr-total-label').textContent   = `${displayTotal} reviews`;
 
     const base = dTotal > 0 ? dTotal : 1;
     [1, 2, 3, 4, 5].forEach(star => {
@@ -517,7 +462,7 @@
     });
 
     const recPct = Math.round(((dist[4] + dist[5]) / base) * 100);
-    el('nr-recommend-pct').textContent = recPct + '%';
+    if (el('nr-recommend-pct')) el('nr-recommend-pct').textContent = recPct + '%';
   }
 
   /* ── Photo strip ─────────────────────────────────────────────────────── */
@@ -527,24 +472,12 @@
 
     const photos = [];
 
-    // ── FIX 8 (KEY BUG): The original code iterated items and read
-    //    r.uploads[].link — which is CORRECT for item-level uploads.
-    //    However it was also accidentally reading from the TOP-LEVEL
-    //    data.uploads array (passed as `items` in some code paths),
-    //    which has shape: [{ review_id, uploads: [{ link }] }] — one
-    //    extra nesting level — so `.link` was always undefined → no photos.
-    //
-    //    Fix: we now explicitly handle BOTH shapes so the strip works
-    //    whether you pass items[] or the top-level uploads[].
     items.forEach(r => {
-      // Shape A: items[i].uploads = [{ link, type }]  ← standard item
       if (Array.isArray(r.uploads)) {
         r.uploads.forEach(u => {
           if (u && u.link && u.type === 'image') photos.push(u.link);
         });
       }
-      // Shape B: data.uploads[i] = { review_id, uploads: [{ link }] }
-      // (only reached if someone calls buildPhotoStrip with the wrong array)
       else if (Array.isArray(r.uploads && r.uploads.uploads)) {
         r.uploads.uploads.forEach(u => {
           if (u && u.link) photos.push(u.link);
@@ -562,8 +495,11 @@
 
   /* ── Filter + Sort ───────────────────────────────────────────────────── */
   function applyFilter() {
-    const ratingVal = el('nr-filter-rating').value;
-    const sortVal   = el('nr-sort').value;
+    // Safety checks added here
+    const ratingFilter = el('nr-filter-rating');
+    const sortSelect = el('nr-sort');
+    const ratingVal = ratingFilter ? ratingFilter.value : 'all';
+    const sortVal   = sortSelect ? sortSelect.value : 'newest';
 
     filteredReviews = allReviews.filter(r =>
       ratingVal === 'all' || Math.round(parseFloat(r.rating)) === parseInt(ratingVal, 10)
@@ -579,12 +515,13 @@
       return (fB - fA) || (dB - dA);
     });
 
-    // ── FIX 9: Update the total label with the FILTERED count, not the
-    //    global count, so "3 reviews" filters show the right number.
-    el('nr-total-label').textContent = `${filteredReviews.length} review${filteredReviews.length !== 1 ? 's' : ''}`;
+    if (el('nr-total-label')) {
+      el('nr-total-label').textContent = `${filteredReviews.length} review${filteredReviews.length !== 1 ? 's' : ''}`;
+    }
 
     renderedCount = 0;
-    el('nr-grid').innerHTML = '';  // clear grid + spinner before rendering
+    const grid = el('nr-grid');
+    if (grid) grid.innerHTML = '';  // clear grid + spinner before rendering
     renderBatch();
   }
 
@@ -592,6 +529,8 @@
   function renderBatch() {
     const grid   = el('nr-grid');
     const lmWrap = el('nr-loadmore-wrap');
+    if (!grid) return; // Quick safety check if grid is missing entirely
+
     const batch  = filteredReviews.slice(renderedCount, renderedCount + CONFIG.pageSize);
 
     if (renderedCount === 0 && !batch.length) {
@@ -617,14 +556,11 @@
   function buildCardHtml(r) {
     const name     = (r.name || 'Customer').trim();
     const rating   = parseFloat(r.rating) || 0;
-    // ── FIX 10: Nector uses `description` not `body` — was already
-    //    correct but added a fallback to `r.body` for forward-compat.
     const body     = (r.description || r.body || '').trim();
     const date     = r.posted_at || r.created_at || '';
     const verified = r.is_verified === true;
     const product  = (r.reference_product_name || '').trim();
 
-    // item-level uploads: [{ link, type }]
     const uploads  = Array.isArray(r.uploads) ? r.uploads : [];
     const imgs     = uploads.filter(u => u && u.type === 'image' && u.link);
     const firstImg = imgs.length ? imgs[0].link : '';
@@ -699,8 +635,8 @@
   /* ── Lightbox ────────────────────────────────────────────────────────── */
   window.NectorReviews = {
     openLightbox(src) {
-      el('nr-lightbox-img').src = src;
-      el('nr-lightbox').classList.add('is-open');
+      if(el('nr-lightbox-img')) el('nr-lightbox-img').src = src;
+      if(el('nr-lightbox')) el('nr-lightbox').classList.add('is-open');
     }
   };
 
@@ -718,32 +654,46 @@
 
   /* ── Write Review Modal ──────────────────────────────────────────────── */
   if (CONFIG.showWrite) {
-    el('nr-write-btn')?.addEventListener('click', () => el('nr-modal-overlay').classList.add('is-open'));
-    el('nr-modal-close')?.addEventListener('click', () => el('nr-modal-overlay').classList.remove('is-open'));
+    el('nr-write-btn')?.addEventListener('click', () => el('nr-modal-overlay')?.classList.add('is-open'));
+    el('nr-modal-close')?.addEventListener('click', () => el('nr-modal-overlay')?.classList.remove('is-open'));
     el('nr-modal-overlay')?.addEventListener('click', e => {
       if (e.target === el('nr-modal-overlay')) el('nr-modal-overlay').classList.remove('is-open');
     });
     el('nr-submit-btn')?.addEventListener('click', () => {
-      const name   = el('wr-name').value.trim();
-      const rating = parseInt(el('wr-rating').value, 10);
-      const body   = el('wr-body').value.trim();
-      const msg    = el('wr-message');
+      const nameEl = el('wr-name');
+      const ratingEl = el('wr-rating');
+      const bodyEl = el('wr-body');
+      const msg = el('wr-message');
+      
+      if (!nameEl || !ratingEl || !bodyEl || !msg) return;
+
+      const name   = nameEl.value.trim();
+      const rating = parseInt(ratingEl.value, 10);
+      const body   = bodyEl.value.trim();
+      
       if (!name || !rating || !body) {
         msg.textContent = 'Please fill in your name, rating, and review.';
         msg.style.color = '#c0392b'; return;
       }
       msg.textContent = 'Thank you! Your review has been submitted for moderation.';
       msg.style.color = '#5a8a5a';
-      setTimeout(() => el('nr-modal-overlay').classList.remove('is-open'), 2000);
+      setTimeout(() => el('nr-modal-overlay')?.classList.remove('is-open'), 2000);
     });
 
     const picker = el('nr-star-picker');
     if (picker) {
       const setStars = val => picker.querySelectorAll('span').forEach((s, i) => s.classList.toggle('active', i < val));
       picker.addEventListener('mouseover',  e => { if (e.target.dataset.val) setStars(+e.target.dataset.val); });
-      picker.addEventListener('mouseleave', () => setStars(+(el('wr-rating').value) || 0));
+      picker.addEventListener('mouseleave', () => {
+        const ratingEl = el('wr-rating');
+        if (ratingEl) setStars(+(ratingEl.value) || 0);
+      });
       picker.addEventListener('click',      e => {
-        if (e.target.dataset.val) { el('wr-rating').value = e.target.dataset.val; setStars(+e.target.dataset.val); }
+        const ratingEl = el('wr-rating');
+        if (e.target.dataset.val && ratingEl) { 
+          ratingEl.value = e.target.dataset.val; 
+          setStars(+e.target.dataset.val); 
+        }
       });
     }
   }
