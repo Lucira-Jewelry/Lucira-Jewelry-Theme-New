@@ -27,22 +27,18 @@
     {% elsif v.available and v.inventory_management == blank %}
       {% assign v_in_stock = true %}
     {% endif %}
-
     {% if v_in_stock %}
       {% assign v_days = 2 %}
     {% else %}
       {% assign v_days = 15 %}
     {% endif %}
-
     {% assign v_seconds = v_days | times: 86400 %}
     {% assign v_future  = now_ts | plus: v_seconds %}
-
     "{{ v.id }}": {
       "available": {{ v.available }},
       "inventory": {{ v.inventory_quantity | default: 0 }},
       "days": {{ v_days }},
-      "date": "{{ v_future | date: '%B %d, %Y' }}",
-      "inStock": {{ v_in_stock }}
+      "date": "{{ v_future | date: '%B %d, %Y' }}"
     }{% unless forloop.last %},{% endunless %}
   {% endfor %}
 }
@@ -85,23 +81,18 @@
       </button>
     </div>
   </div>
-
   <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
 
   <div class="lucira-delivery-info">
     <span class="lucira-delivery-time">
       <span id="delivery-status-text">
-        {% if v_in_stock %}
-          This stock is available at store
+        {% if is_in_stock %}
+          Estimated Free Dispatch by
         {% else %}
           Available &amp; Dispatched by
         {% endif %}
       </span>
-      <span class="delivry_txt" id="delivery-date-display">
-        {% unless v_in_stock %}
-          {{ delivery_date }}
-        {% endunless %}
-      </span>
+      <span class="delivry_txt" id="delivery-date-display">{{ delivery_date }}</span>
     </span>
   </div>
 </div>
@@ -114,38 +105,224 @@
 (function () {
   'use strict';
 
-  function updateDeliveryUI(variantId) {
-    if (!window.variantDeliveryData) return;
+  var lastSavedPincode = null;
 
-    const data = window.variantDeliveryData[variantId];
-    if (!data) return;
-
-    const dateEl = document.getElementById('delivery-date-display');
-    const statusText = document.getElementById('delivery-status-text');
-
-    if (!dateEl || !statusText) return;
-
-    if (data.inStock) {
-      statusText.innerText = "This stock is available at store";
-      dateEl.innerText = "";
-    } else {
-      statusText.innerText = "Available & Dispatched by";
-      dateEl.innerText = data.date;
+  function getCustomerId() {
+    try {
+      if (!window.customerId || window.customerId === 'null') return null;
+      return String(window.customerId).replace('gid://shopify/Customer/', '');
+    } catch (e) {
+      return null;
     }
   }
 
-  document.addEventListener('variant:change', function (event) {
-    const variant = event.detail.variant;
-    if (!variant) return;
-
-    updateDeliveryUI(String(variant.id));
-  });
-
-  document.addEventListener('change', function (e) {
-    if (e.target.name === "id") {
-      updateDeliveryUI(String(e.target.value));
+  function setCookie(name, value, days = 30) {
+    var expires = "";
+    if (days) {
+      var date = new Date();
+      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+      expires = "; expires=" + date.toUTCString();
     }
-  });
+    // ✅ FORCE STRING
+    document.cookie = name + "=" + String(value) + "; path=/" + expires;
+  }
+
+  function getCookie(name) {
+    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    // ✅ FORCE STRING
+    return match ? String(match[2]) : null;
+  }
+
+  function deleteCookie(name) {
+    document.cookie = name + "=; Max-Age=0; path=/";
+  }
+
+  function showError(msg) {
+    var el = document.getElementById('lucira-pincode-error');
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+  }
+
+  function setLocateBtnState(loading) {
+    var btn = document.getElementById('lucira-locate-btn');
+    var label = btn && btn.querySelector('.locate-btn-label');
+    if (!btn) return;
+    btn.disabled = loading;
+    if (label) label.textContent = loading ? 'Locating...' : 'Locate Me';
+  }
+
+  function toggleButtonState(isSaved = false) {
+    var input = document.getElementById('lucira-delivery-zipcode');
+    var btn = document.getElementById('lucira-locate-btn');
+    if (!input || !btn) return;
+
+    var val = input.value.replace(/\s+/g, '').trim();
+    var label = btn.querySelector('.locate-btn-label');
+
+    if (isSaved) {
+      label.textContent = "Change";
+      btn.dataset.mode = "saved";
+      input.setAttribute("readonly", true);
+      return;
+    }
+
+    input.removeAttribute("readonly");
+
+    if (/^\d{6}$/.test(val)) {
+      label.textContent = "Submit";
+      btn.dataset.mode = "manual";
+    } else {
+      label.textContent = "Locate Me";
+      btn.dataset.mode = "geo";
+    }
+  }
+
+  function pushPromoClick(pincode) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name: 'pincodeEntered',
+        promo_position: String(pincode)
+      }
+    });
+  }
+
+  function savePincodeToServer(pincode) {
+    try {
+      function attemptSend(retry = 0) {
+        let customerId = window.customerId;
+
+        if (!customerId || customerId === 'null') {
+          if (retry < 5) {
+            setTimeout(() => attemptSend(retry + 1), 300);
+            return;
+          } else {
+            return;
+          }
+        }
+
+        customerId = String(customerId)
+          .replace('gid://shopify/Customer/', '');
+
+        fetch('https://api.lucirajewelry.com/customers/pincode.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: String(customerId), // ✅ STRING
+            pincode: String(pincode)         // ✅ STRING
+          })
+        });
+      }
+
+      attemptSend();
+    } catch (e) {}
+  }
+
+  function fetchWithRetry(url) {
+    return fetch(url).then(r => r.json());
+  }
+
+  function init() {
+    var btn = document.getElementById('lucira-locate-btn');
+    var input = document.getElementById('lucira-delivery-zipcode');
+
+    if (!btn || !input) return;
+
+    input.addEventListener('input', () => toggleButtonState(false));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
+
+    btn.addEventListener('click', function () {
+      showError('');
+
+      var mode = btn.dataset.mode;
+      var val = input.value.replace(/\s+/g, '').trim();
+
+      if (mode === "saved") {
+        deleteCookie('user_pincode');
+        input.value = '';
+        toggleButtonState(false);
+        return;
+      }
+
+      // 🔹 Manual
+      if (mode === "manual") {
+
+        if (!/^\d{6}$/.test(val)) {
+          showError('Invalid pincode');
+          return;
+        }
+
+        fetchWithRetry(`https://nominatim.openstreetmap.org/search?postalcode=${val}&country=India&format=json`)
+          .then(data => {
+            if (data && data.length) {
+
+              setCookie('user_pincode', String(val)); // ✅ STRING
+              pushPromoClick(val);
+              savePincodeToServer(val);
+
+              toggleButtonState(true);
+
+            } else {
+              showError('Pincode not found');
+            }
+          });
+
+        return;
+      }
+
+      // 🔹 GEO
+      if (!navigator.geolocation) {
+        showError('Geolocation not supported');
+        return;
+      }
+
+      setLocateBtnState(true);
+
+      navigator.geolocation.getCurrentPosition(function (pos) {
+
+        fetchWithRetry(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
+          .then(data => {
+
+            var pin = data?.address?.postcode?.replace(/\s+/g, '');
+
+            if (pin && /^\d{6}$/.test(pin)) {
+
+              input.value = pin;
+
+              setCookie('user_pincode', String(pin)); // ✅ STRING
+              pushPromoClick(pin);
+              savePincodeToServer(pin);
+
+              toggleButtonState(true);
+
+            } else {
+              showError('Invalid location');
+            }
+          })
+          .finally(() => setLocateBtnState(false));
+
+      }, function () {
+        setLocateBtnState(false);
+        showError('Permission denied');
+      });
+    });
+
+    // ✅ LOAD COOKIE AS STRING
+    var saved = String(getCookie('user_pincode') || '');
+
+    if (saved && /^\d{6}$/.test(saved)) {
+      input.value = saved;
+      toggleButtonState(true);
+
+      savePincodeToServer(saved); // sync
+    } else {
+      toggleButtonState(false);
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
 
 })();
 </script>
