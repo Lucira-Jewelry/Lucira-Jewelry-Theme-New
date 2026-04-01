@@ -45,6 +45,53 @@
 }
 {% endcapture %}
 
+<style>
+  .lucira-location-list {
+    margin-top: 10px;
+    font-size: 13px;
+  }
+  .lucira-location-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .lucira-location-item:last-child {
+    border-bottom: none;
+  }
+  .lucira-location-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .lucira-location-dot.in-stock  { background: green; }
+  .lucira-location-dot.out-stock { background: #ccc; }
+  .lucira-location-name { flex: 1; color: #333; }
+  .lucira-location-tag {
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 999px;
+    font-weight: 500;
+  }
+  .lucira-location-tag.store     { background: #e8f5e9; color: #2e7d32; }
+  .lucira-location-tag.warehouse { background: #e3f2fd; color: #1565c0; }
+  .lucira-location-tag.out       { background: #f5f5f5; color: #999; }
+  .lucira-location-loading {
+    font-size: 12px;
+    color: #999;
+    margin-top: 8px;
+  }
+  .lucira-location-header {
+    font-size: 12px;
+    color: #555;
+    margin-top: 10px;
+    margin-bottom: 4px;
+    font-weight: 500;
+  }
+</style>
+
 <div
   class="lucira-delivery-container"
   id="pdp-delivery-check"
@@ -82,25 +129,30 @@
       </button>
     </div>
   </div>
+
   <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
 
-  <!-- Stock availability line — hidden when out of stock -->
-  <div id="lucira-stock-badge" style="{% unless is_in_stock %}display:none;{% endunless %}font-size:13px; margin-bottom:6px; color:green;">
+  <!-- Stock badge -->
+  <div id="lucira-stock-badge" style="{% unless is_in_stock %}display:none;{% endunless %}font-size:13px; margin-top:6px; margin-bottom:4px; color:green;">
     ✓ Available at Store
   </div>
 
+  <!-- Delivery info -->
   <div class="lucira-delivery-info">
     <span class="lucira-delivery-time">
       <span id="delivery-status-text">
-        {% if is_in_stock %}
-          Estimated Free Dispatch by
-        {% else %}
-          Available &amp; Dispatched by
-        {% endif %}
+        {% if is_in_stock %}Estimated Free Dispatch by{% else %}Available &amp; Dispatched by{% endif %}
       </span>
       <span class="delivry_txt" id="delivery-date-display">{{ delivery_date }}</span>
     </span>
   </div>
+
+  <!-- Location availability — shown after pincode submit -->
+  <div id="lucira-location-wrapper" style="display:none;">
+    <div class="lucira-location-header">Availability near your location:</div>
+    <div class="lucira-location-list" id="lucira-location-list"></div>
+  </div>
+
 </div>
 
 <script>
@@ -110,6 +162,8 @@
 <script>
 (function () {
   'use strict';
+
+  var currentVariantId = '{{ variant.id }}';
 
   function setCookie(name, value, days) {
     days = days || 30;
@@ -135,7 +189,7 @@
   }
 
   function setLocateBtnState(loading) {
-    var btn = document.getElementById('lucira-locate-btn');
+    var btn   = document.getElementById('lucira-locate-btn');
     var label = btn && btn.querySelector('.locate-btn-label');
     if (!btn) return;
     btn.disabled = loading;
@@ -158,7 +212,6 @@
     }
 
     input.removeAttribute("readonly");
-
     if (/^\d{6}$/.test(val)) {
       label.textContent = "Submit";
       btn.dataset.mode  = "manual";
@@ -200,38 +253,95 @@
     return fetch(url).then(function (r) { return r.json(); });
   }
 
-  // ✅ Update badge visibility + delivery text when variant changes
-  function updateVariantUI(variantId) {
-    var data = window.variantDeliveryData && window.variantDeliveryData[String(variantId)];
-    if (!data) return;
+  // ─── Location availability ───────────────────────────────────────────────
 
-    var badge      = document.getElementById('lucira-stock-badge');
-    var statusTxt  = document.getElementById('delivery-status-text');
-    var dateTxt    = document.getElementById('delivery-date-display');
-
-    // Show or hide the availability line
-    if (badge) badge.style.display = data.inStock ? '' : 'none';
-
-    // Swap delivery label
-    if (statusTxt) {
-      statusTxt.textContent = data.inStock
-        ? 'Estimated Free Dispatch by'
-        : 'Available & Dispatched by';
-    }
-
-    // Update delivery date
-    if (dateTxt) dateTxt.textContent = data.date;
+  function showLocationLoading() {
+    var wrapper = document.getElementById('lucira-location-wrapper');
+    var list    = document.getElementById('lucira-location-list');
+    if (!wrapper || !list) return;
+    wrapper.style.display = 'block';
+    list.innerHTML = '<div class="lucira-location-loading">Checking store availability…</div>';
   }
 
-  // Listen for variant changes across theme types
+  function renderLocations(locations, userPincode) {
+    var list = document.getElementById('lucira-location-list');
+    if (!list) return;
+
+    if (!locations || !locations.length) {
+      list.innerHTML = '<div style="font-size:12px;color:#999;">No location data available.</div>';
+      return;
+    }
+
+    // Sort: in-stock first, then by proximity (same pincode prefix = closer)
+    locations.sort(function (a, b) {
+      var aStock = a.available > 0 ? 1 : 0;
+      var bStock = b.available > 0 ? 1 : 0;
+      if (bStock !== aStock) return bStock - aStock;
+      // rough proximity: compare first 3 digits of pincode
+      var userPre = userPincode ? userPincode.slice(0, 3) : '';
+      var aClose  = a.pincode && a.pincode.slice(0, 3) === userPre ? 1 : 0;
+      var bClose  = b.pincode && b.pincode.slice(0, 3) === userPre ? 1 : 0;
+      return bClose - aClose;
+    });
+
+    list.innerHTML = locations.map(function (loc) {
+      var inStock   = loc.available > 0;
+      var dotClass  = inStock ? 'in-stock' : 'out-stock';
+      var tagClass  = inStock ? loc.type : 'out';
+      var tagLabel  = inStock
+        ? (loc.type === 'warehouse' ? 'Ships from here' : 'Walk-in available')
+        : 'Out of stock';
+      var cityLine  = loc.city ? ' <span style="color:#999;font-size:11px;">· ' + loc.city + '</span>' : '';
+
+      return '<div class="lucira-location-item">'
+        + '<div class="lucira-location-dot ' + dotClass + '"></div>'
+        + '<span class="lucira-location-name">' + loc.name + cityLine + '</span>'
+        + '<span class="lucira-location-tag ' + tagClass + '">' + tagLabel + '</span>'
+        + '</div>';
+    }).join('');
+  }
+
+  function fetchLocationAvailability(variantId, pincode) {
+    showLocationLoading();
+    fetch('https://api.lucirajewelry.com/products/inventory.php?variant_id=' + variantId)
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        renderLocations(data.locations, pincode);
+      })
+      .catch(function () {
+        var list = document.getElementById('lucira-location-list');
+        if (list) list.innerHTML = '<div style="font-size:12px;color:#999;">Could not load store availability.</div>';
+      });
+  }
+
+  // ─── Variant change ──────────────────────────────────────────────────────
+
+  function updateVariantUI(variantId) {
+    currentVariantId = String(variantId);
+    var data = window.variantDeliveryData && window.variantDeliveryData[currentVariantId];
+    if (!data) return;
+
+    var badge     = document.getElementById('lucira-stock-badge');
+    var statusTxt = document.getElementById('delivery-status-text');
+    var dateTxt   = document.getElementById('delivery-date-display');
+
+    if (badge)     badge.style.display = data.inStock ? '' : 'none';
+    if (statusTxt) statusTxt.textContent = data.inStock ? 'Estimated Free Dispatch by' : 'Available & Dispatched by';
+    if (dateTxt)   dateTxt.textContent = data.date;
+
+    // If a pincode is already saved, refresh location data for new variant
+    var saved = String(getCookie('user_pincode') || '');
+    if (saved && /^\d{6}$/.test(saved)) {
+      fetchLocationAvailability(currentVariantId, saved);
+    }
+  }
+
   function listenForVariantChanges() {
-    // Method 1: native variant:changed event (Dawn + most modern themes)
     document.addEventListener('variant:changed', function (e) {
       var variant = e.detail && (e.detail.variant || e.detail);
       if (variant && variant.id) updateVariantUI(variant.id);
     });
 
-    // Method 2: ?variant= URL param polling (older/custom themes)
     var lastVariantId = null;
     setInterval(function () {
       var params    = new URLSearchParams(window.location.search);
@@ -242,7 +352,6 @@
       }
     }, 300);
 
-    // Method 3: MutationObserver on data-variant-id attribute
     var container = document.getElementById('pdp-delivery-check');
     if (container && window.MutationObserver) {
       new MutationObserver(function (mutations) {
@@ -254,6 +363,16 @@
         });
       }).observe(container, { attributes: true });
     }
+  }
+
+  // ─── Pincode submit handler ──────────────────────────────────────────────
+
+  function onPincodeConfirmed(pincode) {
+    setCookie('user_pincode', String(pincode));
+    pushPromoClick(pincode);
+    savePincodeToServer(pincode);
+    toggleButtonState(true);
+    fetchLocationAvailability(currentVariantId, pincode);
   }
 
   function init() {
@@ -272,6 +391,7 @@
       if (mode === "saved") {
         deleteCookie('user_pincode');
         input.value = '';
+        document.getElementById('lucira-location-wrapper').style.display = 'none';
         toggleButtonState(false);
         return;
       }
@@ -281,10 +401,7 @@
         fetchWithRetry('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
           .then(function (data) {
             if (data && data.length) {
-              setCookie('user_pincode', String(val));
-              pushPromoClick(val);
-              savePincodeToServer(val);
-              toggleButtonState(true);
+              onPincodeConfirmed(val);
             } else {
               showError('Pincode not found');
             }
@@ -301,10 +418,7 @@
             var pin = data && data.address && data.address.postcode && data.address.postcode.replace(/\s+/g, '');
             if (pin && /^\d{6}$/.test(pin)) {
               input.value = pin;
-              setCookie('user_pincode', String(pin));
-              pushPromoClick(pin);
-              savePincodeToServer(pin);
-              toggleButtonState(true);
+              onPincodeConfirmed(pin);
             } else {
               showError('Invalid location');
             }
@@ -316,11 +430,13 @@
       });
     });
 
+    // Load saved pincode
     var saved = String(getCookie('user_pincode') || '');
     if (saved && /^\d{6}$/.test(saved)) {
       input.value = saved;
       toggleButtonState(true);
       savePincodeToServer(saved);
+      fetchLocationAvailability(currentVariantId, saved);
     } else {
       toggleButtonState(false);
     }
