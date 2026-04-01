@@ -364,6 +364,7 @@
   let filteredReviews = [];
   let renderedCount   = 0;
   let isProductView   = false;
+  let lastParsedData  = null; // Saves the API data so we can recover it if the theme wipes the DOM
 
   /* ── DOM ─────────────────────────────────────────────────────────────── */
   const el = id => document.getElementById(id);
@@ -397,7 +398,6 @@
     try {
       let parsed = null;
 
-      // Always fetch all reviews (works reliably; filter client-side if needed)
       if (!parsed) {
         const json = await apiFetch(CONFIG.baseUrl);
         parsed        = parseResponse(json);
@@ -408,10 +408,11 @@
         throw new Error('Unexpected API response shape');
       }
 
+      // Save data globally for the auto-recovery observer
+      lastParsedData = parsed;
       allReviews = parsed.items;
-      buildSummary(parsed.items, parsed.count, parsed.stats);
-      if (CONFIG.showPhotos) buildPhotoStrip(parsed.items);
-      applyFilter();
+      
+      renderAllUI();
 
     } catch (err) {
       console.error('[NectorReviews]', err);
@@ -420,6 +421,14 @@
         grid.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
       }
     }
+  }
+
+  // Extracted this so the Auto-Recovery observer can call it again
+  function renderAllUI() {
+    if (!lastParsedData) return;
+    buildSummary(lastParsedData.items, lastParsedData.count, lastParsedData.stats);
+    if (CONFIG.showPhotos) buildPhotoStrip(lastParsedData.items);
+    applyFilter();
   }
 
   /* ── Summary ─────────────────────────────────────────────────────────── */
@@ -446,7 +455,6 @@
 
     const displayTotal = totalCount > 0 ? totalCount : items.length;
     
-    // Safety checks added here
     if (el('nr-overall-score')) el('nr-overall-score').textContent = avg;
     if (el('nr-overall-stars')) el('nr-overall-stars').innerHTML   = starsHtml(parseFloat(avg), false);
     if (el('nr-review-count')) el('nr-review-count').textContent  = `${displayTotal} reviews`;
@@ -495,7 +503,6 @@
 
   /* ── Filter + Sort ───────────────────────────────────────────────────── */
   function applyFilter() {
-    // Safety checks added here
     const ratingFilter = el('nr-filter-rating');
     const sortSelect = el('nr-sort');
     const ratingVal = ratingFilter ? ratingFilter.value : 'all';
@@ -521,7 +528,7 @@
 
     renderedCount = 0;
     const grid = el('nr-grid');
-    if (grid) grid.innerHTML = '';  // clear grid + spinner before rendering
+    if (grid) grid.innerHTML = '';  
     renderBatch();
   }
 
@@ -529,7 +536,7 @@
   function renderBatch() {
     const grid   = el('nr-grid');
     const lmWrap = el('nr-loadmore-wrap');
-    if (!grid) return; // Quick safety check if grid is missing entirely
+    if (!grid) return; 
 
     const batch  = filteredReviews.slice(renderedCount, renderedCount + CONFIG.pageSize);
 
@@ -703,12 +710,34 @@
   el('nr-sort')?.addEventListener('change', applyFilter);
   el('nr-loadmore-btn')?.addEventListener('click', renderBatch);
 
-  /* ── Init ────────────────────────────────────────────────────────────── */
+  /* ── Init & Auto-Recovery ────────────────────────────────────────────── */
+  
+  // 1. Initial Load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadReviews);
   } else {
     loadReviews();
   }
+
+  // 2. The Auto-Recovery Watchdog
+  // This watches the webpage. If your theme deletes the #nr-grid element
+  // (which causes the "flash and disappear"), this will detect it and immediately put the reviews back.
+  let recoveryTimer;
+  const themeObserver = new MutationObserver(() => {
+    const grid = el('nr-grid');
+    
+    // Check if the grid was emptied out by the theme, but we already successfully loaded data
+    if (grid && grid.innerHTML.trim() === '' && lastParsedData && lastParsedData.items.length > 0) {
+      clearTimeout(recoveryTimer);
+      recoveryTimer = setTimeout(() => {
+        console.log('[NectorReviews] Theme wiped the grid. Auto-recovering UI...');
+        renderAllUI(); 
+      }, 100); 
+    }
+  });
+
+  // Start watching the page body for changes
+  themeObserver.observe(document.body, { childList: true, subtree: true });
 
 })();
 </script>
