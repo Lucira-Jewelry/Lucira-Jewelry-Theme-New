@@ -3,7 +3,7 @@
   Usage: {% render 'nector-reviews', product: product %}
 {% endcomment %}
 
-<div class="nector-reviews-wrapper" id="nector-reviews" data-product-id="{{ product.id }}">
+<div class="nector-reviews-wrapper" id="nector-reviews-custom" data-product-id="{{ product.id }}">
 
   <div class="nr-header">
     <h2 class="nr-title">Customer Reviews</h2>
@@ -263,6 +263,9 @@
   let renderedCount   = 0;
   let lastParsedData  = null;
 
+  // Global cache to survive theme re-renders
+  window.NectorCache = window.NectorCache || { data: null, isProduct: false };
+
   /* ── Helpers ─────────────────────────────────────────────────────────── */
   function $(id) { return document.getElementById(id + '-' + PID); }
 
@@ -290,6 +293,15 @@
   }
 
   async function loadReviews() {
+    // 0. Use cache if available (very fast)
+    if (window.NectorCache.data) {
+      console.log('[NectorReviews] Snippet using cached data');
+      lastParsedData = window.NectorCache.data;
+      allReviews = extract(lastParsedData);
+      renderAllUI();
+      return;
+    }
+
     try {
       let data = null;
 
@@ -304,6 +316,9 @@
 
       // 2. Fallback: all reviews
       if (!data) data = await apiFetch(BASE);
+
+      // Save to global cache
+      window.NectorCache.data = data;
 
       lastParsedData = data;
       allReviews = extract(data);

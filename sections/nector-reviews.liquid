@@ -9,7 +9,7 @@
 
 <div
   class="nector-reviews-wrapper"
-  id="nector-reviews"
+  id="nector-reviews-custom"
   data-product-id="{{ nr_pid }}"
   data-section-id="{{ section.id }}"
 >
@@ -369,6 +369,9 @@
   /* ── DOM ─────────────────────────────────────────────────────────────── */
   const el = id => document.getElementById(id);
 
+  // Global cache to survive theme re-renders
+  window.NectorCache = window.NectorCache || { data: null, isProduct: false };
+
   /* ── API ─────────────────────────────────────────────────────────────── */
   async function apiFetch(url) {
     const res = await fetch(url, {
@@ -395,6 +398,16 @@
 
   /* ── Load reviews ────────────────────────────────────────────────────── */
   async function loadReviews() {
+    // 0. Use cache if available (very fast)
+    if (window.NectorCache.data) {
+      console.log('[NectorReviews] Using cached data');
+      lastParsedData = window.NectorCache.data;
+      allReviews = lastParsedData.items;
+      isProductView = window.NectorCache.isProduct;
+      renderAllUI();
+      return;
+    }
+
     try {
       let parsed = null;
 
@@ -408,7 +421,10 @@
         throw new Error('Unexpected API response shape');
       }
 
-      // Save data globally for the auto-recovery observer
+      // Save data globally
+      window.NectorCache.data = parsed;
+      window.NectorCache.isProduct = isProductView;
+      
       lastParsedData = parsed;
       allReviews = parsed.items;
       
@@ -426,6 +442,7 @@
   // Extracted this so the Auto-Recovery observer can call it again
   function renderAllUI() {
     if (!lastParsedData) return;
+    console.log('[NectorReviews] Rendering UI...');
     buildSummary(lastParsedData.items, lastParsedData.count, lastParsedData.stats);
     if (CONFIG.showPhotos) buildPhotoStrip(lastParsedData.items);
     applyFilter();
