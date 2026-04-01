@@ -45,34 +45,6 @@
 }
 {% endcapture %}
 
-<style>
-  .lucira-stock-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 12px;
-    border-radius: 999px;
-    font-size: 13px;
-    font-weight: 500;
-    margin-bottom: 8px;
-    transition: background 0.2s, color 0.2s;
-  }
-  .lucira-stock-badge.in-stock {
-    background-color: #e6f4ea;
-    color: #1e7e34;
-    border: 1px solid #a8d5b0;
-  }
-  .lucira-stock-badge.on-order {
-    background-color: #fff8e6;
-    color: #a66b00;
-    border: 1px solid #f0cc80;
-  }
-  .lucira-stock-badge .badge-icon {
-    font-size: 14px;
-    line-height: 1;
-  }
-</style>
-
 <div
   class="lucira-delivery-container"
   id="pdp-delivery-check"
@@ -112,15 +84,9 @@
   </div>
   <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
 
-  <!-- ✅ Dynamic stock badge -->
-  <div
-    id="lucira-stock-badge"
-    class="lucira-stock-badge {% if is_in_stock %}in-stock{% else %}on-order{% endif %}"
-  >
-    <span class="badge-icon">{% if is_in_stock %}✓{% else %}○{% endif %}</span>
-    <span id="lucira-stock-label">
-      {% if is_in_stock %}Available at Store{% else %}Available on Order{% endif %}
-    </span>
+  <!-- Stock availability line — hidden when out of stock -->
+  <div id="lucira-stock-badge" style="{% unless is_in_stock %}display:none;{% endunless %}font-size:13px; margin-bottom:6px; color:green;">
+    ✓ Available at Store
   </div>
 
   <div class="lucira-delivery-info">
@@ -145,26 +111,11 @@
 (function () {
   'use strict';
 
-  var lastSavedPincode = null;
-
-  function getCustomerId() {
-    try {
-      if (!window.customerId || window.customerId === 'null') return null;
-      return String(window.customerId).replace('gid://shopify/Customer/', '');
-    } catch (e) {
-      return null;
-    }
-  }
-
   function setCookie(name, value, days) {
     days = days || 30;
-    var expires = "";
-    if (days) {
-      var date = new Date();
-      date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-      expires = "; expires=" + date.toUTCString();
-    }
-    document.cookie = name + "=" + String(value) + "; path=/" + expires;
+    var date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    document.cookie = name + "=" + String(value) + "; path=/; expires=" + date.toUTCString();
   }
 
   function getCookie(name) {
@@ -193,15 +144,15 @@
 
   function toggleButtonState(isSaved) {
     var input = document.getElementById('lucira-delivery-zipcode');
-    var btn = document.getElementById('lucira-locate-btn');
+    var btn   = document.getElementById('lucira-locate-btn');
     if (!input || !btn) return;
 
-    var val = input.value.replace(/\s+/g, '').trim();
+    var val   = input.value.replace(/\s+/g, '').trim();
     var label = btn.querySelector('.locate-btn-label');
 
     if (isSaved) {
       label.textContent = "Change";
-      btn.dataset.mode = "saved";
+      btn.dataset.mode  = "saved";
       input.setAttribute("readonly", true);
       return;
     }
@@ -210,10 +161,10 @@
 
     if (/^\d{6}$/.test(val)) {
       label.textContent = "Submit";
-      btn.dataset.mode = "manual";
+      btn.dataset.mode  = "manual";
     } else {
       label.textContent = "Locate Me";
-      btn.dataset.mode = "geo";
+      btn.dataset.mode  = "geo";
     }
   }
 
@@ -221,10 +172,7 @@
     window.dataLayer = window.dataLayer || [];
     window.dataLayer.push({
       event: 'promoClick',
-      promoClick: {
-        creative_name: 'pincodeEntered',
-        promo_position: String(pincode)
-      }
+      promoClick: { creative_name: 'pincodeEntered', promo_position: String(pincode) }
     });
   }
 
@@ -233,28 +181,17 @@
       function attemptSend(retry) {
         retry = retry || 0;
         var customerId = window.customerId;
-
         if (!customerId || customerId === 'null') {
-          if (retry < 5) {
-            setTimeout(function () { attemptSend(retry + 1); }, 300);
-            return;
-          } else {
-            return;
-          }
+          if (retry < 5) { setTimeout(function () { attemptSend(retry + 1); }, 300); }
+          return;
         }
-
         customerId = String(customerId).replace('gid://shopify/Customer/', '');
-
         fetch('https://api.lucirajewelry.com/customers/pincode.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            customer_id: String(customerId),
-            pincode: String(pincode)
-          })
+          body: JSON.stringify({ customer_id: String(customerId), pincode: String(pincode) })
         });
       }
-
       attemptSend(0);
     } catch (e) {}
   }
@@ -263,71 +200,65 @@
     return fetch(url).then(function (r) { return r.json(); });
   }
 
-  // ✅ Update stock badge + delivery info when variant changes
-  function updateStockBadge(variantId) {
-    var data = window.variantDeliveryData && window.variantDeliveryData[variantId];
+  // ✅ Update badge visibility + delivery text when variant changes
+  function updateVariantUI(variantId) {
+    var data = window.variantDeliveryData && window.variantDeliveryData[String(variantId)];
     if (!data) return;
 
-    var badge     = document.getElementById('lucira-stock-badge');
-    var label     = document.getElementById('lucira-stock-label');
-    var statusTxt = document.getElementById('delivery-status-text');
-    var dateTxt   = document.getElementById('delivery-date-display');
+    var badge      = document.getElementById('lucira-stock-badge');
+    var statusTxt  = document.getElementById('delivery-status-text');
+    var dateTxt    = document.getElementById('delivery-date-display');
 
-    if (!badge || !label) return;
+    // Show or hide the availability line
+    if (badge) badge.style.display = data.inStock ? '' : 'none';
 
-    if (data.inStock) {
-      badge.className = 'lucira-stock-badge in-stock';
-      badge.querySelector('.badge-icon').textContent = '✓';
-      label.textContent = 'Available at Store';
-      if (statusTxt) statusTxt.textContent = 'Estimated Free Dispatch by ';
-    } else {
-      badge.className = 'lucira-stock-badge on-order';
-      badge.querySelector('.badge-icon').textContent = '○';
-      label.textContent = 'Available on Order';
-      if (statusTxt) statusTxt.textContent = 'Available & Dispatched by ';
+    // Swap delivery label
+    if (statusTxt) {
+      statusTxt.textContent = data.inStock
+        ? 'Estimated Free Dispatch by'
+        : 'Available & Dispatched by';
     }
 
+    // Update delivery date
     if (dateTxt) dateTxt.textContent = data.date;
   }
 
-  // ✅ Listen for Shopify variant changes (works with most themes)
+  // Listen for variant changes across theme types
   function listenForVariantChanges() {
-    // Method 1: Shopify's native variant change event
+    // Method 1: native variant:changed event (Dawn + most modern themes)
     document.addEventListener('variant:changed', function (e) {
       var variant = e.detail && (e.detail.variant || e.detail);
-      if (variant && variant.id) updateStockBadge(String(variant.id));
+      if (variant && variant.id) updateVariantUI(variant.id);
     });
 
-    // Method 2: URL param change (for themes using ?variant=)
+    // Method 2: ?variant= URL param polling (older/custom themes)
     var lastVariantId = null;
     setInterval(function () {
-      var params = new URLSearchParams(window.location.search);
+      var params    = new URLSearchParams(window.location.search);
       var currentId = params.get('variant');
       if (currentId && currentId !== lastVariantId) {
         lastVariantId = currentId;
-        updateStockBadge(currentId);
+        updateVariantUI(currentId);
       }
     }, 300);
 
-    // Method 3: MutationObserver on the container's data-variant-id
+    // Method 3: MutationObserver on data-variant-id attribute
     var container = document.getElementById('pdp-delivery-check');
     if (container && window.MutationObserver) {
-      var observer = new MutationObserver(function (mutations) {
+      new MutationObserver(function (mutations) {
         mutations.forEach(function (m) {
           if (m.attributeName === 'data-variant-id') {
             var id = container.getAttribute('data-variant-id');
-            if (id) updateStockBadge(id);
+            if (id) updateVariantUI(id);
           }
         });
-      });
-      observer.observe(container, { attributes: true });
+      }).observe(container, { attributes: true });
     }
   }
 
   function init() {
-    var btn = document.getElementById('lucira-locate-btn');
+    var btn   = document.getElementById('lucira-locate-btn');
     var input = document.getElementById('lucira-delivery-zipcode');
-
     if (!btn || !input) return;
 
     input.addEventListener('input', function () { toggleButtonState(false); });
@@ -335,9 +266,8 @@
 
     btn.addEventListener('click', function () {
       showError('');
-
       var mode = btn.dataset.mode;
-      var val = input.value.replace(/\s+/g, '').trim();
+      var val  = input.value.replace(/\s+/g, '').trim();
 
       if (mode === "saved") {
         deleteCookie('user_pincode');
@@ -347,11 +277,7 @@
       }
 
       if (mode === "manual") {
-        if (!/^\d{6}$/.test(val)) {
-          showError('Invalid pincode');
-          return;
-        }
-
+        if (!/^\d{6}$/.test(val)) { showError('Invalid pincode'); return; }
         fetchWithRetry('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
           .then(function (data) {
             if (data && data.length) {
@@ -363,22 +289,16 @@
               showError('Pincode not found');
             }
           });
-
         return;
       }
 
-      if (!navigator.geolocation) {
-        showError('Geolocation not supported');
-        return;
-      }
-
+      if (!navigator.geolocation) { showError('Geolocation not supported'); return; }
       setLocateBtnState(true);
 
       navigator.geolocation.getCurrentPosition(function (pos) {
         fetchWithRetry('https://nominatim.openstreetmap.org/reverse?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude + '&format=json')
           .then(function (data) {
             var pin = data && data.address && data.address.postcode && data.address.postcode.replace(/\s+/g, '');
-
             if (pin && /^\d{6}$/.test(pin)) {
               input.value = pin;
               setCookie('user_pincode', String(pin));
@@ -390,7 +310,6 @@
             }
           })
           .finally(function () { setLocateBtnState(false); });
-
       }, function () {
         setLocateBtnState(false);
         showError('Permission denied');
@@ -410,6 +329,5 @@
   }
 
   document.addEventListener('DOMContentLoaded', init);
-
 })();
 </script>
