@@ -539,6 +539,42 @@
   }
 
   /* ── Load reviews with fallback ────────────────────────────────────── */
+ /* ── Fetch ALL pages from API ────────────────────────────────────────── */
+async function fetchAllPages(baseUrl) {
+  const LIMIT = 100; // max per request — adjust if Nector supports higher
+  let page = 1;
+  let allItems = [];
+  let totalCount = 0;
+  let stats = [];
+
+  while (true) {
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${separator}limit=${LIMIT}&page=${page}`;
+    console.log(`[NectorReviews] Fetching page ${page}:`, url);
+
+    const json = await apiFetch(url);
+    const parsed = parseResponse(json);
+
+    // Capture stats and total count from first page only
+    if (page === 1) {
+      totalCount = parsed.count;
+      stats = parsed.stats;
+    }
+
+    if (!parsed.items || parsed.items.length === 0) break;
+
+    allItems = allItems.concat(parsed.items);
+
+    // Stop if we've fetched everything or API returned less than limit (last page)
+    if (parsed.items.length < LIMIT || allItems.length >= totalCount) break;
+
+    page++;
+  }
+
+  return { items: allItems, count: totalCount, stats };
+}
+
+  /* ── Load reviews with fallback ────────────────────────────────────── */
   async function loadReviews() {
     // Check cache first
     if (window.NectorCache.data) {
@@ -547,80 +583,60 @@
       allReviews = lastParsedData.items;
       isProductView = window.NectorCache.isProduct;
       usedFallback = window.NectorCache.usedFallback;
-      
-      // Add a subtle indicator if showing fallback reviews
-      if (usedFallback && CONFIG.showWrite) {
-        showFallbackNotice();
-      }
-      
+
+      if (usedFallback && CONFIG.showWrite) showFallbackNotice();
       renderAllUI();
       return;
     }
 
     try {
-      // First try: Fetch reviews for specific product
-      console.log('[NectorReviews] Fetching reviews for product ID:', CONFIG.productId);
+      console.log('[NectorReviews] Fetching all reviews for product ID:', CONFIG.productId);
       const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
-      console.log('[NectorReviews] Product URL:', productUrl);
-      
-      let productResponse = await apiFetch(productUrl);
-      let parsed = parseResponse(productResponse);
-      
-      // Check if we got any reviews for this product
+
+      // Fetch ALL pages for this product
+      const parsed = await fetchAllPages(productUrl);
+
       if (parsed.items && parsed.items.length > 0) {
-        console.log(`[NectorReviews] Found ${parsed.items.length} reviews for this product`);
+        console.log(`[NectorReviews] Total reviews fetched: ${parsed.items.length}`);
         isProductView = true;
         usedFallback = false;
-        
-        // Save data globally
+
         window.NectorCache.data = parsed;
         window.NectorCache.isProduct = isProductView;
         window.NectorCache.usedFallback = usedFallback;
-        
+
         lastParsedData = parsed;
         allReviews = parsed.items;
         renderAllUI();
         return;
       }
-      
-      // No reviews found for this product - use fallback (all reviews)
-      console.log('[NectorReviews] No reviews found for this product. Loading all reviews as fallback...');
-      
-      const allReviewsUrl = CONFIG.baseUrl;
-      console.log('[NectorReviews] Fallback URL:', allReviewsUrl);
-      
-      let allResponse = await apiFetch(allReviewsUrl);
-      let fallbackParsed = parseResponse(allResponse);
-      
+
+      // Fallback: fetch ALL reviews across all products
+      console.log('[NectorReviews] No product reviews found. Loading all reviews as fallback...');
+      const fallbackParsed = await fetchAllPages(CONFIG.baseUrl);
+
       if (fallbackParsed.items && fallbackParsed.items.length > 0) {
-        console.log(`[NectorReviews] Fallback: Loaded ${fallbackParsed.items.length} total reviews`);
-        isProductView = false; // Show product names since these are from various products
+        console.log(`[NectorReviews] Fallback total fetched: ${fallbackParsed.items.length}`);
+        isProductView = false;
         usedFallback = true;
-        
-        // Save fallback data globally
+
         window.NectorCache.data = fallbackParsed;
         window.NectorCache.isProduct = isProductView;
         window.NectorCache.usedFallback = usedFallback;
-        
+
         lastParsedData = fallbackParsed;
         allReviews = fallbackParsed.items;
-        
-        // Show notice that we're displaying general reviews
         showFallbackNotice();
-        
         renderAllUI();
         return;
       }
-      
-      // No reviews at all
+
       throw new Error('No reviews found in fallback either');
-      
+
     } catch (err) {
       console.error('[NectorReviews]', err);
       const grid = el('nr-grid');
-      if (grid) {
-        grid.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
-      }
+      if (grid) grid.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
     }
   }
   
