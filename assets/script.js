@@ -348,3 +348,83 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 });
 
+document.addEventListener("DOMContentLoaded", function () {
+  const fabMain = document.getElementById("fabMain");
+  const fabActions = document.getElementById("fabActions");
+  const fabChat = document.getElementById("fabChat");
+  let isOpen = false;
+
+  function closeFab() {
+    isOpen = false;
+    fabActions.style.display = "none";
+    fabMain.classList.remove("is-open");
+  }
+
+  function openFab() {
+    isOpen = true;
+    fabActions.style.display = "flex";
+    fabMain.classList.add("is-open");
+  }
+
+  fabMain.addEventListener("click", function () {
+    if (isOpen) {
+      // Also close Zoho chat if it's currently open
+      const chatWrap = document.getElementById("zsiq_chat_wrap");
+      const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
+      if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("hide");
+      }
+
+      closeFab();
+    } else {
+      openFab();
+    }
+  });
+
+  // Close FAB when clicking outside
+  document.addEventListener("click", function (e) {
+    if (!e.target.closest(".fab-container") && isOpen) {
+      closeFab();
+    }
+  });
+
+  fabChat.addEventListener("click", function (e) {
+    e.preventDefault();
+    if (window.$zoho && $zoho.salesiq) {
+      $zoho.salesiq.floatwindow.visible("show");
+      closeFab(); // collapse FAB after opening chat
+    }
+  });
+
+  function observeZohoChat() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    if (!chatWrap) return;
+
+    const observer = new MutationObserver(function (mutations) {
+      mutations.forEach(function (mutation) {
+        if (mutation.attributeName === "class") {
+          const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+
+          if (isChatOpen) {
+            isOpen = true;
+            fabActions.style.display = "none";
+            fabMain.classList.add("is-open");   // ← was: fabMain.textContent = "×"
+          } else {
+            closeFab();
+          }
+        }
+      });
+    });
+
+    observer.observe(chatWrap, { attributes: true });
+  }
+
+  // Zoho loads async — wait for it to be ready before observing
+  const zohoReadyInterval = setInterval(function () {
+    if (document.getElementById("zsiq_chat_wrap")) {
+      observeZohoChat();
+      clearInterval(zohoReadyInterval);
+    }
+  }, 500);
+});
