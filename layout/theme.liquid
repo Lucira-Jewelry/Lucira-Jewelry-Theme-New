@@ -375,15 +375,7 @@
       <script src="{{ 'tabs-controller.js' | asset_url }}" defer></script>
     {% endif %}
 
-    <script>
-      window.$zoho=window.$zoho || {};
-      $zoho.salesiq=$zoho.salesiq||{
-        ready:function(){}
-      }
-    </script>
-
-    <script id="zsiqscript" src="https://salesiq.zohopublic.in/widget?wc=..." defer></script>
-
+    <script>window.$zoho=window.$zoho || {};$zoho.salesiq=$zoho.salesiq||{ready:function(){}}</script><script id="zsiqscript" src="https://salesiq.zohopublic.in/widget?wc=siq2e12e9db232ea8ab5f0ff99b39f60ba8cf16a05cc958274a1631cbcf3fc63621" defer></script>
     <script>
       window.$zoho = window.$zoho || {};
       $zoho.salesiq = $zoho.salesiq || {};
@@ -714,24 +706,127 @@
       </script>
     {% endif %}
 
-    <script src="{{ 'jquery.min.js' | asset_url }}" defer="defer"></script>
+    <script src="{{ 'swiper-bundle.min.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'header-main.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'data-layer-event.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'gtm-data-layer-event.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'owl.carousel.min.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'slick.min.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'swiper-bundle.min.js' | asset_url }}" defer="defer"></script>
-    {% render 'sticky-chat-experts' %}
-    {% render 'gokwik' %}
-    {% render 'wishlist-app-links', linkType: 'app-script' %}
-    <script src="{{ 'script.js' | asset_url }}" defer="defer"></script>
-    <script src="{{ 'infinite-scroll.js' | asset_url }}" defer="defer"></script>
-    {% unless customer %}
-      <script src="{{ 'login-register.js' | asset_url }}" defer="defer"></script>
-    {% endunless %}
-    {% render 'razorpay-magic-sso' %}
     <script src="{{ 'similar-drawer.min.js' | asset_url }}" defer="defer"></script>
     <script src="{{ 'similar-items-drawer.min.js' | asset_url }}" defer></script>
+    {% render 'gokwik' %}
+    <template id="delayed-scripts-template">
+      {% render 'delayed-scripts' %}
+    </template>
+    
+    <script>
+      (function() {
+        var scriptsLoaded = false;
+        function loadDelayedScripts() {
+          if (scriptsLoaded) return;
+          scriptsLoaded = true;
+          var template = document.getElementById('delayed-scripts-template');
+          if (!template || !template.content) return;
+          
+          var container = document.createElement('div');
+          container.appendChild(template.content.cloneNode(true));
+          
+          var scripts = container.querySelectorAll('script');
+          scripts.forEach(function(oldScript, index) {
+            setTimeout(function() {
+              var newScript = document.createElement('script');
+              Array.from(oldScript.attributes).forEach(function(attr) {
+                newScript.setAttribute(attr.name, attr.value);
+              });
+              if (oldScript.src) {
+                newScript.src = oldScript.src;
+              } else {
+                newScript.textContent = oldScript.textContent;
+              }
+              document.body.appendChild(newScript);
+            }, index * 100);
+          });
+
+          setTimeout(function() {
+            while (container.firstChild) {
+              if (container.firstChild.tagName !== 'SCRIPT') {
+                document.body.appendChild(container.firstChild);
+              } else {
+                container.removeChild(container.firstChild);
+              }
+            }
+          }, 10);
+          
+          console.log('⚡ Apps hydrated safely');
+        }
+        window.addEventListener('scroll', loadDelayedScripts, { passive: true, once: true });
+        window.addEventListener('mousemove', loadDelayedScripts, { passive: true, once: true });
+        window.addEventListener('touchstart', loadDelayedScripts, { passive: true, once: true });
+        setTimeout(loadDelayedScripts, 5000);
+      })();
+    </script>
+    <script src="{{ 'login-register.js' | asset_url }}" defer="defer"></script>
+
+    <script>
+      (function () {
+        const COOKIE_NAME = "user_pincode";
+
+        function getCookie(name) {
+          const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+          return match ? match[2] : null;
+        }
+
+        function setCookie(name, value, days = 30) {
+          const maxAge = days * 24 * 60 * 60;
+          document.cookie = `${name}=${value}; path=/; max-age=${maxAge}`;
+        }
+
+        function fetchPincode(lat, lng) {
+          fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`)
+            .then(res => res.json())
+            .then(data => {
+              const pincode = data?.address?.postcode;
+
+              if (pincode) {
+                setCookie(COOKIE_NAME, pincode);
+                console.log("Pincode saved:", pincode);
+              } else {
+                console.warn("Pincode not found");
+              }
+            })
+            .catch(err => console.error("Geocode error:", err));
+        }
+
+        function getLocationAndFetch() {
+          if (!navigator.geolocation) return;
+
+          navigator.geolocation.getCurrentPosition(
+            pos => {
+              const { latitude, longitude } = pos.coords;
+              fetchPincode(latitude, longitude);
+            },
+            err => {
+              console.warn("Location denied or unavailable:", err);
+            },
+            {
+              enableHighAccuracy: false,
+              maximumAge: 0
+            }
+          );
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+          const existing = getCookie(COOKIE_NAME);
+
+          // Only run if no pincode already saved
+          if (!existing) {
+            setTimeout(getLocationAndFetch, 800);
+          } else {
+            console.log("Pincode already exists:", existing);
+          }
+        });
+      })();
+    </script>
+
+    {%- render 'social-proof-popup' -%}
     {% if template.name == 'product' %}
       {% render 'floating-icons' %}
       <script src="{{ 'floating-icons-script.js' | asset_url }}" defer="defer"></script>
