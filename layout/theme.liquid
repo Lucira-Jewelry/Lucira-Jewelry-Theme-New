@@ -723,39 +723,43 @@
         function loadDelayedScripts() {
           if (scriptsLoaded) return;
           scriptsLoaded = true;
-          var template = document.getElementById('delayed-scripts-template');
-          if (!template || !template.content) return;
-          
-          var container = document.createElement('div');
-          container.appendChild(template.content.cloneNode(true));
-          
-          var scripts = container.querySelectorAll('script');
-          scripts.forEach(function(oldScript, index) {
-            setTimeout(function() {
-              var newScript = document.createElement('script');
-              Array.from(oldScript.attributes).forEach(function(attr) {
-                newScript.setAttribute(attr.name, attr.value);
-              });
-              if (oldScript.src) {
-                newScript.src = oldScript.src;
-              } else {
-                newScript.textContent = oldScript.textContent;
-              }
-              document.body.appendChild(newScript);
-            }, index * 100);
-          });
 
-          setTimeout(function() {
-            while (container.firstChild) {
-              if (container.firstChild.tagName !== 'SCRIPT') {
-                document.body.appendChild(container.firstChild);
-              } else {
-                container.removeChild(container.firstChild);
-              }
-            }
-          }, 10);
+          const template = document.getElementById('delayed-scripts-template');
+          if (!template || !template.content) return;
+
+          const scripts = Array.from(template.content.querySelectorAll('script'));
           
-          console.log('⚡ Apps hydrated safely');
+          // Recursive function to load scripts in the EXACT order they appear
+          function injectNext(index) {
+            if (index >= scripts.length) {
+              console.log('⚡ All scripts hydrated in order');
+              return;
+            }
+
+            const oldScript = scripts[index];
+            const newScript = document.createElement('script');
+
+            // Copy attributes
+            Array.from(oldScript.attributes).forEach(attr => {
+              newScript.setAttribute(attr.name, attr.value);
+            });
+
+            if (oldScript.src) {
+              newScript.src = oldScript.src;
+              // CRITICAL: Wait for this script to finish loading before starting the next one
+              newScript.onload = () => injectNext(index + 1);
+              newScript.onerror = () => injectNext(index + 1); // Don't get stuck on a 404
+            } else {
+              newScript.textContent = oldScript.textContent;
+              document.body.appendChild(newScript);
+              injectNext(index + 1); // Inline scripts execute immediately, move to next
+              return;
+            }
+
+            document.body.appendChild(newScript);
+          }
+
+          injectNext(0);
         }
         window.addEventListener('scroll', loadDelayedScripts, { passive: true, once: true });
         window.addEventListener('mousemove', loadDelayedScripts, { passive: true, once: true });
