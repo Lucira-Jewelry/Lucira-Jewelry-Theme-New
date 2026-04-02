@@ -391,30 +391,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
-
-    function openZohoChat() {
-      if (
-        window.$zoho &&
-        $zoho.salesiq &&
-        $zoho.salesiq.floatwindow
-      ) {
+    if (window.$zoho && $zoho.salesiq) {
         $zoho.salesiq.floatwindow.visible("show");
-        closeFab();
-        return true;
-      }
-      return false;
+      closeFab(); // collapse FAB after opening chat
     }
-
-    // Try immediately
-    if (openZohoChat()) return;
-
-    // Retry until ready
-    const interval = setInterval(function () {
-      if (openZohoChat()) {
-        clearInterval(interval);
-      }
-    }, 300);
-
   });
 
   function observeZohoChat() {
