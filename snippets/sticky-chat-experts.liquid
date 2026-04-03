@@ -47,33 +47,41 @@
 </div>
 
 <script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const chatLink = document.querySelector('.fixed-cta-whatsapp a');
+  /*
+   * Delegated click listener — works regardless of when the element is
+   * injected into the DOM (the snippet lives inside a <template> tag in
+   * theme.liquid and is hydrated lazily, so DOMContentLoaded has already
+   * fired by the time this code runs).
+   *
+   * Covers:
+   *  - .fixed-cta-whatsapp a   → global sticky WA button (this file's <a>)
+   *  - .lucira-sticky-wa-btn   → PDP mobile sticky-bar WA button (buy-buttons.liquid)
+   */
+  document.addEventListener('click', function (e) {
+    var anchor = e.target.closest('.fixed-cta-whatsapp a, .lucira-sticky-wa-btn');
+    if (!anchor) return;
 
-    if (!chatLink) return;
+    e.preventDefault();
 
-    chatLink.addEventListener('click', function (e) {
-      e.preventDefault(); // stop immediate navigation
+    var chatData = {
+      promo_id:      '{{ product.selected_or_first_available_variant.sku | default: "NA" }}',
+      promo_name:    {{ product.title | json | default: '"NA"' }},
+      creative_name: 'chatWithExperts',
+      location_id:   '{{ request.path }}'
+    };
 
-      const chatData = {
-        promo_id: '{{ product.selected_or_first_available_variant.sku | default: "NA" }}',
-        promo_name: {{ product.title | json | default: '"NA"' }},
-        creative_name: 'chatWithExperts',
-        location_id: '{{ request.path }}'
-      };
-
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'promoClick',
-        promoClick: chatData,
-      });
-
-      console.log('✅ Chat with Experts dataLayer pushed:', chatData);
-
-      // redirect after slight delay
-      setTimeout(() => {
-        window.open(chatLink.href, '_blank');
-      }, 200);
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: chatData
     });
+
+    console.log('✅ chatWithExperts dataLayer pushed:', chatData);
+
+    // Open after brief delay so GTM/GA can process the push
+    var href = anchor.href;
+    setTimeout(function () {
+      window.open(href, '_blank');
+    }, 200);
   });
 </script>
