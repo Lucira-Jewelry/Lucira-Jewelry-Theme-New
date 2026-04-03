@@ -1,5 +1,22 @@
+{% comment %}
+  ============================================================
+  Lucira Delivery Checker — PDP Snippet
+  ============================================================
+  NEW: Fetches real Shopify location inventory via Storefront API.
+  
+  SETUP REQUIRED:
+    1. Shopify Admin → Apps & Sales Channels → Develop Apps →
+       Create/select app → Storefront API → generate token.
+    2. Online Store → Themes → Customize → Theme Settings →
+       add setting key "storefront_api_token" and paste the token.
+    3. Admin → Settings → Shipping & Delivery → enable
+       "In-store pickup" for each location you want shown.
+  ============================================================
+{% endcomment %}
+
 {% assign variant = product.selected_or_first_available_variant %}
 
+{% comment %} ── Stock detection ── {% endcomment %}
 {% assign is_in_stock = false %}
 {% if variant.available and variant.inventory_quantity > 0 %}
   {% assign is_in_stock = true %}
@@ -14,12 +31,12 @@
 {% endif %}
 
 {% assign total_seconds = delivery_days | times: 86400 %}
-{% assign now_ts         = 'now' | date: '%s' %}
-{% assign future_ts      = now_ts | plus: total_seconds %}
+{% assign now_ts        = 'now' | date: '%s' %}
+{% assign future_ts     = now_ts | plus: total_seconds %}
 {% assign delivery_date = future_ts | date: '%B %d, %Y' %}
 
-{% capture variant_stock_json %}
-{
+{% comment %} ── Per-variant delivery JSON (all variants, baked in at page load) ── {% endcomment %}
+{% capture variant_stock_json %}{
   {% for v in product.variants %}
     {% assign v_in_stock = false %}
     {% if v.available and v.inventory_quantity > 0 %}
@@ -27,11 +44,7 @@
     {% elsif v.available and v.inventory_management == blank %}
       {% assign v_in_stock = true %}
     {% endif %}
-    {% if v_in_stock %}
-      {% assign v_days = 2 %}
-    {% else %}
-      {% assign v_days = 15 %}
-    {% endif %}
+    {% if v_in_stock %}{% assign v_days = 2 %}{% else %}{% assign v_days = 15 %}{% endif %}
     {% assign v_seconds = v_days | times: 86400 %}
     {% assign v_future  = now_ts | plus: v_seconds %}
     "{{ v.id }}": {
@@ -42,53 +55,69 @@
       "inStock": {{ v_in_stock }}
     }{% unless forloop.last %},{% endunless %}
   {% endfor %}
-}
-{% endcapture %}
+}{% endcapture %}
 
 <style>
+  /* ── Location list ── */
   .lucira-location-list {
-    margin-top: 10px;
+    margin-top: 8px;
     font-size: 13px;
   }
   .lucira-location-item {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 5px 0;
+    padding: 7px 0;
     border-bottom: 1px solid #f0f0f0;
   }
-  .lucira-location-item:last-child {
-    border-bottom: none;
-  }
+  .lucira-location-item:last-child { border-bottom: none; }
+
   .lucira-location-dot {
     width: 8px;
     height: 8px;
     border-radius: 50%;
     flex-shrink: 0;
   }
-  .lucira-location-dot.in-stock  { background: green; }
+  .lucira-location-dot.in-stock  { background: #2e7d32; }
   .lucira-location-dot.out-stock { background: #ccc; }
-  .lucira-location-name { flex: 1; color: #333; }
+
+  .lucira-location-name { flex: 1; color: #333; line-height: 1.3; }
+  .lucira-location-city { color: #999; font-size: 11px; }
+
+  .lucira-location-qty {
+    font-size: 11px;
+    color: #888;
+    white-space: nowrap;
+  }
+
   .lucira-location-tag {
     font-size: 11px;
-    padding: 2px 7px;
+    padding: 2px 8px;
     border-radius: 999px;
     font-weight: 500;
+    white-space: nowrap;
   }
   .lucira-location-tag.store     { background: #e8f5e9; color: #2e7d32; }
   .lucira-location-tag.warehouse { background: #e3f2fd; color: #1565c0; }
   .lucira-location-tag.out       { background: #f5f5f5; color: #999; }
-  .lucira-location-loading {
-    font-size: 12px;
-    color: #999;
-    margin-top: 8px;
-  }
+
+  .lucira-location-loading { font-size: 12px; color: #999; padding: 8px 0; }
+
   .lucira-location-header {
     font-size: 12px;
     color: #555;
     margin-top: 10px;
+    margin-bottom: 2px;
+    font-weight: 600;
+  }
+  .lucira-location-summary {
+    font-size: 12px;
     margin-bottom: 4px;
-    font-weight: 500;
+  }
+  .lucira-location-error {
+    font-size: 12px;
+    color: #999;
+    padding: 6px 0;
   }
 </style>
 
@@ -99,6 +128,9 @@
   data-product-sku="{{ variant.sku | escape }}"
   data-product-title="{{ product.title | escape }}"
   data-variant-id="{{ variant.id }}"
+  data-variant-gid="gid://shopify/ProductVariant/{{ variant.id }}"
+  data-shop-domain="{{ shop.permanent_domain }}"
+  data-storefront-token="{{ settings.storefront_api_token }}"
   data-inventory-quantity="{{ variant.inventory_quantity | default: 0 }}"
   data-available="{{ variant.available }}"
   data-variant-count="{{ product.variants.size }}"
@@ -108,6 +140,7 @@
     window.variantDeliveryData = {{ variant_stock_json }};
   </script>
 
+  <!-- ── Pincode input ── -->
   <div class="lucira-delivery-input-container">
     <div class="input-wrapper">
       <svg class="pin-beside-pincode" width="18" height="18">
@@ -130,14 +163,21 @@
     </div>
   </div>
 
-  <span class="lucira-pincode-error" id="lucira-pincode-error" style="display:none;color:red;font-size:12px;margin-top:5px;"></span>
+  <span
+    class="lucira-pincode-error"
+    id="lucira-pincode-error"
+    style="display:none; color:red; font-size:12px; margin-top:5px;"
+  ></span>
 
-  <!-- Stock badge -->
-  <div id="lucira-stock-badge" style="{% unless is_in_stock %}display:none;{% endunless %}font-size:13px; margin-top:6px; margin-bottom:4px; color:green;">
+  <!-- ── Stock badge ── -->
+  <div
+    id="lucira-stock-badge"
+    style="{% unless is_in_stock %}display:none;{% endunless %}font-size:13px; margin-top:6px; margin-bottom:4px; color:green;"
+  >
     ✓ Available at Store
   </div>
 
-  <!-- Delivery info -->
+  <!-- ── Delivery date ── -->
   <div class="lucira-delivery-info">
     <span class="lucira-delivery-time">
       <span id="delivery-status-text">
@@ -147,12 +187,12 @@
     </span>
   </div>
 
-  <!-- Location availability — shown after pincode submit -->
+  <!-- ── Location availability (revealed after pincode submit) ── -->
   <div id="lucira-location-wrapper" style="display:none;">
-    <div class="lucira-location-header">Availability near your location:</div>
+    <div class="lucira-location-header">Stock availability at our locations:</div>
+    <div id="lucira-location-summary" class="lucira-location-summary"></div>
     <div class="lucira-location-list" id="lucira-location-list"></div>
   </div>
-
 </div>
 
 <script>
@@ -163,23 +203,30 @@
 (function () {
   'use strict';
 
-  var currentVariantId = '{{ variant.id }}';
+  var container        = document.getElementById('pdp-delivery-check');
+  var SHOP_DOMAIN      = container.dataset.shopDomain;      // e.g. "yourstore.myshopify.com"
+  var STOREFRONT_TOKEN = container.dataset.storefrontToken; // from theme settings
+  var currentVariantId = container.dataset.variantId;
+
+  // ─── Cookies ──────────────────────────────────────────────────────────────
 
   function setCookie(name, value, days) {
     days = days || 30;
-    var date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    document.cookie = name + "=" + String(value) + "; path=/; expires=" + date.toUTCString();
+    var d = new Date();
+    d.setTime(d.getTime() + days * 86400000);
+    document.cookie = name + '=' + String(value) + '; path=/; expires=' + d.toUTCString();
   }
 
   function getCookie(name) {
-    var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return match ? String(match[2]) : null;
+    var m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    return m ? String(m[2]) : null;
   }
 
   function deleteCookie(name) {
-    document.cookie = name + "=; Max-Age=0; path=/";
+    document.cookie = name + '=; Max-Age=0; path=/';
   }
+
+  // ─── UI helpers ───────────────────────────────────────────────────────────
 
   function showError(msg) {
     var el = document.getElementById('lucira-pincode-error');
@@ -193,33 +240,34 @@
     var label = btn && btn.querySelector('.locate-btn-label');
     if (!btn) return;
     btn.disabled = loading;
-    if (label) label.textContent = loading ? 'Locating...' : 'Locate Me';
+    if (label) label.textContent = loading ? 'Locating…' : 'Locate Me';
   }
 
   function toggleButtonState(isSaved) {
     var input = document.getElementById('lucira-delivery-zipcode');
     var btn   = document.getElementById('lucira-locate-btn');
     if (!input || !btn) return;
-
-    var val   = input.value.replace(/\s+/g, '').trim();
     var label = btn.querySelector('.locate-btn-label');
 
     if (isSaved) {
-      label.textContent = "Change";
-      btn.dataset.mode  = "saved";
-      input.setAttribute("readonly", true);
+      label.textContent = 'Change';
+      btn.dataset.mode  = 'saved';
+      input.setAttribute('readonly', true);
       return;
     }
 
-    input.removeAttribute("readonly");
+    input.removeAttribute('readonly');
+    var val = input.value.replace(/\s+/g, '').trim();
     if (/^\d{6}$/.test(val)) {
-      label.textContent = "Submit";
-      btn.dataset.mode  = "manual";
+      label.textContent = 'Submit';
+      btn.dataset.mode  = 'manual';
     } else {
-      label.textContent = "Locate Me";
-      btn.dataset.mode  = "geo";
+      label.textContent = 'Locate Me';
+      btn.dataset.mode  = 'geo';
     }
   }
+
+  // ─── Analytics ────────────────────────────────────────────────────────────
 
   function pushPromoClick(pincode) {
     window.dataLayer = window.dataLayer || [];
@@ -231,90 +279,227 @@
 
   function savePincodeToServer(pincode) {
     try {
-      function attemptSend(retry) {
-        retry = retry || 0;
-        var customerId = window.customerId;
-        if (!customerId || customerId === 'null') {
-          if (retry < 5) { setTimeout(function () { attemptSend(retry + 1); }, 300); }
+      (function attempt(retry) {
+        var cid = window.customerId;
+        if (!cid || cid === 'null') {
+          if (retry < 5) setTimeout(function () { attempt(retry + 1); }, 300);
           return;
         }
-        customerId = String(customerId).replace('gid://shopify/Customer/', '');
+        cid = String(cid).replace('gid://shopify/Customer/', '');
         fetch('https://api.lucirajewelry.com/customers/pincode.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ customer_id: String(customerId), pincode: String(pincode) })
+          body: JSON.stringify({ customer_id: String(cid), pincode: String(pincode) })
         });
-      }
-      attemptSend(0);
+      }(0));
     } catch (e) {}
   }
 
-  function fetchWithRetry(url) {
-    return fetch(url).then(function (r) { return r.json(); });
-  }
-
-  // ─── Location availability ───────────────────────────────────────────────
+  // ─── Location rendering ───────────────────────────────────────────────────
 
   function showLocationLoading() {
     var wrapper = document.getElementById('lucira-location-wrapper');
     var list    = document.getElementById('lucira-location-list');
-    if (!wrapper || !list) return;
+    var summary = document.getElementById('lucira-location-summary');
+    if (!wrapper) return;
     wrapper.style.display = 'block';
-    list.innerHTML = '<div class="lucira-location-loading">Checking store availability…</div>';
+    if (summary) summary.textContent = '';
+    if (list)    list.innerHTML = '<div class="lucira-location-loading">Checking availability across locations…</div>';
   }
 
+  /**
+   * Render location rows.
+   *
+   * Expected shape per location object:
+   *   { name, city?, available (bool), quantityAvailable (int), type? ('store'|'warehouse') }
+   */
   function renderLocations(locations, userPincode) {
-    var list = document.getElementById('lucira-location-list');
+    var list    = document.getElementById('lucira-location-list');
+    var summary = document.getElementById('lucira-location-summary');
     if (!list) return;
 
     if (!locations || !locations.length) {
-      list.innerHTML = '<div style="font-size:12px;color:#999;">No location data available.</div>';
+      list.innerHTML = '<div class="lucira-location-error">No location data available.</div>';
       return;
     }
 
-    // Sort: in-stock first, then by proximity (same pincode prefix = closer)
+    // Sort: in-stock first, then by pincode proximity (first 3 digits)
+    var userPre = userPincode ? String(userPincode).slice(0, 3) : '';
     locations.sort(function (a, b) {
-      var aStock = a.available > 0 ? 1 : 0;
-      var bStock = b.available > 0 ? 1 : 0;
-      if (bStock !== aStock) return bStock - aStock;
-      // rough proximity: compare first 3 digits of pincode
-      var userPre = userPincode ? userPincode.slice(0, 3) : '';
-      var aClose  = a.pincode && a.pincode.slice(0, 3) === userPre ? 1 : 0;
-      var bClose  = b.pincode && b.pincode.slice(0, 3) === userPre ? 1 : 0;
-      return bClose - aClose;
+      var aS = a.available ? 1 : 0;
+      var bS = b.available ? 1 : 0;
+      if (bS !== aS) return bS - aS;
+      var aC = a.pincode && String(a.pincode).slice(0, 3) === userPre ? 1 : 0;
+      var bC = b.pincode && String(b.pincode).slice(0, 3) === userPre ? 1 : 0;
+      return bC - aC;
     });
 
+    // Summary line
+    var inStockCount = locations.filter(function (l) { return l.available; }).length;
+    if (summary) {
+      if (inStockCount > 0) {
+        summary.textContent = '✓ In stock at ' + inStockCount + ' of ' + locations.length + ' location' + (locations.length !== 1 ? 's' : '');
+        summary.style.color = '#2e7d32';
+      } else {
+        summary.textContent = '✗ Currently out of stock at all locations';
+        summary.style.color = '#999';
+      }
+    }
+
     list.innerHTML = locations.map(function (loc) {
-      var inStock   = loc.available > 0;
-      var dotClass  = inStock ? 'in-stock' : 'out-stock';
-      var tagClass  = inStock ? loc.type : 'out';
-      var tagLabel  = inStock
-        ? (loc.type === 'warehouse' ? 'Ships from here' : 'Walk-in available')
+      var inStock  = !!loc.available;
+      var qty      = typeof loc.quantityAvailable === 'number'
+                       ? loc.quantityAvailable
+                       : (typeof loc.inventory === 'number' ? loc.inventory : null);
+      var dotCls   = inStock ? 'in-stock' : 'out-stock';
+      var locType  = loc.type || 'store';
+      var tagCls   = inStock ? locType : 'out';
+      var tagLabel = inStock
+        ? (locType === 'warehouse' ? 'Ships from here' : 'Walk-in available')
         : 'Out of stock';
-      var cityLine  = loc.city ? ' <span style="color:#999;font-size:11px;">· ' + loc.city + '</span>' : '';
+
+      var cityHtml = loc.city
+        ? ' <span class="lucira-location-city">· ' + escapeHtml(loc.city) + '</span>'
+        : '';
+      var qtyHtml = inStock && qty !== null && qty > 0
+        ? '<span class="lucira-location-qty">(' + qty + ' in stock)</span>'
+        : '';
 
       return '<div class="lucira-location-item">'
-        + '<div class="lucira-location-dot ' + dotClass + '"></div>'
-        + '<span class="lucira-location-name">' + loc.name + cityLine + '</span>'
-        + '<span class="lucira-location-tag ' + tagClass + '">' + tagLabel + '</span>'
+        + '<div class="lucira-location-dot ' + dotCls + '"></div>'
+        + '<span class="lucira-location-name">' + escapeHtml(loc.name) + cityHtml + '</span>'
+        + qtyHtml
+        + '<span class="lucira-location-tag ' + tagCls + '">' + tagLabel + '</span>'
         + '</div>';
     }).join('');
   }
 
-  function fetchLocationAvailability(variantId, pincode) {
+  function escapeHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  // ─── Storefront API — storeAvailability ───────────────────────────────────
+
+  /**
+   * Queries Shopify Storefront API for per-location inventory.
+   *
+   * NOTE: Only locations with "In-store pickup" enabled in Shopify Admin
+   * (Settings → Shipping & Delivery) will appear in this response.
+   * Enable pickup for each location you want displayed.
+   *
+   * Returns a normalised array matching the renderLocations() shape.
+   */
+  function fetchStoreAvailability(variantId) {
+    if (!STOREFRONT_TOKEN || !SHOP_DOMAIN) {
+      return Promise.reject(new Error('storefront-token-missing'));
+    }
+
+    var variantGid = 'gid://shopify/ProductVariant/' + variantId;
+
+    // GraphQL query — storeAvailability returns one node per location
+    var query = [
+      'query variantAvailability($id: ID!) {',
+      '  node(id: $id) {',
+      '    ... on ProductVariant {',
+      '      storeAvailability(first: 30) {',
+      '        nodes {',
+      '          available',
+      '          quantityAvailable',
+      '          location {',
+      '            id',
+      '            name',
+      '            address {',
+      '              city',
+      '              zip',
+      '            }',
+      '          }',
+      '        }',
+      '      }',
+      '    }',
+      '  }',
+      '}'
+    ].join('\n');
+
+    return fetch('https://' + SHOP_DOMAIN + '/api/2024-01/graphql.json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Storefront-Access-Token': STOREFRONT_TOKEN
+      },
+      body: JSON.stringify({ query: query, variables: { id: variantGid } })
+    })
+    .then(function (r) {
+      if (!r.ok) throw new Error('storefront-http-' + r.status);
+      return r.json();
+    })
+    .then(function (json) {
+      if (
+        !json.data ||
+        !json.data.node ||
+        !json.data.node.storeAvailability
+      ) {
+        throw new Error('storefront-unexpected-shape');
+      }
+
+      return json.data.node.storeAvailability.nodes.map(function (n) {
+        return {
+          name:              n.location.name,
+          city:              n.location.address && n.location.address.city,
+          pincode:           n.location.address && n.location.address.zip,
+          available:         n.available,          // bool — true = at least 1 unit
+          quantityAvailable: n.quantityAvailable,  // int  — exact count
+          type:              'store'               // Storefront API = retail locations
+        };
+      });
+    });
+  }
+
+  // ─── Legacy API fallback ──────────────────────────────────────────────────
+
+  /**
+   * Calls your existing backend which can use the Shopify Admin API
+   * to return inventory for ALL locations (including warehouses not
+   * enabled for storefront pickup).
+   */
+  function fetchLegacyInventory(variantId) {
+    return fetch(
+      'https://api.lucirajewelry.com/products/inventory.php?variant_id=' + variantId
+    )
+    .then(function (r) {
+      if (!r.ok) throw new Error('legacy-http-' + r.status);
+      return r.json();
+    })
+    .then(function (data) {
+      return Array.isArray(data.locations) ? data.locations : [];
+    });
+  }
+
+  /**
+   * Master fetch: tries Storefront API, falls back to legacy API.
+   */
+  function fetchAndRenderLocations(variantId, pincode) {
     showLocationLoading();
-    fetch('https://api.lucirajewelry.com/products/inventory.php?variant_id=' + variantId)
-      .then(function (r) { return r.json(); })
-      .then(function (data) {
-        renderLocations(data.locations, pincode);
+
+    fetchStoreAvailability(variantId)
+      .catch(function (err) {
+        // Fallback: Storefront token not set, or API error
+        console.warn('[lucira] Storefront API failed (' + err.message + '), falling back to legacy API');
+        return fetchLegacyInventory(variantId);
+      })
+      .then(function (locations) {
+        renderLocations(locations, pincode);
       })
       .catch(function () {
         var list = document.getElementById('lucira-location-list');
-        if (list) list.innerHTML = '<div style="font-size:12px;color:#999;">Could not load store availability.</div>';
+        if (list) list.innerHTML = '<div class="lucira-location-error">Could not load location availability.</div>';
       });
   }
 
-  // ─── Variant change ──────────────────────────────────────────────────────
+  // ─── Variant change handling ──────────────────────────────────────────────
 
   function updateVariantUI(variantId) {
     currentVariantId = String(variantId);
@@ -325,55 +510,79 @@
     var statusTxt = document.getElementById('delivery-status-text');
     var dateTxt   = document.getElementById('delivery-date-display');
 
-    if (badge)     badge.style.display = data.inStock ? '' : 'none';
-    if (statusTxt) statusTxt.textContent = data.inStock ? 'Estimated Free Dispatch by' : 'Available & Dispatched by';
+    if (badge)     badge.style.display  = data.inStock ? '' : 'none';
+    if (statusTxt) statusTxt.textContent = data.inStock
+      ? 'Estimated Free Dispatch by'
+      : 'Available & Dispatched by';
     if (dateTxt)   dateTxt.textContent = data.date;
 
-    // If a pincode is already saved, refresh location data for new variant
-    var saved = String(getCookie('user_pincode') || '');
+    // Keep data attributes in sync (useful for external scripts / MutationObservers)
+    container.setAttribute('data-variant-id', currentVariantId);
+    container.setAttribute(
+      'data-variant-gid',
+      'gid://shopify/ProductVariant/' + currentVariantId
+    );
+
+    // If pincode already saved, refresh location data for new variant
+    var saved = getCookie('user_pincode');
     if (saved && /^\d{6}$/.test(saved)) {
-      fetchLocationAvailability(currentVariantId, saved);
+      fetchAndRenderLocations(currentVariantId, saved);
     }
   }
 
   function listenForVariantChanges() {
+    // 1. Custom DOM event fired by most themes
     document.addEventListener('variant:changed', function (e) {
-      var variant = e.detail && (e.detail.variant || e.detail);
-      if (variant && variant.id) updateVariantUI(variant.id);
+      var v = e.detail && (e.detail.variant || e.detail);
+      if (v && v.id) updateVariantUI(v.id);
     });
 
-    var lastVariantId = null;
+    // 2. URL ?variant= polling (URL-based themes)
+    var lastUrlVariantId = null;
     setInterval(function () {
-      var params    = new URLSearchParams(window.location.search);
-      var currentId = params.get('variant');
-      if (currentId && currentId !== lastVariantId) {
-        lastVariantId = currentId;
-        updateVariantUI(currentId);
+      var id = new URLSearchParams(window.location.search).get('variant');
+      if (id && id !== lastUrlVariantId) {
+        lastUrlVariantId = id;
+        updateVariantUI(id);
       }
     }, 300);
 
-    var container = document.getElementById('pdp-delivery-check');
-    if (container && window.MutationObserver) {
+    // 3. MutationObserver on data-variant-id attribute (attribute-based themes)
+    if (window.MutationObserver) {
       new MutationObserver(function (mutations) {
         mutations.forEach(function (m) {
           if (m.attributeName === 'data-variant-id') {
             var id = container.getAttribute('data-variant-id');
-            if (id) updateVariantUI(id);
+            if (id && id !== currentVariantId) updateVariantUI(id);
           }
         });
       }).observe(container, { attributes: true });
     }
   }
 
-  // ─── Pincode submit handler ──────────────────────────────────────────────
+  // ─── Pincode flow ─────────────────────────────────────────────────────────
 
   function onPincodeConfirmed(pincode) {
     setCookie('user_pincode', String(pincode));
     pushPromoClick(pincode);
     savePincodeToServer(pincode);
     toggleButtonState(true);
-    fetchLocationAvailability(currentVariantId, pincode);
+    fetchAndRenderLocations(currentVariantId, pincode);
   }
+
+  function validatePincodeWithNominatim(val) {
+    return fetch(
+      'https://nominatim.openstreetmap.org/search?postalcode=' +
+      val + '&country=India&format=json'
+    )
+    .then(function (r) { return r.json(); })
+    .then(function (data) {
+      if (!data || !data.length) throw new Error('not-found');
+      return val;
+    });
+  }
+
+  // ─── Init ─────────────────────────────────────────────────────────────────
 
   function init() {
     var btn   = document.getElementById('lucira-locate-btn');
@@ -388,7 +597,8 @@
       var mode = btn.dataset.mode;
       var val  = input.value.replace(/\s+/g, '').trim();
 
-      if (mode === "saved") {
+      // ── "Change" mode: clear saved pincode ──
+      if (mode === 'saved') {
         deleteCookie('user_pincode');
         input.value = '';
         document.getElementById('lucira-location-wrapper').style.display = 'none';
@@ -396,47 +606,63 @@
         return;
       }
 
-      if (mode === "manual") {
-        if (!/^\d{6}$/.test(val)) { showError('Invalid pincode'); return; }
-        fetchWithRetry('https://nominatim.openstreetmap.org/search?postalcode=' + val + '&country=India&format=json')
-          .then(function (data) {
-            if (data && data.length) {
-              onPincodeConfirmed(val);
-            } else {
-              showError('Pincode not found');
-            }
-          });
+      // ── Manual 6-digit entry ──
+      if (mode === 'manual') {
+        if (!/^\d{6}$/.test(val)) {
+          showError('Please enter a valid 6-digit pincode');
+          return;
+        }
+        validatePincodeWithNominatim(val)
+          .then(function () { onPincodeConfirmed(val); })
+          .catch(function () { showError('Pincode not found. Please try again.'); });
         return;
       }
 
-      if (!navigator.geolocation) { showError('Geolocation not supported'); return; }
+      // ── Geolocation ──
+      if (!navigator.geolocation) {
+        showError('Geolocation not supported. Please enter pincode manually.');
+        return;
+      }
       setLocateBtnState(true);
 
-      navigator.geolocation.getCurrentPosition(function (pos) {
-        fetchWithRetry('https://nominatim.openstreetmap.org/reverse?lat=' + pos.coords.latitude + '&lon=' + pos.coords.longitude + '&format=json')
+      navigator.geolocation.getCurrentPosition(
+        function (pos) {
+          fetch(
+            'https://nominatim.openstreetmap.org/reverse?lat=' +
+            pos.coords.latitude + '&lon=' + pos.coords.longitude + '&format=json'
+          )
+          .then(function (r) { return r.json(); })
           .then(function (data) {
-            var pin = data && data.address && data.address.postcode && data.address.postcode.replace(/\s+/g, '');
+            var pin = data &&
+                      data.address &&
+                      data.address.postcode &&
+                      data.address.postcode.replace(/\s+/g, '');
             if (pin && /^\d{6}$/.test(pin)) {
               input.value = pin;
               onPincodeConfirmed(pin);
             } else {
-              showError('Invalid location');
+              showError('Could not detect a valid Indian pincode. Please enter manually.');
             }
           })
+          .catch(function () {
+            showError('Location lookup failed. Please enter pincode manually.');
+          })
           .finally(function () { setLocateBtnState(false); });
-      }, function () {
-        setLocateBtnState(false);
-        showError('Permission denied');
-      });
+        },
+        function () {
+          setLocateBtnState(false);
+          showError('Location permission denied. Please enter pincode manually.');
+        }
+      );
     });
 
-    // Load saved pincode
-    var saved = String(getCookie('user_pincode') || '');
+    // ── Restore saved pincode from cookie ──
+    var saved = getCookie('user_pincode');
     if (saved && /^\d{6}$/.test(saved)) {
       input.value = saved;
       toggleButtonState(true);
       savePincodeToServer(saved);
-      fetchLocationAvailability(currentVariantId, saved);
+      fetchAndRenderLocations(currentVariantId, saved);
     } else {
       toggleButtonState(false);
     }
@@ -444,6 +670,12 @@
     listenForVariantChanges();
   }
 
-  document.addEventListener('DOMContentLoaded', init);
+  // Safe DOMContentLoaded (handles both early and late script execution)
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
 })();
 </script>
