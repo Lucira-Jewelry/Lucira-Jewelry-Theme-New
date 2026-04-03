@@ -1,4 +1,4 @@
-{%- liquid
+{% comment %} {%- liquid
   assign nr_pid = product.id
   assign nr_api_key = section.settings.api_key
   assign nr_workspace = section.settings.workspace_id
@@ -1196,5 +1196,1073 @@
       "category": "Product"
     }
   ]
+}
+{% endschema %} {% endcomment %}
+
+
+{%- liquid
+  assign nr_pid = product.id
+  assign nr_api_key = section.settings.api_key
+  assign nr_workspace = section.settings.workspace_id
+  assign nr_page_size = section.settings.page_size
+  assign nr_show_photos = section.settings.show_photo_strip
+  assign nr_show_write = section.settings.show_write_review
+-%}
+
+<div
+  class="nector-reviews-wrapper"
+  id="nector-reviews-custom"
+  data-product-id="{{ nr_pid }}"
+  data-section-id="{{ section.id }}"
+>
+  {%- if section.settings.show_title -%}
+    <div class="nr-header">
+      <h2 class="nr-title">{{ section.settings.title }}</h2>
+    </div>
+  {%- endif -%}
+
+  <!-- Summary -->
+  <div class="nr-summary" id="nr-summary">
+    <div class="nr-summary__left">
+      <div class="nr-score" id="nr-overall-score">—</div>
+      <div class="nr-stars" id="nr-overall-stars"></div>
+      <div class="nr-count" id="nr-review-count">— reviews</div>
+    </div>
+    <div class="nr-summary__bars">
+      {%- for i in (1..5) -%}
+        {%- assign star = 6 | minus: i -%}
+        <div class="nr-bar-row">
+          <span class="nr-bar-label">{{ star }} Stars</span>
+          <div class="nr-bar-track">
+            <div class="nr-bar-fill" data-star="{{ star }}" style="width:0%"><span></span></div>
+          </div>
+          <span class="nr-bar-pct" id="nr-pct-{{ star }}">0%</span>
+        </div>
+      {%- endfor -%}
+    </div>
+    <div class="nr-summary__recommend">
+      <div class="nr-recommend-pct" id="nr-recommend-pct">—%</div>
+      <div class="nr-recommend-text">Would recommend<br>this product</div>
+    </div>
+  </div>
+
+  {%- if nr_show_write -%}
+    <div class="nr-write-cta">
+      <button class="nr-write-btn" id="nr-write-btn">{{ section.settings.write_review_label }}</button>
+    </div>
+  {%- endif -%}
+
+  {%- if nr_show_photos -%}
+    <div class="nr-photos-strip" id="nr-photos-strip" style="display:none">
+      <div class="nr-photos-inner" id="nr-photos-inner"></div>
+    </div>
+  {%- endif -%}
+
+  <!-- Controls -->
+  <div class="nr-controls">
+    <div class="nr-filter-group">
+      <label class="nr-control-label">Rating:</label>
+      <div class="nr-select-wrap">
+        <select id="nr-filter-rating">
+          <option value="all">All</option>
+          <option value="5">5 Stars</option>
+          <option value="4">4 Stars</option>
+          <option value="3">3 Stars</option>
+          <option value="2">2 Stars</option>
+          <option value="1">1 Star</option>
+        </select>
+      </div>
+    </div>
+    <div class="nr-total-label" id="nr-total-label">— reviews</div>
+    <div class="nr-sort-group">
+      <label class="nr-control-label">Sort by:</label>
+      <div class="nr-select-wrap">
+        <select id="nr-sort">
+          <option value="featured">Featured</option>
+          <option value="newest">Newest</option>
+          <option value="highest">Highest Rated</option>
+          <option value="lowest">Lowest Rated</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Review Grid -->
+  <div class="nr-grid" id="nr-grid">
+    <div class="nr-loading">
+      <div class="nr-spinner"></div>
+      <p>Loading reviews…</p>
+    </div>
+  </div>
+
+  <!-- Load More -->
+  <div class="nr-loadmore-wrap" id="nr-loadmore-wrap" style="display:none">
+    <button class="nr-loadmore-btn" id="nr-loadmore-btn">{{ section.settings.load_more_label }}</button>
+  </div>
+
+  <!-- Write Review Modal — 2-Step -->
+  {%- if nr_show_write -%}
+  <div class="nr-modal-overlay" id="nr-modal-overlay">
+    <div class="nr-modal" role="dialog" aria-modal="true" aria-labelledby="nr-modal-title-text">
+      <button class="nr-modal-close" id="nr-modal-close" aria-label="Close">&times;</button>
+
+      <!-- STEP 1: Review details -->
+      <div id="nr-step-1">
+        <h3 class="nr-modal-title" id="nr-modal-title-text">Write a Review</h3>
+        <div class="nr-step-indicator">
+          <div class="nr-step-dot active" id="nr-dot-1"></div>
+          <div class="nr-step-line"></div>
+          <div class="nr-step-dot" id="nr-dot-2"></div>
+        </div>
+        <p class="nr-step-label">Step 1 of 2 — Your Review</p>
+
+        <div class="nr-form-group">
+          <label for="wr-name">Your Name *</label>
+          <input type="text" id="wr-name" placeholder="e.g. Aesha S." autocomplete="name">
+        </div>
+        <div class="nr-form-group">
+          <label for="wr-email">Email *</label>
+          <input type="email" id="wr-email" placeholder="your@email.com" autocomplete="email">
+        </div>
+        <div class="nr-form-group">
+          <label for="wr-mobile">Mobile (Optional)</label>
+          <input type="tel" id="wr-mobile" placeholder="Phone number" autocomplete="tel">
+        </div>
+        <div class="nr-form-group">
+          <label>Rating *</label>
+          <div class="nr-star-picker" id="nr-star-picker">
+            <span data-val="1">&#9733;</span>
+            <span data-val="2">&#9733;</span>
+            <span data-val="3">&#9733;</span>
+            <span data-val="4">&#9733;</span>
+            <span data-val="5">&#9733;</span>
+          </div>
+          <input type="hidden" id="wr-rating" value="0">
+        </div>
+        <div class="nr-form-group">
+          <label for="wr-title">Review Title (Optional)</label>
+          <input type="text" id="wr-title" placeholder="Summary of your experience">
+        </div>
+        <div class="nr-form-group">
+          <label for="wr-body">Your Review *</label>
+          <textarea id="wr-body" rows="4" placeholder="Tell us what you think…"></textarea>
+        </div>
+
+        <button class="nr-submit-btn" id="nr-next-btn">Continue to Add Photos →</button>
+        <p class="nr-submit-note" id="wr-message-1" aria-live="polite"></p>
+      </div>
+
+      <!-- STEP 2: Image upload -->
+      <div id="nr-step-2" style="display:none">
+        <h3 class="nr-modal-title">Add Photos</h3>
+        <div class="nr-step-indicator">
+          <div class="nr-step-dot done" id="nr-dot-1b"></div>
+          <div class="nr-step-line active"></div>
+          <div class="nr-step-dot active" id="nr-dot-2b"></div>
+        </div>
+        <p class="nr-step-label">Step 2 of 2 — Photos (Optional)</p>
+
+        <div class="nr-step2-success">
+          <div class="nr-success-icon">✓</div>
+          <p class="nr-success-text">Your review was submitted successfully!</p>
+          <p class="nr-success-sub">You can optionally add up to 5 photos to your review.</p>
+        </div>
+
+        <div class="nr-form-group">
+          <label for="wr-images">Upload Photos (Optional)</label>
+          <div class="nr-upload-area" id="nr-upload-area">
+            <input type="file" id="wr-images" accept="image/*" multiple>
+            <div class="nr-upload-placeholder" id="nr-upload-placeholder">
+              <span class="nr-upload-icon">📷</span>
+              <span>Tap to select photos</span>
+              <small>Up to 5 images · JPG, PNG, WEBP</small>
+            </div>
+            <div class="nr-image-previews" id="nr-image-previews"></div>
+          </div>
+        </div>
+
+        <button class="nr-submit-btn" id="nr-upload-btn">Upload Photos</button>
+        <button class="nr-skip-btn" id="nr-skip-btn">Skip — Done</button>
+        <p class="nr-submit-note" id="wr-message-2" aria-live="polite"></p>
+      </div>
+
+    </div>
+  </div>
+  {%- endif -%}
+</div>
+
+<!-- Lightbox -->
+<div class="nr-lightbox" id="nr-lightbox" role="dialog" aria-modal="true" aria-label="Review photo">
+  <button class="nr-lightbox-close" id="nr-lightbox-close" aria-label="Close">&times;</button>
+  <img src="" id="nr-lightbox-img" alt="Review photo">
+</div>
+
+<style>
+  @font-face {
+    font-family: 'Futura Std';
+    src: url('{{ "FuturaStd-Book.woff2" | asset_url }}') format('woff2');
+    font-weight: 400; font-style: normal; font-display: swap;
+  }
+  @font-face {
+    font-family: 'Futura Std';
+    src: url('{{ "FuturaStd-Medium.woff2" | asset_url }}') format('woff2');
+    font-weight: 500 700; font-style: normal; font-display: swap;
+  }
+
+  :root {
+    --nr-bg          : {{ section.settings.bg_color }};
+    --nr-card-bg     : #ffffff;
+    --nr-border      : #ede5df;
+    --nr-accent      : {{ section.settings.accent_color }};
+    --nr-accent-dark : #a8865f;
+    --nr-text        : #1a1a1a;
+    --nr-text-muted  : #1a1a1a;
+    --nr-star-fill   : {{ section.settings.star_color }};
+    --nr-star-empty  : #e5ddd8;
+    --nr-radius      : 10px;
+    --nr-shadow      : 0 2px 12px rgba(44,34,24,0.07);
+    --nr-font        : 'Futura Std';
+  }
+
+  .nector-reviews-wrapper {
+    background: var(--nr-bg); padding: 48px 0 56px;
+    font-family: var(--nr-font); color: var(--nr-text); letter-spacing: 0.01em;
+  }
+
+  .nr-header { text-align: center; margin-bottom: 32px; }
+  .nr-title  { font-family: var(--nr-font); font-size: 22px; font-weight: 500;
+               letter-spacing: 0.15em; text-transform: uppercase; margin: 0; color: var(--nr-text); }
+
+  .nr-summary            { display: flex; align-items: center; gap: 40px; max-width: 820px; margin: 0 auto 28px; padding: 0 24px; }
+  .nr-summary__left      { text-align: center; min-width: 110px; }
+  .nr-score              { font-size: 50px; font-weight: 500; line-height: 1; letter-spacing: -1px; }
+  .nr-stars              { font-size: 20px; color: var(--nr-star-fill); margin: 6px 0; letter-spacing: 2px; }
+  .nr-count              { font-size: 11px; color: var(--nr-text-muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .nr-summary__bars      { flex: 1; }
+  .nr-bar-row            { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .nr-bar-label          { font-size: 11px; color: var(--nr-text-muted); min-width: 50px; letter-spacing: 0.04em; }
+  .nr-bar-track          { flex: 1; height: 6px; background: var(--nr-border); border-radius: 99px; overflow: hidden; }
+  .nr-bar-fill           { height: 100%; background: var(--nr-accent); border-radius: 99px; width: 0%;
+                           transition: width 0.9s cubic-bezier(.22,.61,.36,1); }
+  .nr-bar-pct            { font-size: 11px; color: var(--nr-text-muted); min-width: 32px; text-align: right; }
+  .nr-summary__recommend { text-align: center; min-width: 110px; }
+  .nr-recommend-pct      { font-size: 40px; font-weight: 500; line-height: 1; }
+  .nr-recommend-text     { font-size: 11px; color: var(--nr-text-muted); margin-top: 6px; line-height: 1.5; letter-spacing: 0.04em; }
+
+  .nr-write-cta { text-align: center; margin-bottom: 28px; }
+  .nr-write-btn {
+    background: #a05a64; color: white; font-family: var(--nr-font);
+    font-size: 15px; font-weight: 500; letter-spacing: 1px; text-transform: uppercase;
+    padding: 14px 64px; cursor: pointer; border-radius: 12px;
+    transition: background 0.2s; border: none;
+  }
+  .nr-write-btn:hover { background: #ab3e4e; }
+
+  .nr-photos-strip { overflow-x: auto; scrollbar-width: none; width: 1200px; margin: 0 auto 28px;
+                     background: #F8F8F8; border-top: 1px solid var(--nr-border); border-bottom: 1px solid var(--nr-border); }
+  .nr-photos-strip::-webkit-scrollbar { display: none; }
+  .nr-photos-inner { display: flex; gap: 8px; padding: 14px 0; width: max-content; min-width: 100%; }
+  .nr-photos-inner img { width: 94px; height: 94px; object-fit: cover; cursor: pointer;
+                         transition: opacity 0.2s; flex-shrink: 0; border-radius: 4px; }
+  .nr-photos-inner img:hover { opacity: 0.82; }
+
+  .nr-controls { display: flex; align-items: center; justify-content: space-between;
+                 max-width: 1150px; margin: 14px auto 14px; padding: 0 24px 14px;
+                 border-bottom: 1px solid var(--nr-border); }
+  .nr-filter-group, .nr-sort-group { display: flex; align-items: center; gap: 6px; }
+  .nr-control-label { font-size: 12px; color: var(--nr-text-muted); letter-spacing: 0.08em; text-transform: capitalize; }
+  .nr-select-wrap { position: relative; display: inline-flex; align-items: center; }
+  .nr-select-wrap select {
+    background: transparent; border: none; font-size: 12px;
+    font-family: var(--nr-font); color: var(--nr-text); cursor: pointer; outline: none; letter-spacing: 0.04em;
+  }
+  .nr-total-label { font-size: 12px; color: var(--nr-text-muted); letter-spacing: 0.05em; }
+
+  .nr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+             max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+  @media (max-width: 680px) { .nr-grid { grid-template-columns: 1fr; } }
+
+  .nr-card {
+    background: var(--nr-card-bg); border: 1px solid var(--nr-border);
+    border-radius: var(--nr-radius); padding: 18px 20px;
+    box-shadow: var(--nr-shadow); animation: nr-fadein 0.35s ease both;
+  }
+  @keyframes nr-fadein { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  .nr-card__top    { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; }
+  .nr-card__author { display: flex; align-items: center; gap: 10px; }
+  .nr-avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--nr-accent);
+               color: #fff; font-size: 14px; font-weight: 500; letter-spacing: 1px;
+               display: flex; align-items: center; justify-content: center; flex-shrink: 0; text-transform: uppercase; }
+  .nr-author-name { font-size: 16px; font-weight: 500; color: var(--nr-text);
+                    display: flex; align-items: center; gap: 5px; letter-spacing: 1px; }
+  .nr-verified { display: inline-flex; align-items: center; gap: 3px; font-size: 10px;
+                 color: #0f7112; font-weight: 500; letter-spacing: 0.5px; }
+  .nr-verified::before { content: '✔'; font-size: 10px; }
+  .nr-card__meta  { text-align: right; flex-shrink: 0; }
+  .nr-card-stars  { font-size: 20px; color: var(--nr-star-fill); letter-spacing: 1px; }
+  .nr-card-score  { font-size: 12px; color: var(--nr-text-muted); margin-left: 3px; }
+  .nr-card-date   { font-size: 12px; color: var(--nr-text-muted); margin-top: 3px; letter-spacing: 0.03em; }
+  .nr-card__product { font-size: 10px; color: var(--nr-text-muted); letter-spacing: 0.06em;
+                      text-transform: uppercase; margin-bottom: 8px;
+                      border-left: 2px solid var(--nr-accent); padding-left: 7px; }
+  .nr-card__body  { font-size: 14px; color: #614b3b; line-height: 1.8; margin: 0 0 12px;
+                    letter-spacing: 0.02em; word-break: break-word; }
+  .nr-card__img img { width: 72px; height: 72px; object-fit: cover; border-radius: 6px;
+                      cursor: pointer; transition: opacity 0.2s; }
+  .nr-card__img img:hover { opacity: 0.82; }
+
+  .nr-loading { grid-column: 1 / -1; text-align: center; padding: 56px 0; color: var(--nr-text-muted); }
+  .nr-spinner { width: 30px; height: 30px; border: 2.5px solid var(--nr-border);
+                border-top-color: var(--nr-accent); border-radius: 50%;
+                animation: nr-spin 0.75s linear infinite; margin: 0 auto 14px; }
+  @keyframes nr-spin { to { transform: rotate(360deg); } }
+  .nr-empty { grid-column: 1 / -1; text-align: center; padding: 56px 0;
+              color: var(--nr-text-muted); font-size: 13px; letter-spacing: 0.06em; }
+
+  .nr-loadmore-wrap { text-align: center; margin-top: 36px; }
+  .nr-loadmore-btn {
+    background: transparent; border: 0.5px solid var(--nr-accent); color: var(--nr-text);
+    font-family: var(--nr-font); font-size: 12px; font-weight: 500; letter-spacing: 2px;
+    text-transform: uppercase; padding: 13px 44px; cursor: pointer; border-radius: 12px;
+    transition: background 0.2s, color 0.2s;
+  }
+  .nr-loadmore-btn:hover { background: var(--nr-accent); color: #fff; }
+
+  /* ── Modal ── */
+  .nr-modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+                      z-index: 9999; align-items: center; justify-content: center; }
+  .nr-modal-overlay.is-open { display: flex; }
+  .nr-modal { background: #fff; border-radius: 10px; padding: 32px 28px;
+              width: 90%; max-width: 460px; position: relative; max-height: 90vh; overflow-y: auto; }
+  .nr-modal-close { position: absolute; top: 14px; right: 18px; background: none; border: none;
+                    font-size: 22px; cursor: pointer; color: var(--nr-text-muted); line-height: 1; }
+  .nr-modal-title { font-family: var(--nr-font); font-size: 15px; font-weight: 600;
+                    letter-spacing: 0.12em; text-transform: uppercase; margin: 0 0 16px; }
+
+  /* Step indicator */
+  .nr-step-indicator { display: flex; align-items: center; margin-bottom: 6px; }
+  .nr-step-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--nr-border); flex-shrink: 0; }
+  .nr-step-dot.active { background: var(--nr-accent); }
+  .nr-step-dot.done { background: #0f7112; }
+  .nr-step-line { flex: 1; height: 2px; background: var(--nr-border); margin: 0 6px; }
+  .nr-step-line.active { background: var(--nr-accent); }
+  .nr-step-label { font-size: 10px; color: var(--nr-text-muted); letter-spacing: 0.08em;
+                   text-transform: uppercase; margin: 0 0 20px; }
+
+  /* Step 2 success banner */
+  .nr-step2-success { background: #f0faf0; border: 1px solid #b8ddb8; border-radius: 8px;
+                      padding: 16px; margin-bottom: 20px; text-align: center; }
+  .nr-success-icon { font-size: 28px; color: #0f7112; margin-bottom: 6px; }
+  .nr-success-text { font-size: 14px; font-weight: 600; color: #0f7112; margin: 0 0 4px; }
+  .nr-success-sub  { font-size: 12px; color: #555; margin: 0; }
+
+  /* Upload area */
+  .nr-upload-area { position: relative; border: 2px dashed var(--nr-border); border-radius: 8px;
+                    min-height: 100px; cursor: pointer; transition: border-color 0.2s; }
+  .nr-upload-area:hover { border-color: var(--nr-accent); }
+  .nr-upload-area input[type="file"] {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    opacity: 0; cursor: pointer; z-index: 2;
+  }
+  .nr-upload-placeholder { display: flex; flex-direction: column; align-items: center;
+                            justify-content: center; gap: 4px; padding: 24px;
+                            color: var(--nr-text-muted); pointer-events: none; }
+  .nr-upload-icon { font-size: 28px; }
+  .nr-upload-placeholder span { font-size: 13px; }
+  .nr-upload-placeholder small { font-size: 10px; letter-spacing: 0.05em; }
+  .nr-image-previews { display: flex; gap: 8px; flex-wrap: wrap; padding: 10px;
+                        position: relative; z-index: 1; pointer-events: none; }
+  .nr-image-previews img { width: 64px; height: 64px; object-fit: cover; border-radius: 6px;
+                            border: 2px solid var(--nr-accent); }
+
+  .nr-form-group  { margin-bottom: 16px; }
+  .nr-form-group label { display: block; font-size: 10px; font-weight: 600;
+                          letter-spacing: 0.1em; text-transform: uppercase;
+                          margin-bottom: 6px; color: var(--nr-text-muted); }
+  .nr-form-group input,
+  .nr-form-group textarea {
+    width: 100%; box-sizing: border-box; border: 1px solid var(--nr-border);
+    border-radius: 5px; padding: 10px 12px; font-size: 13px;
+    font-family: var(--nr-font); color: var(--nr-text);
+    outline: none; transition: border-color 0.2s; letter-spacing: 0.02em;
+  }
+  .nr-form-group input:focus,
+  .nr-form-group textarea:focus { border-color: var(--nr-accent); }
+
+  .nr-star-picker { font-size: 28px; color: var(--nr-star-empty); cursor: pointer;
+                    letter-spacing: 3px; user-select: none; }
+  .nr-star-picker span.active { color: var(--nr-star-fill); }
+
+  .nr-submit-btn {
+    width: 100%; background: var(--nr-text); color: #fff; border: none; border-radius: 5px;
+    padding: 13px; font-size: 11px; font-weight: 600; letter-spacing: 2px;
+    text-transform: uppercase; cursor: pointer; font-family: var(--nr-font); transition: background 0.2s;
+  }
+  .nr-submit-btn:hover { background: var(--nr-accent-dark); }
+  .nr-submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+  .nr-skip-btn {
+    width: 100%; background: transparent; color: var(--nr-text-muted); border: 1px solid var(--nr-border);
+    border-radius: 5px; padding: 11px; font-size: 11px; font-weight: 500; letter-spacing: 1px;
+    text-transform: uppercase; cursor: pointer; font-family: var(--nr-font);
+    margin-top: 10px; transition: border-color 0.2s;
+  }
+  .nr-skip-btn:hover { border-color: var(--nr-accent); }
+
+  .nr-submit-note { font-size: 12px; color: var(--nr-text-muted); margin-top: 10px; text-align: center; }
+
+  /* Lightbox */
+  .nr-lightbox         { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.88);
+                          z-index: 10000; align-items: center; justify-content: center; }
+  .nr-lightbox.is-open { display: flex; }
+  .nr-lightbox img     { max-width: 90vw; max-height: 85vh; border-radius: 6px; }
+  .nr-lightbox-close   { position: absolute; top: 20px; right: 24px; color: #fff;
+                          font-size: 28px; cursor: pointer; background: none; border: none; line-height: 1; }
+
+  @media (max-width: 640px) {
+    .nr-title { font-size: 18px; }
+    .nr-summary { flex-direction: row; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; padding: 0 16px; margin-bottom: 20px; }
+    .nr-summary__left { flex: 1; min-width: 100px; text-align: center; }
+    .nr-score { font-size: 42px; }
+    .nr-stars { font-size: 17px; letter-spacing: 1px; }
+    .nr-count { font-size: 10px; }
+    .nr-summary__recommend { flex: 1; min-width: 100px; text-align: center; }
+    .nr-recommend-pct { font-size: 34px; }
+    .nr-recommend-text { font-size: 10px; }
+    .nr-summary__bars { flex: 0 0 100%; order: 3; margin-top: 4px; }
+    .nr-bar-label { min-width: 44px; font-size: 10px; }
+    .nr-bar-pct { min-width: 28px; font-size: 10px; }
+    .nr-write-cta { padding: 0 16px; margin-bottom: 20px; }
+    .nr-write-btn { width: 100%; box-sizing: border-box; padding: 14px 20px; border-radius: 8px; font-size: 13px; }
+    .nr-fallback-notice > div { margin: 0 16px 16px !important; }
+    .nr-photos-strip { width: 100% !important; margin: 0 0 20px !important; }
+    .nr-photos-inner img { width: 72px; height: 72px; }
+    .nr-controls { flex-wrap: nowrap; align-items: center; gap: 4px; padding: 0 16px 12px; margin: 8px auto 8px; }
+    .nr-control-label { font-size: 10px; }
+    .nr-total-label { font-size: 10px; }
+    .nr-select-wrap select { font-size: 11px; }
+    .nr-filter-group, .nr-sort-group { gap: 4px; }
+    .nr-grid { grid-template-columns: 1fr; padding: 0 16px; gap: 16px; max-width: 100%; }
+    .nr-card { padding: 14px 16px; }
+    .nr-author-name { font-size: 13px; letter-spacing: 0.5px; }
+    .nr-card-stars { font-size: 16px; letter-spacing: 0.5px; }
+    .nr-card-date { font-size: 11px; }
+    .nr-card__body { font-size: 13px; line-height: 1.7; }
+    .nr-card__img img { width: 64px; height: 64px; }
+    .nr-avatar { width: 32px; height: 32px; font-size: 12px; }
+    .nr-loadmore-wrap { padding: 0 16px; }
+    .nr-loadmore-btn { width: 100%; box-sizing: border-box; }
+    .nr-modal { width: 100%; max-width: 100%; border-radius: 16px 16px 0 0;
+                position: fixed; bottom: 0; left: 0; right: 0; max-height: 92vh; }
+    .nr-modal-overlay { align-items: flex-end; }
+  }
+</style>
+
+<script>
+(function () {
+  'use strict';
+
+  const CONFIG = {
+    productId   : '{{ nr_pid }}',
+    apiKey      : {{ nr_api_key | json }},
+    workspaceId : {{ nr_workspace | json }},
+    pageSize    : {{ nr_page_size }},
+    baseUrl     : 'https://platform.nector.io/api/v2/merchant/reviews',
+    uploadUrl   : 'https://platform.nector.io/api/v2/merchant/uploads',
+    showPhotos  : {{ nr_show_photos }},
+    showWrite   : {{ nr_show_write }},
+  };
+
+  let allReviews      = [];
+  let filteredReviews = [];
+  let renderedCount   = 0;
+  let isProductView   = false;
+  let lastParsedData  = null;
+  let usedFallback    = false;
+
+  const el = id => document.getElementById(id);
+  window.NectorCache = window.NectorCache || { data: null, isProduct: false, usedFallback: false };
+
+  /* ── API: GET ── */
+  async function apiFetch(url) {
+    const res = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'x-apikey'      : CONFIG.apiKey,
+        'x-source'      : 'mobile',
+        'x-workspaceid' : CONFIG.workspaceId,
+        'Accept'        : 'application/json',
+      }
+    });
+    if (!res.ok) throw new Error('Nector API HTTP ' + res.status);
+    return res.json();
+  }
+
+  /* ── API: POST review ── */
+  async function submitReview(payload) {
+    const response = await fetch(CONFIG.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type'  : 'application/json',
+        'x-apikey'      : CONFIG.apiKey,
+        'x-source'      : 'mobile',
+        'x-workspaceid' : CONFIG.workspaceId,
+        'Accept'        : 'application/json',
+      },
+      body: JSON.stringify(payload)
+    });
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json.message || `HTTP ${response.status}`);
+    return json;
+  }
+
+  /* ── API: POST single image — called AFTER review created ── */
+  async function uploadSingleImage(file, reviewId) {
+    const formData = new FormData();
+    formData.append('parent_type', 'reviews');
+    formData.append('parent_id',   reviewId);
+    formData.append('file',        file);       // singular 'file' per Postman spec
+
+    // DO NOT set Content-Type — browser sets multipart boundary automatically
+    const response = await fetch(CONFIG.uploadUrl, {
+      method : 'POST',
+      headers: {
+        'x-apikey' : CONFIG.apiKey,
+        'x-source' : 'web',
+        // x-workspaceid omitted — Postman confirmed not needed for uploads
+      },
+      body: formData,
+    });
+
+    const result = await response.json().catch(() => ({}));
+    console.log(`[NectorReviews] Upload response for "${file.name}":`, result);
+    if (!response.ok) throw new Error(result?.message || `Upload HTTP ${response.status}`);
+    return result;
+  }
+
+  /* ── Extract _id from create-review response ── */
+  function extractReviewId(result) {
+    console.log('[NectorReviews] Create-review response:', JSON.stringify(result, null, 2));
+    // Walk every known shape the API might return
+    return (
+      result?.data?.review?._id  ||
+      result?.data?.item?._id    ||
+      result?.data?._id          ||
+      result?.data?.id           ||
+      result?.review?._id        ||
+      result?._id                ||
+      null
+    );
+  }
+
+  /* ── Parse list response ── */
+  function parseResponse(json) {
+    const d = json?.data ?? {};
+    return {
+      items : Array.isArray(d.items)           ? d.items  : [],
+      count : typeof d.count === 'number'      ? d.count  : (parseInt(d.count) || 0),
+      stats : Array.isArray(d.stats)           ? d.stats  : [],
+    };
+  }
+
+  /* ── Paginated fetch ── */
+  async function fetchAllPages(baseUrl) {
+    const LIMIT = 100;
+    let page = 1, allItems = [], totalCount = 0, stats = [];
+    while (true) {
+      const sep = baseUrl.includes('?') ? '&' : '?';
+      const url = `${baseUrl}${sep}limit=${LIMIT}&page=${page}`;
+      const json   = await apiFetch(url);
+      const parsed = parseResponse(json);
+      if (page === 1) { totalCount = parsed.count; stats = parsed.stats; }
+      if (!parsed.items.length) break;
+      allItems = allItems.concat(parsed.items);
+      if (parsed.items.length < LIMIT || allItems.length >= totalCount) break;
+      page++;
+    }
+    return { items: allItems, count: totalCount, stats };
+  }
+
+  /* ── Load reviews ── */
+  async function loadReviews() {
+    if (window.NectorCache.data) {
+      lastParsedData = window.NectorCache.data;
+      allReviews     = lastParsedData.items;
+      isProductView  = window.NectorCache.isProduct;
+      usedFallback   = window.NectorCache.usedFallback;
+      if (usedFallback && CONFIG.showWrite) showFallbackNotice();
+      renderAllUI();
+      return;
+    }
+    try {
+      const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
+      const parsed     = await fetchAllPages(productUrl);
+
+      if (parsed.items.length > 0) {
+        isProductView = true; usedFallback = false;
+        window.NectorCache = { data: parsed, isProduct: true, usedFallback: false };
+        lastParsedData = parsed; allReviews = parsed.items;
+        renderAllUI(); return;
+      }
+
+      const fallback = await fetchAllPages(CONFIG.baseUrl);
+      if (fallback.items.length > 0) {
+        isProductView = false; usedFallback = true;
+        window.NectorCache = { data: fallback, isProduct: false, usedFallback: true };
+        lastParsedData = fallback; allReviews = fallback.items;
+        showFallbackNotice(); renderAllUI(); return;
+      }
+      throw new Error('No reviews');
+    } catch (err) {
+      console.error('[NectorReviews]', err);
+      const g = el('nr-grid');
+      if (g) g.innerHTML = '<div class="nr-empty">Unable to load reviews. Please try again later.</div>';
+    }
+  }
+
+  function showFallbackNotice() {
+    if (document.querySelector('.nr-fallback-notice')) return;
+    const summary = el('nr-summary');
+    if (!summary) return;
+    const notice = document.createElement('div');
+    notice.className = 'nr-fallback-notice';
+    notice.innerHTML = `<div style="background:#f5f5f5;border-left:3px solid var(--nr-accent);padding:10px 16px;margin:0 auto 20px;max-width:820px;font-size:12px;color:var(--nr-text-muted);">ℹ️ No reviews yet for this product. Showing reviews from other products instead.</div>`;
+    summary.parentNode.insertBefore(notice, summary.nextSibling);
+  }
+
+  function renderAllUI() {
+    if (!lastParsedData) return;
+    buildSummary(lastParsedData.items, lastParsedData.count, lastParsedData.stats);
+    if (CONFIG.showPhotos) buildPhotoStrip(lastParsedData.items);
+    applyFilter();
+  }
+
+  /* ── Summary ── */
+  function buildSummary(items, totalCount, stats) {
+    if (!items.length && !stats.length) return;
+    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    if (stats?.length) {
+      stats.forEach(s => { const r = parseInt(s.rating, 10); if (dist[r] !== undefined) dist[r] = parseInt(s.count, 10) || 0; });
+    } else {
+      items.forEach(r => { const rt = Math.round(parseFloat(r.rating) || 0); if (dist[rt] !== undefined) dist[rt]++; });
+    }
+    let wSum = 0, dTotal = 0;
+    Object.entries(dist).forEach(([star, cnt]) => { wSum += parseInt(star) * cnt; dTotal += cnt; });
+    const avg = dTotal > 0 ? (wSum / dTotal).toFixed(1)
+      : items.length > 0 ? (items.reduce((s, r) => s + (parseFloat(r.rating) || 0), 0) / items.length).toFixed(1) : '0.0';
+    const displayTotal = totalCount > 0 ? totalCount : items.length;
+    if (el('nr-overall-score')) el('nr-overall-score').textContent = avg;
+    if (el('nr-overall-stars')) el('nr-overall-stars').innerHTML   = starsHtml(parseFloat(avg), false);
+    if (el('nr-review-count'))  el('nr-review-count').textContent  = `${displayTotal} reviews`;
+    if (el('nr-total-label'))   el('nr-total-label').textContent   = `${displayTotal} reviews`;
+    const base = dTotal > 0 ? dTotal : 1;
+    [1,2,3,4,5].forEach(star => {
+      const pct = Math.round((dist[star] / base) * 100);
+      const fill = document.querySelector(`.nr-bar-fill[data-star="${star}"]`);
+      const pctEl = el(`nr-pct-${star}`);
+      if (fill)  setTimeout(() => { fill.style.width = pct + '%'; }, 150);
+      if (pctEl) pctEl.textContent = pct + '%';
+    });
+    if (el('nr-recommend-pct')) el('nr-recommend-pct').textContent = Math.round(((dist[4] + dist[5]) / base) * 100) + '%';
+  }
+
+  /* ── Photo strip ── */
+  function buildPhotoStrip(items) {
+    const strip = el('nr-photos-strip');
+    if (!strip) return;
+    const photos = [];
+    items.forEach(r => {
+      const ups = Array.isArray(r.uploads) ? r.uploads : (r.uploads?.uploads || []);
+      ups.forEach(u => { if (u?.link && u.type === 'image') photos.push(u.link); });
+    });
+    if (!photos.length) { strip.style.display = 'none'; return; }
+    el('nr-photos-inner').innerHTML = photos.map(src =>
+      `<img src="${esc(src)}" alt="Review photo" loading="lazy" onclick="NectorReviews.openLightbox(this.src)">`
+    ).join('');
+    strip.style.display = 'block';
+  }
+
+  /* ── Filter + Sort ── */
+  function applyFilter() {
+    const ratingVal = el('nr-filter-rating')?.value || 'all';
+    const sortVal   = el('nr-sort')?.value || 'newest';
+    filteredReviews = allReviews.filter(r =>
+      ratingVal === 'all' || Math.round(parseFloat(r.rating)) === parseInt(ratingVal, 10)
+    );
+    filteredReviews.sort((a, b) => {
+      const dA = new Date(a.posted_at || a.created_at || 0);
+      const dB = new Date(b.posted_at || b.created_at || 0);
+      if (sortVal === 'newest')  return dB - dA;
+      if (sortVal === 'highest') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+      if (sortVal === 'lowest')  return (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0);
+      return ((b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0)) || (dB - dA);
+    });
+    if (el('nr-total-label')) el('nr-total-label').textContent = `${filteredReviews.length} review${filteredReviews.length !== 1 ? 's' : ''}`;
+    renderedCount = 0;
+    const grid = el('nr-grid');
+    if (grid) grid.innerHTML = '';
+    renderBatch();
+  }
+
+  /* ── Render batch ── */
+  function renderBatch() {
+    const grid = el('nr-grid'), lmWrap = el('nr-loadmore-wrap');
+    if (!grid) return;
+    const batch = filteredReviews.slice(renderedCount, renderedCount + CONFIG.pageSize);
+    if (renderedCount === 0 && !batch.length) {
+      grid.innerHTML = usedFallback
+        ? '<div class="nr-empty">No reviews available. Be the first to write a review!</div>'
+        : '<div class="nr-empty">No reviews found for this product.</div>';
+      if (lmWrap) lmWrap.style.display = 'none';
+      return;
+    }
+    const frag = document.createDocumentFragment();
+    batch.forEach((review, i) => {
+      const card = document.createElement('div');
+      card.className = 'nr-card';
+      card.style.animationDelay = (i * 55) + 'ms';
+      card.innerHTML = buildCardHtml(review);
+      frag.appendChild(card);
+    });
+    grid.appendChild(frag);
+    renderedCount += batch.length;
+    if (lmWrap) lmWrap.style.display = renderedCount < filteredReviews.length ? 'block' : 'none';
+  }
+
+  function buildCardHtml(r) {
+    const name     = (r.name || 'Customer').trim();
+    const rating   = parseFloat(r.rating) || 0;
+    const body     = (r.description || r.body || '').trim();
+    const date     = r.posted_at || r.created_at || '';
+    const verified = r.is_verified === true;
+    const product  = (r.reference_product_name || '').trim();
+    const uploads  = Array.isArray(r.uploads) ? r.uploads : (r.uploads?.uploads || []);
+    const firstImg = uploads.find(u => u?.link && (u.type === 'image' || !u.type))?.link || '';
+    const productTag = (!isProductView && product) ? `<div class="nr-card__product">${esc(product)}</div>` : '';
+    return `
+      <div class="nr-card__top">
+        <div class="nr-card__author">
+          <div class="nr-avatar">${esc(initials(name))}</div>
+          <div>
+            <div class="nr-author-name">
+              ${esc(name)}
+              ${verified ? '<span class="nr-verified">Verified</span>' : ''}
+            </div>
+          </div>
+        </div>
+        <div class="nr-card__meta">
+          <div class="nr-card-stars">${starsHtml(rating, true)}</div>
+          <div class="nr-card-date">${esc(timeAgo(date))}</div>
+        </div>
+      </div>
+      ${productTag}
+      ${body ? `<div class="nr-card__body">${esc(body)}</div>` : ''}
+      ${firstImg ? `<div class="nr-card__img"><img src="${esc(firstImg)}" alt="Review photo" loading="lazy" onclick="NectorReviews.openLightbox(this.src)"></div>` : ''}
+    `;
+  }
+
+  /* ── Helpers ── */
+  function starsHtml(rating, showScore) {
+    const r = Math.round(rating);
+    let s = '';
+    for (let i = 1; i <= 5; i++)
+      s += `<span style="color:${i <= r ? 'var(--nr-star-fill)' : 'var(--nr-star-empty)'}">&#9733;</span>`;
+    if (showScore) s += `<span class="nr-card-score">(${parseFloat(rating).toFixed(1)})</span>`;
+    return s;
+  }
+  function initials(name) {
+    const p = (name || '').trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return '?';
+    return (p.length >= 2 ? p[0][0] + p[p.length-1][0] : p[0][0]).toUpperCase();
+  }
+  function timeAgo(dateStr) {
+    if (!dateStr) return '';
+    const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
+    if (days <= 0) return 'Today';
+    if (days === 1) return '1 day ago';
+    if (days < 30) return `${days} days ago`;
+    const m = Math.floor(days / 30);
+    if (m === 1) return '1 month ago';
+    if (m < 12) return `${m} months ago`;
+    const y = Math.floor(m / 12);
+    return y === 1 ? '1 year ago' : `${y} years ago`;
+  }
+  function esc(str) {
+    return String(str || '')
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+  }
+
+  /* ── Lightbox ── */
+  window.NectorReviews = {
+    openLightbox(src) {
+      if (el('nr-lightbox-img')) el('nr-lightbox-img').src = src;
+      if (el('nr-lightbox'))     el('nr-lightbox').classList.add('is-open');
+    }
+  };
+  el('nr-lightbox')?.addEventListener('click', e => {
+    if (e.target === el('nr-lightbox') || e.target === el('nr-lightbox-close'))
+      el('nr-lightbox').classList.remove('is-open');
+  });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      el('nr-lightbox')?.classList.remove('is-open');
+      el('nr-modal-overlay')?.classList.remove('is-open');
+    }
+  });
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     2-STEP WRITE REVIEW MODAL
+     Step 1 → fill form → submit → get reviewId
+     Step 2 → upload images using that reviewId → done
+  ═══════════════════════════════════════════════════════════════════════ */
+  if (CONFIG.showWrite) {
+
+    let currentReviewId = null; // holds _id after step 1 succeeds
+
+    /* ── Reset modal to step 1 ── */
+    function resetModal() {
+      currentReviewId = null;
+      // Clear step 1 fields
+      ['wr-name','wr-email','wr-mobile','wr-title','wr-body'].forEach(id => { const e = el(id); if (e) e.value = ''; });
+      const rv = el('wr-rating'); if (rv) rv.value = '0';
+      document.querySelectorAll('#nr-star-picker span').forEach(s => s.classList.remove('active'));
+      const msg1 = el('wr-message-1'); if (msg1) msg1.textContent = '';
+      // Clear step 2
+      const imagesEl = el('wr-images'); if (imagesEl) imagesEl.value = '';
+      const previews = el('nr-image-previews'); if (previews) previews.innerHTML = '';
+      const placeholder = el('nr-upload-placeholder'); if (placeholder) placeholder.style.display = '';
+      const msg2 = el('wr-message-2'); if (msg2) msg2.textContent = '';
+      const uploadBtn = el('nr-upload-btn'); if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = 'Upload Photos'; }
+      // Show step 1, hide step 2
+      const s1 = el('nr-step-1'); if (s1) s1.style.display = '';
+      const s2 = el('nr-step-2'); if (s2) s2.style.display = 'none';
+    }
+
+    /* ── Open / close ── */
+    el('nr-write-btn')?.addEventListener('click', () => {
+      resetModal();
+      el('nr-modal-overlay')?.classList.add('is-open');
+    });
+    el('nr-modal-close')?.addEventListener('click', () => {
+      el('nr-modal-overlay')?.classList.remove('is-open');
+    });
+    el('nr-modal-overlay')?.addEventListener('click', e => {
+      if (e.target === el('nr-modal-overlay')) el('nr-modal-overlay').classList.remove('is-open');
+    });
+
+    /* ── Star picker ── */
+    const picker = el('nr-star-picker');
+    if (picker) {
+      const setStars = val => picker.querySelectorAll('span').forEach((s, i) => s.classList.toggle('active', i < val));
+      picker.addEventListener('mouseover',  e => { if (e.target.dataset.val) setStars(+e.target.dataset.val); });
+      picker.addEventListener('mouseleave', () => setStars(+(el('wr-rating')?.value) || 0));
+      picker.addEventListener('click',      e => {
+        if (e.target.dataset.val) { el('wr-rating').value = e.target.dataset.val; setStars(+e.target.dataset.val); }
+      });
+    }
+
+    /* ── Image preview on file select ── */
+    el('wr-images')?.addEventListener('change', function () {
+      const previews    = el('nr-image-previews');
+      const placeholder = el('nr-upload-placeholder');
+      if (!previews) return;
+      previews.innerHTML = '';
+      const files = Array.from(this.files).slice(0, 5);
+      if (files.length) {
+        if (placeholder) placeholder.style.display = 'none';
+        files.forEach(f => {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(f);
+          img.onload = () => URL.revokeObjectURL(img.src);
+          previews.appendChild(img);
+        });
+      } else {
+        if (placeholder) placeholder.style.display = '';
+      }
+    });
+
+    /* ════════════════════════════════
+       STEP 1: Submit review
+    ════════════════════════════════ */
+    el('nr-next-btn')?.addEventListener('click', async () => {
+      const nameEl   = el('wr-name');
+      const emailEl  = el('wr-email');
+      const mobileEl = el('wr-mobile');
+      const ratingEl = el('wr-rating');
+      const titleEl  = el('wr-title');
+      const bodyEl   = el('wr-body');
+      const msg      = el('wr-message-1');
+      const nextBtn  = el('nr-next-btn');
+
+      const name   = nameEl?.value.trim()  || '';
+      const email  = emailEl?.value.trim() || '';
+      const mobile = mobileEl?.value.trim() || '';
+      const rating = parseInt(ratingEl?.value, 10) || 0;
+      const title  = titleEl?.value.trim()  || '';
+      const body   = bodyEl?.value.trim()   || '';
+
+      // Validate
+      if (!name)               { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your name.'; return; }
+      if (!email)              { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your email.'; return; }
+      if (rating < 1 || rating > 5) { msg.style.color = '#c0392b'; msg.textContent = 'Please select a star rating.'; return; }
+      if (!body)               { msg.style.color = '#c0392b'; msg.textContent = 'Please write your review.'; return; }
+
+      nextBtn.disabled    = true;
+      nextBtn.textContent = 'Submitting…';
+      msg.style.color     = '#5a8a5a';
+      msg.textContent     = 'Submitting your review…';
+
+      try {
+        const payload = {
+          reference_product_source : 'shopify',
+          reference_product_id     : CONFIG.productId,
+          name, rating,
+          description : body,
+          metadetail  : { email },
+        };
+        if (mobile) payload.metadetail.mobile = mobile;
+        if (title)  payload.title = title;
+
+        const result = await submitReview(payload);
+        console.log('[NectorReviews] Create review raw response:', JSON.stringify(result, null, 2));
+
+        // The API returns success even if meta.code != 200 sometimes — check both
+        const success = result?.meta?.code === 200 || result?.data?.success === true;
+        if (!success) throw new Error(result?.meta?.message || 'Review submission failed');
+
+        // Extract the review _id
+        currentReviewId = extractReviewId(result);
+        console.log('[NectorReviews] Extracted review ID:', currentReviewId);
+
+        // Move to step 2
+        nextBtn.disabled    = false;
+        nextBtn.textContent = 'Continue to Add Photos →';
+        msg.textContent     = '';
+
+        el('nr-step-1').style.display = 'none';
+        el('nr-step-2').style.display = '';
+
+        // Scroll modal to top
+        el('nr-step-2').closest('.nr-modal')?.scrollTo({ top: 0, behavior: 'smooth' });
+
+      } catch (err) {
+        console.error('[NectorReviews] Step 1 error:', err);
+        msg.style.color = '#c0392b';
+        msg.textContent = err.message || 'Failed to submit. Please try again.';
+        nextBtn.disabled    = false;
+        nextBtn.textContent = 'Continue to Add Photos →';
+      }
+    });
+
+    /* ════════════════════════════════
+       STEP 2: Upload images
+    ════════════════════════════════ */
+    el('nr-upload-btn')?.addEventListener('click', async () => {
+      const imagesEl  = el('wr-images');
+      const msg       = el('wr-message-2');
+      const uploadBtn = el('nr-upload-btn');
+      const files     = imagesEl ? Array.from(imagesEl.files).slice(0, 5) : [];
+
+      if (!files.length) {
+        msg.style.color = '#c0392b';
+        msg.textContent = 'Please select at least one image, or tap "Skip — Done".';
+        return;
+      }
+
+      if (!currentReviewId) {
+        // This should never happen, but just in case
+        msg.style.color = '#c0392b';
+        msg.textContent = 'Review ID missing — please close and try again.';
+        return;
+      }
+
+      uploadBtn.disabled    = true;
+      uploadBtn.textContent = `Uploading ${files.length} photo${files.length > 1 ? 's' : ''}…`;
+      msg.style.color   = '#5a8a5a';
+      msg.textContent   = '';
+
+      let successCount = 0;
+      for (let i = 0; i < files.length; i++) {
+        try {
+          msg.textContent = `Uploading photo ${i + 1} of ${files.length}…`;
+          await uploadSingleImage(files[i], currentReviewId);
+          successCount++;
+        } catch (err) {
+          console.error(`[NectorReviews] Upload failed for image ${i + 1}:`, err.message);
+        }
+      }
+
+      if (successCount === files.length) {
+        msg.textContent = `✓ All ${successCount} photo${successCount > 1 ? 's' : ''} uploaded successfully!`;
+      } else {
+        msg.textContent = `${successCount} of ${files.length} photos uploaded. Some may have failed.`;
+      }
+
+      uploadBtn.textContent = 'Done!';
+      setTimeout(() => closeAndRefresh(), 2000);
+    });
+
+    /* ── Skip button ── */
+    el('nr-skip-btn')?.addEventListener('click', () => closeAndRefresh());
+
+    /* ── Close and refresh reviews ── */
+    function closeAndRefresh() {
+      el('nr-modal-overlay')?.classList.remove('is-open');
+      window.NectorCache.data = null;
+      loadReviews();
+      setTimeout(resetModal, 400); // reset after animation
+    }
+  }
+
+  /* ── Controls ── */
+  el('nr-filter-rating')?.addEventListener('change', applyFilter);
+  el('nr-sort')?.addEventListener('change', applyFilter);
+  el('nr-loadmore-btn')?.addEventListener('click', renderBatch);
+
+  /* ── Init ── */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', loadReviews);
+  } else {
+    loadReviews();
+  }
+
+  /* ── Auto-recovery watchdog ── */
+  let recoveryTimer;
+  new MutationObserver(() => {
+    const grid = el('nr-grid');
+    if (grid && grid.innerHTML.trim() === '' && lastParsedData?.items.length > 0) {
+      clearTimeout(recoveryTimer);
+      recoveryTimer = setTimeout(() => { console.log('[NectorReviews] Auto-recovering…'); renderAllUI(); }, 100);
+    }
+  }).observe(document.body, { childList: true, subtree: true });
+
+})();
+</script>
+
+{% schema %}
+{
+  "name": "Nector Reviews",
+  "tag": "section",
+  "class": "nector-reviews-section",
+  "settings": [
+    { "type": "header", "content": "API Configuration" },
+    { "type": "text", "id": "api_key", "label": "Nector API Key", "default": "ak_cc146d9440ff8d3308d2158f23224df524bc6d1461195233af3140ee66740376", "info": "Found in your Nector dashboard under Settings > API" },
+    { "type": "text", "id": "workspace_id", "label": "Nector Workspace ID", "default": "shopify-luciraonline", "info": "Your workspace slug from the Nector dashboard" },
+    { "type": "header", "content": "Display Settings" },
+    { "type": "checkbox", "id": "show_title", "label": "Show section title", "default": true },
+    { "type": "text", "id": "title", "label": "Section title", "default": "Customer Reviews" },
+    { "type": "range", "id": "page_size", "label": "Reviews per page", "min": 2, "max": 12, "step": 2, "default": 6 },
+    { "type": "checkbox", "id": "show_photo_strip", "label": "Show review photo strip", "default": true },
+    { "type": "checkbox", "id": "show_write_review", "label": "Show Write a Review button", "default": true },
+    { "type": "text", "id": "write_review_label", "label": "Write review button label", "default": "WRITE A REVIEW" },
+    { "type": "text", "id": "load_more_label", "label": "Load more button label", "default": "READ MORE REVIEWS" },
+    { "type": "header", "content": "Colors" },
+    { "type": "color", "id": "bg_color", "label": "Background color", "default": "#fdf8f5" },
+    { "type": "color", "id": "accent_color", "label": "Accent color (bars, avatar)", "default": "#c8a882" },
+    { "type": "color", "id": "star_color", "label": "Star color", "default": "#d4a853" }
+  ],
+  "presets": [{ "name": "Nector Reviews", "category": "Product" }]
 }
 {% endschema %}
