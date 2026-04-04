@@ -447,20 +447,18 @@
 </style>
 
 <script>
+<script>
 (function () {
   'use strict';
 
-  // ── ONLY the proxy URL is here — API key lives in PHP only ──
-  // The ?action= param MUST be the first param so it is always read by PHP
+  // ── Proxy URL — API key lives server-side only ──────────
   const PROXY = 'https://app.lucirajewelry.com/reviews/nectorproxy.php';
 
   const CONFIG = {
     productId  : '{{ nr_pid }}',
     pageSize   : {{ nr_page_size }},
-    // All calls:
-    //   GET reviews:  PROXY + '?action=reviews&reference_product_id=X&limit=100&page=1'
-    //   POST review:  PROXY + '?action=reviews'
-    //   POST upload:  PROXY + '?action=upload'
+    baseUrl    : PROXY + '?action=reviews',   // GET + POST reviews
+    uploadUrl  : PROXY + '?action=upload',    // POST multipart images
     showPhotos : {{ nr_show_photos }},
     showWrite  : {{ nr_show_write }},
   };
@@ -475,79 +473,77 @@
   const el = id => document.getElementById(id);
   window.NectorCache = window.NectorCache || { data: null, isProduct: false, usedFallback: false };
 
-  /* ── Build proxy URL ensuring action is always first param ── */
-  function proxyUrl(action, extraParams) {
-    let url = PROXY + '?action=' + action;
-    if (extraParams) {
-      const qs = new URLSearchParams(extraParams).toString();
-      if (qs) url += '&' + qs;
-    }
-    return url;
-  }
-
-  /* ── GET via proxy ── */
+  /* ── API: GET via proxy ── */
   async function apiFetch(url) {
     const res = await fetch(url, {
       method : 'GET',
       headers: { 'Accept': 'application/json' },
     });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => '');
-      throw new Error('Proxy ' + res.status + ': ' + txt.slice(0, 300));
-    }
+    if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
     return res.json();
   }
 
-  /* ── POST review via proxy ── */
+  /* ── API: POST review via proxy ── */
   async function submitReview(payload) {
-    const url = proxyUrl('reviews');
-    const res = await fetch(url, {
+    const response = await fetch(CONFIG.baseUrl, {
       method : 'POST',
       headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body   : JSON.stringify(payload),
     });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(json.message || json.error || 'HTTP ' + res.status);
+    const json = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(json.message || `HTTP ${response.status}`);
     return json;
   }
 
-  /* ── POST image upload via proxy ── */
+  /* ── API: POST single image via proxy ── */
   async function uploadSingleImage(file, reviewId) {
-    const url      = proxyUrl('upload');
     const formData = new FormData();
     formData.append('parent_type', 'reviews');
     formData.append('parent_id',   reviewId);
     formData.append('file',        file);
 
-    const res    = await fetch(url, { method: 'POST', body: formData });
-    const result = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(result?.message || result?.error || 'Upload HTTP ' + res.status);
+    const response = await fetch(CONFIG.uploadUrl, {
+      method: 'POST',
+      body  : formData,
+    });
+
+    const result = await response.json().catch(() => ({}));
+    console.log(`[NectorReviews] Upload response for "${file.name}":`, result);
+    if (!response.ok) throw new Error(result?.message || `Upload HTTP ${response.status}`);
     return result;
   }
 
-  /* ── Extract review _id ── */
+  /* ── Extract _id from create-review response ── */
   function extractReviewId(result) {
-    return result?.data?.review?._id || result?.data?.item?._id || result?.data?._id ||
-           result?.data?.id || result?.review?._id || result?._id || null;
+    console.log('[NectorReviews] Create-review response:', JSON.stringify(result, null, 2));
+    return (
+      result?.data?.review?._id ||
+      result?.data?.item?._id   ||
+      result?.data?._id         ||
+      result?.data?.id          ||
+      result?.review?._id       ||
+      result?._id               ||
+      null
+    );
   }
 
-  /* ── Parse Nector list response ── */
+  /* ── Parse list response ── */
   function parseResponse(json) {
     const d = json?.data ?? {};
     return {
-      items : Array.isArray(d.items) ? d.items : [],
+      items : Array.isArray(d.items)      ? d.items : [],
       count : typeof d.count === 'number' ? d.count : (parseInt(d.count) || 0),
-      stats : Array.isArray(d.stats)  ? d.stats  : [],
+      stats : Array.isArray(d.stats)      ? d.stats : [],
     };
   }
 
   /* ── Paginated fetch ── */
-  async function fetchAllPages(action, baseParams) {
+  async function fetchAllPages(baseUrl) {
     const LIMIT = 100;
     let page = 1, allItems = [], totalCount = 0, stats = [];
     while (true) {
-      const params = Object.assign({}, baseParams, { limit: LIMIT, page });
-      const url    = proxyUrl(action, params);
+      const sep  = baseUrl.includes('?') ? '&' : '?';
+      const url  = `${baseUrl}${sep}limit=${LIMIT}&page=${page}`;
       const json   = await apiFetch(url);
       const parsed = parseResponse(json);
       if (page === 1) { totalCount = parsed.count; stats = parsed.stats; }
@@ -567,11 +563,12 @@
       isProductView  = window.NectorCache.isProduct;
       usedFallback   = window.NectorCache.usedFallback;
       if (usedFallback && CONFIG.showWrite) showFallbackNotice();
-      renderAllUI(); return;
+      renderAllUI();
+      return;
     }
     try {
-      // Try product-specific first
-      const parsed = await fetchAllPages('reviews', { reference_product_id: CONFIG.productId });
+      const productUrl = `${CONFIG.baseUrl}&reference_product_id=${CONFIG.productId}`;
+      const parsed     = await fetchAllPages(productUrl);
 
       if (parsed.items.length > 0) {
         isProductView = true; usedFallback = false;
@@ -580,15 +577,13 @@
         renderAllUI(); return;
       }
 
-      // Fallback: all store reviews
-      const fallback = await fetchAllPages('reviews', {});
+      const fallback = await fetchAllPages(CONFIG.baseUrl);
       if (fallback.items.length > 0) {
         isProductView = false; usedFallback = true;
         window.NectorCache = { data: fallback, isProduct: false, usedFallback: true };
         lastParsedData = fallback; allReviews = fallback.items;
         showFallbackNotice(); renderAllUI(); return;
       }
-
       throw new Error('No reviews');
     } catch (err) {
       console.error('[NectorReviews]', err);
@@ -762,7 +757,10 @@
 
   /* ── Helpers ── */
   function toHandle(name) {
-    return name.toLowerCase().trim().replace(/[^a-z0-9\s-]/g,'').replace(/\s+/g,'-').replace(/-+/g,'-');
+    return name.toLowerCase().trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
   }
   function starsHtml(rating, showScore) {
     const r = Math.round(rating);
@@ -784,10 +782,10 @@
     if (days === 1) return '1 day ago';
     if (days < 30)  return `${days} days ago`;
     const m = Math.floor(days / 30);
-    if (m === 1) return '1 month ago';
-    if (m < 12)  return `${m} months ago`;
+    if (m === 1)    return '1 month ago';
+    if (m < 12)     return `${m} months ago`;
     const y = Math.floor(m / 12);
-    return y === 1 ? '1 year ago' : `${y} years ago`;
+    return y === 1  ? '1 year ago' : `${y} years ago`;
   }
   function esc(str) {
     return String(str || '')
@@ -817,6 +815,7 @@
      2-STEP WRITE REVIEW MODAL
   ═══════════════════════════════════════════════════════ */
   if (CONFIG.showWrite) {
+
     let currentReviewId = null;
 
     function resetModal() {
@@ -835,20 +834,27 @@
       const s2 = el('nr-step-2'); if (s2) s2.style.display = 'none';
     }
 
-    el('nr-write-btn')?.addEventListener('click', () => { resetModal(); el('nr-modal-overlay')?.classList.add('is-open'); });
-    el('nr-modal-close')?.addEventListener('click', () => { el('nr-modal-overlay')?.classList.remove('is-open'); });
-    el('nr-modal-overlay')?.addEventListener('click', e => { if (e.target === el('nr-modal-overlay')) el('nr-modal-overlay').classList.remove('is-open'); });
+    el('nr-write-btn')?.addEventListener('click', () => {
+      resetModal();
+      el('nr-modal-overlay')?.classList.add('is-open');
+    });
+    el('nr-modal-close')?.addEventListener('click', () => {
+      el('nr-modal-overlay')?.classList.remove('is-open');
+    });
+    el('nr-modal-overlay')?.addEventListener('click', e => {
+      if (e.target === el('nr-modal-overlay')) el('nr-modal-overlay').classList.remove('is-open');
+    });
 
-    /* ── Star picker ── */
     const picker = el('nr-star-picker');
     if (picker) {
       const setStars = val => picker.querySelectorAll('span').forEach((s, i) => s.classList.toggle('active', i < val));
       picker.addEventListener('mouseover',  e => { if (e.target.dataset.val) setStars(+e.target.dataset.val); });
       picker.addEventListener('mouseleave', () => setStars(+(el('wr-rating')?.value) || 0));
-      picker.addEventListener('click',      e => { if (e.target.dataset.val) { el('wr-rating').value = e.target.dataset.val; setStars(+e.target.dataset.val); } });
+      picker.addEventListener('click',      e => {
+        if (e.target.dataset.val) { el('wr-rating').value = e.target.dataset.val; setStars(+e.target.dataset.val); }
+      });
     }
 
-    /* ── Image preview ── */
     el('wr-images')?.addEventListener('change', function () {
       const previews    = el('nr-image-previews');
       const placeholder = el('nr-upload-placeholder');
@@ -868,24 +874,32 @@
       }
     });
 
-    /* ── Step 1: Submit review ── */
     el('nr-next-btn')?.addEventListener('click', async () => {
-      const name   = el('wr-name')?.value.trim()   || '';
-      const email  = el('wr-email')?.value.trim()  || '';
-      const mobile = el('wr-mobile')?.value.trim() || '';
-      const rating = parseInt(el('wr-rating')?.value, 10) || 0;
-      const title  = el('wr-title')?.value.trim()  || '';
-      const body   = el('wr-body')?.value.trim()   || '';
-      const msg    = el('wr-message-1');
-      const btn    = el('nr-next-btn');
+      const nameEl   = el('wr-name');
+      const emailEl  = el('wr-email');
+      const mobileEl = el('wr-mobile');
+      const ratingEl = el('wr-rating');
+      const titleEl  = el('wr-title');
+      const bodyEl   = el('wr-body');
+      const msg      = el('wr-message-1');
+      const nextBtn  = el('nr-next-btn');
 
-      if (!name)                    { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your name.'; return; }
-      if (!mobile)                  { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your mobile number.'; return; }
-      if (rating < 1 || rating > 5) { msg.style.color = '#c0392b'; msg.textContent = 'Please select a star rating.'; return; }
-      if (!body)                    { msg.style.color = '#c0392b'; msg.textContent = 'Please write your review.'; return; }
+      const name   = nameEl?.value.trim()   || '';
+      const email  = emailEl?.value.trim()  || '';
+      const mobile = mobileEl?.value.trim() || '';
+      const rating = parseInt(ratingEl?.value, 10) || 0;
+      const title  = titleEl?.value.trim()  || '';
+      const body   = bodyEl?.value.trim()   || '';
 
-      btn.disabled = true; btn.textContent = 'Submitting…';
-      msg.style.color = '#5a8a5a'; msg.textContent = 'Submitting your review…';
+      if (!name)                   { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your name.'; return; }
+      if (!mobile)                 { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your mobile number.'; return; }
+      if (rating < 1 || rating > 5){ msg.style.color = '#c0392b'; msg.textContent = 'Please select a star rating.'; return; }
+      if (!body)                   { msg.style.color = '#c0392b'; msg.textContent = 'Please write your review.'; return; }
+
+      nextBtn.disabled    = true;
+      nextBtn.textContent = 'Submitting…';
+      msg.style.color     = '#5a8a5a';
+      msg.textContent     = 'Submitting your review…';
 
       try {
         const payload = {
@@ -899,12 +913,17 @@
         if (title) payload.title = title;
 
         const result = await submitReview(payload);
+        console.log('[NectorReviews] Create review response:', JSON.stringify(result, null, 2));
+
         const success = result?.meta?.code === 200 || result?.data?.success === true;
-        if (!success) throw new Error(result?.meta?.message || result?.error || 'Submission failed');
+        if (!success) throw new Error(result?.meta?.message || 'Review submission failed');
 
         currentReviewId = extractReviewId(result);
-        btn.disabled = false; btn.textContent = 'Continue to Add Photos →';
-        msg.textContent = '';
+        console.log('[NectorReviews] Extracted review ID:', currentReviewId);
+
+        nextBtn.disabled    = false;
+        nextBtn.textContent = 'Continue to Add Photos →';
+        msg.textContent     = '';
 
         el('nr-step-1').style.display = 'none';
         el('nr-step-2').style.display = '';
@@ -912,25 +931,34 @@
 
       } catch (err) {
         console.error('[NectorReviews] Step 1 error:', err);
-        msg.style.color = '#c0392b';
-        msg.textContent = err.message || 'Failed to submit. Please try again.';
-        btn.disabled = false; btn.textContent = 'Continue to Add Photos →';
+        msg.style.color     = '#c0392b';
+        msg.textContent     = err.message || 'Failed to submit. Please try again.';
+        nextBtn.disabled    = false;
+        nextBtn.textContent = 'Continue to Add Photos →';
       }
     });
 
-    /* ── Step 2: Upload images ── */
     el('nr-upload-btn')?.addEventListener('click', async () => {
       const imagesEl  = el('wr-images');
       const msg       = el('wr-message-2');
       const uploadBtn = el('nr-upload-btn');
       const files     = imagesEl ? Array.from(imagesEl.files).slice(0, 5) : [];
 
-      if (!files.length)    { msg.style.color = '#c0392b'; msg.textContent = 'Please select at least one image, or tap "Skip — Done".'; return; }
-      if (!currentReviewId) { msg.style.color = '#c0392b'; msg.textContent = 'Review ID missing — please close and try again.'; return; }
+      if (!files.length) {
+        msg.style.color = '#c0392b';
+        msg.textContent = 'Please select at least one image, or tap "Skip — Done".';
+        return;
+      }
+      if (!currentReviewId) {
+        msg.style.color = '#c0392b';
+        msg.textContent = 'Review ID missing — please close and try again.';
+        return;
+      }
 
-      uploadBtn.disabled = true;
+      uploadBtn.disabled    = true;
       uploadBtn.textContent = `Uploading ${files.length} photo${files.length > 1 ? 's' : ''}…`;
-      msg.style.color = '#5a8a5a'; msg.textContent = '';
+      msg.style.color   = '#5a8a5a';
+      msg.textContent   = '';
 
       let successCount = 0;
       for (let i = 0; i < files.length; i++) {
@@ -939,13 +967,13 @@
           await uploadSingleImage(files[i], currentReviewId);
           successCount++;
         } catch (err) {
-          console.error('[NectorReviews] Upload failed:', err.message);
+          console.error(`[NectorReviews] Upload failed for image ${i + 1}:`, err.message);
         }
       }
 
       msg.textContent = successCount === files.length
         ? `✓ All ${successCount} photo${successCount > 1 ? 's' : ''} uploaded successfully!`
-        : `${successCount} of ${files.length} photos uploaded.`;
+        : `${successCount} of ${files.length} photos uploaded. Some may have failed.`;
 
       uploadBtn.textContent = 'Done!';
       setTimeout(() => closeAndRefresh(), 2000);
@@ -979,11 +1007,12 @@
     const grid = el('nr-grid');
     if (grid && grid.innerHTML.trim() === '' && lastParsedData?.items.length > 0) {
       clearTimeout(recoveryTimer);
-      recoveryTimer = setTimeout(() => { renderAllUI(); }, 100);
+      recoveryTimer = setTimeout(() => { console.log('[NectorReviews] Auto-recovering…'); renderAllUI(); }, 100);
     }
   }).observe(document.body, { childList: true, subtree: true });
 
 })();
+</script>
 </script>
 
 {% schema %}
