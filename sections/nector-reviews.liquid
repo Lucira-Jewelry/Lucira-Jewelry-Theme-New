@@ -817,15 +817,16 @@
 (function () {
   'use strict';
 
+  // ── Proxy URL — API key lives server-side only ──────────
+  const PROXY = 'https://app.lucirajewelry.com/reviews/nectorproxy.php';
+
   const CONFIG = {
-    productId   : '{{ nr_pid }}',
-    apiKey      : {{ nr_api_key | json }},
-    workspaceId : {{ nr_workspace | json }},
-    pageSize    : {{ nr_page_size }},
-    baseUrl     : 'https://platform.nector.io/api/v2/merchant/reviews',
-    uploadUrl   : 'https://platform.nector.io/api/v2/merchant/uploads',
-    showPhotos  : {{ nr_show_photos }},
-    showWrite   : {{ nr_show_write }},
+    productId  : '{{ nr_pid }}',
+    pageSize   : {{ nr_page_size }},
+    baseUrl    : PROXY + '?action=reviews',   // GET + POST reviews
+    uploadUrl  : PROXY + '?action=upload',    // POST multipart images
+    showPhotos : {{ nr_show_photos }},
+    showWrite  : {{ nr_show_write }},
   };
 
   let allReviews      = [];
@@ -841,30 +842,19 @@
   /* ── API: GET ── */
   async function apiFetch(url) {
     const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        'x-apikey'      : CONFIG.apiKey,
-        'x-source'      : 'mobile',
-        'x-workspaceid' : CONFIG.workspaceId,
-        'Accept'        : 'application/json',
-      }
+      method : 'GET',
+      headers: { 'Accept': 'application/json' },
     });
-    if (!res.ok) throw new Error('Nector API HTTP ' + res.status);
+    if (!res.ok) throw new Error('Proxy HTTP ' + res.status);
     return res.json();
   }
 
   /* ── API: POST review ── */
   async function submitReview(payload) {
     const response = await fetch(CONFIG.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type'  : 'application/json',
-        'x-apikey'      : CONFIG.apiKey,
-        'x-source'      : 'mobile',
-        'x-workspaceid' : CONFIG.workspaceId,
-        'Accept'        : 'application/json',
-      },
-      body: JSON.stringify(payload)
+      method : 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body   : JSON.stringify(payload),
     });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(json.message || `HTTP ${response.status}`);
@@ -879,12 +869,9 @@
     formData.append('file',        file);
 
     const response = await fetch(CONFIG.uploadUrl, {
-      method : 'POST',
-      headers: {
-        'x-apikey' : CONFIG.apiKey,
-        'x-source' : 'web',
-      },
-      body: formData,
+      method: 'POST',
+      body  : formData,
+      // No Content-Type header — browser sets multipart boundary automatically
     });
 
     const result = await response.json().catch(() => ({}));
@@ -897,12 +884,12 @@
   function extractReviewId(result) {
     console.log('[NectorReviews] Create-review response:', JSON.stringify(result, null, 2));
     return (
-      result?.data?.review?._id  ||
-      result?.data?.item?._id    ||
-      result?.data?._id          ||
-      result?.data?.id           ||
-      result?.review?._id        ||
-      result?._id                ||
+      result?.data?.review?._id ||
+      result?.data?.item?._id   ||
+      result?.data?._id         ||
+      result?.data?.id          ||
+      result?.review?._id       ||
+      result?._id               ||
       null
     );
   }
@@ -911,9 +898,9 @@
   function parseResponse(json) {
     const d = json?.data ?? {};
     return {
-      items : Array.isArray(d.items)           ? d.items  : [],
-      count : typeof d.count === 'number'      ? d.count  : (parseInt(d.count) || 0),
-      stats : Array.isArray(d.stats)           ? d.stats  : [],
+      items : Array.isArray(d.items)      ? d.items : [],
+      count : typeof d.count === 'number' ? d.count : (parseInt(d.count) || 0),
+      stats : Array.isArray(d.stats)      ? d.stats : [],
     };
   }
 
@@ -922,8 +909,8 @@
     const LIMIT = 100;
     let page = 1, allItems = [], totalCount = 0, stats = [];
     while (true) {
-      const sep = baseUrl.includes('?') ? '&' : '?';
-      const url = `${baseUrl}${sep}limit=${LIMIT}&page=${page}`;
+      const sep  = baseUrl.includes('?') ? '&' : '?';
+      const url  = `${baseUrl}${sep}limit=${LIMIT}&page=${page}`;
       const json   = await apiFetch(url);
       const parsed = parseResponse(json);
       if (page === 1) { totalCount = parsed.count; stats = parsed.stats; }
@@ -947,7 +934,7 @@
       return;
     }
     try {
-      const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
+      const productUrl = `${CONFIG.baseUrl}&reference_product_id=${CONFIG.productId}`;
       const parsed     = await fetchAllPages(productUrl);
 
       if (parsed.items.length > 0) {
@@ -992,7 +979,7 @@
   /* ── Summary ── */
   function buildSummary(items, totalCount, stats) {
     if (!items.length && !stats.length) return;
-    const dist = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    const dist = { 1:0, 2:0, 3:0, 4:0, 5:0 };
     if (stats?.length) {
       stats.forEach(s => { const r = parseInt(s.rating, 10); if (dist[r] !== undefined) dist[r] = parseInt(s.count, 10) || 0; });
     } else {
@@ -1000,7 +987,8 @@
     }
     let wSum = 0, dTotal = 0;
     Object.entries(dist).forEach(([star, cnt]) => { wSum += parseInt(star) * cnt; dTotal += cnt; });
-    const avg = dTotal > 0 ? (wSum / dTotal).toFixed(1)
+    const avg = dTotal > 0
+      ? (wSum / dTotal).toFixed(1)
       : items.length > 0 ? (items.reduce((s, r) => s + (parseFloat(r.rating) || 0), 0) / items.length).toFixed(1) : '0.0';
     const displayTotal = totalCount > 0 ? totalCount : items.length;
     if (el('nr-overall-score')) el('nr-overall-score').textContent = avg;
@@ -1009,8 +997,8 @@
     if (el('nr-total-label'))   el('nr-total-label').textContent   = `${displayTotal} reviews`;
     const base = dTotal > 0 ? dTotal : 1;
     [1,2,3,4,5].forEach(star => {
-      const pct = Math.round((dist[star] / base) * 100);
-      const fill = document.querySelector(`.nr-bar-fill[data-star="${star}"]`);
+      const pct   = Math.round((dist[star] / base) * 100);
+      const fill  = document.querySelector(`.nr-bar-fill[data-star="${star}"]`);
       const pctEl = el(`nr-pct-${star}`);
       if (fill)  setTimeout(() => { fill.style.width = pct + '%'; }, 150);
       if (pctEl) pctEl.textContent = pct + '%';
@@ -1020,7 +1008,7 @@
 
   /* ── Photo strip ── */
   function buildPhotoStrip(items) {
-    const stripOuter = el('nr-photos-strip'); // the outer wrapper
+    const stripOuter = el('nr-photos-strip');
     if (!stripOuter) return;
     const photos = [];
     items.forEach(r => {
@@ -1035,29 +1023,19 @@
     initPhotoArrows();
   }
 
-  /* ── Photo strip arrow logic ── */
   function initPhotoArrows() {
     const scroll  = el('nr-photos-scroll');
     const prevBtn = el('nr-photos-prev');
     const nextBtn = el('nr-photos-next');
     if (!scroll || !prevBtn || !nextBtn) return;
-
-    const STEP = 300; // px per arrow click
-
+    const STEP = 300;
     function updateArrows() {
       prevBtn.disabled = scroll.scrollLeft <= 2;
       nextBtn.disabled = scroll.scrollLeft + scroll.clientWidth >= scroll.scrollWidth - 2;
     }
-
-    prevBtn.addEventListener('click', () => {
-      scroll.scrollBy({ left: -STEP, behavior: 'smooth' });
-    });
-    nextBtn.addEventListener('click', () => {
-      scroll.scrollBy({ left: STEP, behavior: 'smooth' });
-    });
+    prevBtn.addEventListener('click', () => scroll.scrollBy({ left: -STEP, behavior: 'smooth' }));
+    nextBtn.addEventListener('click', () => scroll.scrollBy({ left:  STEP, behavior: 'smooth' }));
     scroll.addEventListener('scroll', updateArrows, { passive: true });
-
-    // Initial state
     updateArrows();
   }
 
@@ -1109,10 +1087,10 @@
   }
 
   function buildCardHtml(r) {
-    const name     = (r.name || 'Customer').trim();
-    const rating   = parseFloat(r.rating) || 0;
-    const body     = (r.description || r.body || '').trim();
-    const date     = r.posted_at || r.created_at || '';
+    const name    = (r.name || 'Customer').trim();
+    const rating  = parseFloat(r.rating) || 0;
+    const body    = (r.description || r.body || '').trim();
+    const date    = r.posted_at || r.created_at || '';
     const verified = r.is_verified === true;
     const product  = (r.reference_product_name || '').trim();
     const uploads  = Array.isArray(r.uploads) ? r.uploads : (r.uploads?.uploads || []);
@@ -1139,13 +1117,12 @@
         </div>
       </div>
       ${productTag}
-      ${body ? `<div class="nr-card__body">${esc(body)}</div>` : ''}
+      ${body    ? `<div class="nr-card__body">${esc(body)}</div>` : ''}
       ${firstImg ? `<div class="nr-card__img"><img src="${esc(firstImg)}" alt="Review photo" loading="lazy" onclick="NectorReviews.openLightbox(this.src)"></div>` : ''}
     `;
   }
 
   /* ── Helpers ── */
-
   function toHandle(name) {
     return name.toLowerCase().trim()
       .replace(/[^a-z0-9\s-]/g, '')
@@ -1170,12 +1147,12 @@
     const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
     if (days <= 0) return 'Today';
     if (days === 1) return '1 day ago';
-    if (days < 30) return `${days} days ago`;
+    if (days < 30)  return `${days} days ago`;
     const m = Math.floor(days / 30);
-    if (m === 1) return '1 month ago';
-    if (m < 12) return `${m} months ago`;
+    if (m === 1)    return '1 month ago';
+    if (m < 12)     return `${m} months ago`;
     const y = Math.floor(m / 12);
-    return y === 1 ? '1 year ago' : `${y} years ago`;
+    return y === 1  ? '1 year ago' : `${y} years ago`;
   }
   function esc(str) {
     return String(str || '')
@@ -1201,14 +1178,13 @@
     }
   });
 
-  /* ═══════════════════════════════════════════════════════════════════════
+  /* ═══════════════════════════════════════════════════════
      2-STEP WRITE REVIEW MODAL
-  ═══════════════════════════════════════════════════════════════════════ */
+  ═══════════════════════════════════════════════════════ */
   if (CONFIG.showWrite) {
 
     let currentReviewId = null;
 
-    /* ── Reset modal to step 1 ── */
     function resetModal() {
       currentReviewId = null;
       ['wr-name','wr-email','wr-mobile','wr-title','wr-body'].forEach(id => { const e = el(id); if (e) e.value = ''; });
@@ -1219,12 +1195,12 @@
       const previews = el('nr-image-previews'); if (previews) previews.innerHTML = '';
       const placeholder = el('nr-upload-placeholder'); if (placeholder) placeholder.style.display = '';
       const msg2 = el('wr-message-2'); if (msg2) msg2.textContent = '';
-      const uploadBtn = el('nr-upload-btn'); if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = 'Upload Photos'; }
+      const uploadBtn = el('nr-upload-btn');
+      if (uploadBtn) { uploadBtn.disabled = false; uploadBtn.textContent = 'Upload Photos'; }
       const s1 = el('nr-step-1'); if (s1) s1.style.display = '';
       const s2 = el('nr-step-2'); if (s2) s2.style.display = 'none';
     }
 
-    /* ── Open / close ── */
     el('nr-write-btn')?.addEventListener('click', () => {
       resetModal();
       el('nr-modal-overlay')?.classList.add('is-open');
@@ -1247,7 +1223,7 @@
       });
     }
 
-    /* ── Image preview on file select ── */
+    /* ── Image preview ── */
     el('wr-images')?.addEventListener('change', function () {
       const previews    = el('nr-image-previews');
       const placeholder = el('nr-upload-placeholder');
@@ -1267,9 +1243,7 @@
       }
     });
 
-    /* ════════════════════════════════
-       STEP 1: Submit review
-    ════════════════════════════════ */
+    /* ── Step 1: Submit review ── */
     el('nr-next-btn')?.addEventListener('click', async () => {
       const nameEl   = el('wr-name');
       const emailEl  = el('wr-email');
@@ -1280,17 +1254,17 @@
       const msg      = el('wr-message-1');
       const nextBtn  = el('nr-next-btn');
 
-      const name   = nameEl?.value.trim()  || '';
-      const email  = emailEl?.value.trim() || '';
+      const name   = nameEl?.value.trim()   || '';
+      const email  = emailEl?.value.trim()  || '';
       const mobile = mobileEl?.value.trim() || '';
       const rating = parseInt(ratingEl?.value, 10) || 0;
       const title  = titleEl?.value.trim()  || '';
       const body   = bodyEl?.value.trim()   || '';
 
-      if (!name)               { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your name.'; return; }
-      if (!mobile)             { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your mobile number.'; return; }
-      if (rating < 1 || rating > 5) { msg.style.color = '#c0392b'; msg.textContent = 'Please select a star rating.'; return; }
-      if (!body)               { msg.style.color = '#c0392b'; msg.textContent = 'Please write your review.'; return; }
+      if (!name)                   { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your name.'; return; }
+      if (!mobile)                 { msg.style.color = '#c0392b'; msg.textContent = 'Please enter your mobile number.'; return; }
+      if (rating < 1 || rating > 5){ msg.style.color = '#c0392b'; msg.textContent = 'Please select a star rating.'; return; }
+      if (!body)                   { msg.style.color = '#c0392b'; msg.textContent = 'Please write your review.'; return; }
 
       nextBtn.disabled    = true;
       nextBtn.textContent = 'Submitting…';
@@ -1305,11 +1279,11 @@
           description : body,
           metadetail  : { mobile, country: 'ind' },
         };
-        if (email)  payload.metadetail.email = email;
-        if (title)  payload.title = title;
+        if (email) payload.metadetail.email = email;
+        if (title) payload.title = title;
 
         const result = await submitReview(payload);
-        console.log('[NectorReviews] Create review raw response:', JSON.stringify(result, null, 2));
+        console.log('[NectorReviews] Create review response:', JSON.stringify(result, null, 2));
 
         const success = result?.meta?.code === 200 || result?.data?.success === true;
         if (!success) throw new Error(result?.meta?.message || 'Review submission failed');
@@ -1327,16 +1301,14 @@
 
       } catch (err) {
         console.error('[NectorReviews] Step 1 error:', err);
-        msg.style.color = '#c0392b';
-        msg.textContent = err.message || 'Failed to submit. Please try again.';
+        msg.style.color     = '#c0392b';
+        msg.textContent     = err.message || 'Failed to submit. Please try again.';
         nextBtn.disabled    = false;
         nextBtn.textContent = 'Continue to Add Photos →';
       }
     });
 
-    /* ════════════════════════════════
-       STEP 2: Upload images
-    ════════════════════════════════ */
+    /* ── Step 2: Upload images ── */
     el('nr-upload-btn')?.addEventListener('click', async () => {
       const imagesEl  = el('wr-images');
       const msg       = el('wr-message-2');
@@ -1370,20 +1342,16 @@
         }
       }
 
-      if (successCount === files.length) {
-        msg.textContent = `✓ All ${successCount} photo${successCount > 1 ? 's' : ''} uploaded successfully!`;
-      } else {
-        msg.textContent = `${successCount} of ${files.length} photos uploaded. Some may have failed.`;
-      }
+      msg.textContent = successCount === files.length
+        ? `✓ All ${successCount} photo${successCount > 1 ? 's' : ''} uploaded successfully!`
+        : `${successCount} of ${files.length} photos uploaded. Some may have failed.`;
 
       uploadBtn.textContent = 'Done!';
       setTimeout(() => closeAndRefresh(), 2000);
     });
 
-    /* ── Skip button ── */
     el('nr-skip-btn')?.addEventListener('click', () => closeAndRefresh());
 
-    /* ── Close and refresh reviews ── */
     function closeAndRefresh() {
       el('nr-modal-overlay')?.classList.remove('is-open');
       window.NectorCache.data = null;
