@@ -101,6 +101,8 @@
       assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
     -%}
 
+  
+
     {% comment %} ── Scheme visibility gate: only show for products >= ₹18,000 ── {% endcomment %}
     {% assign _show_scheme_btn = false %}
     {% if val_total >= 18000 %}
@@ -208,7 +210,7 @@
             endif
           -%}
 
-          {% comment %} 
+          {% comment %} <a
             href="{{ scheme_url }}"
             class="lucira-mobile-scheme-btn"
           >
@@ -264,7 +266,7 @@
 
       <div class="desktop-show inline-flex">
         <div class="iwish-app-block-product">
-          
+          <a
             class="iWishAdd st-1"
             href="#"
             data-variant="{{ product.variants.first.id }}"
@@ -276,7 +278,7 @@
 
       {% comment %} <div class="mobile-show">
         <div class="custom-wp_btn-link">
-          
+          <a
             href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
             style="padding: 0 !important; border: 0 !important;"
             target="_blank"
@@ -334,14 +336,14 @@
 
     <pickup-availability
       class="product__pickup-availabilities quick-add-hidden"
-      {% if pick_up_availabilities.size > 0 %}
+      {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
         available
       {% endif %}
-      data-root-url="{{ routes.root_url }}"
-      data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-      data-has-only-default-variant="{{ product.has_only_default_variant }}"
-      data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-    >
+        data-root-url="{{ routes.root_url }}"
+        data-variant-id="{{ product.selected_or_first_available_variant.id }}"
+        data-has-only-default-variant="{{ product.has_only_default_variant }}"
+        data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
+      >
       <template>
         <pickup-availability-preview class="pickup-availability-preview">
           <div class="pickup-availability-info">
@@ -359,17 +361,22 @@
 </div>
 
 <style>
+  /* ── Mobile-only scheme button ────────────────────────────────────────
+     Hidden on desktop (≥750px). No interference with desktop layout.   */
+
   {% comment %} .lucira-mobile-scheme-btn {
     display: none;
   } {% endcomment %}
 
   @media (max-width: 749px) {
+    /* Make .product-form__buttons a flex row on mobile */
     .buy-buttons-wrapper .product-form__buttons {
       display: flex;
       align-items: stretch;
       gap: 10px;
     }
 
+    /* Show the scheme button on mobile only */
     .lucira-mobile-scheme-btn {
       display: flex;
       align-items: center;
@@ -398,6 +405,7 @@
       text-decoration: none;
     }
 
+    /* ATC button takes remaining width */
     .buy-buttons-wrapper .product-form__buttons .product-form__submit {
       flex: 1 1 auto;
     }
@@ -405,6 +413,7 @@
 </style>
 
 {% comment %} chatWithExperts datalayer is fired by the waLink click listener inside buildBar() below {% endcomment %}
+
 
 {% comment %} ── Sticky Mobile Bar — pure JS clone approach ── {% endcomment %}
 
@@ -444,6 +453,7 @@
       gap: 8px;
     }
 
+    /* WhatsApp circle icon */
     #lucira-sticky-bar .lucira-sticky-wa-btn {
       display: flex !important;
       align-items: center;
@@ -466,6 +476,7 @@
       display: block;
     }
 
+    /* BUY WITH SCHEME — outlined, no price */
     #lucira-sticky-bar .lucira-mobile-scheme-btn {
       display: flex !important;
       align-items: center;
@@ -487,6 +498,7 @@
       text-align: center;
     }
 
+    /* ATC takes remaining width */
     #lucira-sticky-bar .product-form__submit {
       flex: 1 1 auto;
     }
@@ -500,11 +512,12 @@
   if (window.__luciraStickyBarInit) return;
   window.__luciraStickyBarInit = true;
 
+  /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
   var SCHEME_URL         = {{ scheme_url | json }};
   var SHOW_SCHEME_BTN    = {{ _show_scheme_btn }};
   var PRODUCT_TITLE      = {{ product.title | json }};
   var currentVariantId   = '{{ product.selected_or_first_available_variant.id }}';
-
+  /* ── Build the sticky bar by CLONING the real button row ── */
   function buildBar() {
     var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
     if (!originalButtons) return null;
@@ -513,11 +526,14 @@
     bar.id = 'lucira-sticky-bar';
     bar.setAttribute('aria-hidden', 'true');
 
+    /* Deep-clone the entire buttons row */
     var cloned = originalButtons.cloneNode(true);
 
+    /* Remove any accidentally cloned scheme buttons (safety net) */
     var existingScheme = cloned.querySelector('.lucira-mobile-scheme-btn');
     if (existingScheme) existingScheme.remove();
 
+    /* Wire ATC clone → original submit */
     var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
     if (clonedSubmit) {
       clonedSubmit.id = 'lucira-sticky-atc-btn';
@@ -528,6 +544,7 @@
       });
     }
 
+    /* ── Build WhatsApp icon ── */
     var waLink = document.createElement('a');
     waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
     waLink.target = '_blank';
@@ -545,6 +562,10 @@
     waImg.className = 'chat-with-experts';
     waLink.appendChild(waImg);
 
+    /* chatWithExperts datalayer is handled by the delegated document listener
+       in sticky-chat-experts.liquid (catches .lucira-sticky-wa-btn class) */
+
+    /* ── Build Scheme button using Liquid-resolved SCHEME_URL ── */
     var schemeBtn = document.createElement('a');
     schemeBtn.href = SCHEME_URL;
     schemeBtn.className = 'lucira-mobile-scheme-btn';
@@ -565,16 +586,18 @@
       });
     });
 
+    /* Order: [WA icon] [SCHEME btn] [ATC btn] */
     if (SHOW_SCHEME_BTN) {
-      cloned.insertBefore(schemeBtn, cloned.firstChild);
+      cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
     }
-    cloned.insertBefore(waLink, cloned.firstChild);
+    cloned.insertBefore(waLink, cloned.firstChild);    // WA always shown
 
     bar.appendChild(cloned);
     document.body.appendChild(bar);
     return bar;
   }
 
+  /* ── Sync disabled state + button text from original → clone ── */
   function syncATC() {
     var origBtn   = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
     var stickyBtn = document.getElementById('lucira-sticky-atc-btn');
@@ -589,6 +612,7 @@
     }
   }
 
+  /* ── Show / hide ── */
   function setBarVisible(visible) {
     var bar = document.getElementById('lucira-sticky-bar');
     if (!bar) return;
@@ -596,6 +620,7 @@
     bar.setAttribute('aria-hidden', String(!visible));
   }
 
+  /* ── IntersectionObserver on the real button row ── */
   function initObserver() {
     var sentinel = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
     if (!sentinel) sentinel = document.querySelector('.buy-buttons-wrapper');
@@ -603,6 +628,7 @@
 
     var observer = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
+        // Show sticky bar whenever ATC is NOT visible in viewport (above OR below)
         setBarVisible(!entry.isIntersecting);
       });
     }, { threshold: 0, rootMargin: '0px' });
@@ -610,9 +636,11 @@
     observer.observe(sentinel);
   }
 
+  /* ── Variant change → sync ATC state only ── */
   function onVariantChange() {
     requestAnimationFrame(syncATC);
 
+    // Keep currentVariantId fresh for dataLayer reads
     var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
     var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
     if (variantInput && variantInput.value) {
@@ -623,6 +651,7 @@
   document.addEventListener('variant:change',  function () { onVariantChange(); });
   document.addEventListener('variant:changed', function () { onVariantChange(); });
 
+  /* MutationObserver fallback on hidden input[name="id"] */
   function watchVariantInput() {
     var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
     var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
@@ -641,6 +670,7 @@
     });
   }
 
+  /* ── Boot ── */
   document.addEventListener('DOMContentLoaded', function () {
     buildBar();
     syncATC();
