@@ -668,97 +668,100 @@
 <script>
   (function () {
 
-    const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
+  const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
 
-    // ✅ GET VARIANT ID
-    function getVariantId() {
-      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
-      return input ? input.value : null;
+  // ✅ GET VARIANT ID (fallback safe)
+  function getVariantId() {
+    const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+    return input ? input.value : null;
+  }
+
+  // ✅ FUTURE DATE (MADE TO ORDER)
+  function getFutureDate(days = 15) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+  }
+
+  // ✅ RENDER UI
+  function renderStoreData(data) {
+    const container = document.getElementById("store-availability-dynamic");
+    if (!container) return;
+
+    if (!data) {
+      container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
+      return;
     }
 
-    // ✅ FUTURE DATE (MADE TO ORDER)
-    function getFutureDate(days = 15) {
-      const d = new Date();
-      d.setDate(d.getDate() + days);
+    if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+      const store = data.in_stock_locations[0];
 
-      return d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
+      container.innerHTML = `
+        <div class="store-available">
+          <p>
+            Available at your nearest store:
+            <strong>${store.location_name}</strong>
+          </p>
+          ${
+            data.in_stock_locations.length > 1
+              ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
+              : ''
+          }
+        </div>
+      `;
+    } else {
+      container.innerHTML = `
+        <div class="made-to-order-box">
+          Dispatch by: ${getFutureDate()} | This item is made to order
+        </div>
+      `;
+    }
+  }
+
+  // ✅ FETCH INVENTORY (WITH VARIANT FROM EVENT)
+  function fetchInventoryByVariant(variant) {
+    const variantId = variant?.id || getVariantId();
+    if (!variantId) return;
+
+    renderStoreData(null);
+
+    fetch(`${API_URL}?variant_id=${variantId}`)
+      .then(res => res.json())
+      .then(data => {
+        console.log("Inventory API:", data);
+        renderStoreData(data);
+      })
+      .catch(err => {
+        console.error("Inventory error:", err);
+        renderStoreData({ in_stock_locations: [] });
       });
-    }
+  }
 
-    // ✅ RENDER UI
-    function renderStoreData(data) {
-      const container = document.getElementById("store-availability-dynamic");
-      if (!container) return;
+  // ✅ INITIAL LOAD (LIKE SHOPIFY)
+  document.addEventListener("DOMContentLoaded", function () {
+    fetchInventoryByVariant();
+  });
 
-      // 🔄 LOADING STATE
-      if (!data) {
-        container.innerHTML = `
-          <div class="store-loading">
-            Checking availability...
-          </div>
-        `;
-        return;
-      }
+  // ✅ 1. SHOPIFY CORE EVENT (MOST IMPORTANT)
+  if (typeof subscribe === "function") {
+    subscribe(PUB_SUB_EVENTS.variantChange, ({ data }) => {
+      fetchInventoryByVariant(data?.variant);
+    });
+  }
 
-      // ✅ STOCK AVAILABLE
-      if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+  // ✅ 2. GLOBAL EVENTS (BACKUP)
+  document.addEventListener('variant:change', (e) => {
+    fetchInventoryByVariant(e.detail?.variant);
+  });
 
-        const store = data.in_stock_locations[0];
+  document.addEventListener('variant:changed', (e) => {
+    fetchInventoryByVariant(e.detail?.variant);
+  });
 
-        container.innerHTML = `
-          <div class="store-available">
-            <p>
-              Available at your nearest store:
-              <strong>${store.location_name}</strong>
-            </p>
-
-            ${
-              data.in_stock_locations.length > 1
-                ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
-                : ''
-            }
-          </div>
-        `;
-
-      } else {
-
-        // ❌ NO STOCK → MADE TO ORDER
-        container.innerHTML = `
-          <div class="made-to-order-box">
-            Dispatch by: ${getFutureDate()} | This item is made to order
-          </div>
-        `;
-      }
-    }
-
-    // ✅ FETCH INVENTORY
-    function fetchInventory() {
-      const variantId = getVariantId();
-      if (!variantId) return;
-
-      renderStoreData(null); // loading
-
-      fetch(`${API_URL}?variant_id=${variantId}`)
-        .then(res => res.json())
-        .then(data => {
-          console.log("Inventory API:", data);
-          renderStoreData(data);
-        })
-        .catch(err => {
-          console.error("Inventory error:", err);
-          renderStoreData({ in_stock_locations: [] });
-        });
-    }
-
-    // ✅ INITIAL LOAD (FIXED)
-    setTimeout(fetchInventory, 300);
-
-    // ✅ VARIANT CHANGE (ALL CASES COVERED)
-    document.addEventListener('variant:change', fetchInventory);
-    document.addEventListener('variant:changed', fetchInventory);
-
-  })();
+})();
 </script>
