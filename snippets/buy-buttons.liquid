@@ -792,3 +792,91 @@
 
   })();
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+  const variantSelects = document.querySelector("variant-selects");
+  const container = document.getElementById("store-availability-dynamic");
+
+  if (!variantSelects || !container) return;
+
+  const API_URL = "https://app.lucirajewelry.com/inventory/inventory-check.php";
+
+  function getFutureDate(days = 15) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+
+    return d.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+  }
+
+  function render(data) {
+    // 🔄 loading
+    if (!data) {
+      container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
+      return;
+    }
+
+    // ✅ stock
+    if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+      const store = data.in_stock_locations[0];
+
+      container.innerHTML = `
+        <div class="store-available">
+          <p>
+            Available at your nearest store:
+            <strong>${store.location_name}</strong>
+          </p>
+          ${
+            data.in_stock_locations.length > 1
+              ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
+              : ""
+          }
+        </div>
+      `;
+    } else {
+      // ❌ no stock
+      container.innerHTML = `
+        <div class="made-to-order-box">
+          Dispatch by: ${getFutureDate()} | This item is made to order
+        </div>
+      `;
+    }
+  }
+
+  function fetchInventory(variantId) {
+    if (!variantId) return;
+
+    render(null);
+
+    fetch(`${API_URL}?variant_id=${variantId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("Inventory:", data);
+        render(data);
+      })
+      .catch((err) => {
+        console.error("Inventory error:", err);
+        render({ in_stock_locations: [] });
+      });
+  }
+
+  // ✅ INITIAL LOAD (same as your price logic would need)
+  const initialVariantInput = document.querySelector('form[action="/cart/add"] input[name="id"]');
+  if (initialVariantInput && initialVariantInput.value) {
+    fetchInventory(initialVariantInput.value);
+  }
+
+  // ✅ EXACT SAME STYLE AS YOUR PRICE SCRIPT
+  variantSelects.addEventListener("variant:change", function (event) {
+    const variant = event.detail?.variant;
+    if (!variant) return;
+
+    fetchInventory(variant.id);
+  });
+
+});
+</script>
