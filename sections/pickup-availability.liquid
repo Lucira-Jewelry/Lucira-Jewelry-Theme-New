@@ -2,50 +2,63 @@
 {%- assign pick_up_availabilities = product_variant.store_availabilities | where: 'pick_up_enabled', true -%}
 
 {%- if pick_up_availabilities.size > 0 -%}
+
+  {% comment %} ── Map FIRST (closest) location ── {% endcomment %}
+  {% assign closest_location = pick_up_availabilities.first %}
+  {% assign loc = closest_location.location.name %}
+
+  {% case loc %}
+    {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+    {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+    {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+    {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+    {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+    {% else %}{% assign loc_name = loc %}
+  {% endcase %}
+
   <pickup-availability-preview class="pickup-availability-preview">
-    {% assign closest_location = pick_up_availabilities.first %}
-
-    {% if closest_location.available %}
-      <span class="svg-wrapper">{{ 'icon-tick.svg' | inline_asset_content }}</span>
-    {% endif %}
-
     <div class="pickup-availability-info">
+
       {%- if closest_location.available -%}
+
         <p class="caption-large">
-          {{
-            'products.product.pickup_availability.pick_up_available_at_html'
-            | t: location_name: closest_location.location.name
-          }}
+          {% if pick_up_availabilities.size == 1 %}
+            Available at {{ loc_name }}
+          {% else %}
+            Available at {{ loc_name }} + {{ pick_up_availabilities.size | minus: 1 }} other store{% if pick_up_availabilities.size > 2 %}s{% endif %}
+          {% endif %}
         </p>
-        <p class="caption">{{ closest_location.pick_up_time }}</p>
+
         <button
           id="ShowPickupAvailabilityDrawer"
           class="pickup-availability-button link link--text underlined-link"
           aria-haspopup="dialog"
         >
-          {%- if pick_up_availabilities.size == 1 -%}
-            {{ 'products.product.pickup_availability.view_store_info' | t }}
-          {%- else -%}
-            {{ 'products.product.pickup_availability.check_other_stores' | t }}
-          {%- endif -%}
+          {% if pick_up_availabilities.size == 1 %}
+            View Store
+          {% else %}
+            Find All Stores
+          {% endif %}
         </button>
+
       {%- else -%}
+
         <p class="caption-large">
-          {{
-            'products.product.pickup_availability.pick_up_unavailable_at_html'
-            | t: location_name: closest_location.location.name
-          }}
+          Not available at {{ loc_name }}
         </p>
-        {%- if pick_up_availabilities.size > 1 -%}
+
+        {% if pick_up_availabilities.size > 1 %}
           <button
             id="ShowPickupAvailabilityDrawer"
             class="pickup-availability-button link link--text underlined-link"
             aria-haspopup="dialog"
           >
-            {{ 'products.product.pickup_availability.check_other_stores' | t }}
+            Check Other Stores
           </button>
-        {%- endif -%}
+        {% endif %}
+
       {%- endif -%}
+
     </div>
   </pickup-availability-preview>
 
@@ -80,16 +93,31 @@
     {%- endunless -%}
 
     <ul class="pickup-availability-list list-unstyled" role="list" data-store-availability-drawer-content>
+
       {%- for availability in pick_up_availabilities -%}
+
+        {% assign loc = availability.location.name %}
+
+        {% case loc %}
+          {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+          {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+          {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+          {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+          {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+          {% else %}{% assign loc_name = loc %}
+        {% endcase %}
+
         <li class="pickup-availability-list__item">
-          <h3 class="h4">{{ availability.location.name | escape }}</h3>
+          <h3 class="h4">{{ loc_name }}</h3>
+
           <p class="pickup-availability-preview caption-large">
             {%- if availability.available -%}
               <span class="svg-wrapper">
                 {{- 'icon-tick.svg' | inline_asset_content -}}
               </span>
-              {{ 'products.product.pickup_availability.pick_up_available' | t }},
-              {{ availability.pick_up_time | downcase }}
+              Available at {{ loc_name }}
+            {%- else -%}
+              Not available
             {%- endif -%}
           </p>
 
@@ -102,7 +130,10 @@
             {%- endif -%}
           </address>
         </li>
+
       {%- endfor -%}
+
     </ul>
   </pickup-availability-drawer>
+
 {%- endif -%}
