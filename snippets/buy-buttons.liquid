@@ -696,81 +696,99 @@
   })();
 </script>
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+  (function () {
 
-  const variantSelects = document.querySelector("variant-selects");
-  const container = document.getElementById("store-availability-dynamic");
+    const API_URL = "https://app.lucirajewelry.com/inventory/inventory-check.php";
 
-  if (!variantSelects || !container) return;
-
-  const API_URL = "https://app.lucirajewelry.com/inventory/inventory-check.php";
-
-  function getFutureDate(days = 15) {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-
-    return d.toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-    });
-  }
-
-  function render(data) {
-    if (!data) {
-      container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
-      return;
+    // ✅ GET VARIANT ID
+    function getVariantId() {
+      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+      return input ? input.value : null;
     }
 
-    if (data.in_stock_locations && data.in_stock_locations.length > 0) {
-      const store = data.in_stock_locations[0];
+    // ✅ FUTURE DATE (MADE TO ORDER)
+    function getFutureDate(days = 15) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
 
-      container.innerHTML = `
-        <div class="store-available">
-          <p>
-            Available at your nearest store:
-            <strong>${store.location_name}</strong>
-          </p>
-          ${
-            data.in_stock_locations.length > 1
-              ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
-              : ""
-          }
-        </div>
-      `;
-    } else {
-      container.innerHTML = `
-        <div class="made-to-order-box">
-          Dispatch by: ${getFutureDate()} | This item is made to order
-        </div>
-      `;
+      return d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric'
+      });
     }
-  }
 
-  function fetchInventory(variantId) {
-    if (!variantId) return;
+    // ✅ RENDER UI
+    function renderStoreData(data) {
+      const container = document.getElementById("store-availability-dynamic");
+      if (!container) return;
 
-    render(null);
+      // 🔄 LOADING STATE
+      if (!data) {
+        container.innerHTML = `
+          <div class="store-loading">
+            Checking availability...
+          </div>
+        `;
+        return;
+      }
 
-    fetch(`${API_URL}?variant_id=${variantId}`)
-      .then(res => res.json())
-      .then(data => render(data))
-      .catch(() => render({ in_stock_locations: [] }));
-  }
+      // ✅ STOCK AVAILABLE
+      if (data.in_stock_locations && data.in_stock_locations.length > 0) {
 
-  // ✅ INITIAL LOAD
-  const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
-  if (input && input.value) {
-    fetchInventory(input.value);
-  }
+        const store = data.in_stock_locations[0];
 
-  // ✅ EXACT SAME AS YOUR PRICE LOGIC
-  variantSelects.addEventListener("variant:change", function (event) {
-    const variant = event.detail?.variant;
-    if (!variant) return;
+        container.innerHTML = `
+          <div class="store-available">
+            <p>
+              Available at your nearest store:
+              <strong>${store.location_name}</strong>
+            </p>
 
-    fetchInventory(variant.id);
-  });
+            ${
+              data.in_stock_locations.length > 1
+                ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
+                : ''
+            }
+          </div>
+        `;
 
-});
+      } else {
+
+        // ❌ NO STOCK → MADE TO ORDER
+        container.innerHTML = `
+          <div class="made-to-order-box">
+            Dispatch by: ${getFutureDate()} | This item is made to order
+          </div>
+        `;
+      }
+    }
+
+    // ✅ FETCH INVENTORY
+    function fetchInventory() {
+      const variantId = getVariantId();
+      if (!variantId) return;
+
+      renderStoreData(null); // loading
+
+      fetch(`${API_URL}?variant_id=${variantId}`)
+        .then(res => res.json())
+        .then(data => {
+          console.log("Inventory API:", data);
+          renderStoreData(data);
+        })
+        .catch(err => {
+          console.error("Inventory error:", err);
+          renderStoreData({ in_stock_locations: [] });
+        });
+    }
+
+    // ✅ INITIAL LOAD (FIXED)
+    setTimeout(fetchInventory, 300);
+
+    // ✅ VARIANT CHANGE (ALL CASES COVERED)
+    document.addEventListener('variant:change', fetchInventory);
+    document.addEventListener('variant:changed', fetchInventory);
+
+  })();
 </script>
