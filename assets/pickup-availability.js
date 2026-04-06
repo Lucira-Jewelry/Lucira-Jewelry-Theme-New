@@ -41,7 +41,7 @@ if (!customElements.get('pickup-availability')) {
       }
 
       update(variant) {
-        if (variant?.available) {
+        if (variant) {
           this.fetchAvailability(variant.id);
         } else {
           this.removeAttribute('available');
