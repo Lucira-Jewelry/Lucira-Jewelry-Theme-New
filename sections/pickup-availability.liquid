@@ -1,174 +1,139 @@
-{% assign variant = product.selected_or_first_available_variant %}
+{% comment %}theme-check-disable UndefinedObject{% endcomment %}
+{%- assign pick_up_availabilities = product_variant.store_availabilities | where: 'pick_up_enabled', true -%}
 
-{% assign is_in_stock = false %}
-{% if variant.available and variant.inventory_quantity > 0 %}
-  {% assign is_in_stock = true %}
-{% elsif variant.available and variant.inventory_management == blank %}
-  {% assign is_in_stock = true %}
-{% endif %}
+{%- if pick_up_availabilities.size > 0 -%}
 
-{% if is_in_stock %}
-  {% assign delivery_days = 2 %}
-{% else %}
-  {% assign delivery_days = 15 %}
-{% endif %}
+  {% comment %} ── Map FIRST (closest) location ── {% endcomment %}
+  {% assign closest_location = pick_up_availabilities.first %}
+  {% assign loc = closest_location.location.name %}
 
-{% assign total_seconds = delivery_days | times: 86400 %}
-{% assign now_ts = 'now' | date: '%s' %}
-{% assign future_ts = now_ts | plus: total_seconds %}
-{% assign delivery_date = future_ts | date: '%B %d, %Y' %}
+  {% case loc %}
+    {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+    {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+    {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+    {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+    {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+    {% else %}{% assign loc_name = loc %}
+  {% endcase %}
 
-<div class="lucira-delivery-container">
+  <pickup-availability-preview class="pickup-availability-preview">
+    <div class="pickup-availability-info">
 
-  <!-- PINCODE INPUT -->
-  <div class="lucira-delivery-input-container">
-    <input id="lucira-delivery-zipcode" placeholder="Enter Pincode" maxlength="6">
-    <button id="lucira-locate-btn">Locate / Submit</button>
-  </div>
+      {%- if closest_location.available -%}
 
-  <!-- DELIVERY -->
-  <div class="lucira-delivery-info">
-    <span>
-      {% if is_in_stock %}
-        Estimated Free Dispatch by
-      {% else %}
-        Available & Dispatched by
-      {% endif %}
-      <b id="delivery-date-display">{{ delivery_date }}</b>
-    </span>
-  </div>
+        <p class="caption-large">
+          {% if pick_up_availabilities.size == 1 %}
+            Available at {{ loc_name }}
+          {% else %}
+            Available at {{ loc_name }} + {{ pick_up_availabilities.size | minus: 1 }} other store{% if pick_up_availabilities.size > 2 %}s{% endif %}
+          {% endif %}
+        </p>
 
-  <!-- PICKUP (NEW) -->
-  <div id="pickup-dynamic"></div>
-
-</div>
-
-<script>
-(function () {
-
-  function setCookie(name, value) {
-    document.cookie = name + "=" + value + "; path=/";
-  }
-
-  function getCookie(name) {
-    const m = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-    return m ? m[2] : null;
-  }
-
-  function initPincode() {
-    const input = document.getElementById('lucira-delivery-zipcode');
-    const btn = document.getElementById('lucira-locate-btn');
-
-    btn.onclick = function () {
-      const val = input.value.trim();
-      if (/^\d{6}$/.test(val)) {
-        setCookie('user_pincode', val);
-        renderPickup(); // 🔥 trigger pickup refresh
-      }
-    };
-
-    const saved = getCookie('user_pincode');
-    if (saved) input.value = saved;
-  }
-
-  // =============================
-  // 🔥 PICKUP LOGIC START
-  // =============================
-
-  const STORE_CONFIG = {
-    "CS1": { name: "Chembur", lat: 19.0576, lng: 72.9007 },
-    "BO1": { name: "Borivali", lat: 19.2226, lng: 72.8643 },
-    "PS1": { name: "Pune", lat: 18.5233, lng: 73.8479 },
-    "NOS18": { name: "Noida", lat: 28.5701, lng: 77.3236 },
-    "Divinecarat Lifestyles Pvt Ltd": { name: "Head Office", lat: 19.1742, lng: 72.8448 }
-  };
-
-  function pincodeToLatLng(pin) {
-    pin = parseInt(pin);
-    if (pin >= 400000 && pin < 401000) return { lat: 19.0760, lng: 72.8777 };
-    if (pin >= 411000 && pin < 412000) return { lat: 18.5204, lng: 73.8567 };
-    if (pin >= 201000 && pin < 202000) return { lat: 28.5355, lng: 77.3910 };
-    return null;
-  }
-
-  function getDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a =
-      Math.sin(dLat/2)**2 +
-      Math.cos(lat1*Math.PI/180) *
-      Math.cos(lat2*Math.PI/180) *
-      Math.sin(dLon/2)**2;
-    return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-  }
-
-  function renderPickup() {
-
-    const container = document.getElementById("pickup-dynamic");
-
-    let stores = [
-      {% for availability in product.selected_or_first_available_variant.store_availabilities %}
-      {
-        code: "{{ availability.location.name }}",
-        available: {{ availability.available | json }}
-      }{% unless forloop.last %},{% endunless %}
-      {% endfor %}
-    ];
-
-    stores = stores.filter(s => s.available);
-
-    if (!stores.length) {
-      container.innerHTML = "Not available in stores";
-      return;
-    }
-
-    const pin = getCookie('user_pincode');
-    const userCoords = pincodeToLatLng(pin);
-
-    let nearby = [];
-
-    if (userCoords) {
-      nearby = stores.filter(s => {
-        const store = STORE_CONFIG[s.code];
-        if (!store) return false;
-
-        return getDistance(
-          userCoords.lat,
-          userCoords.lng,
-          store.lat,
-          store.lng
-        ) <= 25;
-      });
-    }
-
-    const finalStores = nearby.length ? nearby : stores;
-
-    const first = finalStores[0];
-    const firstName = STORE_CONFIG[first.code]?.name || first.code;
-
-    let text = finalStores.length === 1
-      ? `Available at ${firstName}`
-      : `Available at ${firstName} + ${finalStores.length - 1} other store`;
-
-    container.innerHTML = `
-      <div>
-        <p>${text}</p>
-        <button onclick="alert('Open drawer')">
-          ${finalStores.length === 1 ? 'View Store' : 'Find All Stores'}
+        <button
+          id="ShowPickupAvailabilityDrawer"
+          class="pickup-availability-button link link--text underlined-link"
+          aria-haspopup="dialog"
+        >
+          {% if pick_up_availabilities.size == 1 %}
+            View Store
+          {% else %}
+            Find All Stores
+          {% endif %}
         </button>
-      </div>
-    `;
-  }
 
-  // =============================
-  // INIT
-  // =============================
+      {%- else -%}
 
-  document.addEventListener("DOMContentLoaded", function () {
-    initPincode();
-    renderPickup();
-  });
+        <p class="caption-large">
+          Not available at {{ loc_name }}
+        </p>
 
-})();
-</script>
+        {% if pick_up_availabilities.size > 1 %}
+          <button
+            id="ShowPickupAvailabilityDrawer"
+            class="pickup-availability-button link link--text underlined-link"
+            aria-haspopup="dialog"
+          >
+            Check Other Stores
+          </button>
+        {% endif %}
+
+      {%- endif -%}
+
+    </div>
+  </pickup-availability-preview>
+
+  <pickup-availability-drawer
+    class="gradient"
+    tabindex="-1"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="PickupAvailabilityHeading"
+  >
+    <div class="pickup-availability-header">
+      <h2 class="h3 pickup-availability-drawer-title" id="PickupAvailabilityHeading">
+        {{ product_variant.product.title | escape }}
+      </h2>
+      <button class="pickup-availability-drawer-button" type="button" aria-label="{{ 'accessibility.close' | t }}">
+        {{- 'icon-close.svg' | inline_asset_content -}}
+      </button>
+    </div>
+
+    {%- unless product_variant.product.has_only_default_variant -%}
+      <p class="pickup-availability-variant">
+        {%- for product_option in product_variant.product.options_with_values -%}
+          {{ product_option.name | escape }}:&nbsp;
+          {%- for value in product_option.values -%}
+            {%- if product_option.selected_value == value -%}
+              <span>{{ value | escape }}</span>
+            {%- endif -%}
+          {%- endfor -%}
+          {%- unless forloop.last -%},&nbsp;{%- endunless -%}
+        {%- endfor -%}
+      </p>
+    {%- endunless -%}
+
+    <ul class="pickup-availability-list list-unstyled" role="list" data-store-availability-drawer-content>
+
+      {%- for availability in pick_up_availabilities -%}
+
+        {% assign loc = availability.location.name %}
+
+        {% case loc %}
+          {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+          {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+          {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+          {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+          {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+          {% else %}{% assign loc_name = loc %}
+        {% endcase %}
+
+        <li class="pickup-availability-list__item">
+          <h3 class="h4">{{ loc_name }}</h3>
+
+          <p class="pickup-availability-preview caption-large">
+            {%- if availability.available -%}
+              <span class="svg-wrapper">
+                {{- 'icon-tick.svg' | inline_asset_content -}}
+              </span>
+              Available at {{ loc_name }}
+            {%- else -%}
+              Not available
+            {%- endif -%}
+          </p>
+
+          {%- assign address = availability.location.address -%}
+          <address class="pickup-availability-address">
+            {{ address | format_address }}
+
+            {%- if address.phone.size > 0 -%}
+              <p>{{ address.phone }}</p>
+            {%- endif -%}
+          </address>
+        </li>
+
+      {%- endfor -%}
+
+    </ul>
+  </pickup-availability-drawer>
+
+{%- endif -%}
