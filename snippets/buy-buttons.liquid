@@ -328,30 +328,23 @@
   {% render 'pdp-delivery-details' %}
 
   
-    <p>
-      {{ store.location.name }} |
-      available: {{ store.available }} |
-      qty: {{ store.inventory_quantity | default: 'NULL' }}
-    </p>
-  
 
   {% assign variant = product.selected_or_first_available_variant %}
 
-  {% assign valid_store_count = 0 %}
   {% assign first_store_name = '' %}
   {% assign first_store_lat = '' %}
   {% assign first_store_lng = '' %}
 
   {% for store in variant.store_availabilities %}
 
-    {% if store.pick_up_enabled and store.available %}
-      {% assign valid_store_count = valid_store_count | plus: 1 %}
+    {% if store.pick_up_enabled %}
 
-      {% if first_store_name == '' %}
-        {% assign first_store_name = store.location.name %}
-        {% assign first_store_lat = store.location.latitude %}
-        {% assign first_store_lng = store.location.longitude %}
-      {% endif %}
+      {% assign first_store_name = store.location.name %}
+      {% assign first_store_lat = store.location.latitude %}
+      {% assign first_store_lng = store.location.longitude %}
+
+      {% break %} {# ✅ STOP LOOP HERE #}
+
     {% endif %}
 
   {% endfor %}
@@ -362,20 +355,20 @@
 
   <div class="lucira-store-availability">
 
-    {% if valid_store_count > 0 %}
+    {% if first_store_name != '' %}
+
       <p>
         Available at your nearest store:
         <strong>{{ first_store_name }}</strong>
       </p>
-      {% if valid_store_count > 1 %}
-        <p>+ {{ valid_store_count | minus: 1 }} other stores</p>
-      {% endif %}
+
       <a 
         href="https://www.google.com/maps/search/?api=1&query={{ first_store_lat }},{{ first_store_lng }}"
         target="_blank"
       >
         Get Direction
       </a>
+
     {% else %}
 
       <div class="made-to-order-box">
@@ -383,41 +376,10 @@
           Dispatch by: {{ future_date }} | This item is made to order
         </span>
       </div>
+
     {% endif %}
+
   </div>
-
-  {% comment %} {%- if show_pickup_availability -%}
-    {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
-      | where: 'pick_up_enabled', true
-      | where: 'available', true
-    -%}
-
-    {%- if pick_up_availabilities.size > 0 -%}
-      {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag }}
-
-      <pickup-availability
-        class="product__pickup-availabilities quick-add-hidden"
-        available
-        data-root-url="{{ routes.root_url }}"
-        data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-        data-has-only-default-variant="{{ product.has_only_default_variant }}"
-        data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-      >
-        <template>
-          <pickup-availability-preview class="pickup-availability-preview">
-            <div class="pickup-availability-info">
-              <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
-              <button class="pickup-availability-button link link--text underlined-link">
-                {{ 'products.product.pickup_availability.refresh' | t }}
-              </button>
-            </div>
-          </pickup-availability-preview>
-        </template>
-      </pickup-availability>
-
-      <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
-    {%- endif -%}
-  {%- endif -%} {% endcomment %}
 
 </div>
 
