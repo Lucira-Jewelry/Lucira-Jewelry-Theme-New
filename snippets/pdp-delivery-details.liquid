@@ -123,11 +123,13 @@
       date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
       expires = "; expires=" + date.toUTCString();
     }
+    // ✅ FORCE STRING
     document.cookie = name + "=" + String(value) + "; path=/" + expires;
   }
 
   function getCookie(name) {
     var match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+    // ✅ FORCE STRING
     return match ? String(match[2]) : null;
   }
 
@@ -208,8 +210,8 @@
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            customer_id: String(customerId),
-            pincode: String(pincode)
+            customer_id: String(customerId), // ✅ STRING
+            pincode: String(pincode)         // ✅ STRING
           })
         });
       }
@@ -222,36 +224,21 @@
     return fetch(url).then(r => r.json());
   }
 
-  function reloadAfterSave() {
-    // small delay for UX smoothness
-    setTimeout(function () {
-      location.reload();
-    }, 300);
-  }
-
   function init() {
-
     var btn = document.getElementById('lucira-locate-btn');
     var input = document.getElementById('lucira-delivery-zipcode');
 
     if (!btn || !input) return;
 
-    input.addEventListener('input', function () {
-      toggleButtonState(false);
-    });
-
-    input.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') btn.click();
-    });
+    input.addEventListener('input', () => toggleButtonState(false));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') btn.click(); });
 
     btn.addEventListener('click', function () {
-
       showError('');
 
       var mode = btn.dataset.mode;
       var val = input.value.replace(/\s+/g, '').trim();
 
-      // 🔁 CHANGE PINCODE
       if (mode === "saved") {
         deleteCookie('user_pincode');
         input.value = '';
@@ -259,7 +246,7 @@
         return;
       }
 
-      // 🧠 MANUAL ENTRY
+      // 🔹 Manual
       if (mode === "manual") {
 
         if (!/^\d{6}$/.test(val)) {
@@ -267,37 +254,25 @@
           return;
         }
 
-        setLocateBtnState(true);
-
         fetchWithRetry(`https://nominatim.openstreetmap.org/search?postalcode=${val}&country=India&format=json`)
-          .then(function (data) {
-
+          .then(data => {
             if (data && data.length) {
 
-              setCookie('user_pincode', String(val));
+              setCookie('user_pincode', String(val)); // ✅ STRING
               pushPromoClick(val);
               savePincodeToServer(val);
 
               toggleButtonState(true);
 
-              reloadAfterSave(); // ✅ KEY FIX
-
             } else {
               showError('Pincode not found');
             }
-
-          })
-          .catch(function () {
-            showError('Something went wrong');
-          })
-          .finally(function () {
-            setLocateBtnState(false);
           });
 
         return;
       }
 
-      // 📍 GEOLOCATION
+      // 🔹 GEO
       if (!navigator.geolocation) {
         showError('Geolocation not supported');
         return;
@@ -308,7 +283,7 @@
       navigator.geolocation.getCurrentPosition(function (pos) {
 
         fetchWithRetry(`https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`)
-          .then(function (data) {
+          .then(data => {
 
             var pin = data?.address?.postcode?.replace(/\s+/g, '');
 
@@ -316,44 +291,35 @@
 
               input.value = pin;
 
-              setCookie('user_pincode', String(pin));
+              setCookie('user_pincode', String(pin)); // ✅ STRING
               pushPromoClick(pin);
               savePincodeToServer(pin);
 
               toggleButtonState(true);
 
-              reloadAfterSave(); // ✅ KEY FIX
-
             } else {
               showError('Invalid location');
             }
-
           })
-          .catch(function () {
-            showError('Location fetch failed');
-          })
-          .finally(function () {
-            setLocateBtnState(false);
-          });
+          .finally(() => setLocateBtnState(false));
 
       }, function () {
         setLocateBtnState(false);
         showError('Permission denied');
       });
-
     });
 
-    // 🔁 LOAD SAVED PINCODE
+    // ✅ LOAD COOKIE AS STRING
     var saved = String(getCookie('user_pincode') || '');
 
     if (saved && /^\d{6}$/.test(saved)) {
       input.value = saved;
       toggleButtonState(true);
-      savePincodeToServer(saved);
+
+      savePincodeToServer(saved); // sync
     } else {
       toggleButtonState(false);
     }
-
   }
 
   document.addEventListener('DOMContentLoaded', init);
