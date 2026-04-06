@@ -1,10 +1,11 @@
 {% comment %}theme-check-disable UndefinedObject{% endcomment %}
+
 {%- assign pick_up_availabilities = product_variant.store_availabilities | where: 'pick_up_enabled', true -%}
+{%- assign available_stores = pick_up_availabilities | where: 'available', true -%}
 
-{%- if pick_up_availabilities.size > 0 -%}
+{%- if available_stores.size > 0 -%}
 
-  {% comment %} ── Map FIRST (closest) location ── {% endcomment %}
-  {% assign closest_location = pick_up_availabilities.first %}
+  {% assign closest_location = available_stores.first %}
   {% assign loc = closest_location.location.name %}
 
   {% case loc %}
@@ -16,52 +17,34 @@
     {% else %}{% assign loc_name = loc %}
   {% endcase %}
 
+  <!-- 🔹 PREVIEW -->
   <pickup-availability-preview class="pickup-availability-preview">
     <div class="pickup-availability-info">
 
-      {%- if closest_location.available -%}
-
-        <p class="caption-large">
-          {% if pick_up_availabilities.size == 1 %}
-            Available at {{ loc_name }}
-          {% else %}
-            Available at {{ loc_name }} + {{ pick_up_availabilities.size | minus: 1 }} other store{% if pick_up_availabilities.size > 2 %}s{% endif %}
-          {% endif %}
-        </p>
-
-        <button
-          id="ShowPickupAvailabilityDrawer"
-          class="pickup-availability-button link link--text underlined-link"
-          aria-haspopup="dialog"
-        >
-          {% if pick_up_availabilities.size == 1 %}
-            View Store
-          {% else %}
-            Find All Stores
-          {% endif %}
-        </button>
-
-      {%- else -%}
-
-        <p class="caption-large">
-          Not available at {{ loc_name }}
-        </p>
-
-        {% if pick_up_availabilities.size > 1 %}
-          <button
-            id="ShowPickupAvailabilityDrawer"
-            class="pickup-availability-button link link--text underlined-link"
-            aria-haspopup="dialog"
-          >
-            Check Other Stores
-          </button>
+      <p class="caption-large">
+        {% if available_stores.size == 1 %}
+          Available at {{ loc_name }}
+        {% else %}
+          Available at {{ loc_name }} + {{ available_stores.size | minus: 1 }} other store{% if available_stores.size > 2 %}s{% endif %}
         {% endif %}
+      </p>
 
-      {%- endif -%}
+      <button
+        id="ShowPickupAvailabilityDrawer"
+        class="pickup-availability-button link link--text underlined-link"
+        aria-haspopup="dialog"
+      >
+        {% if available_stores.size == 1 %}
+          View Store
+        {% else %}
+          Find All Stores
+        {% endif %}
+      </button>
 
     </div>
   </pickup-availability-preview>
 
+  <!-- 🔹 DRAWER -->
   <pickup-availability-drawer
     class="gradient"
     tabindex="-1"
@@ -73,6 +56,7 @@
       <h2 class="h3 pickup-availability-drawer-title" id="PickupAvailabilityHeading">
         {{ product_variant.product.title | escape }}
       </h2>
+
       <button class="pickup-availability-drawer-button" type="button" aria-label="{{ 'accessibility.close' | t }}">
         {{- 'icon-close.svg' | inline_asset_content -}}
       </button>
@@ -81,20 +65,16 @@
     {%- unless product_variant.product.has_only_default_variant -%}
       <p class="pickup-availability-variant">
         {%- for product_option in product_variant.product.options_with_values -%}
-          {{ product_option.name | escape }}:&nbsp;
-          {%- for value in product_option.values -%}
-            {%- if product_option.selected_value == value -%}
-              <span>{{ value | escape }}</span>
-            {%- endif -%}
-          {%- endfor -%}
-          {%- unless forloop.last -%},&nbsp;{%- endunless -%}
+          {{ product_option.name }}:
+          {{ product_option.selected_value }}
+          {%- unless forloop.last -%}, {% endunless %}
         {%- endfor -%}
       </p>
     {%- endunless -%}
 
-    <ul class="pickup-availability-list list-unstyled" role="list" data-store-availability-drawer-content>
+    <ul class="pickup-availability-list list-unstyled" role="list">
 
-      {%- for availability in pick_up_availabilities -%}
+      {%- for availability in available_stores -%}
 
         {% assign loc = availability.location.name %}
 
@@ -108,17 +88,14 @@
         {% endcase %}
 
         <li class="pickup-availability-list__item">
+
           <h3 class="h4">{{ loc_name }}</h3>
 
           <p class="pickup-availability-preview caption-large">
-            {%- if availability.available -%}
-              <span class="svg-wrapper">
-                {{- 'icon-tick.svg' | inline_asset_content -}}
-              </span>
-              Available at {{ loc_name }}
-            {%- else -%}
-              Not available
-            {%- endif -%}
+            <span class="svg-wrapper">
+              {{- 'icon-tick.svg' | inline_asset_content -}}
+            </span>
+            Available at {{ loc_name }}
           </p>
 
           {%- assign address = availability.location.address -%}
@@ -129,6 +106,7 @@
               <p>{{ address.phone }}</p>
             {%- endif -%}
           </address>
+
         </li>
 
       {%- endfor -%}
