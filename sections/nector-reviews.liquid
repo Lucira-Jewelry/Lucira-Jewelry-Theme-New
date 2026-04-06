@@ -819,13 +819,11 @@
 
   const CONFIG = {
     productId   : '{{ nr_pid }}',
-    apiKey      : {{ nr_api_key | json }},
-    workspaceId : {{ nr_workspace | json }},
     pageSize    : {{ nr_page_size }},
-    baseUrl     : 'https://platform.nector.io/api/v2/merchant/reviews',
-    uploadUrl   : 'https://platform.nector.io/api/v2/merchant/uploads',
     showPhotos  : {{ nr_show_photos }},
     showWrite   : {{ nr_show_write }},
+    // Your VPS backend URL - IMPORTANT: Update this to your actual domain
+    backendUrl  : 'https://app.lucirajewelry.com/nector-reviews/nector-proxy.php'
   };
 
   let allReviews      = [];
@@ -838,58 +836,80 @@
   const el = id => document.getElementById(id);
   window.NectorCache = window.NectorCache || { data: null, isProduct: false, usedFallback: false };
 
-  /* ── API: GET ── */
+  /* ── API: GET via proxy ── */
   async function apiFetch(url) {
-    const res = await fetch(url, {
+    // Parse the original URL to extract parameters
+    const urlObj = new URL(url);
+    const params = new URLSearchParams();
+    
+    // Extract product_id from the original URL if present
+    if (urlObj.searchParams.has('reference_product_id')) {
+      params.append('product_id', urlObj.searchParams.get('reference_product_id'));
+    } else if (CONFIG.productId) {
+      params.append('product_id', CONFIG.productId);
+    }
+    
+    // Add pagination parameters
+    if (urlObj.searchParams.has('limit')) {
+      params.append('limit', urlObj.searchParams.get('limit'));
+    }
+    if (urlObj.searchParams.has('page')) {
+      params.append('page', urlObj.searchParams.get('page'));
+    }
+    
+    // Build the proxy URL
+    let proxyUrl = CONFIG.backendUrl;
+    if (params.toString()) {
+      proxyUrl += `?${params.toString()}`;
+    }
+    
+    console.log('[NectorReviews] Fetching from proxy:', proxyUrl);
+    
+    const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
-        'x-apikey'      : CONFIG.apiKey,
-        'x-source'      : 'mobile',
-        'x-workspaceid' : CONFIG.workspaceId,
-        'Accept'        : 'application/json',
+        'Accept': 'application/json',
       }
     });
-    if (!res.ok) throw new Error('Nector API HTTP ' + res.status);
-    return res.json();
+    
+    if (!response.ok) {
+      throw new Error(`Proxy API HTTP ${response.status}`);
+    }
+    
+    return response.json();
   }
 
-  /* ── API: POST review ── */
+  /* ── API: POST review via proxy ── */
   async function submitReview(payload) {
-    const response = await fetch(CONFIG.baseUrl, {
+    const response = await fetch(CONFIG.backendUrl, {
       method: 'POST',
       headers: {
-        'Content-Type'  : 'application/json',
-        'x-apikey'      : CONFIG.apiKey,
-        'x-source'      : 'mobile',
-        'x-workspaceid' : CONFIG.workspaceId,
-        'Accept'        : 'application/json',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify(payload)
     });
+    
     const json = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(json.message || `HTTP ${response.status}`);
+    if (!response.ok) throw new Error(json.message || json.error || `HTTP ${response.status}`);
     return json;
   }
 
-  /* ── API: POST single image — called AFTER review created ── */
+  /* ── API: POST single image via proxy ── */
   async function uploadSingleImage(file, reviewId) {
     const formData = new FormData();
     formData.append('parent_type', 'reviews');
-    formData.append('parent_id',   reviewId);
-    formData.append('file',        file);
-
-    const response = await fetch(CONFIG.uploadUrl, {
-      method : 'POST',
-      headers: {
-        'x-apikey' : CONFIG.apiKey,
-        'x-source' : 'web',
-      },
-      body: formData,
+    formData.append('parent_id', reviewId);
+    formData.append('file', file);
+    
+    const response = await fetch(CONFIG.backendUrl.replace('nector-proxy.php', '') + 'api/uploads', {
+      method: 'POST',
+      body: formData
     });
-
+    
     const result = await response.json().catch(() => ({}));
     console.log(`[NectorReviews] Upload response for "${file.name}":`, result);
-    if (!response.ok) throw new Error(result?.message || `Upload HTTP ${response.status}`);
+    if (!response.ok) throw new Error(result?.message || result?.error || `Upload HTTP ${response.status}`);
     return result;
   }
 
@@ -909,9 +929,9 @@
 
   /* ── Parse list response ── */
   function parseResponse(json) {
-    const d = json?.data ?? {};
+    const d = json?.data ?? json ?? {};
     return {
-      items : Array.isArray(d.items)           ? d.items  : [],
+      items : Array.isArray(d.items)           ? d.items  : (Array.isArray(d) ? d : []),
       count : typeof d.count === 'number'      ? d.count  : (parseInt(d.count) || 0),
       stats : Array.isArray(d.stats)           ? d.stats  : [],
     };
@@ -947,8 +967,9 @@
       return;
     }
     try {
-      const productUrl = `${CONFIG.baseUrl}?reference_product_id=${CONFIG.productId}`;
-      const parsed     = await fetchAllPages(productUrl);
+      // Use the proxy URL with product ID parameter
+      const proxyUrl = `${CONFIG.backendUrl}?product_id=${CONFIG.productId}`;
+      const parsed = await fetchAllPages(proxyUrl);
 
       if (parsed.items.length > 0) {
         isProductView = true; usedFallback = false;
@@ -957,7 +978,9 @@
         renderAllUI(); return;
       }
 
-      const fallback = await fetchAllPages(CONFIG.baseUrl);
+      // Fallback: fetch all reviews without product filter
+      const fallbackUrl = CONFIG.backendUrl;
+      const fallback = await fetchAllPages(fallbackUrl);
       if (fallback.items.length > 0) {
         isProductView = false; usedFallback = true;
         window.NectorCache = { data: fallback, isProduct: false, usedFallback: true };
@@ -1020,7 +1043,7 @@
 
   /* ── Photo strip ── */
   function buildPhotoStrip(items) {
-    const stripOuter = el('nr-photos-strip'); // the outer wrapper
+    const stripOuter = el('nr-photos-strip');
     if (!stripOuter) return;
     const photos = [];
     items.forEach(r => {
@@ -1042,7 +1065,7 @@
     const nextBtn = el('nr-photos-next');
     if (!scroll || !prevBtn || !nextBtn) return;
 
-    const STEP = 300; // px per arrow click
+    const STEP = 300;
 
     function updateArrows() {
       prevBtn.disabled = scroll.scrollLeft <= 2;
@@ -1057,7 +1080,6 @@
     });
     scroll.addEventListener('scroll', updateArrows, { passive: true });
 
-    // Initial state
     updateArrows();
   }
 
@@ -1145,13 +1167,13 @@
   }
 
   /* ── Helpers ── */
-
   function toHandle(name) {
     return name.toLowerCase().trim()
       .replace(/[^a-z0-9\s-]/g, '')
       .replace(/\s+/g, '-')
       .replace(/-+/g, '-');
   }
+  
   function starsHtml(rating, showScore) {
     const r = Math.round(rating);
     let s = '';
@@ -1160,11 +1182,13 @@
     if (showScore) s += `<span class="nr-card-score">(${parseFloat(rating).toFixed(1)})</span>`;
     return s;
   }
+  
   function initials(name) {
     const p = (name || '').trim().split(/\s+/).filter(Boolean);
     if (!p.length) return '?';
     return (p.length >= 2 ? p[0][0] + p[p.length-1][0] : p[0][0]).toUpperCase();
   }
+  
   function timeAgo(dateStr) {
     if (!dateStr) return '';
     const days = Math.floor((Date.now() - new Date(dateStr).getTime()) / 86400000);
@@ -1177,6 +1201,7 @@
     const y = Math.floor(m / 12);
     return y === 1 ? '1 year ago' : `${y} years ago`;
   }
+  
   function esc(str) {
     return String(str || '')
       .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
@@ -1190,10 +1215,12 @@
       if (el('nr-lightbox'))     el('nr-lightbox').classList.add('is-open');
     }
   };
+  
   el('nr-lightbox')?.addEventListener('click', e => {
     if (e.target === el('nr-lightbox') || e.target === el('nr-lightbox-close'))
       el('nr-lightbox').classList.remove('is-open');
   });
+  
   document.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       el('nr-lightbox')?.classList.remove('is-open');
@@ -1208,7 +1235,6 @@
 
     let currentReviewId = null;
 
-    /* ── Reset modal to step 1 ── */
     function resetModal() {
       currentReviewId = null;
       ['wr-name','wr-email','wr-mobile','wr-title','wr-body'].forEach(id => { const e = el(id); if (e) e.value = ''; });
@@ -1224,19 +1250,19 @@
       const s2 = el('nr-step-2'); if (s2) s2.style.display = 'none';
     }
 
-    /* ── Open / close ── */
     el('nr-write-btn')?.addEventListener('click', () => {
       resetModal();
       el('nr-modal-overlay')?.classList.add('is-open');
     });
+    
     el('nr-modal-close')?.addEventListener('click', () => {
       el('nr-modal-overlay')?.classList.remove('is-open');
     });
+    
     el('nr-modal-overlay')?.addEventListener('click', e => {
       if (e.target === el('nr-modal-overlay')) el('nr-modal-overlay').classList.remove('is-open');
     });
 
-    /* ── Star picker ── */
     const picker = el('nr-star-picker');
     if (picker) {
       const setStars = val => picker.querySelectorAll('span').forEach((s, i) => s.classList.toggle('active', i < val));
@@ -1247,7 +1273,6 @@
       });
     }
 
-    /* ── Image preview on file select ── */
     el('wr-images')?.addEventListener('change', function () {
       const previews    = el('nr-image-previews');
       const placeholder = el('nr-upload-placeholder');
@@ -1267,9 +1292,6 @@
       }
     });
 
-    /* ════════════════════════════════
-       STEP 1: Submit review
-    ════════════════════════════════ */
     el('nr-next-btn')?.addEventListener('click', async () => {
       const nameEl   = el('wr-name');
       const emailEl  = el('wr-email');
@@ -1312,7 +1334,7 @@
         console.log('[NectorReviews] Create review raw response:', JSON.stringify(result, null, 2));
 
         const success = result?.meta?.code === 200 || result?.data?.success === true;
-        if (!success) throw new Error(result?.meta?.message || 'Review submission failed');
+        if (!success) throw new Error(result?.meta?.message || result?.error || 'Review submission failed');
 
         currentReviewId = extractReviewId(result);
         console.log('[NectorReviews] Extracted review ID:', currentReviewId);
@@ -1334,9 +1356,6 @@
       }
     });
 
-    /* ════════════════════════════════
-       STEP 2: Upload images
-    ════════════════════════════════ */
     el('nr-upload-btn')?.addEventListener('click', async () => {
       const imagesEl  = el('wr-images');
       const msg       = el('wr-message-2');
@@ -1380,10 +1399,8 @@
       setTimeout(() => closeAndRefresh(), 2000);
     });
 
-    /* ── Skip button ── */
     el('nr-skip-btn')?.addEventListener('click', () => closeAndRefresh());
 
-    /* ── Close and refresh reviews ── */
     function closeAndRefresh() {
       el('nr-modal-overlay')?.classList.remove('is-open');
       window.NectorCache.data = null;
@@ -1423,9 +1440,6 @@
   "tag": "section",
   "class": "nector-reviews-section",
   "settings": [
-    { "type": "header", "content": "API Configuration" },
-    { "type": "text", "id": "api_key", "label": "Nector API Key", "default": "ak_cc146d9440ff8d3308d2158f23224df524bc6d1461195233af3140ee66740376", "info": "Found in your Nector dashboard under Settings > API" },
-    { "type": "text", "id": "workspace_id", "label": "Nector Workspace ID", "default": "shopify-luciraonline", "info": "Your workspace slug from the Nector dashboard" },
     { "type": "header", "content": "Display Settings" },
     { "type": "checkbox", "id": "show_title", "label": "Show section title", "default": true },
     { "type": "text", "id": "title", "label": "Section title", "default": "Customer Reviews" },
