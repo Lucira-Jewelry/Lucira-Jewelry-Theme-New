@@ -327,22 +327,16 @@
 
   {% render 'pdp-delivery-details' %}
 
-{% assign valid_store_count = 0 %}
-{% assign first_store_name = '' %}
-{% assign first_store_lat = '' %}
-{% assign first_store_lng = '' %}
+  {% assign variant = product.selected_or_first_available_variant %}
 
-{% for store in variant.store_availabilities %}
+  {% assign valid_store_count = 0 %}
+  {% assign first_store_name = '' %}
+  {% assign first_store_lat = '' %}
+  {% assign first_store_lng = '' %}
 
-  {% assign has_qty = false %}
-  {% if store.inventory_quantity != blank %}
-    {% assign has_qty = true %}
-  {% endif %}
+  {% for store in variant.store_availabilities %}
 
-  {% if store.pick_up_enabled %}
-
-    {% if has_qty and store.inventory_quantity > 0 %}
-
+    {% if store.pick_up_enabled and store.inventory_quantity > 0 %}
       {% assign valid_store_count = valid_store_count | plus: 1 %}
 
       {% if first_store_name == '' %}
@@ -350,21 +344,45 @@
         {% assign first_store_lat = store.location.latitude %}
         {% assign first_store_lng = store.location.longitude %}
       {% endif %}
+    {% endif %}
 
-    {% elsif has_qty == false and store.available %}
+  {% endfor %}
 
-      {% assign valid_store_count = valid_store_count | plus: 1 %}
+  {% assign days_to_add = 15 %}
+  {% assign seconds = days_to_add | times: 86400 %}
+  {% assign future_date = 'now' | date: '%s' | plus: seconds | date: '%d %B, %Y' %}
 
-      {% if first_store_name == '' %}
-        {% assign first_store_name = store.location.name %}
+  <div class="lucira-store-availability">
+
+    {% if valid_store_count > 0 %}
+
+      <p>
+        Available at your nearest store:
+        <strong>{{ first_store_name }}</strong>
+      </p>
+
+      {% if valid_store_count > 1 %}
+        <p>+ {{ valid_store_count | minus: 1 }} other stores</p>
       {% endif %}
+
+      <a 
+        href="https://www.google.com/maps/search/?api=1&query={{ first_store_lat }},{{ first_store_lng }}"
+        target="_blank"
+      >
+        Get Direction
+      </a>
+
+    {% else %}
+
+      <div class="made-to-order-box">
+        <span>
+          Dispatch by: {{ future_date }} | This item is made to order
+        </span>
+      </div>
 
     {% endif %}
 
-  {% endif %}
-
-{% endfor %}
-
+  </div>
 
   {% comment %} {%- if show_pickup_availability -%}
     {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
