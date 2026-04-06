@@ -700,12 +700,6 @@
 
     const API_URL = "https://app.lucirajewelry.com/inventory/inventory-check.php";
 
-    // ✅ GET VARIANT ID
-    function getVariantId() {
-      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
-      return input ? input.value : null;
-    }
-
     // ✅ FUTURE DATE (MADE TO ORDER)
     function getFutureDate(days = 15) {
       const d = new Date();
@@ -723,7 +717,7 @@
       const container = document.getElementById("store-availability-dynamic");
       if (!container) return;
 
-      // 🔄 LOADING STATE
+      // 🔄 LOADING
       if (!data) {
         container.innerHTML = `
           <div class="store-loading">
@@ -755,7 +749,7 @@
 
       } else {
 
-        // ❌ NO STOCK → MADE TO ORDER
+        // ❌ NO STOCK
         container.innerHTML = `
           <div class="made-to-order-box">
             Dispatch by: ${getFutureDate()} | This item is made to order
@@ -764,9 +758,8 @@
       }
     }
 
-    // ✅ FETCH INVENTORY
-    function fetchInventory() {
-      const variantId = getVariantId();
+    // ✅ FETCH USING VARIANT ID (NEW)
+    function fetchInventoryById(variantId) {
       if (!variantId) return;
 
       renderStoreData(null); // loading
@@ -783,16 +776,38 @@
         });
     }
 
-    // ✅ INITIAL LOAD (FIXED)
-    setTimeout(fetchInventory, 300);
+    // ✅ HANDLE VARIANT CHANGE (MAIN FIX)
+    function handleVariantChangeInventory(e) {
+      let variantId = null;
 
-    function handleVariantChangeInventory() {
-      // wait for Shopify to update variant ID
-      setTimeout(() => {
-        fetchInventory();
-      }, 150); // 100–200ms is perfect
+      // 🔥 BEST: get from Shopify event
+      if (e?.detail?.variant?.id) {
+        variantId = e.detail.variant.id;
+      }
+
+      // 🔁 FALLBACK
+      if (!variantId) {
+        const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+        variantId = input ? input.value : null;
+      }
+
+      if (!variantId) return;
+
+      console.log("Fetching inventory for variant:", variantId);
+      fetchInventoryById(variantId);
     }
 
+    // ✅ INITIAL LOAD
+    document.addEventListener('DOMContentLoaded', function () {
+      setTimeout(() => {
+        const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+        if (input?.value) {
+          fetchInventoryById(input.value);
+        }
+      }, 300);
+    });
+
+    // ✅ VARIANT EVENTS (FIXED)
     document.addEventListener('variant:change', handleVariantChangeInventory);
     document.addEventListener('variant:changed', handleVariantChangeInventory);
 
