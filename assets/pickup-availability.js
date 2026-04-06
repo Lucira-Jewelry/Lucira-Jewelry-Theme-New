@@ -5,11 +5,13 @@ if (!customElements.get('pickup-availability')) {
       constructor() {
         super();
 
-        if (!this.hasAttribute('available')) return;
-
         this.errorHtml = this.querySelector('template').content.firstElementChild.cloneNode(true);
         this.onClickRefreshList = this.onClickRefreshList.bind(this);
-        this.fetchAvailability(this.dataset.variantId);
+
+        // Always fetch on load regardless of available attribute
+        if (this.dataset.variantId) {
+          this.fetchAvailability(this.dataset.variantId);
+        }
       }
 
       fetchAvailability(variantId) {
@@ -41,7 +43,8 @@ if (!customElements.get('pickup-availability')) {
       }
 
       update(variant) {
-        if (variant) {
+        // Always fetch for any variant, stock status doesn't affect pickup availability
+        if (variant && variant.id) {
           this.fetchAvailability(variant.id);
         } else {
           this.removeAttribute('available');
@@ -52,14 +55,13 @@ if (!customElements.get('pickup-availability')) {
       renderError() {
         this.innerHTML = '';
         this.appendChild(this.errorHtml);
-
         this.querySelector('button').addEventListener('click', this.onClickRefreshList);
       }
 
       renderPreview(sectionInnerHTML) {
         const drawer = document.querySelector('pickup-availability-drawer');
         if (drawer) drawer.remove();
-        if (!sectionInnerHTML.querySelector('pickup-availability-preview')) {
+        if (!sectionInnerHTML || !sectionInnerHTML.querySelector('pickup-availability-preview')) {
           this.innerHTML = '';
           this.removeAttribute('available');
           return;
@@ -68,11 +70,14 @@ if (!customElements.get('pickup-availability')) {
         this.innerHTML = sectionInnerHTML.querySelector('pickup-availability-preview').outerHTML;
         this.setAttribute('available', '');
 
-        document.body.appendChild(sectionInnerHTML.querySelector('pickup-availability-drawer'));
-        const colorClassesToApply = this.dataset.productPageColorScheme.split(' ');
-        colorClassesToApply.forEach((colorClass) => {
-          document.querySelector('pickup-availability-drawer').classList.add(colorClass);
-        });
+        const newDrawer = sectionInnerHTML.querySelector('pickup-availability-drawer');
+        if (newDrawer) {
+          document.body.appendChild(newDrawer);
+          const colorClassesToApply = this.dataset.productPageColorScheme.split(' ');
+          colorClassesToApply.forEach((colorClass) => {
+            document.querySelector('pickup-availability-drawer').classList.add(colorClass);
+          });
+        }
 
         const button = this.querySelector('button');
         if (button)
