@@ -888,22 +888,25 @@
   }
 
   // ── Paginated fetch through proxy ──────────────────────────────────────
-  async function fetchAllPages(baseProxyUrl) {
-    const LIMIT = 100;
-    let page = 1, allItems = [], totalCount = 0, stats = [];
-    while (true) {
-      const sep  = baseProxyUrl.includes('?') ? '&' : '?';
-      const url  = `${baseProxyUrl}${sep}limit=${LIMIT}&page=${page}`;
-      const json = await apiFetch(url);
-      const parsed = parseResponse(json);
-      if (page === 1) { totalCount = parsed.count; stats = parsed.stats; }
-      if (!parsed.items.length) break;
-      allItems = allItems.concat(parsed.items);
-      if (parsed.items.length < LIMIT || allItems.length >= totalCount) break;
-      page++;
-    }
-    return { items: allItems, count: totalCount, stats };
+// ── Paginated fetch through proxy ──────────────────────────────────────
+async function fetchAllPages(baseProxyUrl) {
+  const LIMIT = 100;
+  let page = 1, allItems = [], totalCount = 0, stats = [];
+  while (true) {
+    // Build URL cleanly using URL API to avoid string concat bugs
+    const urlObj = new URL(baseProxyUrl);
+    urlObj.searchParams.set('limit', LIMIT);
+    urlObj.searchParams.set('page', page);
+    const json   = await apiFetch(urlObj.toString());
+    const parsed = parseResponse(json);
+    if (page === 1) { totalCount = parsed.count; stats = parsed.stats; }
+    if (!parsed.items.length) break;
+    allItems = allItems.concat(parsed.items);
+    if (parsed.items.length < LIMIT || allItems.length >= totalCount) break;
+    page++;
   }
+  return { items: allItems, count: totalCount, stats };
+}
 
   // ── Load reviews ───────────────────────────────────────────────────────
   async function loadReviews() {
@@ -916,20 +919,21 @@
       renderAllUI();
       return;
     }
-    try {
-      // Try product-specific first
-      const productUrl = `${PROXY_URL}?product_id=${CONFIG.productId}`;
-      const parsed     = await fetchAllPages(productUrl);
+      try {
+    // Use URL API instead of string concat
+    const productUrlObj = new URL(PROXY_URL);
+    productUrlObj.searchParams.set('product_id', CONFIG.productId);
+    const parsed = await fetchAllPages(productUrlObj.toString());
 
-      if (parsed.items.length > 0) {
-        isProductView = true; usedFallback = false;
-        window.NectorCache = { data: parsed, isProduct: true, usedFallback: false };
-        lastParsedData = parsed; allReviews = parsed.items;
-        renderAllUI(); return;
-      }
+    if (parsed.items.length > 0) {
+      isProductView = true; usedFallback = false;
+      window.NectorCache = { data: parsed, isProduct: true, usedFallback: false };
+      lastParsedData = parsed; allReviews = parsed.items;
+      renderAllUI(); return;
+    }
 
-      // Fallback: all reviews (no product_id param)
-      const fallback = await fetchAllPages(PROXY_URL);
+    // Fallback: all reviews
+    const fallback = await fetchAllPages(PROXY_URL);
       if (fallback.items.length > 0) {
         isProductView = false; usedFallback = true;
         window.NectorCache = { data: fallback, isProduct: false, usedFallback: true };
