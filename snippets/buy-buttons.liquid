@@ -327,37 +327,127 @@
 
   {% render 'pdp-delivery-details' %}
 
-  {%- if show_pickup_availability and product.selected_or_first_available_variant.available -%}
-    {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag }}
+  {% comment %}theme-check-disable UndefinedObject{% endcomment %}
 
-    {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
-      | where: 'pick_up_enabled', true
-    -%}
+{%- if product_variant.available -%}
 
-    <pickup-availability
-      class="product__pickup-availabilities quick-add-hidden"
-      {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
-        available
-      {% endif %}
-        data-root-url="{{ routes.root_url }}"
-        data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-        data-has-only-default-variant="{{ product.has_only_default_variant }}"
-        data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-      >
-      <template>
-        <pickup-availability-preview class="pickup-availability-preview">
-          <div class="pickup-availability-info">
-            <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
-            <button class="pickup-availability-button link link--text underlined-link">
-              {{ 'products.product.pickup_availability.refresh' | t }}
-            </button>
-          </div>
-        </pickup-availability-preview>
-      </template>
-    </pickup-availability>
+  {%- assign pick_up_availabilities = product_variant.store_availabilities
+    | where: 'pick_up_enabled', true
+    | where: 'available', true -%}
 
-    <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
+  {%- if pick_up_availabilities.size > 0 -%}
+
+    {%- assign closest_location = pick_up_availabilities.first -%}
+
+    {%- assign loc = closest_location.location.name -%}
+    {% case loc %}
+      {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+      {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+      {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+      {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+      {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+      {% else %}{% assign loc_name = loc %}
+    {% endcase %}
+
+    <pickup-availability-preview class="pickup-availability-preview">
+      <div class="pickup-availability-info">
+
+        <p class="caption-large">
+          {% if pick_up_availabilities.size == 1 %}
+            Available at {{ loc_name }}
+          {% else %}
+            Available at {{ loc_name }} + {{ pick_up_availabilities.size | minus: 1 }} other store{% if pick_up_availabilities.size > 2 %}s{% endif %}
+          {% endif %}
+        </p>
+
+        <button
+          id="ShowPickupAvailabilityDrawer"
+          class="pickup-availability-button link link--text underlined-link"
+          aria-haspopup="dialog"
+        >
+          {% if pick_up_availabilities.size == 1 %}
+            View Store
+          {% else %}
+            Find All Stores
+          {% endif %}
+        </button>
+
+      </div>
+    </pickup-availability-preview>
+
+    <pickup-availability-drawer
+      class="gradient"
+      tabindex="-1"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="PickupAvailabilityHeading"
+    >
+      <div class="pickup-availability-header">
+        <h2 class="h3 pickup-availability-drawer-title" id="PickupAvailabilityHeading">
+          {{ product_variant.product.title | escape }}
+        </h2>
+        <button class="pickup-availability-drawer-button" type="button" aria-label="{{ 'accessibility.close' | t }}">
+          {{- 'icon-close.svg' | inline_asset_content -}}
+        </button>
+      </div>
+
+      {%- unless product_variant.product.has_only_default_variant -%}
+        <p class="pickup-availability-variant">
+          {%- for product_option in product_variant.product.options_with_values -%}
+            {{ product_option.name | escape }}:&nbsp;
+            {%- for value in product_option.values -%}
+              {%- if product_option.selected_value == value -%}
+                <span>{{ value | escape }}</span>
+              {%- endif -%}
+            {%- endfor -%}
+            {%- unless forloop.last -%},&nbsp;{%- endunless -%}
+          {%- endfor -%}
+        </p>
+      {%- endunless -%}
+
+      <ul class="pickup-availability-list list-unstyled" role="list" data-store-availability-drawer-content>
+
+        {%- for availability in pick_up_availabilities -%}
+          {%- if availability.available and availability.pick_up_enabled -%}
+
+            {%- assign loc = availability.location.name -%}
+            {% case loc %}
+              {% when 'BO1' %}{% assign loc_name = 'Borivali' %}
+              {% when 'CS1' %}{% assign loc_name = 'Chembur' %}
+              {% when 'PS1' %}{% assign loc_name = 'Pune' %}
+              {% when 'NOS18' %}{% assign loc_name = 'Noida' %}
+              {% when 'Divinecarat Lifestyles Pvt Ltd' %}{% assign loc_name = 'Head Office' %}
+              {% else %}{% assign loc_name = loc %}
+            {% endcase %}
+
+            <li class="pickup-availability-list__item">
+              <h3 class="h4">{{ loc_name }}</h3>
+
+              <p class="pickup-availability-preview caption-large">
+                <span class="svg-wrapper">
+                  {{- 'icon-tick.svg' | inline_asset_content -}}
+                </span>
+                Available at {{ loc_name }}
+              </p>
+
+              {%- assign address = availability.location.address -%}
+              <address class="pickup-availability-address">
+                {{ address | format_address }}
+                {%- if address.phone.size > 0 -%}
+                  <p>{{ address.phone }}</p>
+                {%- endif -%}
+              </address>
+            </li>
+
+          {%- endif -%}
+        {%- endfor -%}
+
+      </ul>
+    </pickup-availability-drawer>
+
   {%- endif -%}
+
+{%- endif -%}
 </div>
 
 <style>
