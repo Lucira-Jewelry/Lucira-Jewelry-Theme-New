@@ -1034,7 +1034,7 @@ async function fetchAllPages(baseProxyUrl) {
   }
 
   // ── Filter + Sort ──────────────────────────────────────────────────────
-  function applyFilter() {
+  {% comment %} function applyFilter() {
     const ratingVal = el('nr-filter-rating')?.value || 'all';
     const sortVal   = el('nr-sort')?.value || 'newest';
     filteredReviews = allReviews.filter(r =>
@@ -1050,6 +1050,44 @@ async function fetchAllPages(baseProxyUrl) {
     });
     if (el('nr-total-label'))
       el('nr-total-label').textContent = `${filteredReviews.length} review${filteredReviews.length !== 1 ? 's' : ''}`;
+    renderedCount = 0;
+    const grid = el('nr-grid');
+    if (grid) grid.innerHTML = '';
+    renderBatch();
+  } {% endcomment %}
+
+  // ── Filter + Sort ──────────────────────────────────────────────────────
+  function hasImages(r) {
+    const uploads = Array.isArray(r.uploads) ? r.uploads : (r.uploads?.uploads || []);
+    return uploads.some(u => u?.link && (u.type === 'image' || !u.type)) ? 1 : 0;
+  }
+
+  function applyFilter() {
+    const ratingVal = el('nr-filter-rating')?.value || 'all';
+    const sortVal   = el('nr-sort')?.value || 'newest';
+
+    filteredReviews = allReviews.filter(r =>
+      ratingVal === 'all' || Math.round(parseFloat(r.rating)) === parseInt(ratingVal, 10)
+    );
+
+    filteredReviews.sort((a, b) => {
+      // ── Primary: reviews with images always come first ──
+      const imgDiff = hasImages(b) - hasImages(a);
+      if (imgDiff !== 0) return imgDiff;
+
+      // ── Secondary: user's chosen sort ──
+      const dA = new Date(a.posted_at || a.created_at || 0);
+      const dB = new Date(b.posted_at || b.created_at || 0);
+      if (sortVal === 'newest')  return dB - dA;
+      if (sortVal === 'highest') return (parseFloat(b.rating) || 0) - (parseFloat(a.rating) || 0);
+      if (sortVal === 'lowest')  return (parseFloat(a.rating) || 0) - (parseFloat(b.rating) || 0);
+      // 'featured': featured flag first, then newest
+      return ((b.is_featured ? 1 : 0) - (a.is_featured ? 1 : 0)) || (dB - dA);
+    });
+
+    if (el('nr-total-label'))
+      el('nr-total-label').textContent = `${filteredReviews.length} review${filteredReviews.length !== 1 ? 's' : ''}`;
+
     renderedCount = 0;
     const grid = el('nr-grid');
     if (grid) grid.innerHTML = '';
