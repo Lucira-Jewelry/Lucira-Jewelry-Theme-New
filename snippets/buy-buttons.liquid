@@ -344,6 +344,20 @@
 
   <div id="store-availability-dynamic"></div>
 
+
+
+  <div id="store-side-sheet" class="store-sheet">
+  <div class="store-sheet-overlay"></div>
+
+  <div class="store-sheet-content">
+    <div class="store-sheet-header">
+      <h3>Store Availability</h3>
+      <button id="close-store-sheet">&times;</button>
+    </div>
+
+    <div id="store-sheet-body"></div>
+  </div>
+</div>
 </div>
 
 
@@ -354,6 +368,96 @@
   {% comment %} .lucira-mobile-scheme-btn {
     display: none;
   } {% endcomment %}
+.store-sheet {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 99999;
+  display: none;
+}
+
+.store-sheet.active {
+  display: block;
+}
+
+.store-sheet-overlay {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.4);
+}
+
+.store-sheet-content {
+  position: absolute;
+  right: 0;
+  top: 0;
+  width: 85%;
+  max-width: 400px;
+  height: 100%;
+  background: #fff;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.store-sheet.active .store-sheet-content {
+  transform: translateX(0);
+}
+
+.store-sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.store-sheet-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+#close-store-sheet {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.store-sheet-body {
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.store-card {
+  border-bottom: 1px solid #eee;
+  padding: 12px 0;
+}
+
+.store-card h4 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.store-card p {
+  margin: 0;
+  font-size: 13px;
+  color: #666;
+}
+
+.store-actions {
+  margin-top: 6px;
+}
+
+.store-actions a {
+  font-size: 13px;
+  color: #a05a64;
+  text-decoration: underline;
+}
+
 
   @media (max-width: 749px) {
     /* Make .product-form__buttons a flex row on mobile */
@@ -671,13 +775,32 @@
     const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
 
     /* ✅ Store Code → Display Name Mapping */
-    const STORE_NAME_MAP = {
-      "PS1": "Pune Store",
-      "CS1": "Chembur",
-      "BO1": "Borivali",
-      "Divinecarat Lifestyles Pvt Ltd": "Head Office"
-    };
-
+const STORE_DETAILS = {
+  "PS1": {
+    name: "Pune Store",
+    address: "Pune, Maharashtra",
+    timings: "10 AM - 8 PM",
+    map: "https://maps.google.com?q=Pune"
+  },
+  "CS1": {
+    name: "Chembur",
+    address: "Chembur, Mumbai",
+    timings: "10 AM - 8 PM",
+    map: "https://maps.google.com?q=Chembur"
+  },
+  "BO1": {
+    name: "Borivali",
+    address: "Borivali, Mumbai",
+    timings: "10 AM - 8 PM",
+    map: "https://maps.google.com?q=Borivali"
+  },
+  "Divinecarat Lifestyles Pvt Ltd": {
+    name: "Head Office",
+    address: "Mumbai HQ",
+    timings: "10 AM - 6 PM",
+    map: "https://maps.google.com?q=Mumbai"
+  }
+};
     function getVariantId() {
       const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
       return input ? input.value : null;
@@ -722,11 +845,13 @@
               Available at your nearest store: ${displayName}
             </p>
 
-            ${
-              data.in_stock_locations.length > 1
-                ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
-                : ''
-            }
+            const extraStoresHTML =
+  data.in_stock_locations.length > 1
+    ? `<p class="extra-stores" id="open-store-sheet">
+        + ${data.in_stock_locations.length - 1} other stores
+      </p>`
+    : '';
+
           </div>
         `;
 
@@ -741,6 +866,58 @@
       }
     }
 
+
+    function openStoreSheet(stores) {
+  const sheet = document.getElementById("store-side-sheet");
+  const body = document.getElementById("store-sheet-body");
+
+  if (!sheet || !body) return;
+
+  body.innerHTML = "";
+
+  stores.forEach(store => {
+    const details = STORE_DETAILS[store.location_name] || {
+      name: store.location_name,
+      address: "N/A",
+      timings: "N/A",
+      map: "#"
+    };
+
+    body.innerHTML += `
+      <div class="store-card">
+        <h4>${details.name}</h4>
+        <p>${details.address}</p>
+        <p>${details.timings}</p>
+        <div class="store-actions">
+          <a href="${details.map}" target="_blank">Get Directions</a>
+        </div>
+      </div>
+    `;
+  });
+
+  sheet.classList.add("active");
+}
+
+function closeStoreSheet() {
+  document.getElementById("store-side-sheet").classList.remove("active");
+}
+
+/* Events */
+document.addEventListener("click", function(e) {
+  if (e.target.id === "open-store-sheet") {
+    if (window.__storeData) {
+      openStoreSheet(window.__storeData.in_stock_locations);
+    }
+  }
+
+  if (
+    e.target.id === "close-store-sheet" ||
+    e.target.classList.contains("store-sheet-overlay")
+  ) {
+    closeStoreSheet();
+  }
+});
+
     function fetchInventory() {
       const variantId = getVariantId();
       if (!variantId) return;
@@ -751,6 +928,7 @@
         .then(res => res.json())
         .then(data => {
           console.log("Inventory API:", data);
+          window.__storeData = data;
           renderStoreData(data);
         })
         .catch(err => {
