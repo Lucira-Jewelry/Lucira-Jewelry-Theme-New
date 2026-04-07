@@ -409,7 +409,9 @@ document.addEventListener("DOMContentLoaded", function () {
           if (isChatOpen) {
             isOpen = true;
             fabActions.style.display = "none";
-            fabMain.classList.add("is-open");   // ← was: fabMain.textContent = "×"
+            fabMain.classList.add("is-open");
+            const fabTooltip = document.getElementById("fabTooltip");
+            if (fabTooltip) fabTooltip.classList.remove("show");
           } else {
             closeFab();
           }
