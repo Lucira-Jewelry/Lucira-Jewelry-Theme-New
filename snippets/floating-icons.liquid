@@ -63,9 +63,9 @@
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-    const fabMainBadge  = document.getElementById('fabMainBadge');
-    const fabChatBadge  = document.getElementById('fabChatBadge');
+  document.addEventListener('DOMContentLoaded', function () {
+    const fabMainBadge = document.getElementById('fabMainBadge');
+    const fabChatBadge = document.getElementById('fabChatBadge');
 
     function syncBadge(count) {
       const show = count && parseInt(count) > 0;
@@ -82,72 +82,74 @@
         setTimeout(watchZsiqIndicator, 800);
         return;
       }
-
       syncBadge(zsiqEl.textContent.trim());
-
       const observer = new MutationObserver(function () {
         syncBadge(zsiqEl.textContent.trim());
       });
-
-      observer.observe(zsiqEl, {
-        childList: true,
-        characterData: true,
-        subtree: true
-      });
+      observer.observe(zsiqEl, { childList: true, characterData: true, subtree: true });
     }
 
     watchZsiqIndicator();
 
-    const fabWhatsapp = document.getElementById('fabWhatsapp');
-
-    if (fabWhatsapp) {
-      fabWhatsapp.addEventListener('click', function () {
-
-        const chatData = {
-          promo_id: '{{ product.selected_or_first_available_variant.sku | default: "N/A" }}',
-          promo_name: '{{ product.title | default: "WhatsApp Enquiry" }}',
-          creative_name: 'chatWithExperts',
-          location_id: '{{ request.path }}'
-        };
-
-        window.dataLayer = window.dataLayer || [];
-        window.dataLayer.push({
-          event: 'promoClick',
-          promoClick: chatData
-        });
-
-        console.log('FAB WhatsApp dataLayer pushed:', chatData);
-
+    // ── Shared push helper ───────────────────────────────────────────────────
+    function pushPromoClick(creativeName) {
+      window.dataLayer = window.dataLayer || [];
+      window.dataLayer.push({
+        event: 'promoClick',
+        promoClick: {
+          promo_id:      '{{ product.selected_or_first_available_variant.sku | default: "N/A" }}',
+          promo_name:    '{{ product.title | default: "FAB Enquiry" }}',
+          creative_name: creativeName,
+          location_id:   '{{ request.path }}'
+        }
       });
+      console.log('FAB dataLayer pushed:', creativeName);
     }
 
+    // ── 1. Main FAB toggle → salesiq ────────────────────────────────────────
+    const fabMain    = document.getElementById('fabMain');
+    const fabActions = document.getElementById('fabActions');
     const fabTooltip = document.getElementById('fabTooltip');
-    const fabMainBtn = document.getElementById('fabMain');
-
     let tooltipShown = false;
 
     setTimeout(function () {
-      if (!tooltipShown && fabTooltip) {
-        fabTooltip.classList.add('show');
-      }
+      if (!tooltipShown && fabTooltip) fabTooltip.classList.add('show');
     }, 5000);
-
-    if (fabMainBtn) {
-      fabMainBtn.addEventListener('click', function () {
-        tooltipShown = true;
-        if (fabTooltip) fabTooltip.classList.remove('show');
-      });
-    }
-
-    const fabMain    = document.getElementById('fabMain');
-    const fabActions = document.getElementById('fabActions');
 
     if (fabMain && fabActions) {
       fabMain.addEventListener('click', function () {
-
         const isOpen = fabActions.classList.toggle('is-open');
         fabMain.classList.toggle('is-open', isOpen);
 
+        tooltipShown = true;
+        if (fabTooltip) fabTooltip.classList.remove('show');
+
+        // dataLayer — fires every time the FAB is opened or closed
+        pushPromoClick('salesiq');
+      });
+    }
+
+    // ── 2. Live Chat → liveChat ──────────────────────────────────────────────
+    const fabChat = document.getElementById('fabChat');
+    if (fabChat) {
+      fabChat.addEventListener('click', function () {
+        pushPromoClick('salesiq-liveChat');
+      });
+    }
+
+    // ── 3. Phone → callUs ───────────────────────────────────────────────────
+    const fabPhone = document.getElementById('fabPhone');
+    if (fabPhone) {
+      fabPhone.addEventListener('click', function () {
+        pushPromoClick('salesiq-callUs');
+      });
+    }
+
+    // ── 4. WhatsApp → chatWithExperts (unchanged) ────────────────────────────
+    const fabWhatsapp = document.getElementById('fabWhatsapp');
+    if (fabWhatsapp) {
+      fabWhatsapp.addEventListener('click', function () {
+        pushPromoClick('chatWithExperts');
       });
     }
 
