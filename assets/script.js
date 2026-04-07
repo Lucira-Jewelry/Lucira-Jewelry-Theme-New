@@ -401,22 +401,26 @@ document.addEventListener("DOMContentLoaded", function () {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
     if (!chatWrap) return;
 
-    const observer = new MutationObserver(function (mutations) {
-      mutations.forEach(function (mutation) {
-        if (mutation.attributeName === "class") {
-          const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+    function syncFabWithChat() {
+      const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
 
-          if (isChatOpen) {
-            isOpen = true;
-            fabActions.style.display = "none";
-            fabMain.classList.add("is-open");
-            const fabTooltip = document.getElementById("fabTooltip");
-            if (fabTooltip) fabTooltip.classList.remove("show");
-          } else {
-            closeFab();
-          }
-        }
-      });
+      if (isChatOpen) {
+        // FORCE correct UI state
+        isOpen = true;
+
+        fabMain.classList.add("is-open"); // shows close icon
+        fabActions.style.display = "none"; // hide extra buttons
+
+      } else {
+        closeFab();
+      }
+    }
+
+    // Run immediately (IMPORTANT for auto-open case)
+    syncFabWithChat();
+
+    const observer = new MutationObserver(function () {
+      syncFabWithChat();
     });
 
     observer.observe(chatWrap, { attributes: true });
