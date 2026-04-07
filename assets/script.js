@@ -405,14 +405,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
 
       if (isChatOpen) {
-        // FORCE correct UI state
-        isOpen = true;
-
-        fabMain.classList.add("is-open"); // shows close icon
-        fabActions.style.display = "none"; // hide extra buttons
-
+        fabMain.classList.add("is-open"); // show close icon
       } else {
-        closeFab();
+        fabMain.classList.remove("is-open");
       }
     }
 
