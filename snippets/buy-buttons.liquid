@@ -344,6 +344,7 @@
 
   <div id="store-availability-dynamic"></div>
 
+
 </div>
 
 
@@ -666,105 +667,167 @@
   })();
 </script>
 <script>
-  (function () {
+(function () {
 
-    const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
+  const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
 
-    /* ✅ Store Code → Display Name Mapping */
-    const STORE_NAME_MAP = {
-      "PS1": "Pune Store",
-      "CS1": "Chembur",
-      "BO1": "Borivali",
-      "Divinecarat Lifestyles Pvt Ltd": "Head Office"
-    };
+  /* 🔥 Store Full Details Mapping */
+  const STORE_DETAILS = {
+    "PS1": {
+      name: "Pune Store",
+      address: "Pune, Maharashtra",
+      timings: "10 AM - 8 PM",
+      map: "https://maps.google.com?q=Pune"
+    },
+    "CS1": {
+      name: "Chembur",
+      address: "Chembur, Mumbai",
+      timings: "10 AM - 8 PM",
+      map: "https://maps.google.com?q=Chembur"
+    },
+    "BO1": {
+      name: "Borivali",
+      address: "Borivali, Mumbai",
+      timings: "10 AM - 8 PM",
+      map: "https://maps.google.com?q=Borivali"
+    },
+    "Divinecarat Lifestyles Pvt Ltd": {
+      name: "Head Office",
+      address: "Mumbai HQ",
+      timings: "10 AM - 6 PM",
+      map: "https://maps.google.com?q=Mumbai"
+    }
+  };
 
-    function getVariantId() {
-      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
-      return input ? input.value : null;
+  function getVariantId() {
+    const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+    return input ? input.value : null;
+  }
+
+  function getFutureDate(days = 15) {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'long',
+      year: 'numeric'
+    });
+  }
+
+  function renderStoreData(data) {
+    const container = document.getElementById("store-availability-dynamic");
+    if (!container) return;
+
+    if (!data) {
+      container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
+      return;
     }
 
-    function getFutureDate(days = 15) {
-      const d = new Date();
-      d.setDate(d.getDate() + days);
+    if (data.in_stock_locations && data.in_stock_locations.length > 0) {
 
-      return d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric'
+      window.__storeData = data; // ✅ store globally
+
+      const store = data.in_stock_locations[0];
+      const displayName = STORE_DETAILS[store.location_name]?.name || store.location_name;
+
+      container.innerHTML = `
+        <div class="store-available">
+          <p class="location-store">
+            Available at your nearest store: ${displayName}
+          </p>
+
+          ${
+            data.in_stock_locations.length > 1
+              ? `<p class="extra-stores" id="open-store-sheet">
+                  + ${data.in_stock_locations.length - 1} other stores
+                </p>`
+              : ''
+          }
+        </div>
+      `;
+
+    } else {
+      container.innerHTML = `
+        <div class="made-to-order-box">
+          Dispatch by: ${getFutureDate()} | This item is made to order
+        </div>
+      `;
+    }
+  }
+
+  function fetchInventory() {
+    const variantId = getVariantId();
+    if (!variantId) return;
+
+    renderStoreData(null);
+
+    fetch(`${API_URL}?variant_id=${variantId}`)
+      .then(res => res.json())
+      .then(data => {
+        renderStoreData(data);
+      })
+      .catch(() => {
+        renderStoreData({ in_stock_locations: [] });
       });
+  }
+
+  /* 🔥 SIDE SHEET LOGIC */
+
+  function openStoreSheet() {
+    const sheet = document.getElementById("store-side-sheet");
+    const body = document.getElementById("store-sheet-body");
+
+    if (!window.__storeData || !sheet || !body) return;
+
+    body.innerHTML = "";
+
+    window.__storeData.in_stock_locations.forEach(store => {
+      const details = STORE_DETAILS[store.location_name] || {
+        name: store.location_name,
+        address: "N/A",
+        timings: "N/A",
+        map: "#"
+      };
+
+      body.innerHTML += `
+        <div class="store-card">
+          <h4>${details.name}</h4>
+          <p>${details.address}</p>
+          <p>${details.timings}</p>
+          <div class="store-actions">
+            <a href="${details.map}" target="_blank">Get Directions</a>
+          </div>
+        </div>
+      `;
+    });
+
+    sheet.classList.add("active");
+  }
+
+  function closeStoreSheet() {
+    document.getElementById("store-side-sheet").classList.remove("active");
+  }
+
+  document.addEventListener("click", function(e) {
+
+    if (e.target.id === "open-store-sheet") {
+      openStoreSheet();
     }
 
-    function renderStoreData(data) {
-      const container = document.getElementById("store-availability-dynamic");
-      if (!container) return;
-
-      /* Loading state */
-      if (!data) {
-        container.innerHTML = `
-          <div class="store-loading">
-            Checking availability...
-          </div>
-        `;
-        return;
-      }
-
-      /* ✅ If stock available in stores */
-      if (data.in_stock_locations && data.in_stock_locations.length > 0) {
-
-        const store = data.in_stock_locations[0];
-
-        /* ✅ Map backend name → frontend display name */
-        const displayName = STORE_NAME_MAP[store.location_name] || store.location_name;
-
-        container.innerHTML = `
-          <div class="store-available">
-            <p class="location-store">
-              Available at your nearest store: ${displayName}
-            </p>
-
-            ${
-              data.in_stock_locations.length > 1
-                ? `<p class="extra-stores">+ ${data.in_stock_locations.length - 1} other stores</p>`
-                : ''
-            }
-          </div>
-        `;
-
-      } else {
-
-        /* ❌ No stock → Made to order */
-        container.innerHTML = `
-          <div class="made-to-order-box">
-            Dispatch by: ${getFutureDate()} | This item is made to order
-          </div>
-        `;
-      }
+    if (
+      e.target.id === "close-store-sheet" ||
+      e.target.classList.contains("store-sheet-overlay")
+    ) {
+      closeStoreSheet();
     }
 
-    function fetchInventory() {
-      const variantId = getVariantId();
-      if (!variantId) return;
+  });
 
-      renderStoreData(null);
+  /* Init */
+  setTimeout(fetchInventory, 300);
+  document.addEventListener('variant:change', fetchInventory);
+  document.addEventListener('variant:changed', fetchInventory);
 
-      fetch(`${API_URL}?variant_id=${variantId}`)
-        .then(res => res.json())
-        .then(data => {
-          console.log("Inventory API:", data);
-          renderStoreData(data);
-        })
-        .catch(err => {
-          console.error("Inventory error:", err);
-          renderStoreData({ in_stock_locations: [] });
-        });
-    }
-
-    /* Initial load */
-    setTimeout(fetchInventory, 300);
-
-    /* Variant change listeners */
-    document.addEventListener('variant:change', fetchInventory);
-    document.addEventListener('variant:changed', fetchInventory);
-
-  })();
+})();
 </script>
