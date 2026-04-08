@@ -343,8 +343,6 @@
   {% render 'pdp-delivery-details' %}
 
   <div id="store-availability-dynamic"></div>
-
-  
 </div>
 
 <style>
@@ -746,76 +744,74 @@
   })();
 </script>
 <script>
-(function () {
+  (function () {
+    const API_URL = 'https://api.lucirajewelry.com/inventory/inventory-check.php';
 
-  const API_URL = "https://api.lucirajewelry.com/inventory/inventory-check.php";
+    /* 🔥 Store Full Details Mapping */
+    const STORE_DETAILS = {
+      PS1: {
+        name: 'Pune Store',
+        address: 'Shop no. 3,4, Balgandharv Chowk, Sai Square, 5 & 6, Jangali Maharaj Rd, Pune, Maharashtra 411005',
+        timings: '10:00 AM – 9:30 PM',
+        map: 'https://maps.google.com?q=Pune',
+        phone: '+91 8433667236',
+      },
+      CS1: {
+        name: 'Chembur Store',
+        address: 'Shop No. 3 Ground Floor, 487, Geraldine CHS LTD, Central Ave Rd, Chembur, Mumbai, Maharashtra 400071',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.google.com?q=Chembur',
+        phone: '+91 9004402038',
+      },
+      BO1: {
+        name: 'Borivali Store',
+        address: 'Sky City Mall, S-40, 2nd Floor, Western Express Highway, Borivali East, Mumbai - 400066',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.google.com?q=Borivali',
+        phone: '+91 8433667238',
+      },
+      'Divinecarat Lifestyles Pvt Ltd': {
+        name: 'Head Office',
+        address: 'Office 1402-2, Dlh Park, 14th Floor, Swami Vivekanand Rd, Mumbai, Maharashtra 400062',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.google.com?q=Mumbai',
+      },
+    };
 
-  /* 🔥 Store Full Details Mapping */
-  const STORE_DETAILS = {
-    "PS1": {
-      name: "Pune Store",
-      address: "Shop no. 3,4, Balgandharv Chowk, Sai Square, 5 & 6, Jangali Maharaj Rd, Pune, Maharashtra 411005",
-      timings: "10:00 AM – 9:30 PM",
-      map: "https://maps.google.com?q=Pune",
-      phone: "+91 8433667236"
-    },
-    "CS1": {
-      name: "Chembur Store",
-      address: "Shop No. 3 Ground Floor, 487, Geraldine CHS LTD, Central Ave Rd, Chembur, Mumbai, Maharashtra 400071",
-      timings: "10:00 AM – 10:00 PM",
-      map: "https://maps.google.com?q=Chembur",
-      phone: "+91 9004402038"
-    },
-    "BO1": {
-      name: "Borivali Store",
-      address: "Sky City Mall, S-40, 2nd Floor, Western Express Highway, Borivali East, Mumbai - 400066",
-      timings: "10:00 AM – 10:00 PM",
-      map: "https://maps.google.com?q=Borivali",
-      phone: "+91 8433667238"
-    },
-    "Divinecarat Lifestyles Pvt Ltd": {
-      name: "Head Office",
-      address: "Office 1402-2, Dlh Park, 14th Floor, Swami Vivekanand Rd, Mumbai, Maharashtra 400062",
-      timings: "10:00 AM – 10:00 PM",
-      map: "https://maps.google.com?q=Mumbai"
-    }
-  };
+    let lastVariantId = null;
 
-  let lastVariantId = null;
-
-  function getVariantId() {
-    const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
-    return input ? input.value : null;
-  }
-
-  function getFutureDate(days = 15) {
-    const d = new Date();
-    d.setDate(d.getDate() + days);
-
-    return d.toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: 'long',
-      year: 'numeric'
-    });
-  }
-
-  function renderStoreData(data) {
-    const container = document.getElementById("store-availability-dynamic");
-    if (!container) return;
-
-    if (!data) {
-      container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
-      return;
+    function getVariantId() {
+      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+      return input ? input.value : null;
     }
 
-    if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+    function getFutureDate(days = 15) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
 
-      window.__storeData = data;
+      return d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
+      });
+    }
 
-      const store = data.in_stock_locations[0];
-      const displayName = STORE_DETAILS[store.location_name]?.name || store.location_name;
+    function renderStoreData(data) {
+      const container = document.getElementById('store-availability-dynamic');
+      if (!container) return;
 
-      container.innerHTML = `
+      if (!data) {
+        container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
+        return;
+      }
+
+      if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+        window.__storeData = data;
+
+        const store = data.in_stock_locations[0];
+        const displayName = STORE_DETAILS[store.location_name]?.name || store.location_name;
+
+        container.innerHTML = `
   <div class="store-available">
     <p class="location-store">
       Available at our ${displayName} & ${data.in_stock_locations.length - 1} other stores
@@ -826,78 +822,77 @@
     </p>
   </div>
 `;
-
-    } else {
-      container.innerHTML = `
+      } else {
+        container.innerHTML = `
         <div class="made-to-order-box">
           Dispatch by: ${getFutureDate()} | This item is made to order
         </div>
       `;
+      }
     }
-  }
 
-  function fetchInventory() {
-    const variantId = getVariantId();
-    if (!variantId) return;
+    function fetchInventory() {
+      const variantId = getVariantId();
+      if (!variantId) return;
 
-    /* 🚀 Prevent duplicate API calls */
-    if (variantId === lastVariantId) return;
-    lastVariantId = variantId;
+      /* 🚀 Prevent duplicate API calls */
+      if (variantId === lastVariantId) return;
+      lastVariantId = variantId;
 
-    renderStoreData(null);
+      renderStoreData(null);
 
-    fetch(`${API_URL}?variant_id=${variantId}`)
-      .then(res => res.json())
-      .then(data => {
-        renderStoreData(data);
-      })
-      .catch(() => {
-        renderStoreData({ in_stock_locations: [] });
+      fetch(`${API_URL}?variant_id=${variantId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          renderStoreData(data);
+        })
+        .catch(() => {
+          renderStoreData({ in_stock_locations: [] });
+        });
+    }
+
+    /* 🔥 SUPER IMPORTANT: MutationObserver (handles ALL themes) */
+    function watchVariantChange() {
+      const form = document.querySelector('form[action="/cart/add"]');
+      if (!form) return;
+
+      const variantInput = form.querySelector('input[name="id"]');
+      if (!variantInput) return;
+
+      /* Detect value change */
+      new MutationObserver(() => {
+        fetchInventory();
+      }).observe(variantInput, {
+        attributes: true,
+        attributeFilter: ['value'],
       });
-  }
 
-  /* 🔥 SUPER IMPORTANT: MutationObserver (handles ALL themes) */
-  function watchVariantChange() {
-    const form = document.querySelector('form[action="/cart/add"]');
-    if (!form) return;
+      /* Backup listeners */
+      variantInput.addEventListener('change', fetchInventory);
+      form.addEventListener('change', function (e) {
+        if (e.target.name === 'id') fetchInventory();
+      });
+    }
 
-    const variantInput = form.querySelector('input[name="id"]');
-    if (!variantInput) return;
+    /* 🔥 SIDE SHEET */
 
-    /* Detect value change */
-    new MutationObserver(() => {
-      fetchInventory();
-    }).observe(variantInput, {
-      attributes: true,
-      attributeFilter: ['value']
-    });
+    function openStoreSheet() {
+      const sheet = document.getElementById('store-side-sheet');
+      const body = document.getElementById('store-sheet-body');
 
-    /* Backup listeners */
-    variantInput.addEventListener('change', fetchInventory);
-    form.addEventListener('change', function(e) {
-      if (e.target.name === 'id') fetchInventory();
-    });
-  }
+      if (!window.__storeData || !sheet || !body) return;
 
-  /* 🔥 SIDE SHEET */
+      body.innerHTML = '';
 
-  function openStoreSheet() {
-    const sheet = document.getElementById("store-side-sheet");
-    const body = document.getElementById("store-sheet-body");
+      window.__storeData.in_stock_locations.forEach((store) => {
+        const details = STORE_DETAILS[store.location_name] || {
+          name: store.location_name,
+          address: 'N/A',
+          timings: 'N/A',
+          map: '#',
+        };
 
-    if (!window.__storeData || !sheet || !body) return;
-
-    body.innerHTML = "";
-
-    window.__storeData.in_stock_locations.forEach(store => {
-      const details = STORE_DETAILS[store.location_name] || {
-        name: store.location_name,
-        address: "N/A",
-        timings: "N/A",
-        map: "#"
-      };
-
-body.innerHTML += `
+        body.innerHTML += `
   <div class="store-card">
     
     <h4 class="store-title">${details.name}</h4>
@@ -911,11 +906,12 @@ body.innerHTML += `
     <div class="store-meta">
       <p><span class="icon">                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
 </span> ${details.phone || ''}</p>
-      <p><span class="icon">⏰</span> ${details.timings}</p>
+      <p><span class="icon">                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+</span> ${details.timings}</p>
     </div>
 
     <div class="store-actions">
-      <a href="https://wa.me/${(details.phone || '').replace(/\\D/g,'')}" target="_blank" class="btn-outline">
+      <a href="https://wa.me/${(details.phone || '').replace(/\\D/g, '')}" target="_blank" class="btn-outline">
         CONNECT WITH US
       </a>
 
@@ -925,35 +921,30 @@ body.innerHTML += `
     </div>
 
   </div>
-`;    });
+`;
+      });
 
-    sheet.classList.add("active");
-  }
-
-  function closeStoreSheet() {
-    document.getElementById("store-side-sheet").classList.remove("active");
-  }
-
-  document.addEventListener("click", function(e) {
-
-    if (e.target.id === "open-store-sheet") {
-      openStoreSheet();
+      sheet.classList.add('active');
     }
 
-    if (
-      e.target.id === "close-store-sheet" ||
-      e.target.classList.contains("store-sheet-overlay")
-    ) {
-      closeStoreSheet();
+    function closeStoreSheet() {
+      document.getElementById('store-side-sheet').classList.remove('active');
     }
 
-  });
+    document.addEventListener('click', function (e) {
+      if (e.target.id === 'open-store-sheet') {
+        openStoreSheet();
+      }
 
-  /* 🚀 INIT */
-  document.addEventListener("DOMContentLoaded", function () {
-    fetchInventory();
-    watchVariantChange();
-  });
+      if (e.target.id === 'close-store-sheet' || e.target.classList.contains('store-sheet-overlay')) {
+        closeStoreSheet();
+      }
+    });
 
-})();
+    /* 🚀 INIT */
+    document.addEventListener('DOMContentLoaded', function () {
+      fetchInventory();
+      watchVariantChange();
+    });
+  })();
 </script>
