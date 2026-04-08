@@ -101,8 +101,6 @@
       assign shipping_date = 'now' | date: '%s' | plus: added_seconds | date: '%d/%m/%Y'
     -%}
 
-  
-
     {% comment %} ── Scheme visibility gate: only show for products >= ₹18,000 ── {% endcomment %}
     {% assign _show_scheme_btn = false %}
     {% if val_total >= 18000 %}
@@ -110,16 +108,16 @@
     {% endif %}
 
     {% comment %} ── Step 1: Compute scheme_amount (FLOOR to previous ₹500) ── {% endcomment %}
-    {% assign _monthly_raw   = val_total | divided_by: 10 | floor %}
-    {% assign _remainder     = _monthly_raw | modulo: 500 %}
-    {% assign _monthly       = _monthly_raw | minus: _remainder %}
+    {% assign _monthly_raw = val_total | divided_by: 10 | floor %}
+    {% assign _remainder = _monthly_raw | modulo: 500 %}
+    {% assign _monthly = _monthly_raw | minus: _remainder %}
     {% assign _scheme_amount = val_total | minus: _monthly %}
 
     {% comment %} ── Step 2: Clean & normalise customer phone ── {% endcomment %}
-    {% assign _raw = customer.phone | remove: "+" | remove: "-" | remove: " " | remove: "(" | remove: ")" | strip %}
+    {% assign _raw = customer.phone | remove: '+' | remove: '-' | remove: ' ' | remove: '(' | remove: ')' | strip %}
     {% if _raw.size == 12 %}
       {% assign _prefix = _raw | slice: 0, 2 %}
-      {% if _prefix == "91" %}
+      {% if _prefix == '91' %}
         {% assign _clean_phone = _raw | slice: 2, 10 %}
       {% else %}
         {% assign _clean_phone = _raw %}
@@ -129,9 +127,9 @@
     {% endif %}
 
     {% comment %} ── Step 3: Build HMAC signature on "phone|timestamp" ── {% endcomment %}
-    {% assign _ts        = 'now' | date: '%s' %}
-    {% assign _hmac_data = _clean_phone | append: "|" | append: _ts %}
-    {% assign _sig       = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
+    {% assign _ts = 'now' | date: '%s' %}
+    {% assign _hmac_data = _clean_phone | append: '|' | append: _ts %}
+    {% assign _sig = _hmac_data | hmac_sha256: settings.orn_hmac_secret %}
 
     {% comment %} ── Step 4: Compose scheme_url with _monthly ── {% endcomment %}
     {% if customer %}
@@ -142,170 +140,189 @@
         | append: '&sig='
         | append: _sig
         | append: '&amount='
-        | append: _monthly %}
+        | append: _monthly
+      %}
     {% else %}
       {% assign scheme_url = 'https://schemes.lucirajewelry.com/?amount=' | append: _monthly %}
     {% endif %}
 
-{% unless product.tags contains 'hide_ATC' %}
-    <product-form
-      class="product-form"
-      data-hide-errors="{{ gift_card_recipient_feature_active }}"
-      data-section-id="{{ section.id }}"
-    >
-      <div class="product-form__error-message-wrapper" role="alert" hidden>
-        <span class="svg-wrapper">
-          {{- 'icon-error.svg' | inline_asset_content -}}
-        </span>
-        <span class="product-form__error-message"></span>
-      </div>
+    {% unless product.tags contains 'hide_ATC' %}
+      <product-form
+        class="product-form"
+        data-hide-errors="{{ gift_card_recipient_feature_active }}"
+        data-section-id="{{ section.id }}"
+      >
+        <div class="product-form__error-message-wrapper" role="alert" hidden>
+          <span class="svg-wrapper">
+            {{- 'icon-error.svg' | inline_asset_content -}}
+          </span>
+          <span class="product-form__error-message"></span>
+        </div>
 
-      {%- form 'product',
-        product,
-        id: product_form_id,
-        class: 'form',
-        novalidate: 'novalidate',
-        data-type: 'add-to-cart-form',
-        onsubmit: 'handleGTMAddToCartSubmit(event)'
-      -%}
-        <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date" value="{{ shipping_date }}">
-        <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
-        <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
-        <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
+        {%- form 'product',
+          product,
+          id: product_form_id,
+          class: 'form',
+          novalidate: 'novalidate',
+          data-type: 'add-to-cart-form',
+          onsubmit: 'handleGTMAddToCartSubmit(event)'
+        -%}
+          <input type="hidden" name="properties[_Shipping Date]" id="prop-shipping-date" value="{{ shipping_date }}">
+          <input type="hidden" name="properties[EngravingText]" value="{{ engraving_text | default: '' }}">
+          <input type="hidden" name="properties[EngravingFont]" value="{{ engraving_font | default: '' }}">
+          <input type="hidden" name="properties[GiftText]" value="{{ gift_text | default: '' }}">
 
-        <input type="hidden" name="properties[_Gold Price Per Gram]" id="prop-gold-price-per-gram" value="{{ val_gold_rate }}">
-        <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
-        <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
-        <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="{{ val_mc_cost }}">
-        <input type="hidden" name="properties[_Diamond Charges]" id="prop-diamond-charges" value="{{ val_diamond_cost }}">
-        <input type="hidden" name="properties[_GST]" id="prop-gst" value="{{ val_tax }}">
-        <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="{{ val_total }}">
-        <input type="hidden" name="properties[_Diamond Total Pcs]" id="prop-diamond-total-pcs" value="{{ diamond_pcs }}">
-
-        <input
-          type="hidden"
-          name="id"
-          value="{{ product.selected_or_first_available_variant.id }}"
-          {% if product.selected_or_first_available_variant.available == false
-            or quantity_rule_soldout
-            or product.selected_or_first_available_variant == null
-          %}
-            disabled
-          {% endif %}
-          class="product-variant-id"
-        >
-
-        {%- if gift_card_recipient_feature_active -%}
-          {%- render 'gift-card-recipient-form', product: product, form: form, section: section -%}
-        {%- endif -%}
-
-        <div class="product-form__buttons">
-          {%- liquid
-            assign check_against_inventory = true
-            if product.selected_or_first_available_variant.inventory_management != 'shopify' or product.selected_or_first_available_variant.inventory_policy == 'continue'
-              assign check_against_inventory = false
-            endif
-            if product.selected_or_first_available_variant.quantity_rule.min > product.selected_or_first_available_variant.inventory_quantity and check_against_inventory
-              assign quantity_rule_soldout = true
-            endif
-          -%}
-
-          {% comment %} <a
-            href="{{ scheme_url }}"
-            class="lucira-mobile-scheme-btn"
+          <input
+            type="hidden"
+            name="properties[_Gold Price Per Gram]"
+            id="prop-gold-price-per-gram"
+            value="{{ val_gold_rate }}"
           >
-            BUY WITH SCHEME
-          </a> {% endcomment %}
+          <input type="hidden" name="properties[_Gold Weight]" id="prop-gold-weight" value="{{ config.metal_weight }}">
+          <input type="hidden" name="properties[_Gold Price]" id="prop-gold-price" value="{{ val_metal_cost }}">
+          <input type="hidden" name="properties[_Making Charges]" id="prop-making-charges" value="{{ val_mc_cost }}">
+          <input
+            type="hidden"
+            name="properties[_Diamond Charges]"
+            id="prop-diamond-charges"
+            value="{{ val_diamond_cost }}"
+          >
+          <input type="hidden" name="properties[_GST]" id="prop-gst" value="{{ val_tax }}">
+          <input type="hidden" name="properties[_Final Price]" id="prop-final-price" value="{{ val_total }}">
+          <input
+            type="hidden"
+            name="properties[_Diamond Total Pcs]"
+            id="prop-diamond-total-pcs"
+            value="{{ diamond_pcs }}"
+          >
 
-          <button
-            id="ProductSubmitButton-{{ section_id }}"
-            type="submit"
-            name="add"
-            class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %} animated-cart-btn"
+          <input
+            type="hidden"
+            name="id"
+            value="{{ product.selected_or_first_available_variant.id }}"
             {% if product.selected_or_first_available_variant.available == false
               or quantity_rule_soldout
               or product.selected_or_first_available_variant == null
             %}
               disabled
             {% endif %}
+            class="product-variant-id"
           >
-            <span class="btn-text-wrapper">
-              <span class="add-to-cart-text">
-                {%- if product.selected_or_first_available_variant == null -%}
-                  {{ 'products.product.unavailable' | t }}
-                {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
-                  {{ 'products.product.sold_out' | t }}
-                {%- else -%}
-                  {{ 'products.product.add_to_cart' | t }}
-                {%- endif -%}
-              </span>
-            </span>
 
-            <svg class="cart-icon" width="24" height="24">
-              <use href="#icon-cart"></use>
-            </svg>
-            <svg class="custom-cart-icon" width="24" height="24">
-              <use href="#icon-cart-check"></use>
-            </svg>
-            <svg width="100" height="100" class="fas fa-box box-icon" class="filled-cart">
-              <use href="#icon-custom-large"></use>
-            </svg>
-            <span
-              class="loading__spinner hidden"
-              style="display: none !important; visibility: hidden !important; position: absolute; width: 0; height: 0; overflow: hidden;"
-            >
-              {%- render 'loading-spinner' -%}
-            </span>
-          </button>
-
-          {%- if show_dynamic_checkout -%}
-            {{ form | payment_button }}
+          {%- if gift_card_recipient_feature_active -%}
+            {%- render 'gift-card-recipient-form', product: product, form: form, section: section -%}
           {%- endif -%}
-        </div>
-      {%- endform -%}
 
-      <div class="desktop-show inline-flex">
-        <div class="iwish-app-block-product">
-          <a
-            class="iWishAdd st-1"
-            href="#"
-            data-variant="{{ product.variants.first.id }}"
-            data-product="{{ product.id }}"
-            data-pTitle="{{ product.title | escape }}"
-          ></a>
-        </div>
-      </div>
+          <div class="product-form__buttons">
+            {%- liquid
+              assign check_against_inventory = true
+              if product.selected_or_first_available_variant.inventory_management != 'shopify' or product.selected_or_first_available_variant.inventory_policy == 'continue'
+                assign check_against_inventory = false
+              endif
+              if product.selected_or_first_available_variant.quantity_rule.min > product.selected_or_first_available_variant.inventory_quantity and check_against_inventory
+                assign quantity_rule_soldout = true
+              endif
+            -%}
 
-      {% comment %} <div class="mobile-show">
-        <div class="custom-wp_btn-link">
-          <a
-            href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
-            style="padding: 0 !important; border: 0 !important;"
-            target="_blank"
-            class="chat-with-experts-mobile"
-          >
-            <img
-              class="chat-with-experts"
-              src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022"
-              height="46"
-              width="46"
-              alt="whatsapp icon"
-              title="whatsapp"
+            {% comment %}
+
+                href="{{ scheme_url }}"
+                class="lucira-mobile-scheme-btn"
+              >
+                BUY WITH SCHEME
+              </a>
+            {% endcomment %}
+
+            <button
+              id="ProductSubmitButton-{{ section_id }}"
+              type="submit"
+              name="add"
+              class="product-form__submit button button--full-width {% if show_dynamic_checkout %}button--secondary{% else %}button--primary{% endif %} animated-cart-btn"
+              {% if product.selected_or_first_available_variant.available == false
+                or quantity_rule_soldout
+                or product.selected_or_first_available_variant == null
+              %}
+                disabled
+              {% endif %}
             >
-          </a>
-        </div>
-      </div> {% endcomment %}
+              <span class="btn-text-wrapper">
+                <span class="add-to-cart-text">
+                  {%- if product.selected_or_first_available_variant == null -%}
+                    {{ 'products.product.unavailable' | t }}
+                  {%- elsif product.selected_or_first_available_variant.available == false or quantity_rule_soldout -%}
+                    {{ 'products.product.sold_out' | t }}
+                  {%- else -%}
+                    {{ 'products.product.add_to_cart' | t }}
+                  {%- endif -%}
+                </span>
+              </span>
 
-      <div class="custom-share-icon desktop-show">
-        <div>
-          <div class="product-share product_share" onclick="share()" id="product_share">
-            {{ 'icon-share-product.svg' | inline_asset_content }}
+              <svg class="cart-icon" width="24" height="24">
+                <use href="#icon-cart"></use>
+              </svg>
+              <svg class="custom-cart-icon" width="24" height="24">
+                <use href="#icon-cart-check"></use>
+              </svg>
+              <svg width="100" height="100" class="fas fa-box box-icon" class="filled-cart">
+                <use href="#icon-custom-large"></use>
+              </svg>
+              <span
+                class="loading__spinner hidden"
+                style="display: none !important; visibility: hidden !important; position: absolute; width: 0; height: 0; overflow: hidden;"
+              >
+                {%- render 'loading-spinner' -%}
+              </span>
+            </button>
+
+            {%- if show_dynamic_checkout -%}
+              {{ form | payment_button }}
+            {%- endif -%}
+          </div>
+        {%- endform -%}
+
+        <div class="desktop-show inline-flex">
+          <div class="iwish-app-block-product">
+            <a
+              class="iWishAdd st-1"
+              href="#"
+              data-variant="{{ product.variants.first.id }}"
+              data-product="{{ product.id }}"
+              data-pTitle="{{ product.title | escape }}"
+            ></a>
           </div>
         </div>
-      </div>
 
-    </product-form>
-{% endunless %}
+        {% comment %}
+          <div class="mobile-show">
+            <div class="custom-wp_btn-link">
+
+                href="https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}"
+                style="padding: 0 !important; border: 0 !important;"
+                target="_blank"
+                class="chat-with-experts-mobile"
+              >
+                <img
+                  class="chat-with-experts"
+                  src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733_1.png?v=1755165022"
+                  height="46"
+                  width="46"
+                  alt="whatsapp icon"
+                  title="whatsapp"
+                >
+              </a>
+            </div>
+          </div>
+        {% endcomment %}
+
+        <div class="custom-share-icon desktop-show">
+          <div>
+            <div class="product-share product_share" onclick="share()" id="product_share">
+              {{ 'icon-share-product.svg' | inline_asset_content }}
+            </div>
+          </div>
+        </div>
+      </product-form>
+    {% endunless %}
   {%- else -%}
     <div class="product-form">
       <div class="product-form__buttons form">
@@ -321,40 +338,11 @@
     </div>
   {%- endif -%}
 
-  {%- if show_pickup_availability -%}
-    {{ 'component-pickup-availability.css' | asset_url | stylesheet_tag: preload: true }}
+  {% render 'schemes-buttons' %}
 
-    {%- assign pick_up_availabilities = product.selected_or_first_available_variant.store_availabilities
-      | where: 'pick_up_enabled', true
-    -%}
+  {% render 'pdp-delivery-details' %}
 
-    <pickup-availability
-      class="product__pickup-availabilities quick-add-hidden"
-      {% if product.selected_or_first_available_variant.available and pick_up_availabilities.size > 0 %}
-        available
-      {% endif %}
-      data-root-url="{{ routes.root_url }}"
-      data-variant-id="{{ product.selected_or_first_available_variant.id }}"
-      data-has-only-default-variant="{{ product.has_only_default_variant }}"
-      data-product-page-color-scheme="gradient color-{{ section.settings.color_scheme }}"
-    >
-      <template>
-        <pickup-availability-preview class="pickup-availability-preview">
-          <span class="svg-wrapper">
-            {{- 'icon-unavailable.svg' | inline_asset_content -}}
-          </span>
-          <div class="pickup-availability-info">
-            <p class="caption-large">{{ 'products.product.pickup_availability.unavailable' | t }}</p>
-            <button class="pickup-availability-button link link--text underlined-link">
-              {{ 'products.product.pickup_availability.refresh' | t }}
-            </button>
-          </div>
-        </pickup-availability-preview>
-      </template>
-    </pickup-availability>
-
-    <script src="{{ 'pickup-availability.js' | asset_url }}" defer="defer"></script>
-  {%- endif -%}
+  <div id="store-availability-dynamic"></div>
 </div>
 
 <style>
@@ -411,269 +399,596 @@
 
 {% comment %} chatWithExperts datalayer is fired by the waLink click listener inside buildBar() below {% endcomment %}
 
-
 {% comment %} ── Sticky Mobile Bar — pure JS clone approach ── {% endcomment %}
 
 <style>
-  @media (min-width: 750px) {
-    #lucira-sticky-bar { display: none !important; }
+    @media (min-width: 750px) {
+      #lucira-sticky-bar { display: none !important; }
+    }
+
+    @media (max-width: 749px) {
+      #lucira-sticky-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        z-index: 9999;
+        background: #ffffff;
+        border-top: 1px solid #e8e0de;
+        padding: 10px 16px;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.10);
+        transform: translateY(100%);
+        transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+        will-change: transform;
+        pointer-events: none;
+        box-sizing: border-box;
+      }
+
+      #lucira-sticky-bar.is-visible {
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+
+      #lucira-sticky-bar .product-form__buttons {
+        margin: 0 !important;
+        display: flex;
+        align-items: stretch;
+        gap: 8px;
+      }
+
+      /* WhatsApp circle icon */
+      #lucira-sticky-bar .lucira-sticky-wa-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 46px;
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        background: transparent;
+        border: none;
+        text-decoration: none;
+        align-self: center;
+        flex-shrink: 0;
+        padding: 0 !important;
+      }
+
+      #lucira-sticky-bar .lucira-sticky-wa-btn img {
+        width: 46px;
+        height: 46px;
+        display: block;
+      }
+
+      /* BUY WITH SCHEME — outlined, no price */
+      #lucira-sticky-bar .lucira-mobile-scheme-btn {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        flex: 0 0 auto;
+        padding: 0 15px;
+        background: transparent;
+        border: 1.5px solid #a05a64;
+        border-radius: 8px;
+        text-decoration: none;
+        font-family: inherit;
+        font-size: 14px;
+        font-weight: 500;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+        color: #a05a64;
+        white-space: nowrap;
+        line-height: 1.2;
+        text-align: center;
+      }
+
+      /* ATC takes remaining width */
+      #lucira-sticky-bar .product-form__submit {
+        flex: 1 1 auto;
+      }
+    }
+
+  .store-sheet {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    z-index: 99999;
   }
 
+  .store-sheet.active {
+    display: block;
+    overflow: scroll;
+  }
+
+  .store-sheet-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 9999999;
+  }
+
+  /* ── Desktop: slide in from right ── */
+  .store-sheet-content {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 85%;
+    max-width: 500px;
+    height: 100%;
+    background: #fff;
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+    overflow-y: scroll;
+  }
+
+  .store-sheet.active .store-sheet-content {
+    transform: translateX(0);
+  }
+
+  /* ── Mobile: slide up from bottom ── */
   @media (max-width: 749px) {
-    #lucira-sticky-bar {
+    .store-sheet-content {
       position: fixed;
       bottom: 0;
       left: 0;
       right: 0;
-      z-index: 9999;
-      background: #ffffff;
-      border-top: 1px solid #e8e0de;
-      padding: 10px 16px;
-      padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-      box-shadow: 0 -4px 20px rgba(0,0,0,0.10);
+      top: auto;
+      width: 100%;
+      max-width: 100%;
+      height: 85dvh;
+      border-radius: 16px 16px 0 0;
       transform: translateY(100%);
-      transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-      will-change: transform;
-      pointer-events: none;
-      box-sizing: border-box;
+      transition: transform 0.3s ease;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
     }
 
-    #lucira-sticky-bar.is-visible {
+    .store-sheet.active .store-sheet-content {
       transform: translateY(0);
-      pointer-events: auto;
     }
 
-    #lucira-sticky-bar .product-form__buttons {
-      margin: 0 !important;
-      display: flex;
-      align-items: stretch;
-      gap: 8px;
-    }
-
-    /* WhatsApp circle icon */
-    #lucira-sticky-bar .lucira-sticky-wa-btn {
-      display: flex !important;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 46px;
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      background: transparent;
-      border: none;
-      text-decoration: none;
-      align-self: center;
-      flex-shrink: 0;
-      padding: 0 !important;
-    }
-
-    #lucira-sticky-bar .lucira-sticky-wa-btn img {
-      width: 46px;
-      height: 46px;
+    /* Drag handle pill */
+    .store-sheet-content::before {
+      content: '';
       display: block;
+      width: 40px;
+      height: 4px;
+      background: #d1c9c7;
+      border-radius: 2px;
+      margin: 10px auto 0;
     }
+  }
 
-    /* BUY WITH SCHEME — outlined, no price */
-    #lucira-sticky-bar .lucira-mobile-scheme-btn {
-      display: flex !important;
-      align-items: center;
-      justify-content: center;
-      flex: 0 0 auto;
-      padding: 0 15px;
-      background: transparent;
-      border: 1.5px solid #a05a64;
-      border-radius: 8px;
-      text-decoration: none;
-      font-family: inherit;
-      font-size: 14px;
-      font-weight: 500;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: #a05a64;
-      white-space: nowrap;
-      line-height: 1.2;
-      text-align: center;
-    }
+  .store-sheet-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 16px;
+    border-bottom: 1px solid #eee;
+  }
 
-    /* ATC takes remaining width */
-    #lucira-sticky-bar .product-form__submit {
-      flex: 1 1 auto;
-    }
+  #close-store-sheet {
+    background: none;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+  }
+
+  #store-sheet-body {
+    padding: 16px;
+  }
+
+  .store-card {
+    border-bottom: 1px solid #eee;
+    padding: 12px 0;
+  }
+
+  .store-card h4 {
+    margin: 0 0 6px;
+  }
+
+  .store-card p {
+    margin: 0;
+    font-size: 12px;
+    color: #666;
+  }
+
+  .store-actions a {
+    color: #a05a64;
+    text-decoration: underline;
+    font-size: 13px;
   }
 </style>
 
 <script>
-(function () {
-  'use strict';
+  (function () {
+    'use strict';
 
-  if (window.__luciraStickyBarInit) return;
-  window.__luciraStickyBarInit = true;
+    if (window.__luciraStickyBarInit) return;
+    window.__luciraStickyBarInit = true;
 
-  /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
-  var SCHEME_URL         = {{ scheme_url | json }};
-  var SHOW_SCHEME_BTN    = {{ _show_scheme_btn }};
-  var PRODUCT_TITLE      = {{ product.title | json }};
-  var currentVariantId   = '{{ product.selected_or_first_available_variant.id }}';
-  /* ── Build the sticky bar by CLONING the real button row ── */
-  function buildBar() {
-    var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
-    if (!originalButtons) return null;
+    /* ── scheme_url resolved in Liquid (SSO for logged-in, plain for guests) ── */
+    var SCHEME_URL         = {{ scheme_url | json }};
+    var SHOW_SCHEME_BTN    = {{ _show_scheme_btn }};
+    var PRODUCT_TITLE      = {{ product.title | json }};
+    var currentVariantId   = '{{ product.selected_or_first_available_variant.id }}';
+    /* ── Build the sticky bar by CLONING the real button row ── */
+    function buildBar() {
+      var originalButtons = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+      if (!originalButtons) return null;
 
-    var bar = document.createElement('div');
-    bar.id = 'lucira-sticky-bar';
-    bar.setAttribute('aria-hidden', 'true');
+      var bar = document.createElement('div');
+      bar.id = 'lucira-sticky-bar';
+      bar.setAttribute('aria-hidden', 'true');
 
-    /* Deep-clone the entire buttons row */
-    var cloned = originalButtons.cloneNode(true);
+      /* Deep-clone the entire buttons row */
+      var cloned = originalButtons.cloneNode(true);
 
-    /* Remove any accidentally cloned scheme buttons (safety net) */
-    var existingScheme = cloned.querySelector('.lucira-mobile-scheme-btn');
-    if (existingScheme) existingScheme.remove();
+      /* Remove any accidentally cloned scheme buttons (safety net) */
+      var existingScheme = cloned.querySelector('.lucira-mobile-scheme-btn');
+      if (existingScheme) existingScheme.remove();
 
-    /* Wire ATC clone → original submit */
-    var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
-    if (clonedSubmit) {
-      clonedSubmit.id = 'lucira-sticky-atc-btn';
-      clonedSubmit.addEventListener('click', function (e) {
-        e.preventDefault();
-        var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
-        if (origBtn && !origBtn.disabled) origBtn.click();
+      /* Wire ATC clone → original submit */
+      var clonedSubmit = cloned.querySelector('[id^="ProductSubmitButton"]');
+      if (clonedSubmit) {
+        clonedSubmit.id = 'lucira-sticky-atc-btn';
+        clonedSubmit.addEventListener('click', function (e) {
+          e.preventDefault();
+          var origBtn = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+          if (origBtn && !origBtn.disabled) origBtn.click();
+        });
+      }
+
+      var waLink = document.createElement('a');
+      waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
+      waLink.target = '_blank';
+      waLink.rel = 'noopener noreferrer';
+      waLink.className = 'lucira-sticky-wa-btn chat-with-experts-mobile';
+      waLink.setAttribute('aria-label', 'Chat on WhatsApp');
+      waLink.style.cssText = 'padding:0!important;border:0!important;';
+
+      var waImg = document.createElement('img');
+      waImg.src = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733.svg?v=1772780374';
+      waImg.width = 46;
+      waImg.height = 46;
+      waImg.alt = 'whatsapp icon';
+      waImg.title = 'whatsapp';
+      waImg.className = 'chat-with-experts';
+      waLink.appendChild(waImg);
+
+      /* chatWithExperts datalayer is handled by the delegated document listener
+         in sticky-chat-experts.liquid (catches .lucira-sticky-wa-btn class) */
+
+      /* ── Build Scheme button using Liquid-resolved SCHEME_URL ── */
+      var schemeBtn = document.createElement('a');
+      schemeBtn.href = SCHEME_URL;
+      schemeBtn.className = 'lucira-mobile-scheme-btn';
+      schemeBtn.target = '_blank';
+      schemeBtn.rel = 'noopener noreferrer';
+      schemeBtn.textContent = ' 9=10 SAVING';
+
+      schemeBtn.addEventListener('click', function () {
+        window.dataLayer = window.dataLayer || [];
+        window.dataLayer.push({
+          event: 'promoClick',
+          promoClick: {
+            creative_name:  'Scheme Button Mobile Sticky',
+            promo_name:     PRODUCT_TITLE,
+            promo_position: currentVariantId,
+            location_id:    'mobile_sticky_atc'
+          }
+        });
+      });
+
+      /* Order: [WA icon] [SCHEME btn] [ATC btn] */
+      if (SHOW_SCHEME_BTN) {
+        cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
+      }
+      cloned.insertBefore(waLink, cloned.firstChild);    // WA always shown
+
+      bar.appendChild(cloned);
+      document.body.appendChild(bar);
+      return bar;
+    }
+
+    /* ── Sync disabled state + button text from original → clone ── */
+    function syncATC() {
+      var origBtn   = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
+      var stickyBtn = document.getElementById('lucira-sticky-atc-btn');
+      if (!origBtn || !stickyBtn) return;
+
+      stickyBtn.disabled = origBtn.disabled;
+
+      var origTxt   = origBtn.querySelector('.add-to-cart-text');
+      var stickyTxt = stickyBtn.querySelector('.add-to-cart-text');
+      if (origTxt && stickyTxt) {
+        stickyTxt.textContent = origTxt.textContent.trim();
+      }
+    }
+
+    /* ── Show / hide ── */
+    function setBarVisible(visible) {
+      var bar = document.getElementById('lucira-sticky-bar');
+      if (!bar) return;
+      bar.classList.toggle('is-visible', visible);
+      bar.setAttribute('aria-hidden', String(!visible));
+    }
+
+    /* ── IntersectionObserver on the real button row ── */
+    function initObserver() {
+      var sentinel = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
+      if (!sentinel) sentinel = document.querySelector('.buy-buttons-wrapper');
+      if (!sentinel) return;
+
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          // Show sticky bar whenever ATC is NOT visible in viewport (above OR below)
+          setBarVisible(!entry.isIntersecting);
+        });
+      }, { threshold: 0, rootMargin: '0px' });
+
+      observer.observe(sentinel);
+    }
+
+    /* ── Variant change → sync ATC state only ── */
+    function onVariantChange() {
+      requestAnimationFrame(syncATC);
+
+      // Keep currentVariantId fresh for dataLayer reads
+      var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+      var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+      if (variantInput && variantInput.value) {
+        currentVariantId = variantInput.value;
+      }
+    }
+
+    document.addEventListener('variant:change',  function () { onVariantChange(); });
+    document.addEventListener('variant:changed', function () { onVariantChange(); });
+
+    /* MutationObserver fallback on hidden input[name="id"] */
+    function watchVariantInput() {
+      var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
+      var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
+      if (!variantInput) return;
+
+      new MutationObserver(function () {
+        if (variantInput.value) onVariantChange();
+      }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+
+      variantInput.addEventListener('change', function () {
+        if (this.value) onVariantChange();
+      });
+
+      mainForm.addEventListener('change', function (e) {
+        if (e.target.name === 'id' && e.target.value) onVariantChange();
       });
     }
 
-    /* ── Build WhatsApp icon ── */
-    var waLink = document.createElement('a');
-    waLink.href = 'https://wa.me/+919004435760?text=Hi, I want to get more information about this product: {{ product.title | url_encode }}';
-    waLink.target = '_blank';
-    waLink.rel = 'noopener noreferrer';
-    waLink.className = 'lucira-sticky-wa-btn chat-with-experts-mobile';
-    waLink.setAttribute('aria-label', 'Chat on WhatsApp');
-    waLink.style.cssText = 'padding:0!important;border:0!important;';
+    /* ── Boot ── */
+    document.addEventListener('DOMContentLoaded', function () {
+      buildBar();
+      syncATC();
+      initObserver();
+      watchVariantInput();
+    });
 
-    var waImg = document.createElement('img');
-    waImg.src = 'https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Group_1321315733.svg?v=1772780374';
-    waImg.width = 46;
-    waImg.height = 46;
-    waImg.alt = 'whatsapp icon';
-    waImg.title = 'whatsapp';
-    waImg.className = 'chat-with-experts';
-    waLink.appendChild(waImg);
+  })();
+</script>
+<script>
+  (function () {
+    const API_URL = 'https://api.lucirajewelry.com/inventory/inventory-check.php';
 
-    /* chatWithExperts datalayer is handled by the delegated document listener
-       in sticky-chat-experts.liquid (catches .lucira-sticky-wa-btn class) */
+    /* 🔥 Store Full Details Mapping */
+    const STORE_DETAILS = {
+      PS1: {
+        name: 'Pune Store',
+        address: 'Shop no. 3,4, Balgandharv Chowk, Sai Square, 5 & 6, Jangali Maharaj Rd, Pune, Maharashtra 411005',
+        timings: '10:00 AM – 9:30 PM',
+        map: 'https://maps.app.goo.gl/e4ZWZcgPB211yswP7',
+        phone: '+91 8433667236',
+      },
+      CS1: {
+        name: 'Chembur Store',
+        address: 'Shop No. 3 Ground Floor, 487, Geraldine CHS LTD, Central Ave Rd, Chembur, Mumbai, Maharashtra 400071',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.app.goo.gl/THxDQjctsLrDbZiF8',
+        phone: '+91 9004402038',
+      },
+      BO1: {
+        name: 'Borivali Store',
+        address: 'Sky City Mall, S-40, 2nd Floor, Western Express Highway, Borivali East, Mumbai - 400066',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.app.goo.gl/MRw5yshJm9vZpn6v5',
+        phone: '+91 8433667238',
+      },
+      'Divinecarat Lifestyles Pvt Ltd': {
+        name: 'Head Office',
+        address: 'Office 1402-2, Dlh Park, 14th Floor, Swami Vivekanand Rd, Mumbai, Maharashtra 400062',
+        timings: '10:00 AM – 10:00 PM',
+        map: 'https://maps.app.goo.gl/1DxijR7yUv3TdrUr9',
+      },
+    };
 
-    /* ── Build Scheme button using Liquid-resolved SCHEME_URL ── */
-    var schemeBtn = document.createElement('a');
-    schemeBtn.href = SCHEME_URL;
-    schemeBtn.className = 'lucira-mobile-scheme-btn';
-    schemeBtn.target = '_blank';
-    schemeBtn.rel = 'noopener noreferrer';
-    schemeBtn.textContent = ' 9=10 SAVING';
+    let lastVariantId = null;
 
-    schemeBtn.addEventListener('click', function () {
-      window.dataLayer = window.dataLayer || [];
-      window.dataLayer.push({
-        event: 'promoClick',
-        promoClick: {
-          creative_name:  'Scheme Button Mobile Sticky',
-          promo_name:     PRODUCT_TITLE,
-          promo_position: currentVariantId,
-          location_id:    'mobile_sticky_atc'
-        }
+    function getVariantId() {
+      const input = document.querySelector('form[action="/cart/add"] input[name="id"]');
+      return input ? input.value : null;
+    }
+
+    function getFutureDate(days = 15) {
+      const d = new Date();
+      d.setDate(d.getDate() + days);
+
+      return d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: 'long',
+        year: 'numeric',
       });
-    });
-
-    /* Order: [WA icon] [SCHEME btn] [ATC btn] */
-    if (SHOW_SCHEME_BTN) {
-      cloned.insertBefore(schemeBtn, cloned.firstChild); // scheme before ATC
     }
-    cloned.insertBefore(waLink, cloned.firstChild);    // WA always shown
 
-    bar.appendChild(cloned);
-    document.body.appendChild(bar);
-    return bar;
-  }
+    function renderStoreData(data) {
+      const container = document.getElementById('store-availability-dynamic');
+      if (!container) return;
 
-  /* ── Sync disabled state + button text from original → clone ── */
-  function syncATC() {
-    var origBtn   = document.querySelector('.buy-buttons-wrapper #ProductSubmitButton-{{ section_id }}');
-    var stickyBtn = document.getElementById('lucira-sticky-atc-btn');
-    if (!origBtn || !stickyBtn) return;
+      if (!data) {
+        container.innerHTML = `<div class="store-loading">Checking availability...</div>`;
+        return;
+      }
 
-    stickyBtn.disabled = origBtn.disabled;
+      if (data.in_stock_locations && data.in_stock_locations.length > 0) {
+        window.__storeData = data;
 
-    var origTxt   = origBtn.querySelector('.add-to-cart-text');
-    var stickyTxt = stickyBtn.querySelector('.add-to-cart-text');
-    if (origTxt && stickyTxt) {
-      stickyTxt.textContent = origTxt.textContent.trim();
+        const store = data.in_stock_locations[0];
+        const displayName = STORE_DETAILS[store.location_name]?.name || store.location_name;
+
+        container.innerHTML = `
+  <div class="store-available">
+    <p class="location-store">
+      Available at our ${displayName} & ${data.in_stock_locations.length - 1} other stores
+    </p>
+
+    <p class="extra-stores" id="open-store-sheet" style="cursor:pointer; text-decoration: underline;">
+      Find All Stores
+    </p>
+  </div>
+`;
+      } else {
+        container.innerHTML = `
+        <div class="made-to-order-box">
+          Dispatch by: ${getFutureDate()} | This item is made to order
+        </div>
+      `;
+      }
+
+      document.dispatchEvent(new CustomEvent('lucira:inventory', {
+    detail: {
+      inStock: !!(data.in_stock_locations && data.in_stock_locations.length > 0),
+      locations: data.in_stock_locations || []
     }
-  }
+  }));
 
-  /* ── Show / hide ── */
-  function setBarVisible(visible) {
-    var bar = document.getElementById('lucira-sticky-bar');
-    if (!bar) return;
-    bar.classList.toggle('is-visible', visible);
-    bar.setAttribute('aria-hidden', String(!visible));
-  }
+    }
 
-  /* ── IntersectionObserver on the real button row ── */
-  function initObserver() {
-    var sentinel = document.querySelector('.buy-buttons-wrapper .product-form__buttons');
-    if (!sentinel) sentinel = document.querySelector('.buy-buttons-wrapper');
-    if (!sentinel) return;
+    function fetchInventory() {
+      const variantId = getVariantId();
+      if (!variantId) return;
 
-    var observer = new IntersectionObserver(function (entries) {
-      entries.forEach(function (entry) {
-        // Show sticky bar whenever ATC is NOT visible in viewport (above OR below)
-        setBarVisible(!entry.isIntersecting);
+      /* 🚀 Prevent duplicate API calls */
+      if (variantId === lastVariantId) return;
+      lastVariantId = variantId;
+
+      renderStoreData(null);
+
+      fetch(`${API_URL}?variant_id=${variantId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          renderStoreData(data);
+        })
+        .catch(() => {
+          renderStoreData({ in_stock_locations: [] });
+        });
+    }
+
+    /* 🔥 SUPER IMPORTANT: MutationObserver (handles ALL themes) */
+    function watchVariantChange() {
+      const form = document.querySelector('form[action="/cart/add"]');
+      if (!form) return;
+
+      const variantInput = form.querySelector('input[name="id"]');
+      if (!variantInput) return;
+
+      /* Detect value change */
+      new MutationObserver(() => {
+        fetchInventory();
+      }).observe(variantInput, {
+        attributes: true,
+        attributeFilter: ['value'],
       });
-    }, { threshold: 0, rootMargin: '0px' });
 
-    observer.observe(sentinel);
-  }
-
-  /* ── Variant change → sync ATC state only ── */
-  function onVariantChange() {
-    requestAnimationFrame(syncATC);
-
-    // Keep currentVariantId fresh for dataLayer reads
-    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
-    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
-    if (variantInput && variantInput.value) {
-      currentVariantId = variantInput.value;
+      /* Backup listeners */
+      variantInput.addEventListener('change', fetchInventory);
+      form.addEventListener('change', function (e) {
+        if (e.target.name === 'id') fetchInventory();
+      });
     }
-  }
 
-  document.addEventListener('variant:change',  function () { onVariantChange(); });
-  document.addEventListener('variant:changed', function () { onVariantChange(); });
+    /* 🔥 SIDE SHEET */
 
-  /* MutationObserver fallback on hidden input[name="id"] */
-  function watchVariantInput() {
-    var mainForm     = document.querySelector('.product-form form[action*="/cart/add"]');
-    var variantInput = mainForm && mainForm.querySelector('input[name="id"]');
-    if (!variantInput) return;
+    function openStoreSheet() {
+      const sheet = document.getElementById('store-side-sheet');
+      const body = document.getElementById('store-sheet-body');
 
-    new MutationObserver(function () {
-      if (variantInput.value) onVariantChange();
-    }).observe(variantInput, { attributes: true, attributeFilter: ['value'] });
+      if (!window.__storeData || !sheet || !body) return;
 
-    variantInput.addEventListener('change', function () {
-      if (this.value) onVariantChange();
+      body.innerHTML = '';
+
+      window.__storeData.in_stock_locations.forEach((store) => {
+        const details = STORE_DETAILS[store.location_name] || {
+          name: store.location_name,
+          address: 'N/A',
+          timings: 'N/A',
+          map: '#',
+        };
+
+        body.innerHTML += `
+  <div class="store-card">
+    
+    <h4 class="store-title">${details.name}</h4>
+
+    <p class="store-address">
+      <span class="icon">                          <svg class="icon-location" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+</span>
+      ${details.address}
+    </p>
+
+    <div class="store-meta">
+      <p><span class="icon">                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+</span> ${details.phone || ''}</p>
+      <p><span class="icon">                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+</span> ${details.timings}</p>
+    </div>
+
+    <div class="store-actions">
+      <a href="https://wa.me/${(details.phone || '').replace(/\\D/g, '')}" target="_blank" class="btn-outline">
+        CONNECT WITH US
+      </a>
+
+      <a href="${details.map}" target="_blank" class="btn-filled">
+        GET DIRECTIONS
+      </a>
+    </div>
+
+  </div>
+`;
+      });
+
+      sheet.classList.add('active');
+    }
+
+    function closeStoreSheet() {
+      document.getElementById('store-side-sheet').classList.remove('active');
+    }
+
+    document.addEventListener('click', function (e) {
+      if (e.target.id === 'open-store-sheet') {
+        openStoreSheet();
+      }
+
+      if (e.target.id === 'close-store-sheet' || e.target.classList.contains('store-sheet-overlay')) {
+        closeStoreSheet();
+      }
     });
 
-    mainForm.addEventListener('change', function (e) {
-      if (e.target.name === 'id' && e.target.value) onVariantChange();
+    /* 🚀 INIT */
+    document.addEventListener('DOMContentLoaded', function () {
+      fetchInventory();
+      watchVariantChange();
     });
-  }
-
-  /* ── Boot ── */
-  document.addEventListener('DOMContentLoaded', function () {
-    buildBar();
-    syncATC();
-    initObserver();
-    watchVariantInput();
-  });
-
-})();
+  })();
 </script>
