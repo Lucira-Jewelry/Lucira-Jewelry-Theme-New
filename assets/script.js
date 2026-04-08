@@ -205,10 +205,12 @@ document.addEventListener("click", function (e) {
     }).catch(console.error);
   }
 
-  // --- Product View ---
+  // Defer to avoid blocking main thread on page load
   if (window.location.pathname.includes('/products/')) {
     const productHandle = window.location.pathname.split('/products/')[1].split('/')[0];
-    sendWebhook('product_view', { product_handle: productHandle, cookies: collectCookies() });
+    (window.requestIdleCallback || function(cb) { setTimeout(cb, 1); })(function () {
+      sendWebhook('product_view', { product_handle: productHandle, cookies: collectCookies() });
+    });
   }
 
   // --- Add To Cart ---
@@ -330,7 +332,11 @@ $(document).ready(function () {
   }
 
   setupBradAccordion();
-  $(window).on("resize", setupBradAccordion);
+  let _resizeTimer;
+  $(window).on("resize", function () {
+    clearTimeout(_resizeTimer);
+    _resizeTimer = setTimeout(setupBradAccordion, 150);
+  });
 });
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -421,11 +427,12 @@ document.addEventListener("DOMContentLoaded", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
-  // Zoho loads async — wait for it to be ready before observing
-  const zohoReadyInterval = setInterval(function () {
+  // Use MutationObserver instead of setInterval — zero polling cost
+  const zohoWatcher = new MutationObserver(function (_, obs) {
     if (document.getElementById("zsiq_chat_wrap")) {
+      obs.disconnect();
       observeZohoChat();
-      clearInterval(zohoReadyInterval);
     }
-  }, 500);
+  });
+  zohoWatcher.observe(document.body, { childList: true, subtree: true });
 });
