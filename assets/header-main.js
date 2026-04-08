@@ -103,13 +103,15 @@ document.addEventListener("DOMContentLoaded", function () {
   const stickyHeader = document.querySelector("sticky-header");
 
   if (stickyHeader) {
+    let _ticking = false;
     window.addEventListener("scroll", function () {
-      if (window.scrollY > 50) { 
-        stickyHeader.classList.add("sticky-header");
-      } else {
-        stickyHeader.classList.remove("sticky-header");
-      }
-    });
+      if (_ticking) return;
+      _ticking = true;
+      requestAnimationFrame(function () {
+        stickyHeader.classList.toggle("sticky-header", window.scrollY > 50);
+        _ticking = false;
+      });
+    }, { passive: true });
   }
 });
 

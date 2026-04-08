@@ -21,9 +21,6 @@ window.handleGTMProductCardClick = function(event) {
   event.preventDefault();
   const target = event.currentTarget;
 
-  console.log("Product card clicked");
-  console.log("Data attributes:", target.dataset);
-
   const productData = {
     event: "productClick",
     products:{
@@ -50,12 +47,11 @@ window.handleGTMProductCardClick = function(event) {
   };
 
   window.dataLayer = window.dataLayer || [];
-  console.log("Pushing to dataLayer:", productData);
   window.dataLayer.push(productData);
 
-  setTimeout(function() {
-    window.location.href = target.href;
-  }, 300);
+  // Navigate immediately — the 300ms delay was a direct INP hit on every PLP click.
+  // GTM processes dataLayer pushes asynchronously; no delay is needed.
+  window.location.href = target.href;
 };
 
 function handleGTMAddToCartSubmit(event) {
