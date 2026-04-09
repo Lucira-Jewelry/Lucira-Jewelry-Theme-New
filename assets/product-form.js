@@ -185,68 +185,102 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Escape key support
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && drawer.classList.contains('active')) {
     closeSizeDrawer();
   }
 });
 
-const engravingDrawer = document.getElementById('engraving-drawer');
-const engravingOverlay = document.getElementById('engraving-drawer-overlay');
+document.addEventListener('DOMContentLoaded', function () {
 
-function openEngravingDrawer() {
-  engravingDrawer.classList.add('active');
-  engravingOverlay.classList.add('active');
-  document.body.style.overflow = 'hidden';
-}
+  const engravingDrawer = document.getElementById('engraving-drawer');
+  const engravingOverlay = document.getElementById('engraving-drawer-overlay');
 
-function closeEngravingDrawer() {
-  engravingDrawer.classList.remove('active');
-  engravingOverlay.classList.remove('active');
-  document.body.style.overflow = '';
-}
+  const variantDrawer = document.getElementById('variant-drawer');
+  const variantOverlay = document.getElementById('drawer-overlay');
 
-// Open drawer button
-document.addEventListener('click', function(e) {
-  if (e.target.closest('#engraving_drawer')) {
-    openEngravingDrawer();
+  // ===== ENGRAVING DRAWER =====
+  function openEngravingDrawer() {
+    if (!engravingDrawer || !engravingOverlay) return;
+
+    // Close variant drawer if open
+    closeVariantDrawer();
+
+    engravingDrawer.classList.add('active');
+    engravingOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
   }
-});
 
-// Close drawer buttons (X button or overlay click)
-document.addEventListener('click', function(e) {
-  if (
-    e.target.closest('#close-engraving-button') ||
-    e.target.closest('#engraving-drawer-overlay')
-  ) {
+  function closeEngravingDrawer() {
+    if (!engravingDrawer || !engravingOverlay) return;
+
+    engravingDrawer.classList.remove('active');
+    engravingOverlay.classList.remove('active');
+    document.body.style.overflow = '';
+  }
+
+  // ===== VARIANT DRAWER =====
+  function openVariantDrawer() {
+    if (!variantDrawer || !variantOverlay) return;
+
+    // Close engraving drawer if open
     closeEngravingDrawer();
-  }
-});
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Escape' && engravingDrawer.classList.contains('active')) {
-    closeEngravingDrawer();
+    variantDrawer.classList.add('active');
+    variantOverlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
   }
-});
 
+  function closeVariantDrawer() {
+    if (!variantDrawer || !variantOverlay) return;
 
-const drawer = document.getElementById('variant-drawer');
-const overlay = document.getElementById('drawer-overlay');
-document.addEventListener('click', function(e) {
-  if (e.target.closest('#product_variant_drawer')) {
-    openDrawer();
+    variantDrawer.classList.remove('active');
+    variantOverlay.classList.remove('active');
+    document.body.style.overflow = '';
   }
-});
 
-document.addEventListener('click', function(e) {
-  if (
-    e.target.closest('#close-drawer') ||
-    e.target.closest('#customize_close_drawer') ||
-    e.target.closest('#drawer-overlay')
-  ) {
-    closeDrawer();
-  }
+  // ===== GLOBAL CLICK HANDLER =====
+  document.addEventListener('click', function (e) {
+
+    // OPEN
+    if (e.target.closest('#engraving_drawer')) {
+      openEngravingDrawer();
+    }
+
+    if (e.target.closest('#product_variant_drawer')) {
+      openVariantDrawer();
+    }
+
+    // CLOSE ENGRAVING
+    if (
+      e.target.closest('#close-engraving-button') ||
+      e.target.closest('#engraving-drawer-overlay')
+    ) {
+      closeEngravingDrawer();
+    }
+
+    // CLOSE VARIANT
+    if (
+      e.target.closest('#close-drawer') ||
+      e.target.closest('#customize_close_drawer') ||
+      e.target.closest('#drawer-overlay')
+    ) {
+      closeVariantDrawer();
+    }
+  });
+
+  // ===== ESC KEY =====
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') {
+      if (engravingDrawer?.classList.contains('active')) {
+        closeEngravingDrawer();
+      }
+      if (variantDrawer?.classList.contains('active')) {
+        closeVariantDrawer();
+      }
+    }
+  });
+
 });
 
 (function () {
