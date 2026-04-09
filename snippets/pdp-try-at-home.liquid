@@ -221,48 +221,37 @@
     var BOOK_APPT_URL =
       "https://wa.me/919004435760?text=Hi,%20I'd%20like%20to%20know%20more%20about%20visiting%20Lucira's%20store.";
 
-    function applyInventoryState(inStock) {
-      var title = document.getElementById('lucira-vs-title');
-      var desc = document.getElementById('lucira-vs-desc');
-      var cta = document.getElementById('lucira-vs-cta');
-      var card = document.getElementById('lucira-visit-store-card');
-      if (!title || !desc || !cta) return;
+    // AFTER
+function applyInventoryState(inStock, displayNames) {
+  var title = document.getElementById('lucira-vs-title');
+  var desc  = document.getElementById('lucira-vs-desc');
+  var cta   = document.getElementById('lucira-vs-cta');
+  var card  = document.getElementById('lucira-visit-store-card');
+  if (!title || !desc || !cta) return;
 
-      if (inStock) {
-        title.textContent = 'Available In Nearby Stores';
-        desc.textContent = 'This design is available for trial at stores near you.';
-        cta.textContent = 'Find All Stores';
-        cta.href = '#';
-        cta.removeAttribute('target');
-        cta.removeAttribute('rel');
-        // Reuse existing side-sheet (id="open-store-sheet" listener already active)
-        cta.id = 'open-store-sheet';
-        //if (card) card.style.borderColor = '#A398DE';
-      } else {
-        title.textContent = 'Visit Our Store';
-        desc.textContent = 'Visit store to explore and try your favourite designs live';
-        cta.textContent = 'Book Appointment';
-        cta.href = BOOK_APPT_URL;
-        cta.setAttribute('target', '_blank');
-        cta.setAttribute('rel', 'noopener');
-        cta.id = 'lucira-vs-cta'; // restore id
-        if (card) card.style.borderColor = '';
-      }
-    }
+  if (inStock) {
+    var locationLabel = (displayNames && displayNames.length === 1)
+      ? displayNames[0]          // e.g. "Pune Store"
+      : 'Nearby Stores';         // 2+ stores → keep generic label
+    title.textContent = 'Available In ' + locationLabel;
+    // ... rest of inStock block unchanged
+  }
+}
 
-    // Listen for inventory event dispatched by buy-buttons.liquid
-    document.addEventListener('lucira:inventory', function (e) {
-      applyInventoryState(e.detail.inStock);
-    });
+// Listener
+document.addEventListener('lucira:inventory', function (e) {
+  applyInventoryState(e.detail.inStock, e.detail.displayNames);
+});
 
-    // Fallback: if event already fired before this script ran, check __storeData
-    document.addEventListener('DOMContentLoaded', function () {
-      if (window.__storeData) {
-        applyInventoryState(
-          !!(window.__storeData.in_stock_locations && window.__storeData.in_stock_locations.length > 0)
-        );
-      }
-    });
+// DOMContentLoaded fallback
+document.addEventListener('DOMContentLoaded', function () {
+  if (window.__storeData) {
+    var locs = window.__storeData.in_stock_locations || [];
+    var names = locs.map(function (s) { return s.location_name; }); // raw fallback
+    applyInventoryState(locs.length > 0, names);
+  }
+});
+
 
     // Also react to variant changes (same event buy-buttons fires)
     document.addEventListener('lucira:inventory', function (e) {
