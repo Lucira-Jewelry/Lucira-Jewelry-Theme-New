@@ -19,8 +19,8 @@
                 </div>
                 <p class="description-store-visit">Visit store to explore and try your favourite designs live</p>
               </div>
-              <a
-                href="https://wa.me/919004435760?text=Hi,%20I’d%20like%20to%20know%20more%20about%20visiting%20Lucira's%20store."
+              
+                href="https://wa.me/919004435760?text=Hi,%20I'd%20like%20to%20know%20more%20about%20visiting%20Lucira's%20store."
                 target="_blank"
                 rel="noopener"
                 class="visit-store-home-button">
@@ -53,7 +53,7 @@
               </p>
             </div>
             <!-- CTA: toggled by JS -->
-            <a
+            
               id="lucira-vs-cta"
               href="https://wa.me/919004435760?text=Hi,%20I'd%20like%20to%20know%20more%20about%20visiting%20Lucira's%20store."
               target="_blank"
@@ -84,7 +84,7 @@
               <p class="description-store-visit">Try your selected pieces from the comfort of your home</p>
             </div>
             {% comment %} <button class="try-at-home-button" onclick="openTryAtHomeOverlay()">Try at Home</button> {% endcomment %}
-            <a
+            
               class="try-at-home-button"
               href="https://wa.me/919004435760?text=Hi,%20I%20want%20to%20try%20this%20product%20at%20home%20:%20{{ product.title | url_encode }}"
               target="_blank"
@@ -221,41 +221,51 @@
     var BOOK_APPT_URL =
       "https://wa.me/919004435760?text=Hi,%20I'd%20like%20to%20know%20more%20about%20visiting%20Lucira's%20store.";
 
-    // AFTER
-function applyInventoryState(inStock, displayNames) {
-  var title = document.getElementById('lucira-vs-title');
-  var desc  = document.getElementById('lucira-vs-desc');
-  var cta   = document.getElementById('lucira-vs-cta');
-  var card  = document.getElementById('lucira-visit-store-card');
-  if (!title || !desc || !cta) return;
+    function applyInventoryState(inStock, displayNames) {
+      var title = document.getElementById('lucira-vs-title');
+      var desc  = document.getElementById('lucira-vs-desc');
+      var cta   = document.getElementById('lucira-vs-cta');
+      var card  = document.getElementById('lucira-visit-store-card');
+      if (!title || !desc || !cta) return;
 
-  if (inStock) {
-    var locationLabel = (displayNames && displayNames.length === 1)
-      ? displayNames[0]          // e.g. "Pune Store"
-      : 'Nearby Stores';         // 2+ stores → keep generic label
-    title.textContent = 'Available In ' + locationLabel;
-    // ... rest of inStock block unchanged
-  }
-}
+      if (inStock) {
+        // If exactly one store has stock, name it specifically; otherwise stay generic
+        var locationLabel = (displayNames && displayNames.length === 1)
+          ? displayNames[0]
+          : 'Nearby Stores';
 
-// Listener
-document.addEventListener('lucira:inventory', function (e) {
-  applyInventoryState(e.detail.inStock, e.detail.displayNames);
-});
+        title.textContent = 'Available In ' + locationLabel;
+        desc.textContent  = 'This design is available for trial at stores near you.';
+        cta.textContent   = 'Find All Stores';
+        cta.href          = '#';
+        cta.removeAttribute('target');
+        cta.removeAttribute('rel');
+        // Reuse existing side-sheet (id="open-store-sheet" listener already active)
+        cta.id = 'open-store-sheet';
+      } else {
+        title.textContent = 'Visit Our Store';
+        desc.textContent  = 'Visit store to explore and try your favourite designs live';
+        cta.textContent   = 'Book Appointment';
+        cta.href          = BOOK_APPT_URL;
+        cta.setAttribute('target', '_blank');
+        cta.setAttribute('rel', 'noopener');
+        cta.id = 'lucira-vs-cta'; // restore id
+        if (card) card.style.borderColor = '';
+      }
+    }
 
-// DOMContentLoaded fallback
-document.addEventListener('DOMContentLoaded', function () {
-  if (window.__storeData) {
-    var locs = window.__storeData.in_stock_locations || [];
-    var names = locs.map(function (s) { return s.location_name; }); // raw fallback
-    applyInventoryState(locs.length > 0, names);
-  }
-});
-
-
-    // Also react to variant changes (same event buy-buttons fires)
+    // Listen for inventory event dispatched by buy-buttons.liquid
     document.addEventListener('lucira:inventory', function (e) {
-      applyInventoryState(e.detail.inStock);
+      applyInventoryState(e.detail.inStock, e.detail.displayNames);
+    });
+
+    // Fallback: if event already fired before this script ran, check __storeData
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.__storeData) {
+        var locs  = window.__storeData.in_stock_locations || [];
+        var names = locs.map(function (s) { return s.location_name; }); // raw fallback (no STORE_DETAILS here)
+        applyInventoryState(locs.length > 0, names);
+      }
     });
   })();
 </script>
