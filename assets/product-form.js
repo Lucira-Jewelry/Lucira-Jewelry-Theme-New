@@ -185,102 +185,68 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// Escape key support
 document.addEventListener('keydown', function(e) {
   if (e.key === 'Escape' && drawer.classList.contains('active')) {
     closeSizeDrawer();
   }
 });
 
-document.addEventListener('DOMContentLoaded', function () {
+const engravingDrawer = document.getElementById('engraving-drawer');
+const engravingOverlay = document.getElementById('engraving-drawer-overlay');
 
-  const engravingDrawer = document.getElementById('engraving-drawer');
-  const engravingOverlay = document.getElementById('engraving-drawer-overlay');
+function openEngravingDrawer() {
+  engravingDrawer.classList.add('active');
+  engravingOverlay.classList.add('active');
+  document.body.style.overflow = 'hidden';
+}
 
-  const variantDrawer = document.getElementById('variant-drawer');
-  const variantOverlay = document.getElementById('drawer-overlay');
+function closeEngravingDrawer() {
+  engravingDrawer.classList.remove('active');
+  engravingOverlay.classList.remove('active');
+  document.body.style.overflow = '';
+}
 
-  // ===== ENGRAVING DRAWER =====
-  function openEngravingDrawer() {
-    if (!engravingDrawer || !engravingOverlay) return;
-
-    // Close variant drawer if open
-    closeVariantDrawer();
-
-    engravingDrawer.classList.add('active');
-    engravingOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
+// Open drawer button
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#engraving_drawer')) {
+    openEngravingDrawer();
   }
+});
 
-  function closeEngravingDrawer() {
-    if (!engravingDrawer || !engravingOverlay) return;
-
-    engravingDrawer.classList.remove('active');
-    engravingOverlay.classList.remove('active');
-    document.body.style.overflow = '';
-  }
-
-  // ===== VARIANT DRAWER =====
-  function openVariantDrawer() {
-    if (!variantDrawer || !variantOverlay) return;
-
-    // Close engraving drawer if open
+// Close drawer buttons (X button or overlay click)
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-engraving-button') ||
+    e.target.closest('#engraving-drawer-overlay')
+  ) {
     closeEngravingDrawer();
-
-    variantDrawer.classList.add('active');
-    variantOverlay.classList.add('active');
-    document.body.style.overflow = 'hidden';
   }
+});
 
-  function closeVariantDrawer() {
-    if (!variantDrawer || !variantOverlay) return;
-
-    variantDrawer.classList.remove('active');
-    variantOverlay.classList.remove('active');
-    document.body.style.overflow = '';
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape' && engravingDrawer.classList.contains('active')) {
+    closeEngravingDrawer();
   }
+});
 
-  // ===== GLOBAL CLICK HANDLER =====
-  document.addEventListener('click', function (e) {
 
-    // OPEN
-    if (e.target.closest('#engraving_drawer')) {
-      openEngravingDrawer();
-    }
+const drawer = document.getElementById('variant-drawer');
+const overlay = document.getElementById('drawer-overlay');
+document.addEventListener('click', function(e) {
+  if (e.target.closest('#product_variant_drawer')) {
+    openDrawer();
+  }
+});
 
-    if (e.target.closest('#product_variant_drawer')) {
-      openVariantDrawer();
-    }
-
-    // CLOSE ENGRAVING
-    if (
-      e.target.closest('#close-engraving-button') ||
-      e.target.closest('#engraving-drawer-overlay')
-    ) {
-      closeEngravingDrawer();
-    }
-
-    // CLOSE VARIANT
-    if (
-      e.target.closest('#close-drawer') ||
-      e.target.closest('#customize_close_drawer') ||
-      e.target.closest('#drawer-overlay')
-    ) {
-      closeVariantDrawer();
-    }
-  });
-
-  // ===== ESC KEY =====
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') {
-      if (engravingDrawer?.classList.contains('active')) {
-        closeEngravingDrawer();
-      }
-      if (variantDrawer?.classList.contains('active')) {
-        closeVariantDrawer();
-      }
-    }
-  });
-
+document.addEventListener('click', function(e) {
+  if (
+    e.target.closest('#close-drawer') ||
+    e.target.closest('#customize_close_drawer') ||
+    e.target.closest('#drawer-overlay')
+  ) {
+    closeDrawer();
+  }
 });
 
 (function () {
