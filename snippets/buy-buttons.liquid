@@ -440,13 +440,15 @@
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
     z-index: 99999;
+    /* Use visibility instead of display:none so transform can animate */
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .store-sheet.active {
-    display: block;
-    overflow: scroll;
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .store-sheet-overlay {
@@ -457,6 +459,12 @@
     height: 100vh;
     background: rgba(0, 0, 0, 0.45);
     z-index: 9999999;
+    opacity: 0;
+    transition: opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .store-sheet.active .store-sheet-overlay {
+    opacity: 1;
   }
 
   .store-sheet-content {
@@ -468,7 +476,7 @@
     height: 100%;
     background: #fff;
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     overflow-y: scroll;
     z-index: 99999999;
   }
@@ -489,7 +497,7 @@
       height: 85dvh;
       border-radius: 16px 16px 0 0;
       transform: translateY(100%);
-      transition: transform 0.3s ease;
+      transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       overflow-y: scroll;
       -webkit-overflow-scrolling: touch;
     }
@@ -497,8 +505,6 @@
     .store-sheet.active .store-sheet-content {
       transform: translateY(0);
     }
-
-    
   }
 
   .store-sheet-header {
@@ -569,7 +575,6 @@
   padding: 4px 10px;
   border-radius: 999px;
   margin-bottom: 6px;
-  margin-right:8px;
 }
 
   .nearest-store-badge {
@@ -587,7 +592,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   margin-bottom: 6px;
-}S
+}
 </style>
 
 <script>
@@ -921,13 +926,23 @@
             </p>
 
             <div class="store-meta">
-              <p>
+              {% comment %} <p>
                 <span class="icon">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                     <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
                   </svg>
                 </span>
                 ${details.phone || ''}
+              </p> {% endcomment %}
+              <p>
+                <span class="icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.05 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+                  </svg>
+                </span>
+                ${details.phone
+                  ? `<a href="tel:${details.phone.replace(/\s+/g, '')}" style="color:inherit;text-decoration:none;">${details.phone}</a>`
+                  : ''}
               </p>
               <p>
                 <span class="icon">
@@ -954,6 +969,12 @@
       });
 
       sheet.classList.add('active');
+      // Lock scroll without shifting page position
+      var scrollY = window.scrollY || window.pageYOffset;
+      document.body.style.position   = 'fixed';
+      document.body.style.top        = '-' + scrollY + 'px';
+      document.body.style.width      = '100%';
+      document.body.dataset.scrollY  = scrollY;
     }
 
     // Expose globally so try-at-home-section can call it with sorted locations
@@ -962,6 +983,13 @@
     function closeStoreSheet() {
       const sheet = document.getElementById('store-side-sheet');
       if (sheet) sheet.classList.remove('active');
+      // Restore scroll position
+      var savedY = parseInt(document.body.dataset.scrollY || '0', 10);
+      document.body.style.position = '';
+      document.body.style.top      = '';
+      document.body.style.width    = '';
+      delete document.body.dataset.scrollY;
+      window.scrollTo(0, savedY);
     }
 
     document.addEventListener('click', function (e) {
