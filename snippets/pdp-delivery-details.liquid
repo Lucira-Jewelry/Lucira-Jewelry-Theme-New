@@ -85,13 +85,8 @@
 
   <div class="lucira-delivery-info">
     <span class="lucira-delivery-time">
-      <span id="delivery-status-text">
-        {% if is_in_stock %}
-          Estimated Free Dispatch by
-        {% else %}
-          Available &amp; Dispatched by
-        {% endif %}
-      </span>
+      <span id="delivery-store-availability" style="display:none;"></span>
+      <span id="delivery-status-text">Dispatched by</span>
       <span class="delivry_txt" id="delivery-date-display">{{ delivery_date }}</span>
     </span>
   </div>
@@ -323,6 +318,49 @@
   }
 
   document.addEventListener('DOMContentLoaded', init);
+
+  // ── Store availability in delivery section ─────────────────────────────────
+  (function () {
+    var STORE_SHORT_NAMES = {
+      PS1:   'Pune',
+      CS1:   'Chembur',
+      BO1:   'Borivali',
+      NOS18: 'Noida',
+    };
+
+    function getShortName(locationKey) {
+      return STORE_SHORT_NAMES[locationKey] || locationKey;
+    }
+
+    function updateStoreAvailability(locations) {
+      var storeEl    = document.getElementById('delivery-store-availability');
+      var statusEl   = document.getElementById('delivery-status-text');
+      if (!storeEl || !statusEl) return;
+
+      if (!locations || locations.length === 0) {
+        storeEl.style.display = 'none';
+        statusEl.textContent  = 'Dispatched by';
+        return;
+      }
+
+      var firstName = getShortName(locations[0].location_name);
+      var extra     = locations.length - 1;
+      var label     = 'Available In Store - ' + firstName + (extra > 0 ? ' +' + extra : '');
+
+      storeEl.textContent  = label;
+      storeEl.style.display = 'block';
+      statusEl.textContent  = 'Dispatched by';
+    }
+
+    // Listen for the inventory event fired by buy-buttons.liquid
+    document.addEventListener('lucira:inventory', function (e) {
+      if (e.detail && e.detail.inStock) {
+        updateStoreAvailability(e.detail.locations);
+      } else {
+        updateStoreAvailability([]);
+      }
+    });
+  })();
 
 })();
 </script>
