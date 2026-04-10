@@ -440,13 +440,15 @@
     left: 0;
     width: 100%;
     height: 100%;
-    display: none;
     z-index: 99999;
+    /* Use visibility instead of display:none so transform can animate */
+    visibility: hidden;
+    pointer-events: none;
   }
 
   .store-sheet.active {
-    display: block;
-    overflow: scroll;
+    visibility: visible;
+    pointer-events: auto;
   }
 
   .store-sheet-overlay {
@@ -457,6 +459,12 @@
     height: 100vh;
     background: rgba(0, 0, 0, 0.45);
     z-index: 9999999;
+    opacity: 0;
+    transition: opacity 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  .store-sheet.active .store-sheet-overlay {
+    opacity: 1;
   }
 
   .store-sheet-content {
@@ -468,7 +476,7 @@
     height: 100%;
     background: #fff;
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     overflow-y: scroll;
     z-index: 99999999;
   }
@@ -489,7 +497,7 @@
       height: 85dvh;
       border-radius: 16px 16px 0 0;
       transform: translateY(100%);
-      transition: transform 0.3s ease;
+      transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
       overflow-y: scroll;
       -webkit-overflow-scrolling: touch;
     }
@@ -497,8 +505,6 @@
     .store-sheet.active .store-sheet-content {
       transform: translateY(0);
     }
-
-    
   }
 
   .store-sheet-header {
@@ -569,7 +575,6 @@
   padding: 4px 10px;
   border-radius: 999px;
   margin-bottom: 6px;
-  margin-right:8px;
 }
 
   .nearest-store-badge {
@@ -587,7 +592,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   margin-bottom: 6px;
-}S
+}
 </style>
 
 <script>
@@ -954,6 +959,12 @@
       });
 
       sheet.classList.add('active');
+      // Lock scroll without shifting page position
+      var scrollY = window.scrollY || window.pageYOffset;
+      document.body.style.position   = 'fixed';
+      document.body.style.top        = '-' + scrollY + 'px';
+      document.body.style.width      = '100%';
+      document.body.dataset.scrollY  = scrollY;
     }
 
     // Expose globally so try-at-home-section can call it with sorted locations
@@ -962,6 +973,13 @@
     function closeStoreSheet() {
       const sheet = document.getElementById('store-side-sheet');
       if (sheet) sheet.classList.remove('active');
+      // Restore scroll position
+      var savedY = parseInt(document.body.dataset.scrollY || '0', 10);
+      document.body.style.position = '';
+      document.body.style.top      = '';
+      document.body.style.width    = '';
+      delete document.body.dataset.scrollY;
+      window.scrollTo(0, savedY);
     }
 
     document.addEventListener('click', function (e) {
