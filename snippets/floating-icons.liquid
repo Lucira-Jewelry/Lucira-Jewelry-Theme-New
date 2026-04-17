@@ -1,3 +1,24 @@
+{% assign wa_text = 'Hi, I want to get more information about Lucira' %}
+{% if template.name == 'index' %}
+  {% assign wa_text = "Hi! Can you tell me more about Lucira Jewelry's collection and designs?" %}
+{% elsif template.name == 'collection' %}
+  {% assign wa_text = 'Hi, I want to get more information about this collection: ' | append: collection.title %}
+{% elsif template.name == 'product' %}
+  {% assign wa_text = 'Hi, I want to get more information about this product: ' | append: product.title %}
+{% elsif template.name == 'blog' %}
+  {% assign wa_text = 'Hi, Can you Tell me more about Lucira Blogs' %}
+{% elsif template.name == 'article' %}
+  {% assign wa_text = 'Hi, can you tell me more about this blog: ' | append: article.title %}
+{% elsif template.name == 'page' %}
+  {% if page.handle contains 'gold-rate' %}
+    {% assign city = page.handle | remove: 'gold-rate-' | replace: '-', ' ' %}
+    {% assign wa_text = 'Tell me more about ' | append: city | append: ' gold rate' %}
+  {% elsif page.handle contains 'platinum-rate' %}
+    {% assign city = page.handle | remove: 'platinum-rate-' | replace: '-', ' ' %}
+    {% assign wa_text = 'Tell me more about ' | append: city | append: ' platinum rate' %}
+  {% endif %}
+{% endif %}
+
 <div class="fab-container">
   <div class="fab-actions" id="fabActions">
     <a href="#" class="fab-btn" id="fabChat" title="Live Chat">
@@ -7,36 +28,24 @@
     <a href="tel:+918976773659" target="_blank" class="fab-btn" id="fabPhone" title="Call">
       <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/phone-call_1.png?v=1772105479" width="20" height="20" loading="lazy">
     </a>
-    {% assign wa_text = 'Hi, I want to get more information about Lucira' %}
-    {% if template.name == 'index' %}
-      {% assign wa_text = "Hi! Can you tell me more about Lucira Jewelry's collection and designs?" %}
-    {% elsif template.name == 'collection' %}
-      {% assign wa_text = 'Hi, I want to get more information about this collection: ' | append: collection.title %}
-    {% elsif template.name == 'product' %}
-      {% assign wa_text = 'Hi, I want to get more information about this product: ' | append: product.title %}
-    {% elsif template.name == 'blog' %}
-      {% assign wa_text = 'Hi, Can you Tell me more about Lucira Blogs' %}
-    {% elsif template.name == 'article' %}
-      {% assign wa_text = 'Hi, can you tell me more about this blog: ' | append: article.title %}
-    {% elsif template.name == 'page' %}
-      {% if page.handle contains 'gold-rate' %}
-        {% assign city = page.handle | remove: 'gold-rate-' | replace: '-', ' ' %}
-        {% assign wa_text = 'Tell me more about ' | append: city | append: ' gold rate' %}
-      {% elsif page.handle contains 'platinum-rate' %}
-        {% assign city = page.handle | remove: 'platinum-rate-' | replace: '-', ' ' %}
-        {% assign wa_text = 'Tell me more about ' | append: city | append: ' platinum rate' %}
-      {% endif %}
-    {% endif %}
     <a
       href="https://wa.me/919004435760?text={{ wa_text | url_encode }}"
-      class="fab-btn"
-      id="fabWhatsapp"
+      class="fab-btn fab-whatsapp-inside"
       title="WhatsApp"
       target="_blank"
     >
       <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/whatsapp_3_1.png?v=1772105856" width="20" height="20" loading="lazy">
     </a>
   </div>
+  <a
+    href="https://wa.me/919004435760?text={{ wa_text | url_encode }}"
+    class="fab-btn fab-whatsapp-outside"
+    id="fabWhatsapp"
+    title="WhatsApp"
+    target="_blank"
+  >
+    <img src="https://cdn.shopify.com/s/files/1/0739/8516/3482/files/whatsapp_3_1.png?v=1772105856" width="20" height="20" loading="lazy">
+  </a>
   <div class="fab-tooltip" id="fabTooltip">
     At your Service
   </div>
@@ -103,13 +112,15 @@
           location_id:   '{{ request.path }}'
         }
       });
-      console.log('FAB dataLayer pushed:', creativeName);
     }
 
-    // ── 1. Main FAB toggle → salesiq ────────────────────────────────────────
+    // ── FAB Logic ────────────────────────
     const fabMain    = document.getElementById('fabMain');
     const fabActions = document.getElementById('fabActions');
     const fabTooltip = document.getElementById('fabTooltip');
+    const fabChat    = document.getElementById('fabChat');
+    const fabPhone   = document.getElementById('fabPhone');
+    const fabWhatsapp = document.getElementById('fabWhatsapp');
     let tooltipShown = false;
 
     setTimeout(function () {
@@ -120,38 +131,75 @@
       fabMain.addEventListener('click', function () {
         const isOpen = fabActions.classList.toggle('is-open');
         fabMain.classList.toggle('is-open', isOpen);
-
         tooltipShown = true;
         if (fabTooltip) fabTooltip.classList.remove('show');
-
-        // dataLayer — fires every time the FAB is opened or closed
         pushPromoClick('salesiq');
+      });
+
+      // Close when clicking outside
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest('.fab-container') && fabActions.classList.contains('is-open')) {
+          fabActions.classList.remove('is-open');
+          fabMain.classList.remove('is-open');
+        }
       });
     }
 
-    // ── 2. Live Chat → liveChat ──────────────────────────────────────────────
-    const fabChat = document.getElementById('fabChat');
+    // ── Live Chat ──────────────────────────────────────────────────
     if (fabChat) {
-      fabChat.addEventListener('click', function () {
+      fabChat.addEventListener('click', function (e) {
+        e.preventDefault();
+        if (window.$zoho && $zoho.salesiq) {
+          $zoho.salesiq.floatwindow.visible("show");
+          fabActions.classList.remove('is-open');
+          fabMain.classList.remove('is-open');
+        }
         pushPromoClick('salesiq-liveChat');
       });
     }
 
-    // ── 3. Phone → callUs ───────────────────────────────────────────────────
-    const fabPhone = document.getElementById('fabPhone');
+    // ── Phone ──────────────────────────────────────────────────
     if (fabPhone) {
       fabPhone.addEventListener('click', function () {
         pushPromoClick('salesiq-callUs');
       });
     }
 
-    // ── 4. WhatsApp → chatWithExperts (unchanged) ────────────────────────────
-    const fabWhatsapp = document.getElementById('fabWhatsapp');
-    if (fabWhatsapp) {
-      fabWhatsapp.addEventListener('click', function () {
-        pushPromoClick('chatWithExperts');
-      });
+    // ── WhatsApp ──────────────────────────────────────────────
+    const fabWhatsappInside = document.querySelector('.fab-whatsapp-inside');
+    [fabWhatsapp, fabWhatsappInside].forEach(function (el) {
+      if (el) {
+        el.addEventListener('click', function () {
+          pushPromoClick('chatWithExperts');
+        });
+      }
+    });
+
+    // ── Zoho Sync Logic ────────────────────────────────────────
+    function observeZohoChat() {
+      const chatWrap = document.getElementById("zsiq_chat_wrap");
+      if (!chatWrap) return;
+      function syncFabWithChat() {
+        const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+        if (isChatOpen) {
+          fabMain.classList.add('is-open');
+        } else {
+          if (!fabActions.classList.contains('is-open')) {
+            fabMain.classList.remove('is-open');
+          }
+        }
+      }
+      syncFabWithChat();
+      const observer = new MutationObserver(syncFabWithChat);
+      observer.observe(chatWrap, { attributes: true });
     }
+    const zohoWatcher = new MutationObserver(function (_, obs) {
+      if (document.getElementById("zsiq_chat_wrap")) {
+        obs.disconnect();
+        observeZohoChat();
+      }
+    });
+    zohoWatcher.observe(document.body, { childList: true, subtree: true });
 
   });
 </script>
