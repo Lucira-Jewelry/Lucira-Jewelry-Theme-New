@@ -372,23 +372,29 @@ document.addEventListener("DOMContentLoaded", function () {
     fabMain.classList.add("is-open");
   }
 
+  function isZohoActive() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    const isChatIframeOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
+    const floatWindow = document.getElementById("zsiq_float_container");
+    const isFloatOpen = floatWindow
+      ? floatWindow.style.display !== "none" && !floatWindow.classList.contains("siqhide")
+      : false;
+
+    return isChatIframeOpen || isFloatOpen;
+  }
+
   fabMain.addEventListener("click", function () {
     if (isOpen) {
-      // Also close Zoho chat if it's currently open
-      const chatWrap = document.getElementById("zsiq_chat_wrap");
-      const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
-
-      if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
+      if (isZohoActive() && window.$zoho && $zoho.salesiq) {
         $zoho.salesiq.floatwindow.visible("hide");
       }
-
       closeFab();
     } else {
       openFab();
     }
   });
 
-  // Close FAB when clicking outside
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".fab-container") && isOpen) {
       closeFab();
@@ -398,8 +404,11 @@ document.addEventListener("DOMContentLoaded", function () {
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
-        $zoho.salesiq.floatwindow.visible("show");
-      closeFab(); // collapse FAB after opening chat
+      $zoho.salesiq.floatwindow.visible("show");
+      closeFab();
+      // Keep FAB icon in "close" state while Zoho is open
+      fabMain.classList.add("is-open");
+      isOpen = true;
     }
   });
 
@@ -408,18 +417,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!chatWrap) return;
 
     function syncFabWithChat() {
-      const isChatIframeOpen = chatWrap.classList.contains("chat-iframe-open");
-
-      // Also check if the floating drawer/window is open
-      const floatWindow = document.getElementById("zsiq_float_container") 
-                      || document.getElementById("zsiq-indicator")?.closest("[id*='zsiq']");
-      const isFloatOpen = floatWindow 
-                      ? floatWindow.style.display !== "none" && !floatWindow.classList.contains("siqhide")
-                      : false;
-
-      const zohoIsActive = isChatIframeOpen || isFloatOpen;
-
-      if (zohoIsActive) {
+      const zohoActive = isZohoActive();
+      if (zohoActive) {
         fabMain.classList.add("is-open");
         isOpen = true;
       } else {
@@ -430,22 +429,22 @@ document.addEventListener("DOMContentLoaded", function () {
 
     syncFabWithChat();
 
-    // Observe chatWrap AND body-level class/style changes for float window
-    const observer = new MutationObserver(syncFabWithChat);
-    observer.observe(chatWrap, { attributes: true, attributeFilter: ["class"] });
+    const chatWrapObserver = new MutationObserver(syncFabWithChat);
+    chatWrapObserver.observe(chatWrap, { attributes: true, attributeFilter: ["class"] });
 
-    // Watch for float container appearing or changing
-    const bodyObserver = new MutationObserver(function () {
+    // Also observe float container once it exists
+    const floatContainerWatcher = new MutationObserver(function () {
       const floatWindow = document.getElementById("zsiq_float_container");
       if (floatWindow) {
-        observer.observe(floatWindow, { attributes: true, attributeFilter: ["class", "style"] });
-        bodyObserver.disconnect(); // stop once we've found and attached
+        const floatObserver = new MutationObserver(syncFabWithChat);
+        floatObserver.observe(floatWindow, { attributes: true, attributeFilter: ["class", "style"] });
+        floatContainerWatcher.disconnect();
       }
     });
-    bodyObserver.observe(document.body, { childList: true, subtree: true });
+    floatContainerWatcher.observe(document.body, { childList: true, subtree: true });
   }
 
-  // Use MutationObserver instead of setInterval — zero polling cost
+  // Wait for Zoho to inject zsiq_chat_wrap into DOM
   const zohoWatcher = new MutationObserver(function (_, obs) {
     if (document.getElementById("zsiq_chat_wrap")) {
       obs.disconnect();
