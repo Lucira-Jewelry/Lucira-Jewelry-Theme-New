@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', function () {
+  document.addEventListener('DOMContentLoaded', function () {
 
     // ── SalesIQ Badge Sync ─────────────────────────
     const fabMainBadge  = document.getElementById('fabMainBadge');
