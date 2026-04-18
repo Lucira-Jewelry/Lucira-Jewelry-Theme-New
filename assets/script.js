@@ -408,23 +408,41 @@ document.addEventListener("DOMContentLoaded", function () {
     if (!chatWrap) return;
 
     function syncFabWithChat() {
-      const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+      const isChatIframeOpen = chatWrap.classList.contains("chat-iframe-open");
 
-      if (isChatOpen) {
-        fabMain.classList.add("is-open"); // show close icon
+      // Also check if the floating drawer/window is open
+      const floatWindow = document.getElementById("zsiq_float_container") 
+                      || document.getElementById("zsiq-indicator")?.closest("[id*='zsiq']");
+      const isFloatOpen = floatWindow 
+                      ? floatWindow.style.display !== "none" && !floatWindow.classList.contains("siqhide")
+                      : false;
+
+      const zohoIsActive = isChatIframeOpen || isFloatOpen;
+
+      if (zohoIsActive) {
+        fabMain.classList.add("is-open");
+        isOpen = true;
       } else {
         fabMain.classList.remove("is-open");
+        isOpen = false;
       }
     }
 
-    // Run immediately (IMPORTANT for auto-open case)
     syncFabWithChat();
 
-    const observer = new MutationObserver(function () {
-      syncFabWithChat();
-    });
+    // Observe chatWrap AND body-level class/style changes for float window
+    const observer = new MutationObserver(syncFabWithChat);
+    observer.observe(chatWrap, { attributes: true, attributeFilter: ["class"] });
 
-    observer.observe(chatWrap, { attributes: true });
+    // Watch for float container appearing or changing
+    const bodyObserver = new MutationObserver(function () {
+      const floatWindow = document.getElementById("zsiq_float_container");
+      if (floatWindow) {
+        observer.observe(floatWindow, { attributes: true, attributeFilter: ["class", "style"] });
+        bodyObserver.disconnect(); // stop once we've found and attached
+      }
+    });
+    bodyObserver.observe(document.body, { childList: true, subtree: true });
   }
 
   // Use MutationObserver instead of setInterval — zero polling cost
