@@ -355,9 +355,9 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 document.addEventListener("DOMContentLoaded", function () {
-  const fabMain    = document.getElementById("fabMain");
+  const fabMain = document.getElementById("fabMain");
   const fabActions = document.getElementById("fabActions");
-  const fabChat    = document.getElementById("fabChat");
+  const fabChat = document.getElementById("fabChat");
   let isOpen = false;
 
   function closeFab() {
@@ -374,12 +374,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   fabMain.addEventListener("click", function () {
     if (isOpen) {
-      // Also hide Zoho chat window if it happens to be open
-      const chatWrap  = document.getElementById("zsiq_chat_wrap");
+      // Also close Zoho chat if it's currently open
+      const chatWrap = document.getElementById("zsiq_chat_wrap");
       const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
       if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
         $zoho.salesiq.floatwindow.visible("hide");
       }
+
       closeFab();
     } else {
       openFab();
@@ -396,28 +398,38 @@ document.addEventListener("DOMContentLoaded", function () {
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
-      $zoho.salesiq.floatwindow.visible("show");
+        $zoho.salesiq.floatwindow.visible("show");
       closeFab(); // collapse FAB after opening chat
     }
   });
 
-  // ── Zoho badge sync only — no icon/state interference ───────────────────
   function observeZohoChat() {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
     if (!chatWrap) return;
 
-    // When Zoho chat closes on its own, make sure FAB icon is also reset
-    const observer = new MutationObserver(function () {
+    function syncFabWithChat() {
       const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-      // Only reset FAB if Zoho chat was closed externally while FAB actions were closed
-      if (!isChatOpen && !isOpen) {
+
+      if (isChatOpen) {
+        fabMain.classList.add("is-open");
+        isOpen = true; // ✅ sync state so first click closes correctly
+      } else {
         fabMain.classList.remove("is-open");
+        isOpen = false; // ✅ sync state
       }
+    }
+
+    // Run immediately (IMPORTANT for auto-open case)
+    syncFabWithChat();
+
+    const observer = new MutationObserver(function () {
+      syncFabWithChat();
     });
 
     observer.observe(chatWrap, { attributes: true });
   }
 
+  // Use MutationObserver instead of setInterval — zero polling cost
   const zohoWatcher = new MutationObserver(function (_, obs) {
     if (document.getElementById("zsiq_chat_wrap")) {
       obs.disconnect();
