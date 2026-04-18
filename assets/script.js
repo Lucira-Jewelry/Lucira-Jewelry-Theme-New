@@ -374,21 +374,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
   fabMain.addEventListener("click", function () {
     if (isOpen) {
-      // Also close Zoho chat if it's currently open
       const chatWrap = document.getElementById("zsiq_chat_wrap");
       const zohoIsOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
-
       if (zohoIsOpen && window.$zoho && $zoho.salesiq) {
         $zoho.salesiq.floatwindow.visible("hide");
       }
-
       closeFab();
     } else {
       openFab();
     }
   });
 
-  // Close FAB when clicking outside
   document.addEventListener("click", function (e) {
     if (!e.target.closest(".fab-container") && isOpen) {
       closeFab();
@@ -398,8 +394,8 @@ document.addEventListener("DOMContentLoaded", function () {
   fabChat.addEventListener("click", function (e) {
     e.preventDefault();
     if (window.$zoho && $zoho.salesiq) {
-        $zoho.salesiq.floatwindow.visible("show");
-      closeFab(); // collapse FAB after opening chat
+      $zoho.salesiq.floatwindow.visible("show");
+      closeFab();
     }
   });
 
@@ -409,18 +405,12 @@ document.addEventListener("DOMContentLoaded", function () {
 
     function syncFabWithChat() {
       const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-
-      if (isChatOpen) {
-        fabMain.classList.add("is-open");
-        isOpen = true; // ✅ sync state so first click closes correctly
-      } else {
+      if (!isChatOpen && !isOpen) {
+        // Chat closed externally and FAB menu is also closed — ensure no stale is-open
         fabMain.classList.remove("is-open");
-        isOpen = false; // ✅ sync state
       }
+      // If chat opens externally, do nothing to FAB state
     }
-
-    // Run immediately (IMPORTANT for auto-open case)
-    syncFabWithChat();
 
     const observer = new MutationObserver(function () {
       syncFabWithChat();
@@ -429,12 +419,12 @@ document.addEventListener("DOMContentLoaded", function () {
     observer.observe(chatWrap, { attributes: true });
   }
 
-  // Use MutationObserver instead of setInterval — zero polling cost
   const zohoWatcher = new MutationObserver(function (_, obs) {
     if (document.getElementById("zsiq_chat_wrap")) {
       obs.disconnect();
       observeZohoChat();
     }
   });
+
   zohoWatcher.observe(document.body, { childList: true, subtree: true });
 });
