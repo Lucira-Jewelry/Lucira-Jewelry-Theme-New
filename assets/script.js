@@ -392,12 +392,12 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   fabChat.addEventListener("click", function (e) {
-    e.preventDefault();
-    if (window.$zoho && $zoho.salesiq) {
-      $zoho.salesiq.floatwindow.visible("show");
-      closeFab(); // close FAB menu, but do NOT mark as open
-    }
-  });
+  e.preventDefault();
+  if (window.$zoho && $zoho.salesiq) {
+    $zoho.salesiq.floatwindow.visible("show");
+    // Don't close FAB — keep X icon visible while chat is open
+  }
+});
 
   function observeZohoChat() {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
