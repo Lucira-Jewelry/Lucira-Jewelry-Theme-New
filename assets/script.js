@@ -403,17 +403,13 @@ document.addEventListener("DOMContentLoaded", function () {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
     if (!chatWrap) return;
 
-    function syncFabWithChat() {
-      const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
-      if (!isChatOpen && !isOpen) {
-        // Chat closed externally and FAB menu is also closed — ensure no stale is-open
-        fabMain.classList.remove("is-open");
-      }
-      // If chat opens externally, do nothing to FAB state
-    }
-
     const observer = new MutationObserver(function () {
-      syncFabWithChat();
+      const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
+      // Only close FAB actions if chat was closed externally while FAB was open
+      if (!isChatOpen && isOpen) {
+        closeFab();
+      }
+      // NEVER add is-open based on chat state — FAB icon is fully independent
     });
 
     observer.observe(chatWrap, { attributes: true });
