@@ -358,98 +358,229 @@ document.addEventListener("DOMContentLoaded", function () {
   const fabMain = document.getElementById("fabMain");
   const fabActions = document.getElementById("fabActions");
   const fabChat = document.getElementById("fabChat");
-  let isOpen = false;
+  const fabPhone = document.getElementById("fabPhone");
+  const fabWhatsapp = document.getElementById("fabWhatsapp");
+  const fabTooltip = document.getElementById("fabTooltip");
 
-  function closeFab() {
-    isOpen = false;
-    fabActions.style.display = "none";
-    fabMain.classList.remove("is-open");
+  const fabMainBadge = document.getElementById("fabMainBadge");
+  const fabChatBadge = document.getElementById("fabChatBadge");
+
+  let isFabOpen = false;
+  let tooltipShown = false;
+
+  // ─────────────────────────────────────────
+  // 🧠 Helpers
+  // ─────────────────────────────────────────
+  function isZohoActive() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    const floatWindow = document.getElementById("zsiq_float_container");
+
+    const iframeOpen =
+      chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
+    const floatOpen =
+      floatWindow &&
+      floatWindow.style.display !== "none" &&
+      !floatWindow.classList.contains("siqhide");
+
+    return iframeOpen || floatOpen;
   }
 
   function openFab() {
-    isOpen = true;
-    fabActions.style.display = "flex";
+    isFabOpen = true;
+    fabActions.classList.add("is-open");
     fabMain.classList.add("is-open");
   }
 
-  function isZohoActive() {
-    const chatWrap = document.getElementById("zsiq_chat_wrap");
-    const isChatIframeOpen = chatWrap && chatWrap.classList.contains("chat-iframe-open");
-
-    const floatWindow = document.getElementById("zsiq_float_container");
-    const isFloatOpen = floatWindow
-      ? floatWindow.style.display !== "none" && !floatWindow.classList.contains("siqhide")
-      : false;
-
-    return isChatIframeOpen || isFloatOpen;
+  function closeFab() {
+    isFabOpen = false;
+    fabActions.classList.remove("is-open");
+    fabMain.classList.remove("is-open");
   }
 
-  fabMain.addEventListener("click", function () {
-    if (isOpen) {
+  function syncWithZoho() {
+    if (isZohoActive()) {
+      fabMain.classList.add("is-open"); // show close icon
+      fabActions.classList.remove("is-open"); // hide menu
+      isFabOpen = true;
+    } else {
+      fabMain.classList.remove("is-open");
+      isFabOpen = false;
+    }
+  }
+
+  // ─────────────────────────────────────────
+  // 🎯 FAB Click
+  // ─────────────────────────────────────────
+  if (fabMain) {
+    fabMain.addEventListener("click", function () {
+      // 👉 If Zoho open → close it
       if (isZohoActive() && window.$zoho && $zoho.salesiq) {
         $zoho.salesiq.floatwindow.visible("hide");
+        closeFab();
+        return;
       }
-      closeFab();
-    } else {
-      openFab();
-    }
-  });
 
-  document.addEventListener("click", function (e) {
-    if (!e.target.closest(".fab-container") && isOpen) {
-      closeFab();
-    }
-  });
+      // 👉 Normal toggle
+      if (isFabOpen) {
+        closeFab();
+      } else {
+        openFab();
+      }
 
-  fabChat.addEventListener("click", function (e) {
-    e.preventDefault();
-    if (window.$zoho && $zoho.salesiq) {
-      $zoho.salesiq.floatwindow.visible("show");
+      tooltipShown = true;
+      if (fabTooltip) fabTooltip.classList.remove("show");
+
+      pushPromoClick("salesiq");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 💬 Chat Click
+  // ─────────────────────────────────────────
+  if (fabChat) {
+    fabChat.addEventListener("click", function (e) {
+      e.preventDefault();
+
+      if (window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("show");
+      }
+
       closeFab();
-      // Keep FAB icon in "close" state while Zoho is open
+
+      // keep icon as close
       fabMain.classList.add("is-open");
-      isOpen = true;
-    }
-  });
+      isFabOpen = true;
 
-  function observeZohoChat() {
+      pushPromoClick("salesiq-liveChat");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 📞 Phone
+  // ─────────────────────────────────────────
+  if (fabPhone) {
+    fabPhone.addEventListener("click", function () {
+      pushPromoClick("salesiq-callUs");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 🟢 WhatsApp
+  // ─────────────────────────────────────────
+  if (fabWhatsapp) {
+    fabWhatsapp.addEventListener("click", function () {
+      pushPromoClick("chatWithExperts");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 📊 dataLayer
+  // ─────────────────────────────────────────
+  function pushPromoClick(creativeName) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: "{{ product.selected_or_first_available_variant.sku | default: 'N/A' }}",
+        promo_name: "{{ product.title | default: 'FAB Enquiry' }}",
+        creative_name: creativeName,
+        location_id: "{{ request.path }}"
+      }
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 🔔 Badge Sync (Zoho unread)
+  // ─────────────────────────────────────────
+  function syncBadge(count) {
+    const show = count && parseInt(count) > 0;
+
+    [fabMainBadge, fabChatBadge].forEach(function (el) {
+      if (!el) return;
+      el.textContent = show ? count : "";
+      el.style.display = show ? "flex" : "none";
+    });
+  }
+
+  function watchZsiqIndicator() {
+    const zsiqEl = document.getElementById("zsiq-indicator");
+
+    if (!zsiqEl) {
+      setTimeout(watchZsiqIndicator, 800);
+      return;
+    }
+
+    syncBadge(zsiqEl.textContent.trim());
+
+    const observer = new MutationObserver(function () {
+      syncBadge(zsiqEl.textContent.trim());
+    });
+
+    observer.observe(zsiqEl, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+  }
+
+  watchZsiqIndicator();
+
+  // ─────────────────────────────────────────
+  // 👀 Observe Zoho DOM changes
+  // ─────────────────────────────────────────
+  function observeZoho() {
     const chatWrap = document.getElementById("zsiq_chat_wrap");
     if (!chatWrap) return;
 
-    function syncFabWithChat() {
-      const zohoActive = isZohoActive();
-      if (zohoActive) {
-        fabMain.classList.add("is-open");
-        isOpen = true;
-      } else {
-        fabMain.classList.remove("is-open");
-        isOpen = false;
-      }
-    }
+    syncWithZoho();
 
-    syncFabWithChat();
+    const observer1 = new MutationObserver(syncWithZoho);
+    observer1.observe(chatWrap, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
 
-    const chatWrapObserver = new MutationObserver(syncFabWithChat);
-    chatWrapObserver.observe(chatWrap, { attributes: true, attributeFilter: ["class"] });
-
-    // Also observe float container once it exists
-    const floatContainerWatcher = new MutationObserver(function () {
+    const floatWatcher = new MutationObserver(function () {
       const floatWindow = document.getElementById("zsiq_float_container");
+
       if (floatWindow) {
-        const floatObserver = new MutationObserver(syncFabWithChat);
-        floatObserver.observe(floatWindow, { attributes: true, attributeFilter: ["class", "style"] });
-        floatContainerWatcher.disconnect();
+        const observer2 = new MutationObserver(syncWithZoho);
+
+        observer2.observe(floatWindow, {
+          attributes: true,
+          attributeFilter: ["class", "style"]
+        });
+
+        floatWatcher.disconnect();
       }
     });
-    floatContainerWatcher.observe(document.body, { childList: true, subtree: true });
+
+    floatWatcher.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
   }
 
-  // Wait for Zoho to inject zsiq_chat_wrap into DOM
-  const zohoWatcher = new MutationObserver(function (_, obs) {
+  // Wait until Zoho loads
+  const zohoLoader = new MutationObserver(function (_, obs) {
     if (document.getElementById("zsiq_chat_wrap")) {
       obs.disconnect();
-      observeZohoChat();
+      observeZoho();
     }
   });
-  zohoWatcher.observe(document.body, { childList: true, subtree: true });
+
+  zohoLoader.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  // ─────────────────────────────────────────
+  // ⏱ Tooltip delay
+  // ─────────────────────────────────────────
+  setTimeout(function () {
+    if (!tooltipShown && fabTooltip) {
+      fabTooltip.classList.add("show");
+    }
+  }, 5000);
 });
