@@ -411,11 +411,9 @@ document.addEventListener("DOMContentLoaded", function () {
       const isChatOpen = chatWrap.classList.contains("chat-iframe-open");
 
       if (isChatOpen) {
-        fabMain.classList.add("is-open");
-        isOpen = true; // ✅ sync state so first click closes correctly
+        fabMain.classList.add("is-open"); // show close icon
       } else {
         fabMain.classList.remove("is-open");
-        isOpen = false; // ✅ sync state
       }
     }
 
