@@ -167,6 +167,9 @@
           {%- comment -%}
             Single loop to determine secondary image
           {%- endcomment -%}
+          {%- assign mq_media = null -%}
+          {%- assign mq_ai_media = null -%}
+
           {%- for media in card_product.media limit: 8 -%}
             {%- if media.media_type != 'image' or media.id == primary_media.id -%}
               {%- continue -%}
@@ -174,22 +177,34 @@
 
             {%- assign current_alt = media.alt | default: '' | downcase | strip -%}
 
-            {%- comment -%} Priority 1: MQ image {%- endcomment -%}
-            {%- if current_alt == 'mq' or current_alt == 'mq_ai' -%}
-              {%- assign secondary_media = media -%}
-              {%- break -%}
+            {%- comment %} Capture MQ_AI first {% endcomment -%}
+            {%- if current_alt contains 'mq_ai' -%}
+              {%- assign mq_ai_media = media -%}
             {%- endif -%}
 
-            {%- comment -%} Priority 2: Color match from primary image {%- endcomment -%}
+            {%- comment %} Capture MQ {% endcomment -%}
+            {%- if current_alt contains 'mq' and mq_media == null -%}
+              {%- assign mq_media = media -%}
+            {%- endif -%}
+
+            {%- comment %} Existing color logic (keep as is) {% endcomment -%}
             {%- if secondary_media == null and color_label != blank and current_alt contains color_label -%}
               {%- assign secondary_media = media -%}
             {%- endif -%}
 
-            {%- comment -%} Priority 3: Save first valid fallback {%- endcomment -%}
             {%- if fallback_media == null -%}
               {%- assign fallback_media = media -%}
             {%- endif -%}
           {%- endfor -%}
+
+          {%- comment %} FINAL PRIORITY {% endcomment -%}
+          {%- if mq_ai_media -%}
+            {%- assign secondary_media = mq_ai_media -%}
+          {%- elsif mq_media -%}
+            {%- assign secondary_media = mq_media -%}
+          {%- elsif secondary_media == null -%}
+            {%- assign secondary_media = fallback_media -%}
+          {%- endif -%}
 
           {%- if secondary_media == null -%}
             {%- assign secondary_media = fallback_media -%}
