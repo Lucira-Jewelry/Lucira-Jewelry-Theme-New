@@ -1249,28 +1249,35 @@
     const cards = Array.from(root.querySelectorAll('.order-card'));
 
     const STATUS_STYLES = {
-      1: { label: 'Order Confirmed', className: 'status-chip--confirmed' },
-      2: { label: 'Processing', className: 'status-chip--processing' },
-      3: { label: 'Manufacturing', className: 'status-chip--manufacturing' },
-      13:{ label: 'Quality Control', className: 'status-chip--qc' },
-      4: { label: 'Certification', className: 'status-chip--certification' },
-      5: { label: 'Dispatch', className: 'status-chip--dispatch' },
-      6: { label: 'In Transit', className: 'status-chip--in-transit' },
-      7: { label: 'Delivered', className: 'status-chip--delivered' } // 👈 ADD THIS
+      1:  { label: 'Order Confirmed', className: 'status-chip--confirmed' },
+      2:  { label: 'Processing',      className: 'status-chip--processing' },
+      3:  { label: 'Manufacturing',   className: 'status-chip--manufacturing' },
+      13: { label: 'Quality Control', className: 'status-chip--qc' },
+      4:  { label: 'Certification',   className: 'status-chip--certification' },
+      5:  { label: 'Dispatch',        className: 'status-chip--dispatch' },
+      6:  { label: 'In Transit',      className: 'status-chip--in-transit' },
+      7:  { label: 'Delivered',       className: 'status-chip--delivered' },
     };
+
+    // Strips all status-chip--* modifier classes from an element
+    function clearChipClasses(el) {
+      const toRemove = Array.from(el.classList).filter(function (c) {
+        return c.startsWith('status-chip--');
+      });
+      if (toRemove.length) el.classList.remove.apply(el.classList, toRemove);
+    }
 
     cards.forEach(function (card) {
       const marketplaceOrderId = card.dataset.marketplaceOrderId;
-      const marketplaceItemId = card.dataset.marketplaceItemId;
-      const statusSpan = card.querySelector('.ornaverse-status');
+      const marketplaceItemId  = card.dataset.marketplaceItemId;
+      const statusSpan         = card.querySelector('.ornaverse-status');
 
       if (!statusSpan || !marketplaceOrderId || !marketplaceItemId) return;
 
       const shopifyStatus = (card.dataset.status || '').toLowerCase();
 
-      if (shopifyStatus === 'fulfilled' || shopifyStatus === 'cancelled') {
-        return;
-      }
+      // Skip terminal Shopify statuses — they are already rendered by Liquid
+      if (shopifyStatus === 'fulfilled' || shopifyStatus === 'cancelled') return;
 
       statusSpan.textContent = 'Fetching live status…';
       const chip = statusSpan.closest('.order-status-chip') || statusSpan;
@@ -1284,38 +1291,32 @@
           marketplace_item_id:  Number(marketplaceItemId),
         }),
       })
-      .then(r => r.json())
+      .then(function (r) { return r.json(); })
       .then(function (data) {
         console.log('Ornaverse Live Status Response:', data);
 
-        // Helper: strip all status-chip--* classes cleanly
-        function clearChipClasses(el) {
-          const toRemove = Array.from(el.classList).filter(c => c.startsWith('status-chip--'));
-          el.classList.remove(...toRemove);
-        }
+        clearChipClasses(chip); // always reset before applying new class
 
-        // Guard: no response or HTTP-level failure
+        // Guard: no response / failed request
         if (!data || !data.success || !data.data) {
           statusSpan.textContent = 'Status unavailable';
-          clearChipClasses(chip);
           return;
         }
 
-        // Guard: Ornaverse returned a non-empty Error string
+        // Guard: Ornaverse returned a non-empty error string
+        // NOTE: check typeof + trim — avoids blocking on Error: null / Error: 0
         const apiError = data.data.Error;
         if (apiError && typeof apiError === 'string' && apiError.trim() !== '') {
           statusSpan.textContent = 'Status unavailable';
-          clearChipClasses(chip);
           return;
         }
 
         const statusId = Number(data.data.order_status_id);
-        const info = STATUS_STYLES[statusId];
-
-        clearChipClasses(chip); // always reset first
+        const info     = STATUS_STYLES[statusId];
 
         if (!info) {
-          // statusId exists but not mapped — fall back gracefully
+          // statusId returned but not in our map → log it and show neutral label
+          console.warn('[Ornaverse] Unmapped order_status_id:', statusId, '— add it to STATUS_STYLES');
           statusSpan.textContent = 'In Progress';
           return;
         }
@@ -1325,6 +1326,7 @@
       })
       .catch(function (err) {
         console.error('Ornaverse error', err);
+        clearChipClasses(chip);
         statusSpan.textContent = 'Status unavailable';
       });
     });
