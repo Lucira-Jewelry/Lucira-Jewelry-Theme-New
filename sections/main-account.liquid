@@ -1278,67 +1278,55 @@
 
       fetch('https://lucira-orders-api-385594025448.asia-south1.run.app', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           marketplace_order_id: Number(marketplaceOrderId),
-          marketplace_item_id: Number(marketplaceItemId),
+          marketplace_item_id:  Number(marketplaceItemId),
         }),
       })
-        .then(function (r) {
-          return r.json();
-        })
-        .then(function (data) {
-          console.log('Ornaverse Live Status Response:', data);
+      .then(r => r.json())
+      .then(function (data) {
+        console.log('Ornaverse Live Status Response:', data);
 
-          if (!data || !data.success || !data.data || data.data.Error) {
-            statusSpan.textContent = 'Status unavailable';
-            chip.classList.remove(
-              'status-chip--confirmed',
-              'status-chip--processing',
-              'status-chip--manufacturing',
-              'status-chip--qc',
-              'status-chip--certification',
-              'status-chip--dispatch',
-              'status-chip--in-transit'
-            );
-            return;
-          }
+        // Helper: strip all status-chip--* classes cleanly
+        function clearChipClasses(el) {
+          const toRemove = Array.from(el.classList).filter(c => c.startsWith('status-chip--'));
+          el.classList.remove(...toRemove);
+        }
 
-          const statusId = Number(data.data.order_status_id);
-          const info = STATUS_STYLES[statusId];
-
-          if (!info) {
-            statusSpan.textContent = 'Processing';
-            chip.classList.remove(
-              'status-chip--confirmed',
-              'status-chip--processing',
-              'status-chip--manufacturing',
-              'status-chip--qc',
-              'status-chip--certification',
-              'status-chip--dispatch',
-              'status-chip--in-transit'
-            );
-            return;
-          }
-
-          statusSpan.textContent = info.label;
-          chip.classList.remove(
-            'status-chip--confirmed',
-            'status-chip--processing',
-            'status-chip--manufacturing',
-            'status-chip--qc',
-            'status-chip--certification',
-            'status-chip--dispatch',
-            'status-chip--in-transit'
-          );
-          chip.classList.add(info.className);
-        })
-        .catch(function (err) {
-          console.error('Ornaverse error', err);
+        // Guard: no response or HTTP-level failure
+        if (!data || !data.success || !data.data) {
           statusSpan.textContent = 'Status unavailable';
-        });
+          clearChipClasses(chip);
+          return;
+        }
+
+        // Guard: Ornaverse returned a non-empty Error string
+        const apiError = data.data.Error;
+        if (apiError && typeof apiError === 'string' && apiError.trim() !== '') {
+          statusSpan.textContent = 'Status unavailable';
+          clearChipClasses(chip);
+          return;
+        }
+
+        const statusId = Number(data.data.order_status_id);
+        const info = STATUS_STYLES[statusId];
+
+        clearChipClasses(chip); // always reset first
+
+        if (!info) {
+          // statusId exists but not mapped — fall back gracefully
+          statusSpan.textContent = 'In Progress';
+          return;
+        }
+
+        statusSpan.textContent = info.label;
+        chip.classList.add(info.className);
+      })
+      .catch(function (err) {
+        console.error('Ornaverse error', err);
+        statusSpan.textContent = 'Status unavailable';
+      });
     });
   });
 </script>
