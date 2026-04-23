@@ -605,28 +605,36 @@ document.addEventListener('DOMContentLoaded', function () {
   if (!meta) return;
 
   const shopifyStatus = (meta.dataset.status || '').toLowerCase();
-  const isCancelled = {{ order.cancelled | json }};
+  const isCancelled   = {{ order.cancelled | json }};
 
-  if (shopifyStatus === 'fulfilled' || isCancelled) {
-    return;
-  }
+  // Terminal Shopify statuses — already rendered correctly by Liquid, skip API call
+  if (shopifyStatus === 'fulfilled' || isCancelled) return;
 
   const marketplaceOrderId = meta.dataset.marketplaceOrderId;
   const marketplaceItemId  = meta.dataset.marketplaceItemId;
-  const labelSpan = meta.querySelector('.order-status-label-js');
-  const chip = meta.querySelector('.order-status-chip');
+  const labelSpan          = meta.querySelector('.order-status-label-js');
+  const chip               = meta.querySelector('.order-status-chip');
 
   if (!marketplaceOrderId || !marketplaceItemId || !labelSpan || !chip) return;
 
   const STATUS_STYLES = {
-    1: { label: 'Order Confirmed',  className: 'status-chip--confirmed' },
-    2: { label: 'Processing', className: 'status-chip--processing' },
-    3: { label: 'Manufacturing',    className: 'status-chip--manufacturing' },
-    13:{ label: 'Quality Control',  className: 'status-chip--qc' },
-    4: { label: 'Certification',    className: 'status-chip--certification' },
-    5: { label: 'Dispatch',         className: 'status-chip--dispatch' },
-    6: { label: 'In Transit',       className: 'status-chip--in-transit' }
+    1:  { label: 'Order Confirmed', className: 'status-chip--confirmed'    },
+    2:  { label: 'Processing',      className: 'status-chip--processing'   },
+    3:  { label: 'Manufacturing',   className: 'status-chip--manufacturing'},
+    13: { label: 'Quality Control', className: 'status-chip--qc'           },
+    4:  { label: 'Certification',   className: 'status-chip--certification'},
+    5:  { label: 'Dispatch',        className: 'status-chip--dispatch'     },
+    6:  { label: 'In Transit',      className: 'status-chip--in-transit'   },
+    7:  { label: 'Delivered',       className: 'status-chip--delivered'    },
   };
+
+  // Strips every status-chip--* class so stale classes never bleed through
+  function clearChipClasses(el) {
+    const toRemove = Array.from(el.classList).filter(function (c) {
+      return c.startsWith('status-chip--');
+    });
+    if (toRemove.length) el.classList.remove.apply(el.classList, toRemove);
+  }
 
   labelSpan.textContent = 'Fetching live status…';
 
@@ -635,40 +643,45 @@ document.addEventListener('DOMContentLoaded', function () {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       marketplace_order_id: Number(marketplaceOrderId),
-      marketplace_item_id: Number(marketplaceItemId)
-    })
+      marketplace_item_id:  Number(marketplaceItemId),
+    }),
   })
-  .then(function(r) { return r.json(); })
-  .then(function(data) {
+  .then(function (r) { return r.json(); })
+  .then(function (data) {
     console.log('Ornaverse Live Status (order page):', data);
 
-    if (!data || !data.success || !data.data || data.data.Error) {
+    clearChipClasses(chip); // always reset before applying new state
+
+    // Guard: request failed or empty response
+    if (!data || !data.success || !data.data) {
+      labelSpan.textContent = 'Status unavailable';
+      return;
+    }
+
+    // Guard: Ornaverse returned a non-empty Error string
+    // Must be typeof string + non-empty — avoids blocking on Error: null / Error: 0
+    const apiError = data.data.Error;
+    if (apiError && typeof apiError === 'string' && apiError.trim() !== '') {
       labelSpan.textContent = 'Status unavailable';
       return;
     }
 
     const statusId = Number(data.data.order_status_id);
-    const info = STATUS_STYLES[statusId];
+    const info     = STATUS_STYLES[statusId];
 
     if (!info) {
-      labelSpan.textContent = 'Unknown Status';
+      // statusId came back but isn't mapped — log for debugging, show neutral label
+      console.warn('[Ornaverse] Unmapped order_status_id:', statusId, '— add it to STATUS_STYLES');
+      labelSpan.textContent = 'In Progress';
       return;
     }
 
-    chip.classList.remove(
-      'status-chip--confirmed',
-      'status-chip--processing',
-      'status-chip--manufacturing',
-      'status-chip--qc',
-      'status-chip--certification',
-      'status-chip--dispatch',
-      'status-chip--in-transit'
-    );
     chip.classList.add(info.className);
     labelSpan.textContent = info.label;
   })
-  .catch(function(err) {
+  .catch(function (err) {
     console.error('Ornaverse error (order page)', err);
+    clearChipClasses(chip);
     labelSpan.textContent = 'Status unavailable';
   });
 });

@@ -353,4 +353,234 @@ document.addEventListener('DOMContentLoaded', function () {
     }, 15000); // 15 seconds delay
   });
 });
-
+
+document.addEventListener("DOMContentLoaded", function () {
+  const fabMain = document.getElementById("fabMain");
+  const fabActions = document.getElementById("fabActions");
+  const fabChat = document.getElementById("fabChat");
+  const fabPhone = document.getElementById("fabPhone");
+  const fabWhatsapp = document.getElementById("fabWhatsapp");
+  const fabTooltip = document.getElementById("fabTooltip");
+
+  const fabMainBadge = document.getElementById("fabMainBadge");
+  const fabChatBadge = document.getElementById("fabChatBadge");
+
+  let isFabOpen = false;
+  let tooltipShown = false;
+
+  // ─────────────────────────────────────────
+  // 🧠 Helpers
+  // ─────────────────────────────────────────
+  function isZohoActive() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    const floatWindow = document.getElementById("zsiq_float_container");
+
+    const iframeOpen =
+      chatWrap && chatWrap.classList.contains("chat-iframe-open");
+
+    const floatOpen =
+      floatWindow &&
+      floatWindow.style.display !== "none" &&
+      !floatWindow.classList.contains("siqhide");
+
+    return iframeOpen || floatOpen;
+  }
+
+  function openFab() {
+    isFabOpen = true;
+    fabActions.classList.add("is-open");
+    fabMain.classList.add("is-open");
+  }
+
+  function closeFab() {
+    isFabOpen = false;
+    fabActions.classList.remove("is-open");
+    fabMain.classList.remove("is-open");
+  }
+
+  function syncWithZoho() {
+    if (isZohoActive()) {
+      fabMain.classList.add("is-open"); // show close icon
+      fabActions.classList.remove("is-open"); // hide menu
+      isFabOpen = true;
+    } else {
+      fabMain.classList.remove("is-open");
+      isFabOpen = false;
+    }
+  }
+
+  // ─────────────────────────────────────────
+  // 🎯 FAB Click
+  // ─────────────────────────────────────────
+  if (fabMain) {
+    fabMain.addEventListener("click", function () {
+      // 👉 If Zoho open → close it
+      if (isZohoActive() && window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("hide");
+        closeFab();
+        return;
+      }
+
+      // 👉 Normal toggle
+      if (isFabOpen) {
+        closeFab();
+      } else {
+        openFab();
+      }
+
+      tooltipShown = true;
+      if (fabTooltip) fabTooltip.classList.remove("show");
+
+      pushPromoClick("salesiq");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 💬 Chat Click
+  // ─────────────────────────────────────────
+  if (fabChat) {
+    fabChat.addEventListener("click", function (e) {
+      e.preventDefault();
+
+      if (window.$zoho && $zoho.salesiq) {
+        $zoho.salesiq.floatwindow.visible("show");
+      }
+
+      closeFab();
+
+      // keep icon as close
+      fabMain.classList.add("is-open");
+      isFabOpen = true;
+
+      pushPromoClick("salesiq-liveChat");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 📞 Phone
+  // ─────────────────────────────────────────
+  if (fabPhone) {
+    fabPhone.addEventListener("click", function () {
+      pushPromoClick("salesiq-callUs");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 🟢 WhatsApp
+  // ─────────────────────────────────────────
+  if (fabWhatsapp) {
+    fabWhatsapp.addEventListener("click", function () {
+      pushPromoClick("chatWithExperts");
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 📊 dataLayer
+  // ─────────────────────────────────────────
+  function pushPromoClick(creativeName) {
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: "promoClick",
+      promoClick: {
+        promo_id: "{{ product.selected_or_first_available_variant.sku | default: 'N/A' }}",
+        promo_name: "{{ product.title | default: 'FAB Enquiry' }}",
+        creative_name: creativeName,
+        location_id: "{{ request.path }}"
+      }
+    });
+  }
+
+  // ─────────────────────────────────────────
+  // 🔔 Badge Sync (Zoho unread)
+  // ─────────────────────────────────────────
+  function syncBadge(count) {
+    const show = count && parseInt(count) > 0;
+
+    [fabMainBadge, fabChatBadge].forEach(function (el) {
+      if (!el) return;
+      el.textContent = show ? count : "";
+      el.style.display = show ? "flex" : "none";
+    });
+  }
+
+  function watchZsiqIndicator() {
+    const zsiqEl = document.getElementById("zsiq-indicator");
+
+    if (!zsiqEl) {
+      setTimeout(watchZsiqIndicator, 800);
+      return;
+    }
+
+    syncBadge(zsiqEl.textContent.trim());
+
+    const observer = new MutationObserver(function () {
+      syncBadge(zsiqEl.textContent.trim());
+    });
+
+    observer.observe(zsiqEl, {
+      childList: true,
+      characterData: true,
+      subtree: true
+    });
+  }
+
+  watchZsiqIndicator();
+
+  // ─────────────────────────────────────────
+  // 👀 Observe Zoho DOM changes
+  // ─────────────────────────────────────────
+  function observeZoho() {
+    const chatWrap = document.getElementById("zsiq_chat_wrap");
+    if (!chatWrap) return;
+
+    syncWithZoho();
+
+    const observer1 = new MutationObserver(syncWithZoho);
+    observer1.observe(chatWrap, {
+      attributes: true,
+      attributeFilter: ["class"]
+    });
+
+    const floatWatcher = new MutationObserver(function () {
+      const floatWindow = document.getElementById("zsiq_float_container");
+
+      if (floatWindow) {
+        const observer2 = new MutationObserver(syncWithZoho);
+
+        observer2.observe(floatWindow, {
+          attributes: true,
+          attributeFilter: ["class", "style"]
+        });
+
+        floatWatcher.disconnect();
+      }
+    });
+
+    floatWatcher.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+  }
+
+  // Wait until Zoho loads
+  const zohoLoader = new MutationObserver(function (_, obs) {
+    if (document.getElementById("zsiq_chat_wrap")) {
+      obs.disconnect();
+      observeZoho();
+    }
+  });
+
+  zohoLoader.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
+
+  // ─────────────────────────────────────────
+  // ⏱ Tooltip delay
+  // ─────────────────────────────────────────
+  setTimeout(function () {
+    if (!tooltipShown && fabTooltip) {
+      fabTooltip.classList.add("show");
+    }
+  }, 5000);
+});
