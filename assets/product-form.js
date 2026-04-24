@@ -290,12 +290,15 @@ document.addEventListener('click', function(e) {
       preCalculateWidths() {
         const measurer = document.createElement('div');
         measurer.className = 'text-measurer';
+        measurer.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;';
         document.body.appendChild(measurer);
 
+        // Group all reads together if possible, but here we must set content then read.
+        // To optimize, we can reduce the number of times we read offsetWidth by doing it once per item 
+        // without other interleaved DOM writes that invalidate the layout.
         this.items.forEach((item, i) => {
           measurer.textContent = item.text;
-          measurer.offsetWidth; // force reflow
-          this.widthCache[i] = 36 + 7 + measurer.offsetWidth + 6 + 3; // icon + margin + text + padding + extra
+          this.widthCache[i] = 36 + 7 + measurer.offsetWidth + 6 + 3; 
         });
 
         document.body.removeChild(measurer);
