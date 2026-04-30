@@ -24,23 +24,19 @@
     assign current_collection_handle = collection.handle | default: ''
     assign skip_first_instock = false
 
-    # Instantly checks the page URL context without querying product collections
     if current_collection_handle == '9kt-collection'
       assign skip_first_instock = true
     endif
 
-    # --- THE SINGLE MASTER LOOP ---
     for v in card_product.variants
       assign v_title_down = v.title | downcase
 
-      # 1. First In-Stock Variant Logic (Preserves your 9kt exception)
       if skip_first_instock == false and first_instock_variant == null
         if v.inventory_quantity > 0
           assign first_instock_variant = v
         endif
       endif
 
-      # 2. Fast Shipping Logic (Preserves your exact availability rules)
       if show_fast_shipping == false and v.available
         if current_collection_handle == '9kt-collection'
           if v_title_down contains '9kt' or v_title_down contains '9 kt'
@@ -55,13 +51,11 @@
         endif
       endif
 
-      # 3. Discount Logic (Captures the first available discount)
       if calculated_discount_percent == 0 and v.compare_at_price > v.price
         assign calc_discount = v.compare_at_price | minus: v.price
         assign calculated_discount_percent = calc_discount | times: 100.0 | divided_by: v.compare_at_price | round
       endif
 
-      # 4. Pre-fetch Color Variants (Eliminates the downstream nested loop)
       if variant_yellow == null and v_title_down contains 'yellow gold'
         assign variant_yellow = v
       endif
@@ -161,12 +155,13 @@
           {%- assign secondary_media = null -%}
           {%- assign fallback_media = null -%}
 
+          {%- assign mq_media = null -%}
+          {%- assign mq_ai_media = null -%}
+          {%- assign mh_media = null -%}
+
           {%- assign primary_alt_down = primary_media.alt | default: '' | downcase -%}
           {%- assign color_label = primary_alt_down | split: '-' | last | strip -%}
 
-          {%- comment -%}
-            Single loop to determine secondary image
-          {%- endcomment -%}
           {%- for media in card_product.media limit: 8 -%}
             {%- if media.media_type != 'image' or media.id == primary_media.id -%}
               {%- continue -%}
@@ -174,24 +169,41 @@
 
             {%- assign current_alt = media.alt | default: '' | downcase | strip -%}
 
-            {%- comment -%} Priority 1: MQ image {%- endcomment -%}
-            {%- if current_alt == 'mq' or current_alt == 'mq_ai' -%}
-              {%- assign secondary_media = media -%}
-              {%- break -%}
+            {%- comment %} Priority capture {% endcomment -%}
+            {%- if current_alt == 'mq' and mq_media == null -%}
+              {%- assign mq_media = media -%}
+              {%- continue -%}
             {%- endif -%}
 
-            {%- comment -%} Priority 2: Color match from primary image {%- endcomment -%}
+            {%- if current_alt == 'mq_ai' and mq_ai_media == null -%}
+              {%- assign mq_ai_media = media -%}
+              {%- continue -%}
+            {%- endif -%}
+
+            {%- if current_alt == 'mh' and mh_media == null -%}
+              {%- assign mh_media = media -%}
+              {%- continue -%}
+            {%- endif -%}
+
+            {%- comment %} Color match {% endcomment -%}
             {%- if secondary_media == null and color_label != blank and current_alt contains color_label -%}
               {%- assign secondary_media = media -%}
             {%- endif -%}
 
-            {%- comment -%} Priority 3: Save first valid fallback {%- endcomment -%}
+            {%- comment %} Fallback {% endcomment -%}
             {%- if fallback_media == null -%}
               {%- assign fallback_media = media -%}
             {%- endif -%}
           {%- endfor -%}
 
-          {%- if secondary_media == null -%}
+          {%- comment %} Final priority order: mq → mq_ai → mh → color → fallback {% endcomment -%}
+          {%- if mq_media -%}
+            {%- assign secondary_media = mq_media -%}
+          {%- elsif mq_ai_media -%}
+            {%- assign secondary_media = mq_ai_media -%}
+          {%- elsif mh_media -%}
+            {%- assign secondary_media = mh_media -%}
+          {%- elsif secondary_media == null -%}
             {%- assign secondary_media = fallback_media -%}
           {%- endif -%}
 
