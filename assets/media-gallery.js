@@ -174,6 +174,7 @@ if (!customElements.get('media-gallery')) {
     };
 
     items.forEach(item => {
+      item.style.display = 'block';
       const img = item.querySelector("img");
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
