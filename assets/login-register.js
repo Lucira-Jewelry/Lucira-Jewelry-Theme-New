@@ -749,21 +749,23 @@ document.addEventListener('DOMContentLoaded', function() {
   if (window.isCustomerLoggedIn && sessionStorage.getItem('open_wishlist_after_login') === 'true') {
     sessionStorage.removeItem('open_wishlist_after_login');
     
-    function tryOpenWishlist() {
+    let clickAttempts = 0;
+    const clickInterval = setInterval(function() {
+      clickAttempts++;
+      
+      const isDrawerOpen = document.querySelector('#iwish-drawer-root .wishlist-drawer-show.show') || 
+                           document.querySelector('#iwish-drawer-root .show') ||
+                           document.querySelector('.wishlist-drawer-show.show');
+                           
+      if (isDrawerOpen || clickAttempts > 12) {
+        clearInterval(clickInterval);
+        return;
+      }
+      
       const wishlistBtn = document.querySelector('.iwishDrawer');
       if (wishlistBtn) {
         wishlistBtn.click();
       }
-    }
-
-    // Try multiple times in case script is still loading
-    let attempts = 0;
-    const interval = setInterval(function() {
-      attempts++;
-      if (typeof iWish !== 'undefined' || attempts > 10) {
-        clearInterval(interval);
-        tryOpenWishlist();
-      }
-    }, 200);
+    }, 500);
   }
 });
