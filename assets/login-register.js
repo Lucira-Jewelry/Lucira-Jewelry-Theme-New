@@ -62,6 +62,7 @@ function closeloginPopup(e, id) {
   document.body.style.overflow = '';
   document.getElementById(id)?.classList.remove('register-popup');
   resetToLoginView();
+  sessionStorage.removeItem('open_wishlist_after_login');
   const popup = document.getElementById('login-popup');
   if (!popup) return;
   const h2 = popup.querySelector('.otp-number-wrapper p.heading');
@@ -726,4 +727,43 @@ document.addEventListener('DOMContentLoaded', () => {
 
 document.getElementById('loginMobile').addEventListener('input', function () {
   this.value = this.value.replace(/\D/g, '').slice(0, 10);
+});
+
+// Wishlist Login Gating
+document.addEventListener('click', function(event) {
+  const wishlistBtn = event.target.closest('.iwishDrawer');
+  if (wishlistBtn) {
+    if (!window.isCustomerLoggedIn) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      sessionStorage.setItem('open_wishlist_after_login', 'true');
+      openloginPopup('login-popup');
+    }
+  }
+}, true); // capturing phase
+
+// Auto-open wishlist after successful login reload
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.isCustomerLoggedIn && sessionStorage.getItem('open_wishlist_after_login') === 'true') {
+    sessionStorage.removeItem('open_wishlist_after_login');
+    
+    function tryOpenWishlist() {
+      const wishlistBtn = document.querySelector('.iwishDrawer');
+      if (wishlistBtn) {
+        wishlistBtn.click();
+      }
+    }
+
+    // Try multiple times in case script is still loading
+    let attempts = 0;
+    const interval = setInterval(function() {
+      attempts++;
+      if (typeof iWish !== 'undefined' || attempts > 10) {
+        clearInterval(interval);
+        tryOpenWishlist();
+      }
+    }, 200);
+  }
 });
