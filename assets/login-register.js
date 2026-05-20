@@ -769,3 +769,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 500);
   }
 });
+
+// Product Card Wishlist Login Gating — same blocking flow as header wishlist
+document.addEventListener('click', function(event) {
+  var productWishlistBtn = event.target.closest('.iWishAddColl, .iWishAdd');
+  if (productWishlistBtn) {
+    if (!window.isCustomerLoggedIn) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      openloginPopup('login-popup');
+    }
+  }
+}, true); // capturing phase — fires before the wishlist app's own listeners
