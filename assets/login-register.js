@@ -62,6 +62,7 @@ function closeloginPopup(e, id) {
   document.body.style.overflow = '';
   document.getElementById(id)?.classList.remove('register-popup');
   resetToLoginView();
+  sessionStorage.removeItem('open_wishlist_after_login');
   const popup = document.getElementById('login-popup');
   if (!popup) return;
   const h2 = popup.querySelector('.otp-number-wrapper p.heading');
@@ -727,3 +728,57 @@ document.addEventListener('DOMContentLoaded', () => {
 document.getElementById('loginMobile').addEventListener('input', function () {
   this.value = this.value.replace(/\D/g, '').slice(0, 10);
 });
+
+// Wishlist Login Gating
+document.addEventListener('click', function(event) {
+  const wishlistBtn = event.target.closest('.iwishDrawer');
+  if (wishlistBtn) {
+    if (!window.isCustomerLoggedIn) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      
+      sessionStorage.setItem('open_wishlist_after_login', 'true');
+      openloginPopup('login-popup');
+    }
+  }
+}, true); // capturing phase
+
+// Auto-open wishlist after successful login reload
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.isCustomerLoggedIn && sessionStorage.getItem('open_wishlist_after_login') === 'true') {
+    sessionStorage.removeItem('open_wishlist_after_login');
+    
+    let clickAttempts = 0;
+    const clickInterval = setInterval(function() {
+      clickAttempts++;
+      
+      const isDrawerOpen = document.querySelector('#iwish-drawer-root .wishlist-drawer-show.show') || 
+                           document.querySelector('#iwish-drawer-root .show') ||
+                           document.querySelector('.wishlist-drawer-show.show');
+                           
+      if (isDrawerOpen || clickAttempts > 12) {
+        clearInterval(clickInterval);
+        return;
+      }
+      
+      const wishlistBtn = document.querySelector('.iwishDrawer');
+      if (wishlistBtn) {
+        wishlistBtn.click();
+      }
+    }, 500);
+  }
+});
+
+// Product Card Wishlist Login Gating — same blocking flow as header wishlist
+document.addEventListener('click', function(event) {
+  var productWishlistBtn = event.target.closest('.iWishAddColl, .iWishAdd');
+  if (productWishlistBtn) {
+    if (!window.isCustomerLoggedIn) {
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      openloginPopup('login-popup');
+    }
+  }
+}, true); // capturing phase — fires before the wishlist app's own listeners
