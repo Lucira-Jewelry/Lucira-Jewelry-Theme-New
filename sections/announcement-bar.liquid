@@ -14,6 +14,14 @@
   if section.blocks.size > 0
     assign announcement_bar = true
   endif
+  assign page_location = 'inner_page'
+  if template.name == 'index'
+    assign page_location = 'homepage'
+  elsif template.name == 'collection'
+    assign page_location = 'plp'
+  elsif template.name == 'product'
+    assign page_location = 'pdp'
+  endif
 -%}
 
 {% if social_icons %}
@@ -85,6 +93,7 @@
             <a
               href="{{ section.blocks.first.settings.link }}"
               class="announcement-bar__link link link--text focus-inset animate-arrow"
+              onclick="handleAnnouncementBarClick(event, '{{ section.blocks.first.settings.text | escape }}', '{{ page_location }}')"
             >
           {%- endif -%}
           <p class="announcement-bar__message h5">
@@ -179,9 +188,10 @@
                     </div>
                   {%- elsif block.settings.text != blank -%}
                     {%- if block.settings.link != blank -%}
-                      <a
+                      
                         href="{{ block.settings.link }}"
                         class="announcement-bar__link link link--text focus-inset animate-arrow"
+                        onclick="handleAnnouncementBarClick(event, '{{ block.settings.text | escape }}', '{{ page_location }}')"
                       >
                     {%- endif -%}
                     <p class="announcement-bar__message h5">
@@ -248,6 +258,23 @@
 
 <script>
 (function() {
+  // ── GTM: Announcement Bar Click ──────────────────────────────────────────
+  window.handleAnnouncementBarClick = function(event, itemId, locationId) {
+    event.preventDefault();
+    const target = event.currentTarget;
+    window.dataLayer = window.dataLayer || [];
+    window.dataLayer.push({
+      event: 'promoClick',
+      promoClick: {
+        creative_name: 'Announcement bar clicked',
+        item_id: itemId,
+        location_id: locationId
+      }
+    });
+    setTimeout(function() { window.location.assign(target.href); }, 100);
+  };
+
+  // ── Countdown Timer ──────────────────────────────────────────────────────
   function parseTime(timeStr) {
     const [hours, minutes] = timeStr.split(':').map(Number);
     return hours * 60 + minutes;
@@ -293,7 +320,6 @@
       
       if (!textEl || !timerEl) return;
 
-      // Get time slots from data attribute
       const timeSlotsData = el.getAttribute('data-timeslots');
       let timeSlots = [];
       
@@ -349,7 +375,6 @@
     });
   }
 
-  // Update immediately and then every second
   updateCountdown();
   setInterval(updateCountdown, 1000);
 })();
