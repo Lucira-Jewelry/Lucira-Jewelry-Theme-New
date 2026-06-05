@@ -164,6 +164,7 @@ if (!customElements.get('media-gallery')) {
     const buckets = {
       color: [],
       codes: { mv: [], "mq-ai": [], mq: [], "mh-ai": [], mh: [], "ci-ai": [], ci: [], v360: [] },
+      size: [],
       cert: [],
       extras: []
     };
@@ -173,6 +174,11 @@ if (!customElements.get('media-gallery')) {
       const alt = (img?.alt || "").toLowerCase();
       const itemColor = getColorFromAlt(alt);
       const isAnyColor = COLOR_TOKENS.some(c => alt.includes(c));
+
+      if (alt.includes("size")) {
+        buckets.size.push(item);
+        return;
+      }
 
       if (alt.includes("cert")) {
         buckets.cert.push(item);
