@@ -249,6 +249,11 @@ if (!customElements.get('media-gallery')) {
       ordered.push(node);
     });
 
+    buckets.size.forEach(node => {
+      node.style.display = 'block';
+      ordered.push(node);
+    });
+
     buckets.cert.forEach(node => {
       node.style.display = 'block';
       ordered.push(node);
