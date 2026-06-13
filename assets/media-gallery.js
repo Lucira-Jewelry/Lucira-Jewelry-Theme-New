@@ -116,7 +116,7 @@ if (!customElements.get('media-gallery')) {
 }
 
 (function() {
-  const COLOR_TOKENS = ["white", "yellow", "rose", "Plt"];
+  const COLOR_TOKENS = ["white", "yellow", "rose", "silver", "Plt"];
   const ALWAYS_SHOW_CODES = ["mv", "mq-ai", "mq", "mh-ai", "mh", "ci-ai", "ci", "360v"];
   let currentSelectedColor = null;
   let isInitialized = false;
@@ -150,12 +150,18 @@ if (!customElements.get('media-gallery')) {
 
   function getColorFromAlt(text) {
     const lower = (text || "").toLowerCase();
-    const match = lower.match(/(yellow|white|rose|plt|platinum)[\s-]?(yellow|white|rose|plt|platinum)?/);
+    const match = lower.match(/(yellow|white|rose|silver|plt|platinum)[\s-]?(yellow|white|rose|silver|plt|platinum)?/);
+
     if (match && match[1]) {
       const firstColor = match[1];
-      if (firstColor === "platinum") return "plt";
+
+      if (firstColor === "platinum" || firstColor === "silver") {
+        return "plt";
+      }
+
       return firstColor;
     }
+
     return "";
   }
 
