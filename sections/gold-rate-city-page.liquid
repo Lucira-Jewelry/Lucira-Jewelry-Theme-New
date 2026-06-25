@@ -20,13 +20,12 @@
     assign city = page.metafields.custom.city.value
   endif
 
-  assign global_rates = shop.metaobjects.gold_rates_global.values | first
+
+  assign global_rates = shop.metaobjects.gold_rates_global['gold-rates']
   if global_rates == blank
-    assign global_rates = shop.metaobjects.gold_rates_global['gold-rates']
+    assign global_rates = shop.metaobjects.gold_rates_global.values | first
   endif
-  if global_rates == blank
-    assign global_rates = shop.metaobjects.gold_rates_global.values | where: 'handle', 'gold-rates' | first
-  endif
+
 
   assign content_order = 'gold-purity,difference-22k-24k,investment-guide,buying-guide,historic-price-trends,factors-affecting-gold-prices,factors-affecting-gold-price,gold-forecast,gold-price-forecast,hallmark-guide' | split: ','
   assign table_order = 'todays-rate,weekly-trend,monthly-trend,historic-rate,forecast-table,city-comparison' | split: ','
@@ -82,10 +81,6 @@
   assign rate_14k_10g = rate_14k_10g | round
   assign rate_14k_100g = rate_14k_100g | round
 
-  {% comment %} Create placeholder replacement function {% endcomment %}
-  assign rate_placeholders = '[RATE_22K]|[RATE_24K]|[RATE_18K]|[RATE_14K]|[RATE_22K_8G]|[RATE_24K_8G]|[RATE_18K_8G]|[RATE_14K_8G]|[RATE_22K_10G]|[RATE_24K_10G]|[RATE_18K_10G]|[RATE_14K_10G]|[RATE_22K_100G]|[RATE_24K_100G]|[RATE_18K_100G]|[RATE_14K_100G]' | split: '|'
-  assign rate_values = rate_22k_display | append: '|' | append: rate_24k_display | append: '|' | append: rate_18k_display | append: '|' | append: rate_14k_display | append: '|' | append: rate_22k_8g | append: '|' | append: rate_24k_8g | append: '|' | append: rate_18k_8g | append: '|' | append: rate_14k_8g | append: '|' | append: rate_22k_10g | append: '|' | append: rate_24k_10g | append: '|' | append: rate_18k_10g | append: '|' | append: rate_14k_10g | append: '|' | append: rate_22k_100g | append: '|' | append: rate_24k_100g | append: '|' | append: rate_18k_100g | append: '|' | append: rate_14k_100g | split: '|'
-
   assign faq_list = city.faq.value
   if faq_list == blank
     assign faq_list = city.faq_reference.value
@@ -98,9 +93,18 @@
 
   assign table_blocks = city.table_reference.value
   if table_blocks == blank
-    assign table_blocks = city.tables.value
+  assign table_blocks = city.tables.value
   endif
+  assign gold_purity_block = content_blocks | where: 'slug', 'gold-purity' | first
+  assign hallmark_block = content_blocks | where: 'slug', 'hallmark-guide' | first
+  assign buying_block = content_blocks | where: 'slug', 'buying-guide' | first
+  assign investment_block = content_blocks | where: 'slug', 'investment-guide' | first
+  assign factors_block = content_blocks | where: 'slug', 'factors-affecting-gold-prices' | first
+  assign festival_block = content_blocks | where: 'slug', 'festival-calendar' | first
+  assign market_block = content_blocks | where: 'slug', 'market-guide' | first
+  assign today_vs_yesterday_table = table_blocks | where: 'table_slug', 'today-vs-yesterday' | first
 %}
+
 
 <section class="gold-rate-page">
   {% if city == blank %}
@@ -173,8 +177,9 @@
     <div class="gold-rate-page__band">
       <div class="page-width">
         <div class="gold-rate-page__section-head">
-          <h2>Today's Gold Rate Table</h2>
-          <p>Global rates are sourced from one shared `gold_rates_global` entry and reused on every city page.</p>
+          <h2>Today's Gold Rate in {{ city_name }} at a Glance</h2>
+          <p>Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; All prices include 3% GST &nbsp;|&nbsp; Hallmark and making charges are additional</p>
+
         </div>
 
         <div class="gold-rate-page__table-wrap">
@@ -223,7 +228,22 @@
       </div>
     </div>
 
+    {% if today_vs_yesterday_table != blank %}
+    <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="today-vs-yesterday">
+      <h2>Today vs Yesterday — Gold Rate Change in {{ city_name }}</h2>
+      <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+        <thead><tr><th scope="col">Karat</th><th scope="col">Today (&#8377;/g)</th><th scope="col">Yesterday (&#8377;/g)</th><th scope="col">Change</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">24K</th><td>&#8377;{{ rate_24k_display }}</td><td>&#8212;</td><td>&#8212;</td></tr>
+          <tr><th scope="row">22K</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8212;</td><td>&#8212;</td></tr>
+          <tr><th scope="row">18K</th><td>&#8377;{{ rate_18k_display }}</td><td>&#8212;</td><td>&#8212;</td></tr>
+        </tbody>
+      </table></div>
+    </div></div>
+    {% endif %}
+
     {% assign gold_purity_block = content_blocks | where: 'slug', 'gold-purity' | first %}
+
     {% assign difference_block = content_blocks | where: 'slug', 'difference-22k-24k' | first %}
     {% assign investment_block = content_blocks | where: 'slug', 'investment-guide' | first %}
     {% assign historic_content_block = content_blocks | where: 'slug', 'historic-price-trends' | first %}
@@ -272,24 +292,7 @@
       <div class="gold-rate-page__band">
         <div class="page-width gold-rate-page__copy-block" id="gold-purity">
           <h2>{{ gold_purity_block.heading | default: gold_purity_block.title }}</h2>
-          {% assign block_content = gold_purity_block.content %}
-          {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-          {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-          {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-          {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-          {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-          <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+          <div class="gold-rate-page__richtext">{{ gold_purity_block.content | metafield_tag }}</div>
         </div>
       </div>
     {% endif %}
@@ -400,24 +403,7 @@
       <div class="gold-rate-page__band">
         <div class="page-width gold-rate-page__copy-block" id="difference-22k-24k">
           <h2>{{ difference_block.heading | default: difference_block.title }}</h2>
-          {% assign block_content = difference_block.content %}
-          {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-          {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-          {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-          {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-          {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-          <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+          <div class="gold-rate-page__richtext">{{ difference_block.content | metafield_tag }}</div>
         </div>
       </div>
     {% endif %}
@@ -427,43 +413,9 @@
         <div class="page-width gold-rate-page__copy-block" id="investment-guide">
           <h2>{% if investment_block != blank %}{{ investment_block.heading | default: investment_block.title }}{% else %}Investment Guide{% endif %}</h2>
           {% if investment_block != blank %}
-            {% assign block_content = investment_block.content %}
-            {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-            {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-            {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-            {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-            {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-            <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+            <div class="gold-rate-page__richtext">{{ investment_block.content | metafield_tag }}</div>
           {% else %}
-            {% assign block_content = investment_text %}
-            {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-            {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-            {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-            {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-            {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-            {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-            {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-            {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-            <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+            <div class="gold-rate-page__richtext">{{ investment_text | metafield_tag }}</div>
           {% endif %}
         </div>
       </div>
@@ -473,24 +425,7 @@
       <div class="gold-rate-page__band">
         <div class="page-width gold-rate-page__copy-block" id="historic-price-trends">
           <h2>{{ historic_content_block.heading | default: historic_content_block.title }}</h2>
-          {% assign block_content = historic_content_block.content %}
-          {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-          {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-          {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-          {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-          {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-          <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+          <div class="gold-rate-page__richtext">{{ historic_content_block.content | metafield_tag }}</div>
         </div>
       </div>
     {% endif %}
@@ -539,24 +474,7 @@
       <div class="gold-rate-page__band">
         <div class="page-width gold-rate-page__copy-block" id="factors-affecting-gold-prices">
           <h2>{{ factors_block.heading | default: factors_block.title }}</h2>
-          {% assign block_content = factors_block.content %}
-          {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-          {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-          {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-          {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-          {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-          <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+          <div class="gold-rate-page__richtext">{{ factors_block.content | metafield_tag }}</div>
         </div>
       </div>
     {% endif %}
@@ -565,24 +483,7 @@
       <div class="gold-rate-page__band">
         <div class="page-width gold-rate-page__copy-block" id="gold-forecast">
           <h2>{{ forecast_block.heading | default: forecast_block.title }}</h2>
-          {% assign block_content = forecast_block.content %}
-          {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-          {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-          {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-          {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-          {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-          {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-          {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-          <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+          <div class="gold-rate-page__richtext">{{ forecast_block.content | metafield_tag }}</div>
         </div>
       </div>
     {% endif %}
@@ -766,7 +667,13 @@
     {% endif %}
 
     {% comment %} Render all remaining content blocks that aren't handled individually {% endcomment %}
-    {% assign handled_slugs = 'gold-purity,difference-22k-24k,investment-guide,historic-price-trends,factors-affecting-gold-prices,factors-affecting-gold-price,gold-forecast,gold-price-forecast,hallmark-guide,buying-guide' | split: ',' %}
+    {% if hallmark_block != blank %}<div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="hallmark-guide"><h2>{{ hallmark_block.heading | default: hallmark_block.title }}</h2><div class="gold-rate-page__richtext">{{ hallmark_block.content | metafield_tag }}</div></div></div>{% endif %}
+    {% if festival_block != blank %}<div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="festival-calendar"><h2>{{ festival_block.heading | default: festival_block.title }}</h2><div class="gold-rate-page__richtext">{{ festival_block.content | metafield_tag }}</div></div></div>{% endif %}
+    {% if buying_block != blank %}<div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="buying-guide"><h2>{{ buying_block.heading | default: buying_block.title }}</h2><div class="gold-rate-page__richtext">{{ buying_block.content | metafield_tag }}</div></div></div>{% endif %}
+    {% if market_block != blank %}<div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="market-guide"><h2>{{ market_block.heading | default: market_block.title }}</h2><div class="gold-rate-page__richtext">{{ market_block.content | metafield_tag }}</div></div></div>{% endif %}
+    {% if faq_list != blank %}<div class="gold-rate-page__band gold-rate-page__band--faq"><div class="page-width gold-rate-page__copy-block" id="faq"><h2>Frequently Asked Questions — Gold Rate in {{ city_name }}</h2><div class="gold-rate-page__faq-list">{% for faq in faq_list %}{% if faq != blank %}<details class="gold-rate-page__faq-item"><summary class="gold-rate-page__faq-question">{{ faq.question }}</summary><div class="gold-rate-page__faq-answer">{{ faq.answer | metafield_tag }}</div></details>{% endif %}{% endfor %}</div></div></div>{% endif %}
+    {% assign handled_slugs = 'gold-purity,difference-22k-24k,investment-guide,historic-price-trends,factors-affecting-gold-prices,factors-affecting-gold-price,gold-forecast,gold-price-forecast,hallmark-guide,buying-guide,festival-calendar,market-guide' | split: ',' %}
+
     {% if content_blocks != blank %}
       {% for block in content_blocks %}
         {% assign block_slug = block.slug | default: '' %}
@@ -781,24 +688,7 @@
           <div class="gold-rate-page__band">
             <div class="page-width gold-rate-page__copy-block" id="{{ block_slug }}">
               <h2>{{ block.heading | default: block.title }}</h2>
-              {% assign block_content = block.content %}
-              {% assign block_content = block_content | replace: '[RATE_22K]', rate_22k_display %}
-              {% assign block_content = block_content | replace: '[RATE_24K]', rate_24k_display %}
-              {% assign block_content = block_content | replace: '[RATE_18K]', rate_18k_display %}
-              {% assign block_content = block_content | replace: '[RATE_14K]', rate_14k_display %}
-              {% assign block_content = block_content | replace: '[RATE_22K_8G]', rate_22k_8g %}
-              {% assign block_content = block_content | replace: '[RATE_24K_8G]', rate_24k_8g %}
-              {% assign block_content = block_content | replace: '[RATE_18K_8G]', rate_18k_8g %}
-              {% assign block_content = block_content | replace: '[RATE_14K_8G]', rate_14k_8g %}
-              {% assign block_content = block_content | replace: '[RATE_22K_10G]', rate_22k_10g %}
-              {% assign block_content = block_content | replace: '[RATE_24K_10G]', rate_24k_10g %}
-              {% assign block_content = block_content | replace: '[RATE_18K_10G]', rate_18k_10g %}
-              {% assign block_content = block_content | replace: '[RATE_14K_10G]', rate_14k_10g %}
-              {% assign block_content = block_content | replace: '[RATE_22K_100G]', rate_22k_100g %}
-              {% assign block_content = block_content | replace: '[RATE_24K_100G]', rate_24k_100g %}
-              {% assign block_content = block_content | replace: '[RATE_18K_100G]', rate_18k_100g %}
-              {% assign block_content = block_content | replace: '[RATE_14K_100G]', rate_14k_100g %}
-              <div class="gold-rate-page__richtext">{{ block_content | metafield_tag }}</div>
+              <div class="gold-rate-page__richtext">{{ block.content | metafield_tag }}</div>
             </div>
           </div>
         {% endif %}
@@ -818,43 +708,9 @@
             {% for faq in faq_list %}
               {% if faq != blank %}
                 <details class="gold-rate-page__faq-item" itemprop="mainEntity" itemscope itemtype="https://schema.org/Question">
-                  {% assign faq_question = faq.question %}
-                  {% assign faq_question = faq_question | replace: '[RATE_22K]', rate_22k_display %}
-                  {% assign faq_question = faq_question | replace: '[RATE_24K]', rate_24k_display %}
-                  {% assign faq_question = faq_question | replace: '[RATE_18K]', rate_18k_display %}
-                  {% assign faq_question = faq_question | replace: '[RATE_14K]', rate_14k_display %}
-                  {% assign faq_question = faq_question | replace: '[RATE_22K_8G]', rate_22k_8g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_24K_8G]', rate_24k_8g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_18K_8G]', rate_18k_8g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_14K_8G]', rate_14k_8g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_22K_10G]', rate_22k_10g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_24K_10G]', rate_24k_10g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_18K_10G]', rate_18k_10g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_14K_10G]', rate_14k_10g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_22K_100G]', rate_22k_100g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_24K_100G]', rate_24k_100g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_18K_100G]', rate_18k_100g %}
-                  {% assign faq_question = faq_question | replace: '[RATE_14K_100G]', rate_14k_100g %}
-                  <summary class="gold-rate-page__faq-question" itemprop="name">{{ faq_question }}</summary>
+                  <summary class="gold-rate-page__faq-question" itemprop="name">{{ faq.question }}</summary>
                   <div class="gold-rate-page__faq-answer" itemscope itemprop="acceptedAnswer" itemtype="https://schema.org/Answer">
-                    {% assign faq_answer = faq.answer %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_22K]', rate_22k_display %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_24K]', rate_24k_display %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_18K]', rate_18k_display %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_14K]', rate_14k_display %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_22K_8G]', rate_22k_8g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_24K_8G]', rate_24k_8g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_18K_8G]', rate_18k_8g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_14K_8G]', rate_14k_8g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_22K_10G]', rate_22k_10g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_24K_10G]', rate_24k_10g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_18K_10G]', rate_18k_10g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_14K_10G]', rate_14k_10g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_22K_100G]', rate_22k_100g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_24K_100G]', rate_24k_100g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_18K_100G]', rate_18k_100g %}
-                    {% assign faq_answer = faq_answer | replace: '[RATE_14K_100G]', rate_14k_100g %}
-                    <div itemprop="text">{{ faq_answer | metafield_tag }}</div>
+                    <div itemprop="text">{{ faq.answer | metafield_tag }}</div>
                   </div>
                 </details>
               {% endif %}
