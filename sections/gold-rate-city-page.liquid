@@ -216,27 +216,61 @@
   </div></div>
   {% endif %}
 
-  {% if weekly_trend_table != blank %}
+  {% assign history_entries = shop.metaobjects.gold_rate_history.values | sort: 'rate_date' | reverse %}
+  {% assign weekly_entries = history_entries | slice: 0, 7 %}
+  {% if weekly_entries.size > 0 %}
   <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="weekly-trend">
-    <h2>{{ weekly_trend_table.table_title }}</h2>
-    {% if weekly_trend_table.table_description != blank %}<p class="gold-rate-page__table-description">{{ weekly_trend_table.table_description }}</p>{% endif %}
+    <h2>Weekly Gold Price Trend in {{ city_name }} (Last 7 Days)</h2>
+    <p class="gold-rate-page__table-description">Daily gold rates in {{ city_name }} based on MCX rates and international bullion prices.</p>
     <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
-      <thead><tr><th scope="col">Date</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">Weekly Change</th><th scope="col">Market Note</th></tr></thead>
-      <tbody><tr><th scope="row">Today</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_24k_display }}</td><td>&#8212;</td><td>Live</td></tr></tbody>
+      <thead><tr><th scope="col">Date</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">18K (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% for entry in weekly_entries %}
+        <tr>
+          <th scope="row">{{ entry.rate_date | date: '%d %b %Y' }}</th>
+          <td>&#8377;{{ entry.rate_22k | plus: 0 | round }}</td>
+          <td>&#8377;{{ entry.rate_24k | plus: 0 | round }}</td>
+          <td>&#8377;{{ entry.rate_18k | plus: 0 | round }}</td>
+          <td>{{ entry.market_note | default: '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table></div>
   </div></div>
   {% endif %}
 
-  {% if monthly_trend_table != blank %}
+
+  {% assign all_history = shop.metaobjects.gold_rate_history.values | sort: 'rate_date' | reverse %}
+  {% if all_history.size > 0 %}
   <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="monthly-trend">
-    <h2>{{ monthly_trend_table.table_title }}</h2>
-    {% if monthly_trend_table.table_description != blank %}<p class="gold-rate-page__table-description">{{ monthly_trend_table.table_description }}</p>{% endif %}
+    <h2>Monthly Gold Rate Trend in {{ city_name }} — Last 12 Months</h2>
+    <p class="gold-rate-page__table-description">Month-end gold rates in {{ city_name }}. Updated as new daily entries are added.</p>
     <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
-      <thead><tr><th scope="col">Month</th><th scope="col">22K Avg (&#8377;/g)</th><th scope="col">24K Avg (&#8377;/g)</th><th scope="col">Change</th><th scope="col">Trend</th></tr></thead>
-      <tbody><tr><th scope="row">Current month</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_24k_display }}</td><td>&#8212;</td><td>Live</td></tr></tbody>
+      <thead><tr><th scope="col">Month</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">18K (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign seen_months = '' %}
+        {% assign month_count = 0 %}
+        {% for entry in all_history %}
+          {% assign entry_month = entry.rate_date | date: '%Y-%m' %}
+          {% unless seen_months contains entry_month %}
+            {% if month_count < 12 %}
+              <tr>
+                <th scope="row">{{ entry.rate_date | date: '%B %Y' }}</th>
+                <td>&#8377;{{ entry.rate_22k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_24k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_18k | plus: 0 | round }}</td>
+                <td>{{ entry.market_note | default: '—' }}</td>
+              </tr>
+              {% assign seen_months = seen_months | append: entry_month | append: ',' %}
+              {% assign month_count = month_count | plus: 1 %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+      </tbody>
     </table></div>
   </div></div>
   {% endif %}
+
 
   {% if nearby_city != blank %}
   <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="nearby-city-rate">
