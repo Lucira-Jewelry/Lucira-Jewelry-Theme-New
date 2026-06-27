@@ -1,0 +1,944 @@
+{% liquid
+  assign city = page.metafields.custom.gold_rate_city.value
+  assign city_slug = ''
+  if city != blank and city.slug != blank
+    assign city_slug = city.slug
+  elsif page.metafields.custom.city_name != blank
+    assign city_slug = page.metafields.custom.city_name | handleize
+  elsif page.handle contains '-gold-rate-today'
+    assign city_slug = page.handle | remove: '-gold-rate-today'
+  elsif page.handle contains '-gold-rate'
+    assign city_slug = page.handle | remove: '-gold-rate'
+  endif
+  if city == blank and city_slug != blank
+    assign city = shop.metaobjects.gold_rate_city.values | where: 'slug', city_slug | first
+  endif
+  if city == blank and page.metafields.custom.city.value and page.metafields.custom.city.value.hero_title != blank
+    assign city = page.metafields.custom.city.value
+  endif
+  assign global_rates = shop.metaobjects.gold_rates_global['gold-rates']
+  if global_rates == blank
+    assign global_rates = shop.metaobjects.gold_rates_global.values | first
+  endif
+  assign city_name = city.city_name | default: page.title | default: 'Gold Rate'
+  assign city_state = city.state | default: ''
+  assign nearby_city = city.nearby_city_name | default: ''
+  assign nearby_city_note = city.nearby_city_note | default: ''
+  assign hero_title = city.hero_title
+  if hero_title == blank
+    assign hero_title = "Today's Gold Rate in " | append: city_name
+  endif
+  assign hero_subtitle = city.hero_subtitle | default: 'Live gold prices'
+  assign hero_description = city.hero_description
+  assign city_intro = city.city_intro
+  assign hero_image = city.hero_image.value | default: city.hero_image
+  assign rate_24k = global_rates.rate_24k | plus: 0
+  assign rate_22k = global_rates.rate_22k | plus: 0
+  assign rate_18k = global_rates.rate_18k | plus: 0
+  assign rate_14k = global_rates.rate_14k | plus: 0
+  assign updated_at = global_rates.updated_at
+  assign rate_24k_display = rate_24k | round
+  assign rate_22k_display = rate_22k | round
+  assign rate_18k_display = rate_18k | round
+  assign rate_14k_display = rate_14k | round
+  assign rate_24k_8g = rate_24k | times: 8 | round
+  assign rate_24k_10g = rate_24k | times: 10 | round
+  assign rate_24k_100g = rate_24k | times: 100 | round
+  assign rate_22k_8g = rate_22k | times: 8 | round
+  assign rate_22k_10g = rate_22k | times: 10 | round
+  assign rate_22k_100g = rate_22k | times: 100 | round
+  assign rate_18k_8g = rate_18k | times: 8 | round
+  assign rate_18k_10g = rate_18k | times: 10 | round
+  assign rate_18k_100g = rate_18k | times: 100 | round
+  assign rate_14k_8g = rate_14k | times: 8 | round
+  assign rate_14k_10g = rate_14k | times: 10 | round
+  assign rate_14k_100g = rate_14k | times: 100 | round
+  assign faq_list = city.faq.value
+  if faq_list == blank
+    assign faq_list = city.faq_reference.value
+  endif
+  assign content_blocks = city.content_blocks.value
+  if content_blocks == blank
+    assign content_blocks = city.content_block_reference.value
+  endif
+  assign table_blocks = city.table_reference.value
+  if table_blocks == blank
+    assign table_blocks = city.tables.value
+  endif
+  assign gold_purity_block = content_blocks | where: 'slug', 'gold-purity' | first
+  assign hallmark_block = content_blocks | where: 'slug', 'hallmark-guide' | first
+  assign buying_block = content_blocks | where: 'slug', 'buying-guide' | first
+  assign investment_block = content_blocks | where: 'slug', 'investment-guide' | first
+  assign factors_block = content_blocks | where: 'slug', 'factors-affecting-gold-prices' | first
+  if factors_block == blank
+    assign factors_block = content_blocks | where: 'slug', 'factors-affecting-gold-price' | first
+  endif
+  assign festival_block = content_blocks | where: 'slug', 'festival-calendar' | first
+  assign market_block = content_blocks | where: 'slug', 'market-guide' | first
+  assign today_vs_yesterday_table = table_blocks | where: 'table_slug', 'today-vs-yesterday' | first
+  assign weekly_trend_table = table_blocks | where: 'table_slug', 'weekly-trend' | first
+  assign monthly_trend_table = table_blocks | where: 'table_slug', 'monthly-trend' | first
+  assign historic_rate_table = table_blocks | where: 'table_slug', 'historic-rate' | first
+  assign forecast_table = table_blocks | where: 'table_slug', 'forecast-table' | first
+  assign city_comparison_table = table_blocks | where: 'table_slug', 'city-comparison' | first
+  assign faq_json = ''
+  if faq_list != blank
+    for faq in faq_list
+      if faq != blank
+        capture faq_entry
+          echo '{"@type":"Question","name":' | append: faq.question | strip_html | json | append: ',"acceptedAnswer":{"@type":"Answer","text":' | append: faq.answer | strip_html | json | append: '}}'
+        endcapture
+        if faq_json == blank
+          assign faq_json = faq_entry | strip
+        else
+          assign faq_json = faq_json | append: ',' | append: faq_entry | strip
+        endif
+      endif
+    endfor
+  endif
+%}
+{% if faq_json != blank %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{{ faq_json }}]}</script>{% endif %}
+<section class="gold-rate-page">
+{% if city == blank %}
+  <div class="page-width gold-rate-page__empty"><h1>Gold Rate Page</h1><p>Connect a gold_rate_city metaobject to this page via the custom.gold_rate_city metafield.</p></div>
+{% else %}
+  <div class="gold-rate-page__hero"><div class="page-width gold-rate-page__hero-grid">
+    <div class="gold-rate-page__hero-copy">
+      <p class="gold-rate-page__eyebrow">{{ hero_subtitle }}{% if city_state != blank %} <span class="gold-rate-page__eyebrow-sep">|</span> {{ city_state }}{% endif %}</p>
+      <h1 class="gold-rate-page__title">{{ hero_title }}</h1>
+      {% if hero_description != blank %}<div class="gold-rate-page__richtext">{{ hero_description | metafield_tag }}</div>{% endif %}
+      {% comment %} {% if city_intro != blank %}<div class="gold-rate-page__intro">{{ city_intro | metafield_tag }}</div>{% endif %} {% endcomment %}
+
+        {% if city_intro != blank %}<div class="gold-rate-page__intro">{{ city_intro | metafield_tag }}</div>{% endif %}
+        <div class="gold-rate-page__aeo-block">
+          <p class="gold-rate-page__aeo-meta">Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; Source: MCX / Multi Commodity Exchange &nbsp;|&nbsp; City: {{ city_name }}{% if city_state != blank %}, {{ city_state }}{% endif %}</p>
+          <details class="gold-rate-page__aeo-item" open>
+            <summary class="gold-rate-page__aeo-question">What is today's gold rate in {{ city_name }}?</summary>
+            <div class="gold-rate-page__aeo-answer">
+              <p>Today's gold rate in {{ city_name }} is <strong>&#8377;{{ rate_22k_display }} per gram for 22 Carat gold</strong> and <strong>&#8377;{{ rate_24k_display }} per gram for 24 Carat gold</strong>. The 10 gram rate for 22K gold is &#8377;{{ rate_22k_10g }} and for 24K gold is &#8377;{{ rate_24k_10g }}. Prices are updated daily based on MCX and international bullion rates.</p>
+            </div>
+          </details>
+        </div>
+
+      <div class="gold-rate-page__hero-stats">
+        <div class="gold-rate-page__stat"><span class="gold-rate-page__stat-label">24K</span><span class="gold-rate-page__stat-value">&#8377;{{ rate_24k_display }}</span></div>
+        <div class="gold-rate-page__stat"><span class="gold-rate-page__stat-label">22K</span><span class="gold-rate-page__stat-value">&#8377;{{ rate_22k_display }}</span></div>
+        <div class="gold-rate-page__stat"><span class="gold-rate-page__stat-label">18K</span><span class="gold-rate-page__stat-value">&#8377;{{ rate_18k_display }}</span></div>
+        <div class="gold-rate-page__stat"><span class="gold-rate-page__stat-label">14K</span><span class="gold-rate-page__stat-value">&#8377;{{ rate_14k_display }}</span></div>
+      </div>
+      {% if updated_at != blank %}<p class="gold-rate-page__updated">Updated {{ updated_at | date: '%d %B %Y' }}</p>{% endif %}
+    </div>
+    <div class="gold-rate-page__hero-media">
+      {% if hero_image != blank %}<img class="gold-rate-page__hero-image" src="{{ hero_image | image_url: width: 1400 }}" alt="{{ city_name | escape }}" loading="eager" width="1400" height="1050">
+      {% else %}<div class="gold-rate-page__hero-fallback"><span>{{ city_name }}</span></div>{% endif %}
+    </div>
+  </div></div>
+
+  <div class="gold-rate-page__band"><div class="page-width">
+    <div class="gold-rate-page__section-head">
+      <h2>Today's Gold Rate in {{ city_name }} at a Glance</h2>
+      <p>Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; All prices include 3% GST &nbsp;|&nbsp; Hallmark and making charges are additional</p>
+    </div>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Gold Type</th><th scope="col">Per Gram</th><th scope="col">Per 8g</th><th scope="col">Per 10g</th><th scope="col">Per 100g</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">24 Carat (99.9%)</th><td>&#8377;{{ rate_24k_display }}</td><td>&#8377;{{ rate_24k_8g }}</td><td>&#8377;{{ rate_24k_10g }}</td><td>&#8377;{{ rate_24k_100g }}</td></tr>
+        <tr><th scope="row">22 Carat (91.6%)</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_22k_8g }}</td><td>&#8377;{{ rate_22k_10g }}</td><td>&#8377;{{ rate_22k_100g }}</td></tr>
+        <tr><th scope="row">18 Carat (75%)</th><td>&#8377;{{ rate_18k_display }}</td><td>&#8377;{{ rate_18k_8g }}</td><td>&#8377;{{ rate_18k_10g }}</td><td>&#8377;{{ rate_18k_100g }}</td></tr>
+        <tr><th scope="row">14 Carat (58.5%)</th><td>&#8377;{{ rate_14k_display }}</td><td>&#8377;{{ rate_14k_8g }}</td><td>&#8377;{{ rate_14k_10g }}</td><td>&#8377;{{ rate_14k_100g }}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="gold-rate-page__table-note">Prices shown are indicative base rates. Actual jewellery prices will include making charges, GST, and stone setting costs.</p>
+  </div></div>
+
+
+
+
+{% assign history_all = shop.metaobjects.gold_rate_history.values %}
+
+{% assign history_today = nil %}
+  {% assign found_yesterday = 0 %}
+  {% assign y_24k = 0 %}
+  {% assign y_22k = 0 %}
+  {% assign y_18k = 0 %}
+  {% assign today_date = '' %}
+
+  {% comment %} Find today entry by is_current_rate flag {% endcomment %}
+  {% for entry in history_all %}
+    {% if entry.is_current_rate == true %}
+      {% assign history_today = entry %}
+      {% assign today_date = entry.rate_date %}
+    {% endif %}
+  {% endfor %}
+
+  {% comment %} Fallback: use first entry as today {% endcomment %}
+  {% if history_today == blank %}
+    {% assign history_today = history_all | first %}
+    {% assign today_date = history_all.first.rate_date %}
+  {% endif %}
+
+  {% comment %} Find yesterday: first entry that is NOT today {% endcomment %}
+  {% for entry in history_all %}
+    {% if found_yesterday == 0 %}
+      {% assign this_date = entry.rate_date %}
+      {% if this_date == today_date %}
+        {% comment %} skip today {% endcomment %}
+      {% else %}
+        {% assign y_24k = entry.rate_24k | plus: 0 | round %}
+        {% assign y_22k = entry.rate_22k | plus: 0 | round %}
+        {% assign y_18k = entry.rate_18k | plus: 0 | round %}
+        {% assign found_yesterday = 1 %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+  {% assign diff_24k = rate_24k_display | minus: y_24k %}
+  {% assign diff_22k = rate_22k_display | minus: y_22k %}
+  {% assign diff_18k = rate_18k_display | minus: y_18k %}
+
+  <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="today-vs-yesterday">
+    <h2>Today vs Yesterday — Gold Rate Change in {{ city_name }}</h2>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Karat</th><th scope="col">Today (&#8377;/g)</th><th scope="col">Yesterday (&#8377;/g)</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">24 Carat (24K)</th>
+          <td>&#8377;{{ rate_24k_display }}</td>
+          <td>{% if y_24k > 0 %}&#8377;{{ y_24k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_24k > 0 %}{% if diff_24k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_24k }}</span>{% elsif diff_24k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_24k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+        <tr>
+          <th scope="row">22 Carat (22K)</th>
+          <td>&#8377;{{ rate_22k_display }}</td>
+          <td>{% if y_22k > 0 %}&#8377;{{ y_22k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_22k > 0 %}{% if diff_22k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_22k }}</span>{% elsif diff_22k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_22k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+        <tr>
+          <th scope="row">18 Carat (18K)</th>
+          <td>&#8377;{{ rate_18k_display }}</td>
+          <td>{% if y_18k > 0 %}&#8377;{{ y_18k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_18k > 0 %}{% if diff_18k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_18k }}</span>{% elsif diff_18k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_18k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div></div>
+
+
+
+  {% if gold_purity_block != blank %}
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="gold-purity">
+    <h2>{{ gold_purity_block.heading | default: gold_purity_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ gold_purity_block.content | metafield_tag }}</div>
+  </div></div>
+  {% endif %}
+
+  {% assign t24 = '24 Carat Gold Rate in ' | append: city_name | append: ' Today' %}
+  {% assign t22 = '22 Carat Gold Rate in ' | append: city_name | append: ' Today (916 Gold)' %}
+  {% assign t18 = '18 Carat Gold Rate in ' | append: city_name | append: ' Today' %}
+  {% assign t14 = '14 Carat Gold Rate in ' | append: city_name | append: ' Today' %}
+  {% assign c24 = '24K Gold Price in ' | append: city_name %}
+  {% assign c22 = '22K / 916 Gold Price in ' | append: city_name %}
+  {% assign c18 = '18K Gold Price in ' | append: city_name %}
+  {% assign c14 = '14K Gold Price in ' | append: city_name %}
+  {% render 'gold-rate-weight-table', table_id: '24k-rate-table', table_title: t24, table_description: '24 Carat gold (99.9% purity) is the purest form of gold available. Used in coins, bars, and digital gold investments. Too soft for daily-wear jewellery.', rate_value: rate_24k, row_labels: '1 gram|2 grams|5 grams|8 grams (Tola)|10 grams|20 grams|50 grams|100 grams|1 kilogram', row_multipliers: '1|2|5|8|10|20|50|100|1000', row_suffixes: '| | | | | | | |', column_label: c24 %}
+  {% render 'gold-rate-weight-table', table_id: '22k-rate-table', table_title: t22, table_description: '22 Carat gold (91.6% purity) is the most widely used gold for jewellery in India. Also known as 916 gold — derived from its 91.6% purity hallmark.', rate_value: rate_22k, row_labels: '1 gram|2 grams|5 grams|8 grams (Tola)|10 grams|20 grams|50 grams|100 grams|1 kilogram', row_multipliers: '1|2|5|8|10|20|50|100|1000', row_suffixes: '| | | | | | | |', column_label: c22 %}
+  {% render 'gold-rate-weight-table', table_id: '18k-rate-table', table_title: t18, table_description: '18 Carat gold (75% purity) is popular for diamond jewellery and modern designs. Lucira Jewellery lab-grown diamond pieces are set in 18K gold.', rate_value: rate_18k, row_labels: '1 gram|5 grams|8 grams|10 grams|20 grams|100 grams', row_multipliers: '1|5|8|10|20|100', row_suffixes: '| | | | |', column_label: c18 %}
+  {% render 'gold-rate-weight-table', table_id: '14k-rate-table', table_title: t14, table_description: '14 Carat gold (58.5% purity) is a practical choice for lightweight and contemporary jewellery designs.', rate_value: rate_14k, row_labels: '1 gram|10 grams|100 grams', row_multipliers: '1|10|100', row_suffixes: '||', column_label: c14 %}
+
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="gold-purity-comparison">
+    <h2>Gold Karat Purity Comparison — {{ city_name }} Buying Guide</h2>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Karat</th><th scope="col">Purity</th><th scope="col">Hallmark</th><th scope="col">Best For</th><th scope="col">Relative Price</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">24K</th><td>99.9%</td><td>999</td><td>Investment, coins, bars</td><td>Highest</td></tr>
+        <tr><th scope="row">22K</th><td>91.6%</td><td>916</td><td>Traditional jewellery</td><td>High</td></tr>
+        <tr><th scope="row">18K</th><td>75%</td><td>750</td><td>Diamond jewellery, modern designs</td><td>Moderate</td></tr>
+        <tr><th scope="row">14K</th><td>58.5%</td><td>585</td><td>Lightweight, fashion jewellery</td><td>Lower</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+
+    {% if hallmark_block != blank %}
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="hallmark-guide">
+    <h2>{{ hallmark_block.heading | default: hallmark_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ hallmark_block.content | metafield_tag }}</div>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Hallmark Code</th><th scope="col">Purity</th><th scope="col">Karat</th><th scope="col">Usage</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">999</th><td>99.9%</td><td>24K</td><td>Gold bars, coins, investment-grade gold</td></tr>
+        <tr><th scope="row">958</th><td>95.8%</td><td>23K</td><td>Rarely used in Indian jewellery market</td></tr>
+        <tr><th scope="row">916</th><td>91.6%</td><td>22K</td><td>Traditional jewellery — most common in {{ city_name }}</td></tr>
+        <tr><th scope="row">875</th><td>87.5%</td><td>21K</td><td>Used in select Middle Eastern designs</td></tr>
+        <tr><th scope="row">750</th><td>75%</td><td>18K</td><td>Diamond and designer jewellery</td></tr>
+        <tr><th scope="row">585</th><td>58.5%</td><td>14K</td><td>Fashion and export jewellery</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+{% if history_all.size > 0 %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="weekly-trend">
+    <h2>Weekly Gold Price Trend in {{ city_name }} (Last 7 Days)</h2>
+    <p class="gold-rate-page__table-description">Daily gold rates in {{ city_name }} based on MCX rates and international bullion prices.</p>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Date</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">18K (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign weekly_count = 0 %}
+        {% for entry in history_all %}
+          {% if weekly_count < 7 %}
+            {% assign e_22k = entry.rate_22k | plus: 0 %}
+            {% assign e_24k = entry.rate_24k | plus: 0 %}
+            {% assign e_18k = entry.rate_18k | plus: 0 %}
+            {% assign e_date = entry.rate_date %}
+            {% if e_22k > 0 or e_24k > 0 or e_date != blank %}
+            <tr>
+              <th scope="row">{{ e_date | date: '%d %b %Y' }}</th>
+              <td>&#8377;{{ e_22k | round }}</td>
+              <td>&#8377;{{ e_24k | round }}</td>
+              <td>&#8377;{{ e_18k | round }}</td>
+              <td>{{ entry.market_note | default: '&mdash;' }}</td>
+            </tr>
+            {% assign weekly_count = weekly_count | plus: 1 %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+
+
+
+  {% if history_all.size > 0 %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="monthly-trend">
+    <h2>Monthly Gold Rate Trend in {{ city_name }} — Last 12 Months</h2>
+    <p class="gold-rate-page__table-description">Month-end gold rates in {{ city_name }}. Updated as new daily entries are added.</p>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Month</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">18K (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign seen_months = '|' %}
+        {% assign month_count = 0 %}
+        {% for entry in history_all %}
+          {% assign entry_month_key = entry.rate_date | date: '%Y-%m' %}
+          {% assign check_key = '|' | append: entry_month_key | append: '|' %}
+          {% unless seen_months contains check_key %}
+            {% if month_count < 12 %}
+              <tr>
+                <th scope="row">{{ entry.rate_date | date: '%B %Y' }}</th>
+                <td>&#8377;{{ entry.rate_22k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_24k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_18k | plus: 0 | round }}</td>
+                <td>{{ entry.market_note | default: '&mdash;' }}</td>
+              </tr>
+              {% assign seen_months = seen_months | append: entry_month_key | append: '|' %}
+              {% assign month_count = month_count | plus: 1 %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+
+  {% if nearby_city != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="nearby-city-rate">
+    <h2>Today's Gold Rate in {{ nearby_city }}</h2>
+    <p class="gold-rate-page__table-description">{{ nearby_city_note | default: 'Gold rates in ' | append: nearby_city | append: ' are the same as ' | append: city_name | append: ' — both fall under the same state jewellery association pricing.' }}</p>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Karat / Purity</th><th scope="col">Per Gram</th><th scope="col">Per 10 Gram</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">24K (999 purity)</th><td>&#8377;{{ rate_24k_display }}</td><td>&#8377;{{ rate_24k_10g }}</td><td>Investment gold</td></tr>
+        <tr><th scope="row">22K / 916</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_22k_10g }}</td><td>Jewellery gold</td></tr>
+        <tr><th scope="row">18K (750 purity)</th><td>&#8377;{{ rate_18k_display }}</td><td>&#8377;{{ rate_18k_10g }}</td><td>Diamond jewellery</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if buying_block != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="buying-guide">
+    <h2>{{ buying_block.heading | default: buying_block.title }}</h2>
+
+      <div class="gold-rate-page__richtext">{{ buying_block.content | metafield_tag }}</div>
+    <h3>How Jewellery Prices Are Calculated in {{ city_name }}</h3>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Component</th><th scope="col">Approximate Range</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Base Gold Rate</th><td>MCX / IBJA rate</td><td>Published daily — forms the base of your jewellery cost</td></tr>
+        <tr><th scope="row">Making Charges</th><td>&#8377;300 – &#8377;1,500/g</td><td>Higher for handcrafted, designer, and intricate pieces</td></tr>
+        <tr><th scope="row">GST</th><td>3%</td><td>On gold value + making charges</td></tr>
+        <tr><th scope="row">Wastage / Karigar</th><td>0–5%</td><td>Applies to handmade jewellery, charged by some retailers</td></tr>
+        <tr><th scope="row">Stone / Diamond Cost</th><td>Market rate</td><td>Additional for gemstone-set jewellery</td></tr>
+        <tr><th scope="row">Hallmarking Fee</th><td>&#8377;35–&#8377;45/piece</td><td>Mandatory BIS hallmarking charge</td></tr>
+      </tbody>
+    </table></div>
+    <p class="gold-rate-page__table-note">At Lucira Jewellery, our lab-grown diamond pieces are priced transparently. The gold cost is calculated on the actual metal weight at daily market rates.</p>
+  </div></div>
+  {% endif %}
+
+  {% if investment_block != blank %}
+
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="investment-guide">
+    <h2>{{ investment_block.heading | default: investment_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ investment_block.content | metafield_tag }}</div>
+    <h3>Gold vs Other Investments — {{ city_name }} Perspective</h3>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Factor</th><th scope="col">Gold</th>
+
+      
+      <th scope="col">Fixed Deposit</th><th scope="col">Equity MF</th><th scope="col">SGBs</th><th scope="col">PPF</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Liquidity</th><td>High</td><td>Medium</td><td>Low</td><td>Low</td><td>High</td></tr>
+        <tr><th scope="row">Inflation Hedge</th><td>Strong</td><td>Weak</td><td>Variable</td><td>Strong</td><td>Moderate</td></tr>
+        <tr><th scope="row">Returns (10yr avg)</th><td>10–13%</td><td>6–7%</td><td>12–15%</td><td>10–13%</td><td>7–8%</td></tr>
+        <tr><th scope="row">Risk Level</th><td>Moderate</td><td>Low</td><td>High</td><td>Moderate</td><td>Low</td></tr>
+        <tr><th scope="row">Tax on Returns</th><td>LTCG 20%</td><td>Taxable</td><td>LTCG 10%</td><td>Tax-free</td><td>Tax-free</td></tr>
+        <tr><th scope="row">Storage Cost</th><td>Yes (locker)</td><td>None</td><td>None</td><td>None (Demat)</td><td>None</td></tr>
+        <tr><th scope="row">Jewellery Utility</th><td>Yes</td><td>No</td><td>No</td><td>No</td><td>No</td></tr>
+      </tbody>
+    </table></div>
+    <p class="gold-rate-page__table-note">Gold bonds (SGBs) offer interest income on top of gold appreciation and are the most tax-efficient gold investment for long-term holders. This table is for general information only and is not personalised financial advice.</p>
+  </div></div>
+  {% endif %}
+
+  {% if factors_block != blank %}
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="factors-affecting-gold-prices">
+    <h2>{{ factors_block.heading | default: factors_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ factors_block.content | metafield_tag }}</div>
+    <h3>Key Factors — How They Influence the {{ city_name }} Gold Rate</h3>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Factor</th><th scope="col">How It Influences
+
+        
+      {{ city_name }} Gold Rate</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">International Spot Price</th><td>London Bullion Market Association (LBMA) sets the global USD price per troy ounce.</td></tr>
+        <tr><th scope="row">USD-INR Exchange Rate</th><td>As gold is imported, a weaker rupee directly raises the {{ city_name }} gold rate.</td></tr>
+        <tr><th scope="row">Import Duty</th><td>India levies a 15% import duty on gold. Changes in budget affect rates immediately.</td></tr>
+        <tr><th scope="row">MCX Rates</th><td>Multi Commodity Exchange futures prices serve as the daily benchmark in India.</td></tr>
+        <tr><th scope="row">IBJA Rates</th><td>India Bullion and Jewellers Association announces standard daily reference rates.</td></tr>
+        <tr><th scope="row">State Taxes &amp; Levies</th><td>{{ city_state | default: 'State' }} applies its own levies; rates may differ marginally from other states.</td></tr>
+        <tr><th scope="row">GST</th><td>3% GST applies on gold value and making charges at point of purchase.</td></tr>
+        <tr><th scope="row">Local Demand</th><td>Festival season (Dhanteras, Akshaya Tritiya, wedding months) can add 1–3% premium.</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+  {% if festival_block != blank %}
+  <div class="gold-rate-page__band"><div class="page-width gold-rate-page__copy-block" id="festival-calendar">
+    <h2>{{ festival_block.heading | default: festival_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ festival_block.content | metafield_tag }}</div>
+    <h3>{{ city_name }} Gold Buying Calendar</h3>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Month/Period</th>
+
+      
+      <th scope="col">Occasion</th><th scope="col">Demand Level</th><th scope="col">Buying Note</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">October/November</th><td>Dhanteras</td><td>Very High</td><td>Highest gold sales day in India — prices may carry a 1–3% premium on the day</td></tr>
+        <tr><th scope="row">April/May</th><td>Akshaya Tritiya</td><td>Very High</td><td>Considered most auspicious; advance booking recommended</td></tr>
+        <tr><th scope="row">March/April</th><td>Gudi Padwa</td><td>High</td><td>Maharashtra's New Year — high local buying in {{ city_name }}</td></tr>
+        <tr><th scope="row">November–February</th><td>Wedding Season</td><td>Very High</td><td>Trousseau and gift buying peaks; plan purchases 30–60 days in advance</td></tr>
+        <tr><th scope="row">January 14</th><td>Makar Sankranti</td><td>Moderate</td><td>Gifting gold is customary in Maharashtra</td></tr>
+        <tr><th scope="row">June–August (Monsoon)</th><td>Slow Season</td><td>Low</td><td>Historically lower prices and lower demand — good buying window for investors</td></tr>
+        <tr><th scope="row">December</th><td>Year-end / Christmas</td><td>Moderate</td><td>Urban buyers tend to invest at year-end; slight demand bump</td></tr>
+      </tbody>
+    </table></div>
+    <p class="gold-rate-page__table-note">Gold prices are determined by global markets, not local festivals. However, high local demand during festival periods can add retail premiums at individual jeweller counters.</p>
+  </div></div>
+  {% endif %}
+
+  {% if market_block != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="market-guide">
+    <h2>{{ market_block.heading | default: market_block.title }}</h2>
+    <div class="gold-rate-page__richtext">{{ market_block.content | metafield_tag }}</div>
+  </div></div>
+  {% endif %}
+
+  {% if historic_rate_table != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="historic-rate">
+    <h2>{{ historic_rate_table.table_title }}</h2>
+    {% if historic_rate_table.table_description != blank %}<p class="gold-rate-page__table-description">{{ historic_rate_table.table_description }}</p>{% endif %}
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Month</th><th scope="col">22K</th><th scope="col">24K</th></tr></thead>
+      <tbody><tr><th scope="row">Current</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_24k_display }}</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if forecast_table != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="forecast-table">
+    <h2>{{ forecast_table.table_title }}</h2>
+    {% if forecast_table.table_description != blank %}<p class="gold-rate-page__table-description">{{ forecast_table.table_description }}</p>{% endif %}
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Scenario</th><th scope="col">22K</th><th scope="col">24K</th><th scope="col">Note</th></tr></thead>
+      <tbody><tr><th scope="row">Today</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_24k_display }}</td><td>Live rate</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if city_comparison_table != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="city-comparison">
+    <h2>{{ city_comparison_table.table_title }}</h2>
+    {% if city_comparison_table.table_description != blank %}<p class="gold-rate-page__table-description">{{ city_comparison_table.table_description }}</p>{% endif %}
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">City</th><th scope="col">22K</th><th scope="col">24K</th><th scope="col">Note</th></tr></thead>
+      <tbody><tr><th scope="row">{{ city_name }}</th><td>&#8377;{{ rate_22k_display }}</td><td>&#8377;{{ rate_24k_display }}</td><td>Current market</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if faq_list != blank %}
+  <div class="gold-rate-page__band gold-rate-page__band--faq"><div class="page-width gold-rate-page__copy-block" id="faq">
+    <h2>Frequently Asked Questions — Gold Rate in {{ city_name }}</h2>
+    <div class="gold-rate-page__faq-list">
+      {% for faq in faq_list %}{% if faq != blank %}
+        <details class="gold-rate-page__faq-item">
+          <summary class="gold-rate-page__faq-question">{{ faq.question }}</summary>
+          <div class="gold-rate-page__faq-answer">{{ faq.answer | metafield_tag }}</div>
+        </details>
+      {% endif %}{% endfor %}
+    </div>
+  </div></div>
+  {% endif %}
+
+{% endif %}
+</section>
+
+<style>
+  .gold-rate-page {
+    color: #191919;
+    background: #fff;
+  }
+
+  .gold-rate-page__hero {
+    padding: 4rem 0 3rem;
+    background: linear-gradient(180deg, #faf7f0 0%, #fff 100%);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.08);
+  }
+
+  .gold-rate-page__hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+    gap: 3rem;
+    align-items: center;
+  }
+
+  .gold-rate-page__eyebrow {
+    margin: 0 0 0.75rem;
+    font-size: 0.82rem;
+    letter-spacing: 0;
+    text-transform: uppercase;
+    color: #6b5a2d;
+  }
+
+  .gold-rate-page__eyebrow-sep {
+    margin: 0 0.5rem;
+    color: rgba(25, 25, 25, 0.35);
+  }
+
+  .gold-rate-page__title {
+    margin: 0 0 1rem;
+    font-size: clamp(2.25rem, 3.5vw, 3.5rem);
+    line-height: 1.1;
+    font-weight: 700;
+    color: #191919;
+  }
+
+  .gold-rate-page__richtext,
+  .gold-rate-page__intro {
+    margin-top: 1rem;
+    font-size: 0.98rem;
+    line-height: 1.7;
+  }
+
+  .gold-rate-page__intro {
+    color: rgba(25, 25, 25, 0.8);
+  }
+
+  .gold-rate-page__richtext p {
+    margin: 0 0 1.25rem;
+    line-height: 1.75;
+    color: rgba(25, 25, 25, 0.85);
+  }
+
+  .gold-rate-page__richtext p:last-child {
+    margin-bottom: 0;
+  }
+
+  .gold-rate-page__richtext h3,
+  .gold-rate-page__richtext h4 {
+    margin: 2rem 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #191919;
+  }
+
+  .gold-rate-page__richtext h3:first-child,
+  .gold-rate-page__richtext h4:first-child {
+    margin-top: 0;
+  }
+
+  .gold-rate-page__richtext ul,
+  .gold-rate-page__richtext ol {
+    margin: 1.5rem 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .gold-rate-page__richtext ol {
+    counter-reset: list-item;
+  }
+
+  .gold-rate-page__richtext ul li,
+  .gold-rate-page__richtext ol li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+    color: rgba(25, 25, 25, 0.85);
+    padding: 0.75rem 1rem;
+    background: #fafafa;
+    border-radius: 6px;
+    border-left: 3px solid #6b5a2d;
+  }
+
+  .gold-rate-page__richtext ul li::before {
+    content: "•";
+    color: #6b5a2d;
+    font-weight: bold;
+    margin-right: 0.75rem;
+  }
+
+  .gold-rate-page__richtext ol li {
+    counter-increment: list-item;
+  }
+
+  .gold-rate-page__richtext ol li::before {
+    content: counter(list-item) ".";
+    color: #6b5a2d;
+    font-weight: bold;
+    margin-right: 0.75rem;
+  }
+
+  .gold-rate-page__richtext a {
+    color: #6b5a2d;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .gold-rate-page__richtext a:hover {
+    color: #5f4c20;
+  }
+
+  .gold-rate-page__richtext strong,
+  .gold-rate-page__richtext b {
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .gold-rate-page__richtext em,
+  .gold-rate-page__richtext i {
+    font-style: italic;
+  }
+
+  .gold-rate-page__hero-stats {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  .gold-rate-page__stat {
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(25, 25, 25, 0.12);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .gold-rate-page__stat-label {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    color: rgba(25, 25, 25, 0.58);
+  }
+
+  .gold-rate-page__stat-value {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+
+  .gold-rate-page__updated {
+    margin: 1rem 0 0;
+    font-size: 0.9rem;
+    color: rgba(25, 25, 25, 0.62);
+  }
+
+  .gold-rate-page__hero-media {
+    min-height: 100%;
+  }
+
+  .gold-rate-page__hero-image,
+  .gold-rate-page__hero-fallback {
+    display: block;
+    width: 100%;
+    min-height: 420px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .gold-rate-page__hero-fallback {
+    display: grid;
+    place-items: center;
+    background: #eee4cf;
+    color: #5f4c20;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .gold-rate-page__band {
+    padding: 3.5rem 0;
+  }
+
+  .gold-rate-page__band--subtle {
+    background: #fcfbf7;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+  }
+
+  .gold-rate-page__band--table {
+    background: #fafafa;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+  }
+
+  .gold-rate-page__band--faq {
+    background: #fafafa;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+    padding: 4.5rem 0;
+  }
+
+  .gold-rate-page__section-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .gold-rate-page__section-head h2,
+  .gold-rate-page__copy-block h2 {
+    margin: 0 0 1rem;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .gold-rate-page__section-head p,
+  .gold-rate-page__table-description {
+    margin: 0;
+    color: rgba(25, 25, 25, 0.72);
+    max-width: 56ch;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .gold-rate-page__table-wrap {
+    overflow-x: auto;
+  }
+
+  .gold-rate-page__table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 680px;
+  }
+
+  .gold-rate-page__table th,
+  .gold-rate-page__table td {
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid rgba(25, 25, 25, 0.1);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .gold-rate-page__table thead th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(25, 25, 25, 0.65);
+    background: #fcfbf7;
+    font-weight: 600;
+  }
+
+  .gold-rate-page__table tbody th {
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .gold-rate-page__table tbody tr:hover {
+    background: rgba(107, 90, 45, 0.03);
+  }
+
+  .gold-rate-page__copy-block {
+    max-width: 78rem;
+    margin: 0 auto;
+  }
+
+  .gold-rate-page__faq-list {
+    display: grid;
+    gap: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .gold-rate-page__faq-item {
+    border: 1px solid rgba(25, 25, 25, 0.12);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .gold-rate-page__faq-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .gold-rate-page__faq-question {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.25rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #191919;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .gold-rate-page__faq-question::after {
+    content: '+';
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: #6b5a2d;
+    transition: transform 0.2s ease;
+  }
+
+  .gold-rate-page__faq-item[open] .gold-rate-page__faq-question::after {
+    transform: rotate(45deg);
+  }
+
+  .gold-rate-page__faq-question::-webkit-details-marker {
+    display: none;
+  }
+
+  .gold-rate-page__faq-answer {
+    padding: 0 1.5rem 1.5rem;
+    color: rgba(25, 25, 25, 0.82);
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  .gold-rate-page__faq-answer p {
+    margin: 0 0 0.75rem;
+  }
+
+  .gold-rate-page__faq-answer p:last-child {
+    margin-bottom: 0;
+  }
+
+  .gold-rate-page__table-richtext table,
+  .gold-rate-page__table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1.5rem 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .gold-rate-page__table-richtext thead,
+  .gold-rate-page__table thead {
+    background: #fcfbf7;
+  }
+
+  .gold-rate-page__table-richtext th,
+  .gold-rate-page__table th {
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(25, 25, 25, 0.7);
+    padding: 0.9rem 1rem;
+    text-align: left;
+    border-bottom: 2px solid rgba(25, 25, 25, 0.1);
+  }
+
+  .gold-rate-page__table-richtext td,
+  .gold-rate-page__table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid rgba(25, 25, 25, 0.08);
+    color: rgba(25, 25, 25, 0.85);
+    line-height: 1.5;
+  }
+
+  .gold-rate-page__table-richtext tbody tr:last-child td,
+  .gold-rate-page__table tbody tr:last-child td {
+    border-bottom: none;
+  }
+
+  .gold-rate-page__table-richtext tbody tr:hover,
+  .gold-rate-page__table tbody tr:hover {
+    background: rgba(107, 90, 45, 0.03);
+  }
+
+  .gold-rate-page__empty {
+    padding: 3rem 0;
+  }
+
+  .gold-rate-page__change--up { color: #2a7a2a; font-weight: 600; }
+.gold-rate-page__change--down { color: #c0392b; font-weight: 600; }
+
+
+  @media screen and (max-width: 990px) {
+    .gold-rate-page__hero-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .gold-rate-page__hero-image,
+    .gold-rate-page__hero-fallback {
+      min-height: 320px;
+    }
+
+    .gold-rate-page__hero-stats {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .gold-rate-page__section-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+
+  @media screen and (max-width: 749px) {
+    .gold-rate-page__hero {
+      padding-top: 2rem;
+    }
+
+    .gold-rate-page__band {
+      padding: 1.6rem 0;
+    }
+
+    .gold-rate-page__hero-stats {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+</style>
+{% schema %}
+{"name":"Gold Rate City Page","tag":"section","class":"gold-rate-city-section","settings":[],"presets":[{"name":"Gold Rate City Page"}]}
+{% endschema %}
+
