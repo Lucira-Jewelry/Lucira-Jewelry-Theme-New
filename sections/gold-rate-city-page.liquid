@@ -156,31 +156,38 @@
 
 {% assign history_all = shop.metaobjects.gold_rate_history.values %}
 
-  {% assign history_today = nil %}
-  {% assign found_yesterday = false %}
+{% assign history_today = nil %}
+  {% assign found_yesterday = 0 %}
   {% assign y_24k = 0 %}
   {% assign y_22k = 0 %}
   {% assign y_18k = 0 %}
+  {% assign today_date = '' %}
 
+  {% comment %} Find today entry by is_current_rate flag {% endcomment %}
   {% for entry in history_all %}
     {% if entry.is_current_rate == true %}
       {% assign history_today = entry %}
+      {% assign today_date = entry.rate_date %}
     {% endif %}
   {% endfor %}
 
+  {% comment %} Fallback: use first entry as today {% endcomment %}
   {% if history_today == blank %}
     {% assign history_today = history_all | first %}
+    {% assign today_date = history_all.first.rate_date %}
   {% endif %}
 
+  {% comment %} Find yesterday: first entry that is NOT today {% endcomment %}
   {% for entry in history_all %}
-    {% if found_yesterday == false %}
-      {% if entry.is_current_rate == true %}
-      {% elsif history_today != blank and entry.rate_date == history_today.rate_date %}
+    {% if found_yesterday == 0 %}
+      {% assign this_date = entry.rate_date %}
+      {% if this_date == today_date %}
+        {% comment %} skip today {% endcomment %}
       {% else %}
         {% assign y_24k = entry.rate_24k | plus: 0 | round %}
         {% assign y_22k = entry.rate_22k | plus: 0 | round %}
         {% assign y_18k = entry.rate_18k | plus: 0 | round %}
-        {% assign found_yesterday = true %}
+        {% assign found_yesterday = 1 %}
       {% endif %}
     {% endif %}
   {% endfor %}
