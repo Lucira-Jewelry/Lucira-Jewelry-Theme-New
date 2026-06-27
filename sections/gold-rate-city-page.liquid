@@ -152,7 +152,7 @@
   </div></div>
 
 
-    {% assign history_all = shop.metaobjects.gold_rate_history.values %}
+    {% comment %} {% assign history_all = shop.metaobjects.gold_rate_history.values %}
   {% assign history_today = history_all | where: 'is_current_rate', true | first %}
   {% assign history_sorted = history_all | sort: 'rate_date' | reverse %}
   {% if history_today == blank %}
@@ -193,7 +193,70 @@
         </tr>
       </tbody>
     </table></div>
+  </div></div> {% endcomment %}
+
+  {% assign history_all = shop.metaobjects.gold_rate_history.values %}
+
+  {% assign history_today = nil %}
+  {% assign found_yesterday = false %}
+  {% assign y_24k = 0 %}
+  {% assign y_22k = 0 %}
+  {% assign y_18k = 0 %}
+
+  {% for entry in history_all %}
+    {% if entry.is_current_rate == true %}
+      {% assign history_today = entry %}
+    {% endif %}
+  {% endfor %}
+
+  {% if history_today == blank %}
+    {% assign history_today = history_all | first %}
+  {% endif %}
+
+  {% for entry in history_all %}
+    {% if found_yesterday == false %}
+      {% if entry.is_current_rate == true %}
+      {% elsif history_today != blank and entry.rate_date == history_today.rate_date %}
+      {% else %}
+        {% assign y_24k = entry.rate_24k | plus: 0 | round %}
+        {% assign y_22k = entry.rate_22k | plus: 0 | round %}
+        {% assign y_18k = entry.rate_18k | plus: 0 | round %}
+        {% assign found_yesterday = true %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+
+  {% assign diff_24k = rate_24k_display | minus: y_24k %}
+  {% assign diff_22k = rate_22k_display | minus: y_22k %}
+  {% assign diff_18k = rate_18k_display | minus: y_18k %}
+
+  <div class="gold-rate-page__band gold-rate-page__band--subtle"><div class="page-width gold-rate-page__copy-block" id="today-vs-yesterday">
+    <h2>Today vs Yesterday — Gold Rate Change in {{ city_name }}</h2>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Karat</th><th scope="col">Today (&#8377;/g)</th><th scope="col">Yesterday (&#8377;/g)</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">24 Carat (24K)</th>
+          <td>&#8377;{{ rate_24k_display }}</td>
+          <td>{% if y_24k > 0 %}&#8377;{{ y_24k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_24k > 0 %}{% if diff_24k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_24k }}</span>{% elsif diff_24k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_24k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+        <tr>
+          <th scope="row">22 Carat (22K)</th>
+          <td>&#8377;{{ rate_22k_display }}</td>
+          <td>{% if y_22k > 0 %}&#8377;{{ y_22k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_22k > 0 %}{% if diff_22k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_22k }}</span>{% elsif diff_22k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_22k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+        <tr>
+          <th scope="row">18 Carat (18K)</th>
+          <td>&#8377;{{ rate_18k_display }}</td>
+          <td>{% if y_18k > 0 %}&#8377;{{ y_18k }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_18k > 0 %}{% if diff_18k > 0 %}<span class="gold-rate-page__change gold-rate-page__change--up">&#9650; &#8377;{{ diff_18k }}</span>{% elsif diff_18k < 0 %}<span class="gold-rate-page__change gold-rate-page__change--down">&#9660; &#8377;{{ diff_18k | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+      </tbody>
+    </table></div>
   </div></div>
+
 
 
   {% if gold_purity_block != blank %}
@@ -246,8 +309,7 @@
     </table></div>
   </div></div>
   {% endif %}
-  {% assign history_entries = shop.metaobjects.gold_rate_history.values | sort: 'rate_date' | reverse %}
-  {% assign weekly_entries = history_entries | slice: 0, 7 %}
+{% assign weekly_entries = history_all | slice: 0, 7 %}
 
   {% if weekly_entries.size > 0 %}
   <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="weekly-trend">
@@ -271,7 +333,7 @@
   {% endif %}
 
 
-  {% assign all_history = shop.metaobjects.gold_rate_history.values | sort: 'rate_date' | reverse %}
+  {% comment %} {% assign all_history = shop.metaobjects.gold_rate_history.values | sort: 'rate_date' | reverse %}
   {% if all_history.size > 0 %}
   <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="monthly-trend">
     <h2>Monthly Gold Rate Trend in {{ city_name }} — Last 12 Months</h2>
@@ -293,6 +355,37 @@
                 <td>{{ entry.market_note | default: '—' }}</td>
               </tr>
               {% assign seen_months = seen_months | append: entry_month | append: ',' %}
+              {% assign month_count = month_count | plus: 1 %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %} {% endcomment %}
+
+  {% if history_all.size > 0 %}
+  <div class="gold-rate-page__band gold-rate-page__band--table"><div class="page-width gold-rate-page__copy-block" id="monthly-trend">
+    <h2>Monthly Gold Rate Trend in {{ city_name }} — Last 12 Months</h2>
+    <p class="gold-rate-page__table-description">Month-end gold rates in {{ city_name }}. Updated as new daily entries are added.</p>
+    <div class="gold-rate-page__table-wrap"><table class="gold-rate-page__table">
+      <thead><tr><th scope="col">Month</th><th scope="col">22K (&#8377;/g)</th><th scope="col">24K (&#8377;/g)</th><th scope="col">18K (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign seen_months = '|' %}
+        {% assign month_count = 0 %}
+        {% for entry in history_all %}
+          {% assign entry_month_key = entry.rate_date | date: '%Y-%m' %}
+          {% assign check_key = '|' | append: entry_month_key | append: '|' %}
+          {% unless seen_months contains check_key %}
+            {% if month_count < 12 %}
+              <tr>
+                <th scope="row">{{ entry.rate_date | date: '%B %Y' }}</th>
+                <td>&#8377;{{ entry.rate_22k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_24k | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_18k | plus: 0 | round }}</td>
+                <td>{{ entry.market_note | default: '&mdash;' }}</td>
+              </tr>
+              {% assign seen_months = seen_months | append: entry_month_key | append: '|' %}
               {% assign month_count = month_count | plus: 1 %}
             {% endif %}
           {% endunless %}
