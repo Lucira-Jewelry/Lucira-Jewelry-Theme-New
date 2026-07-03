@@ -1,934 +1,819 @@
-<div class="platinum-widget-section">
-  <div class="page-width">
-    <div class="wrapper-platinum">
-      <h1>Todays Platinum rate in {{ page.metafields.custom.city_name }}</h1>
-      <div class="platinum-widget__box">
-        <!-- Today's Rate -->
-
-        <div class="platinum-widget__block platinum-widget__block--today">
-          <p class="platinum-widget__label">Platinum Rate: Pt999</p>
-          <p class="platinum-widget__price">
-            <span class="platinum-unit"></span>{{ section.settings.rate_today -}}
-            <span class="platinum-widget__unit">/10 gm</span>
-          </p>
+{% liquid
+  assign city = page.metafields.custom.platinum_rate_city.value
+  assign city_slug = ''
+  if city != blank and city.slug != blank
+    assign city_slug = city.slug
+  elsif page.metafields.custom.city_name != blank
+    assign city_slug = page.metafields.custom.city_name | handleize
+  elsif page.handle contains '-platinum-rate-today'
+    assign city_slug = page.handle | remove: '-platinum-rate-today'
+  elsif page.handle contains '-platinum-rate'
+    assign city_slug = page.handle | remove: '-platinum-rate'
+  endif
+  if city == blank and city_slug != blank
+    assign city = shop.metaobjects.platinum_rate_city.values | where: 'slug', city_slug | first
+  endif
+  if city == blank and page.metafields.custom.city.value and page.metafields.custom.city.value.hero_title != blank
+    assign city = page.metafields.custom.city.value
+  endif
+  assign global_rates = shop.metaobjects.platinum_rates_global['platinum-rates']
+  if global_rates == blank
+    assign global_rates = shop.metaobjects.platinum_rates_global.values | first
+  endif
+  assign city_name = city.city_name | default: page.title | default: 'Platinum Rate'
+  assign city_state = city.state | default: ''
+  assign nearby_city = city.nearby_city_name | default: ''
+  assign nearby_city_note = city.nearby_city_note | default: ''
+  assign hero_title = city.hero_title
+  if hero_title == blank
+    assign hero_title = "Today's Platinum Rate in " | append: city_name
+  endif
+  assign hero_subtitle = city.hero_subtitle | default: 'Live platinum prices'
+  assign hero_description = city.hero_description
+  assign city_intro = city.city_intro
+  assign hero_image = city.hero_image.value | default: city.hero_image
+  assign rate_950 = global_rates.rate_950 | plus: 0
+  assign rate_900 = global_rates.rate_900 | plus: 0
+  assign updated_at = global_rates.updated_at
+  assign rate_950_display = rate_950 | round
+  assign rate_900_display = rate_900 | round
+  assign rate_950_8g = rate_950 | times: 8 | round
+  assign rate_950_10g = rate_950 | times: 10 | round
+  assign rate_950_100g = rate_950 | times: 100 | round
+  assign rate_900_8g = rate_900 | times: 8 | round
+  assign rate_900_10g = rate_900 | times: 10 | round
+  assign rate_900_100g = rate_900 | times: 100 | round
+  assign faq_list = city.faq.value
+  if faq_list == blank
+    assign faq_list = city.faq_reference.value
+  endif
+  assign content_blocks = city.content_blocks.value
+  if content_blocks == blank
+    assign content_blocks = city.content_block_reference.value
+  endif
+  assign table_blocks = city.table_reference.value
+  if table_blocks == blank
+    assign table_blocks = city.tables.value
+  endif
+  assign platinum_purity_block = content_blocks | where: 'slug', 'platinum-purity' | first
+  assign hallmark_block = content_blocks | where: 'slug', 'hallmark-guide' | first
+  assign buying_block = content_blocks | where: 'slug', 'buying-guide' | first
+  assign investment_block = content_blocks | where: 'slug', 'investment-guide' | first
+  assign factors_block = content_blocks | where: 'slug', 'factors-affecting-platinum-prices' | first
+  assign festival_block = content_blocks | where: 'slug', 'festival-calendar' | first
+  assign market_block = content_blocks | where: 'slug', 'market-guide' | first
+  assign today_vs_yesterday_table = table_blocks | where: 'table_slug', 'today-vs-yesterday' | first
+  assign weekly_trend_table = table_blocks | where: 'table_slug', 'weekly-trend' | first
+  assign monthly_trend_table = table_blocks | where: 'table_slug', 'monthly-trend' | first
+  assign historic_rate_table = table_blocks | where: 'table_slug', 'historic-rate' | first
+  assign forecast_table = table_blocks | where: 'table_slug', 'forecast-table' | first
+  assign city_comparison_table = table_blocks | where: 'table_slug', 'city-comparison' | first
+  assign faq_json = ''
+  if faq_list != blank
+    for faq in faq_list
+      if faq != blank
+        capture faq_entry
+          echo '{"@type":"Question","name":' | append: faq.question | strip_html | json | append: ',"acceptedAnswer":{"@type":"Answer","text":' | append: faq.answer | strip_html | json | append: '}}'
+        endcapture
+        if faq_json == blank
+          assign faq_json = faq_entry | strip
+        else
+          assign faq_json = faq_json | append: ',' | append: faq_entry | strip
+        endif
+      endif
+    endfor
+  endif
+%}
+{% if faq_json != blank %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{{ faq_json }}]}</script>{% endif %}
+<section class="platinum-rate-page">
+{% if city == blank %}
+  <div class="page-width platinum-rate-page__empty"><h1>Platinum Rate Page</h1><p>Connect a platinum_rate_city metaobject to this page via the custom.platinum_rate_city metafield.</p></div>
+{% else %}
+  <div class="platinum-rate-page__hero"><div class="page-width platinum-rate-page__hero-grid">
+    <div class="platinum-rate-page__hero-copy">
+      <p class="platinum-rate-page__eyebrow">{{ hero_subtitle }}{% if city_state != blank %} <span class="platinum-rate-page__eyebrow-sep">|</span> {{ city_state }}{% endif %}</p>
+      <h1 class="platinum-rate-page__title">{{ hero_title }}</h1>
+      {% if hero_description != blank %}<div class="platinum-rate-page__richtext">{{ hero_description | metafield_tag }}</div>{% endif %}
+      {% if city_intro != blank %}<div class="platinum-rate-page__intro">{{ city_intro | metafield_tag }}</div>{% endif %}
+        <div class="platinum-rate-page__aeo-block">
+          <p class="platinum-rate-page__aeo-meta">Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; Source: MCX / Multi Commodity Exchange &nbsp;|&nbsp; City: {{ city_name }}{% if city_state != blank %}, {{ city_state }}{% endif %}</p>
+          <details class="platinum-rate-page__aeo-item" open>
+            <summary class="platinum-rate-page__aeo-question">What is today's platinum rate in {{ city_name }}?</summary>
+            <div class="platinum-rate-page__aeo-answer">
+              <p>Today's platinum rate in {{ city_name }} is <strong>&#8377;{{ rate_950_display }} per gram for Pt950 platinum</strong> and <strong>&#8377;{{ rate_900_display }} per gram for Pt900 platinum</strong>. The 10 gram rate for Pt950 is &#8377;{{ rate_950_10g }} and for Pt900 is &#8377;{{ rate_900_10g }}. Prices are updated daily based on MCX and international bullion rates.</p>
+            </div>
+          </details>
         </div>
-
-        <div class="platinum-widget__divider"></div>
-
-        <!-- Weekly Average -->
-        <div class="platinum-widget__block platinum-widget__block--week">
-          <p class="platinum-widget__label">Platinum Rate: Pt999</p>
-          <p class="platinum-widget__price">
-            <span class="platinum-unit"></span>{{ section.settings.rate_avg -}}
-            <span class="platinum-widget__unit">/1 Kg</span>
-          </p>
-        </div>
-        <p class="platinum-widget__date" id="rate-today-date"></p>
+      <div class="platinum-rate-page__hero-stats">
+        <div class="platinum-rate-page__stat"><span class="platinum-rate-page__stat-label">Pt950</span><span class="platinum-rate-page__stat-value">&#8377;{{ rate_950_display }}</span></div>
+        <div class="platinum-rate-page__stat"><span class="platinum-rate-page__stat-label">Pt900</span><span class="platinum-rate-page__stat-value">&#8377;{{ rate_900_display }}</span></div>
       </div>
-      <div class="location-selector">
-        <div class="location-dropdown">
-          <label for="state">State</label>
-          <select id="state" name="state">
-            {% assign states = 'Andaman and Nicobar Islands,Andhra Pradesh,Arunachal Pradesh,Assam,Bihar,Chandigarh,Chhattisgarh,Dadra and Nagar Haveli,Daman and Diu,Delhi,Goa,Gujarat,Haryana,Himachal Pradesh,Jammu and Kashmir,Jharkhand,Karnataka,Kerala,Lakshadweep,Madhya Pradesh,Maharashtra,Manipur,Meghalaya,Mizoram,Nagaland,Odisha,Puducherry,Punjab,Rajasthan,Sikkim,Tamil Nadu,Telangana,Tripura,Uttar Pradesh,Uttarakhand,West Bengal'
-              | split: ','
-            %}
-            {% assign current_state = page.metafields.custom.state_name %}
-            {% for state in states %}
-              {% assign state_value = state | downcase | replace: ' ', '-' %}
-              {% assign state_selected = false %}
-
-              {% comment %} Check if current state matches either the display name or the value {% endcomment %}
-              {% if current_state == state or current_state == state_value %}
-                {% assign state_selected = true %}
-              {% endif %}
-
-              <option
-                value="{{ state_value }}"
-                {% if state_selected %}
-                  selected
-                {% endif %}
-              >
-                {{ state }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-
-        <div class="location-dropdown city-dropdown">
-          <label for="city">City</label>
-          <select id="city" name="city">
-            {% assign current_city = page.metafields.custom.city_name %}
-            {% comment %} Cities will be populated by JavaScript, but we need to set the selected value {% endcomment %}
-          </select>
-        </div>
-      </div>
-      <div class="cta-rate-pages" style=" display: flex;gap: 15px;">
-        <button type="button" class="location-submit">
-          Check Platinum Rate
-
-          <svg
-            class="button-icon-update"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <mask id="mask0_14179_531" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
-              <rect x="20" y="20" width="20" height="20" transform="rotate(-180 20 20)" fill="#D9D9D9"/>
-            </mask>
-            <g mask="url(#mask0_14179_531)">
-              <path d="M14.7018 9.37501L11.9326 6.60584C11.8172 6.49043 11.7581 6.34536 11.7555 6.17064C11.7529 5.99605 11.8119 5.84834 11.9326 5.72751C12.0533 5.60682 12.1997 5.54647 12.3718 5.54647C12.5437 5.54647 12.69 5.60682 12.8107 5.72751L16.5559 9.47272C16.634 9.55077 16.689 9.63307 16.7209 9.71959C16.753 9.80612 16.769 9.89959 16.769 10C16.769 10.1004 16.753 10.1939 16.7209 10.2804C16.689 10.367 16.634 10.4492 16.5559 10.5273L12.8107 14.2725C12.6953 14.3878 12.5503 14.4468 12.3757 14.4496C12.201 14.4522 12.0533 14.3932 11.9326 14.2725C11.8119 14.1517 11.7515 14.0053 11.7515 13.8333C11.7515 13.6614 11.8119 13.515 11.9326 13.3942L14.7018 10.625L3.54155 10.625C3.36418 10.625 3.21571 10.5651 3.09613 10.4454C2.97641 10.3258 2.91654 10.1774 2.91654 10C2.91654 9.82265 2.97641 9.67418 3.09613 9.55459C3.21571 9.43487 3.36418 9.37501 3.54155 9.37501L14.7018 9.37501Z" fill="#1A1A1A"/>
-            </g>
-          </svg>
-        </button>
-
-        <button
-          type="button"
-          class="location-submit"
-          onclick="window.location.href='https://www.lucirajewelry.com/?utm_source=google&utm_medium=organic&utm_campaign=silver-rate-organic-campaign'"
-        >
-          <svg
-            class="button-icon-shop"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <mask id="mask0_14179_381" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
-              <rect width="20" height="20" fill="#D9D9D9"/>
-            </mask>
-            <g mask="url(#mask0_14179_381)">
-              <path d="M4.42296 17.9167C4.00741 17.9167 3.65241 17.7695 3.35796 17.4752C3.06366 17.1808 2.9165 16.8258 2.9165 16.4102V6.92311C2.9165 6.50756 3.06366 6.15256 3.35796 5.85812C3.65241 5.56381 4.00741 5.41666 4.42296 5.41666H6.24984C6.24984 4.3761 6.6147 3.49096 7.34442 2.76124C8.07414 2.03152 8.95928 1.66666 9.99984 1.66666C11.0404 1.66666 11.9255 2.03152 12.6553 2.76124C13.385 3.49096 13.7498 4.3761 13.7498 5.41666H15.5767C15.9923 5.41666 16.3473 5.56381 16.6417 5.85812C16.936 6.15256 17.0832 6.50756 17.0832 6.92311V16.4102C17.0832 16.8258 16.936 17.1808 16.6417 17.4752C16.3473 17.7695 15.9923 17.9167 15.5767 17.9167H4.42296ZM4.42296 16.6667H15.5767C15.6409 16.6667 15.6996 16.6399 15.753 16.5864C15.8064 16.5331 15.8332 16.4744 15.8332 16.4102V6.92311C15.8332 6.85895 15.8064 6.8002 15.753 6.74686C15.6996 6.69339 15.6409 6.66666 15.5767 6.66666H4.42296C4.3588 6.66666 4.30005 6.69339 4.24671 6.74686C4.19324 6.8002 4.1665 6.85895 4.1665 6.92311V16.4102C4.1665 16.4744 4.19324 16.5331 4.24671 16.5864C4.30005 16.6399 4.3588 16.6667 4.42296 16.6667ZM7.49984 5.41666H12.4998C12.4998 4.72221 12.2568 4.13193 11.7707 3.64582C11.2846 3.15971 10.6943 2.91666 9.99984 2.91666C9.30539 2.91666 8.71512 3.15971 8.229 3.64582C7.74289 4.13193 7.49984 4.72221 7.49984 5.41666ZM9.98692 11.25C10.9293 11.25 11.7757 10.9311 12.5263 10.2933C13.2769 9.65541 13.6478 8.93159 13.6392 8.12186C13.6392 7.94978 13.5815 7.80311 13.4661 7.68186C13.3508 7.56061 13.2045 7.49999 13.0271 7.49999C12.8807 7.49999 12.7498 7.55048 12.6344 7.65145C12.519 7.75242 12.4373 7.89318 12.3892 8.07374C12.2685 8.63888 11.9806 9.10124 11.5255 9.46082C11.0703 9.82027 10.5575 9.99999 9.98692 9.99999C9.4165 9.99999 8.90157 9.82027 8.44213 9.46082C7.98268 9.10124 7.69692 8.63888 7.58484 8.07374C7.53678 7.88457 7.45928 7.74166 7.35234 7.64499C7.24553 7.54832 7.11893 7.49999 6.97255 7.49999C6.79518 7.49999 6.64671 7.56061 6.52713 7.68186C6.40741 7.80311 6.34755 7.94978 6.34755 8.12186C6.34755 8.93159 6.71859 9.65541 7.46067 10.2933C8.20262 10.9311 9.0447 11.25 9.98692 11.25Z" fill="#1A1A1A"/>
-            </g>
-          </svg>
-          Explore Lucira
-        </button>
-      </div>
+      {% if updated_at != blank %}<p class="platinum-rate-page__updated">Updated {{ updated_at | date: '%d %B %Y' }}</p>{% endif %}
     </div>
-  </div>
-</div>
-
-<div class="platinum-calc-section">
-  <div class="page-width">
-    <h2 class="platinum-calc__heading">Platinum Rate Today in {{ page.metafields.custom.city_name }}</h2>
-  </div>
-  <div class="platinum-calc__container">
-    <p class="platinum-calc__label">Choose Purity</p>
-
-    <div class="platinum-calc__karat-options">
-      <button class="platinum-calc__karat platinum-calc__karat--active">Pt999</button>
-      <button class="platinum-calc__karat">Pt950</button>
-      <button class="platinum-calc__karat">Pt900</button>
+    <div class="platinum-rate-page__hero-media">
+      {% if hero_image != blank %}<img class="platinum-rate-page__hero-image" src="{{ hero_image | image_url: width: 1400 }}" alt="{{ city_name | escape }}" loading="eager" width="1400" height="1050">
+      {% else %}<div class="platinum-rate-page__hero-fallback"><span>{{ city_name }}</span></div>{% endif %}
     </div>
+  </div></div>
 
-    <div class="platinum-calc__inputs">
-      <div class="platinum-calc__input-group">
-        <label for="weightInput" class="platinum-calc__input-label">In Grams</label>
-        <input type="number" id="weightInput" placeholder="Enter Weight" value="1" class="platinum-calc__input">
-      </div>
-
-      <div class="platinum-calc__input-group">
-        <label for="platinumRate" class="platinum-calc__input-label">
-          <span class="platinum-calc__label--desktop">Today's Standard Rate of Pt999</span>
-          <span class="platinum-calc__label--mobile">Today's Pt999 Rate</span>
-        </label>
-        <div
-          id="platinumRate"
-          class="platinum-calc__rate-display"
-          data-base="{{ section.settings.rate_today | remove: '₹' | remove: ',' | strip }}"
-        ></div>
-      </div>
+  <div class="platinum-rate-page__band"><div class="page-width">
+    <div class="platinum-rate-page__section-head">
+      <h2>Today's Platinum Rate in {{ city_name }} at a Glance</h2>
+      <p>Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; All prices include 3% GST &nbsp;|&nbsp; Making charges are additional</p>
     </div>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Platinum Type</th><th scope="col">Per Gram</th><th scope="col">Per 8g</th><th scope="col">Per 10g</th><th scope="col">Per 100g</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Pt950 (95%)</th><td>&#8377;{{ rate_950_display }}</td><td>&#8377;{{ rate_950_8g }}</td><td>&#8377;{{ rate_950_10g }}</td><td>&#8377;{{ rate_950_100g }}</td></tr>
+        <tr><th scope="row">Pt900 (90%)</th><td>&#8377;{{ rate_900_display }}</td><td>&#8377;{{ rate_900_8g }}</td><td>&#8377;{{ rate_900_10g }}</td><td>&#8377;{{ rate_900_100g }}</td></tr>
+      </tbody>
+    </table></div>
+    <p class="platinum-rate-page__table-note">Prices shown are indicative base rates. Actual jewellery prices will include making charges, GST, and stone setting costs. Platinum is denser than gold, so a platinum ring of the same design typically weighs more — and costs more in making charges — than an equivalent gold ring.</p>
+  </div></div>
 
-    <button class="platinum-calc__button">CALCULATE</button>
+  {% assign history_all = shop.metaobjects.platinum_rate_history.values %}
+  {% assign history_today = nil %}
+  {% assign found_yesterday = 0 %}
+  {% assign y_950 = 0 %}
+  {% assign y_900 = 0 %}
+  {% assign today_date = '' %}
+  {% for entry in history_all %}
+    {% if entry.is_current_rate == true %}
+      {% assign history_today = entry %}
+      {% assign today_date = entry.rate_date %}
+    {% endif %}
+  {% endfor %}
+  {% if history_today == blank %}
+    {% assign history_today = history_all | first %}
+    {% assign today_date = history_all.first.rate_date %}
+  {% endif %}
+  {% for entry in history_all %}
+    {% if found_yesterday == 0 %}
+      {% assign this_date = entry.rate_date %}
+      {% if this_date == today_date %}
+      {% else %}
+        {% assign y_950 = entry.rate_950 | plus: 0 | round %}
+        {% assign y_900 = entry.rate_900 | plus: 0 | round %}
+        {% assign found_yesterday = 1 %}
+      {% endif %}
+    {% endif %}
+  {% endfor %}
+  {% assign diff_950 = rate_950_display | minus: y_950 %}
+  {% assign diff_900 = rate_900_display | minus: y_900 %}
 
-    <div id="platinumCalcResult" class="platinum-calc__rate-display" style="margin-top: 15px; display:none;">
-      <span>Estimated Value: </span><span id="platinumValueOutput"></span>
-    </div>
+  <div class="platinum-rate-page__band platinum-rate-page__band--subtle"><div class="page-width platinum-rate-page__copy-block" id="today-vs-yesterday">
+    <h2>Today vs Yesterday — Platinum Rate Change in {{ city_name }}</h2>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Purity</th><th scope="col">Today (&#8377;/g)</th><th scope="col">Yesterday (&#8377;/g)</th><th scope="col">Change</th></tr></thead>
+      <tbody>
+        <tr>
+          <th scope="row">Pt950</th>
+          <td>&#8377;{{ rate_950_display }}</td>
+          <td>{% if y_950 > 0 %}&#8377;{{ y_950 }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_950 > 0 %}{% if diff_950 > 0 %}<span class="platinum-rate-page__change platinum-rate-page__change--up">&#9650; &#8377;{{ diff_950 }}</span>{% elsif diff_950 < 0 %}<span class="platinum-rate-page__change platinum-rate-page__change--down">&#9660; &#8377;{{ diff_950 | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+        <tr>
+          <th scope="row">Pt900</th>
+          <td>&#8377;{{ rate_900_display }}</td>
+          <td>{% if y_900 > 0 %}&#8377;{{ y_900 }}{% else %}&#8212;{% endif %}</td>
+          <td>{% if y_900 > 0 %}{% if diff_900 > 0 %}<span class="platinum-rate-page__change platinum-rate-page__change--up">&#9650; &#8377;{{ diff_900 }}</span>{% elsif diff_900 < 0 %}<span class="platinum-rate-page__change platinum-rate-page__change--down">&#9660; &#8377;{{ diff_900 | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
+        </tr>
+      </tbody>
+    </table></div>
+  </div></div>
 
-    <p class="platinum-calc__note">*This value is not the final value as Platinum Rate might change*</p>
-  </div>
-</div>
+  {% if platinum_purity_block != blank %}
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="platinum-purity">
+    <h2>{{ platinum_purity_block.heading | default: platinum_purity_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ platinum_purity_block.content | metafield_tag }}</div>
+  </div></div>
+  {% endif %}
 
-<div class="investment-section">
-  <div class="">
-    <div class="investment-section__container">
-      <!-- Left Column -->
-      <div class="investment-section__container">
-        <div class="investment-section__column investment-section__left" style="width:fit-content">
-          <h2 class="investment-section__heading">{{ section.settings.investment_heading }}</h2>
-          <div class="investment-section__description">
-            {{ section.settings.investment_description }}
-          </div>
-        </div>
+  {% assign t950 = 'Pt950 Platinum Rate in ' | append: city_name | append: ' Today' %}
+  {% assign t900 = 'Pt900 Platinum Rate in ' | append: city_name | append: ' Today' %}
+  {% assign c950 = 'Pt950 Platinum Price in ' | append: city_name %}
+  {% assign c900 = 'Pt900 Platinum Price in ' | append: city_name %}
+  {% render 'platinum-rate-weight-table', table_id: '950-rate-table', table_title: t950, table_description: 'Pt950 (95% pure platinum) is the standard used for platinum jewellery in India, alloyed with metals like ruthenium or cobalt for strength and workability.', rate_value: rate_950, row_labels: '1 gram|2 grams|5 grams|8 grams|10 grams|20 grams|50 grams|100 grams', row_multipliers: '1|2|5|8|10|20|50|100', row_suffixes: '| | | | | | |', column_label: c950 %}
+  {% render 'platinum-rate-weight-table', table_id: '900-rate-table', table_title: t900, table_description: 'Pt900 (90% pure platinum) is a slightly less pure alloy, occasionally used for rings and bands where added hardness is preferred.', rate_value: rate_900, row_labels: '1 gram|2 grams|5 grams|8 grams|10 grams|20 grams|50 grams|100 grams', row_multipliers: '1|2|5|8|10|20|50|100', row_suffixes: '| | | | | | |', column_label: c900 %}
 
-        <div class="investment-section__column investment-section__right">
-          <h3 class="investment-section__toc-heading">Table of Contents</h3>
-          {{ section.settings.investment_quick_links }}
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="platinum-purity-comparison">
+    <h2>Platinum Purity Comparison — {{ city_name }} Buying Guide</h2>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Purity</th><th scope="col">Fineness</th><th scope="col">Hallmark</th><th scope="col">Best For</th><th scope="col">Relative Price</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Pt950</th><td>95%</td><td>950</td><td>Engagement rings, wedding bands, fine jewellery</td><td>Higher</td></tr>
+        <tr><th scope="row">Pt900</th><td>90%</td><td>900</td><td>Rings requiring extra durability</td><td>Slightly lower (alloy content)</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
 
-<div class="platinum-table-v2-section">
-  <div class="page-width">
-    <h2 class="platinum-table-v2-title" id="platinum-price-breakdown-weight">PLATINUM PRICE BREAKDOWN BY WEIGHT</h2>
-    <div class="platinum-table-v2-wrapper">
-      <table class="platinum-table-v2">
-        <thead>
-          <tr>
-            <th>PURITY</th>
-            <th>1GM</th>
-            <th>5GM</th>
-            <th>10GM</th>
-            <th>100GM</th>
-          </tr>
-        </thead>
-        <tbody>
-          {%- assign base_999 = section.settings.rate_today | remove: '₹' | remove: ',' | strip | plus: 0 -%}
-          {%- assign rate_per_gram = base_999 | divided_by: 10.0 -%}
-          {%- assign purities = '999,950,900' | split: ',' -%}
-          {%- assign weights = '1,5,10,100' | split: ',' -%}
+  {% if hallmark_block != blank %}
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="hallmark-guide">
+    <h2>{{ hallmark_block.heading | default: hallmark_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ hallmark_block.content | metafield_tag }}</div>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Hallmark Code</th><th scope="col">Purity</th><th scope="col">Usage</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">950</th><td>95%</td><td>Most platinum jewellery sold in {{ city_name }}</td></tr>
+        <tr><th scope="row">900</th><td>90%</td><td>Occasionally used for rings and bands</td></tr>
+      </tbody>
+    </table></div>
+    <p class="platinum-rate-page__table-note">BIS platinum hallmarking (Pt950) exists but is less universally enforced than gold hallmarking in India — ask your jeweller for a purity certificate, especially on higher-value pieces.</p>
+  </div></div>
+  {% endif %}
 
-          {%- for purity in purities -%}
-            {%- assign purity_factor = purity | plus: 0 | divided_by: 1000.0 -%}
+  {% if history_all.size > 0 %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--table"><div class="page-width platinum-rate-page__copy-block" id="weekly-trend">
+    <h2>Weekly Platinum Price Trend in {{ city_name }} (Last 7 Days)</h2>
+    <p class="platinum-rate-page__table-description">Daily platinum rates in {{ city_name }} based on MCX rates and international bullion prices.</p>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Date</th><th scope="col">Pt950 (&#8377;/g)</th><th scope="col">Pt900 (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign weekly_count = 0 %}
+        {% for entry in history_all %}
+          {% if weekly_count < 7 %}
+            {% assign e_950 = entry.rate_950 | plus: 0 %}
+            {% assign e_900 = entry.rate_900 | plus: 0 %}
+            {% assign e_date = entry.rate_date %}
+            {% if e_950 > 0 or e_900 > 0 or e_date != blank %}
             <tr>
-              <td>Pt{{ purity }}</td>
-              {%- for w in weights -%}
-                {%- assign price = rate_per_gram | times: w | times: purity_factor -%}
-                <td>₹{{ price | round }}</td>
-              {%- endfor -%}
+              <th scope="row">{{ e_date | date: '%d %b %Y' }}</th>
+              <td>&#8377;{{ e_950 | round }}</td>
+              <td>&#8377;{{ e_900 | round }}</td>
+              <td>{{ entry.market_note | default: '&mdash;' }}</td>
             </tr>
-          {%- endfor -%}
-        </tbody>
-      </table>
+            {% assign weekly_count = weekly_count | plus: 1 %}
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if history_all.size > 0 %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--table"><div class="page-width platinum-rate-page__copy-block" id="monthly-trend">
+    <h2>Monthly Platinum Rate Trend in {{ city_name }} — Last 12 Months</h2>
+    <p class="platinum-rate-page__table-description">Month-end platinum rates in {{ city_name }}. Updated as new daily entries are added.</p>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Month</th><th scope="col">Pt950 (&#8377;/g)</th><th scope="col">Pt900 (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
+      <tbody>
+        {% assign seen_months = '|' %}
+        {% assign month_count = 0 %}
+        {% for entry in history_all %}
+          {% assign entry_month_key = entry.rate_date | date: '%Y-%m' %}
+          {% assign check_key = '|' | append: entry_month_key | append: '|' %}
+          {% unless seen_months contains check_key %}
+            {% if month_count < 12 %}
+              <tr>
+                <th scope="row">{{ entry.rate_date | date: '%B %Y' }}</th>
+                <td>&#8377;{{ entry.rate_950 | plus: 0 | round }}</td>
+                <td>&#8377;{{ entry.rate_900 | plus: 0 | round }}</td>
+                <td>{{ entry.market_note | default: '&mdash;' }}</td>
+              </tr>
+              {% assign seen_months = seen_months | append: entry_month_key | append: '|' %}
+              {% assign month_count = month_count | plus: 1 %}
+            {% endif %}
+          {% endunless %}
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if nearby_city != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--subtle"><div class="page-width platinum-rate-page__copy-block" id="nearby-city-rate">
+    <h2>Today's Platinum Rate in {{ nearby_city }}</h2>
+    <p class="platinum-rate-page__table-description">{{ nearby_city_note | default: 'Platinum rates in ' | append: nearby_city | append: ' are the same as ' | append: city_name | append: ' — both fall under the same state jewellery association pricing.' }}</p>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Purity</th><th scope="col">Per Gram</th><th scope="col">Per 10 Gram</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Pt950</th><td>&#8377;{{ rate_950_display }}</td><td>&#8377;{{ rate_950_10g }}</td><td>Fine jewellery platinum</td></tr>
+        <tr><th scope="row">Pt900</th><td>&#8377;{{ rate_900_display }}</td><td>&#8377;{{ rate_900_10g }}</td><td>Ring/band platinum</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if buying_block != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--subtle"><div class="page-width platinum-rate-page__copy-block" id="buying-guide">
+    <h2>{{ buying_block.heading | default: buying_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ buying_block.content | metafield_tag }}</div>
+    <h3>How Jewellery Prices Are Calculated in {{ city_name }}</h3>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Component</th><th scope="col">Approximate Range</th><th scope="col">Notes</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Base Platinum Rate</th><td>MCX / international rate</td><td>Published daily — forms the base of your jewellery cost</td></tr>
+        <tr><th scope="row">Making Charges</th><td>&#8377;500 – &#8377;2,500/g</td><td>Higher than gold — platinum is harder to work and melts at a much higher temperature</td></tr>
+        <tr><th scope="row">GST</th><td>3%</td><td>On platinum value + making charges</td></tr>
+        <tr><th scope="row">Wastage / Karigar</th><td>0–8%</td><td>Platinum has higher wastage during crafting than gold</td></tr>
+        <tr><th scope="row">Stone / Diamond Cost</th><td>Market rate</td><td>Additional for gemstone-set jewellery</td></tr>
+        <tr><th scope="row">Hallmarking Fee</th><td>&#8377;35–&#8377;45/piece</td><td>Where BIS platinum hallmarking is applied</td></tr>
+      </tbody>
+    </table></div>
+    <p class="platinum-rate-page__table-note">At Lucira Jewellery, our lab-grown diamond pieces are priced transparently. Platinum's density means the same design typically uses more metal by weight than an equivalent gold piece.</p>
+  </div></div>
+  {% endif %}
+
+  {% if investment_block != blank %}
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="investment-guide">
+    <h2>{{ investment_block.heading | default: investment_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ investment_block.content | metafield_tag }}</div>
+    <h3>Platinum vs Other Investments — {{ city_name }} Perspective</h3>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Factor</th><th scope="col">Platinum</th><th scope="col">Gold</th><th scope="col">Fixed Deposit</th><th scope="col">SGBs</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Liquidity</th><td>Moderate (fewer buyers/sellers than gold)</td><td>High</td><td>Medium</td><td>High</td></tr>
+        <tr><th scope="row">Industrial Demand Link</th><td>Very strong (auto catalytic converters)</td><td>Weak</td><td>None</td><td>None</td></tr>
+        <tr><th scope="row">Price vs Gold</th><td>Has traded both above and below gold historically</td><td>Reference</td><td>N/A</td><td>N/A</td></tr>
+        <tr><th scope="row">Risk Level</th><td>Higher (thinner market, supply concentrated in few countries)</td><td>Moderate</td><td>Low</td><td>Low</td></tr>
+        <tr><th scope="row">Tax on Returns</th><td>LTCG 20%</td><td>LTCG 20%</td><td>Taxable</td><td>Tax-free</td></tr>
+        <tr><th scope="row">Jewellery Utility</th><td>Yes — popular for rings/bands</td><td>Yes</td><td>No</td><td>No</td></tr>
+      </tbody>
+    </table></div>
+    <p class="platinum-rate-page__table-note">Platinum's price is more exposed to industrial cycles (especially automotive demand) than gold, and its market is thinner — meaning prices can move more sharply on supply news from major producing countries. This table is for general information only and is not personalised financial advice.</p>
+  </div></div>
+  {% endif %}
+
+  {% if factors_block != blank %}
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="factors-affecting-platinum-prices">
+    <h2>{{ factors_block.heading | default: factors_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ factors_block.content | metafield_tag }}</div>
+    <h3>Key Factors — How They Influence the {{ city_name }} Platinum Rate</h3>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Factor</th><th scope="col">How It Influences {{ city_name }} Platinum Rate</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">International Spot Price</th><td>Platinum trades on the NYMEX/LPPM and is priced in USD per troy ounce globally.</td></tr>
+        <tr><th scope="row">Automotive/Industrial Demand</th><td>A large share of platinum demand comes from catalytic converters in diesel vehicles — this is a much bigger price driver than for gold.</td></tr>
+        <tr><th scope="row">Mine Supply Concentration</th><td>Most platinum mining is concentrated in South Africa and Russia, making supply disruptions a major price factor.</td></tr>
+        <tr><th scope="row">USD-INR Exchange Rate</th><td>As platinum is imported, a weaker rupee directly raises the {{ city_name }} platinum rate.</td></tr>
+        <tr><th scope="row">Import Duty</th><td>India levies import duty on platinum; budget changes affect rates immediately.</td></tr>
+        <tr><th scope="row">MCX Rates</th><td>Multi Commodity Exchange futures prices serve as a daily benchmark in India.</td></tr>
+        <tr><th scope="row">State Taxes &amp; Levies</th><td>{{ city_state | default: 'State' }} applies its own levies; rates may differ marginally from other states.</td></tr>
+        <tr><th scope="row">GST</th><td>3% GST applies on platinum value and making charges at point of purchase.</td></tr>
+        <tr><th scope="row">Bridal/Wedding Demand</th><td>Platinum is a popular choice for engagement rings and wedding bands in {{ city_name }}, adding seasonal demand around the wedding calendar.</td></tr>
+      </tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if festival_block != blank %}
+  <div class="platinum-rate-page__band"><div class="page-width platinum-rate-page__copy-block" id="festival-calendar">
+    <h2>{{ festival_block.heading | default: festival_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ festival_block.content | metafield_tag }}</div>
+    <h3>{{ city_name }} Platinum Buying Calendar</h3>
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Month/Period</th><th scope="col">Occasion</th><th scope="col">Demand Level</th><th scope="col">Buying Note</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">November–February</th><td>Wedding Season</td><td>High</td><td>Platinum bands and engagement rings peak; plan purchases 30–60 days in advance</td></tr>
+        <tr><th scope="row">October/November</th><td>Dhanteras</td><td>Moderate</td><td>Some buyers extend gold-buying tradition to platinum jewellery</td></tr>
+        <tr><th scope="row">April/May</th><td>Akshaya Tritiya</td><td>Moderate</td><td>Considered auspicious; platinum rings are a growing gifting choice</td></tr>
+        <tr><th scope="row">June–August (Monsoon)</th><td>Slow Season</td><td>Low</td><td>Historically quieter buying window</td></tr>
+      </tbody>
+    </table></div>
+    <p class="platinum-rate-page__table-note">Unlike gold, platinum demand in India is driven more by bridal jewellery timing than by festival calendars.</p>
+  </div></div>
+  {% endif %}
+
+  {% if market_block != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--subtle"><div class="page-width platinum-rate-page__copy-block" id="market-guide">
+    <h2>{{ market_block.heading | default: market_block.title }}</h2>
+    <div class="platinum-rate-page__richtext">{{ market_block.content | metafield_tag }}</div>
+  </div></div>
+  {% endif %}
+
+  {% if historic_rate_table != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--table"><div class="page-width platinum-rate-page__copy-block" id="historic-rate">
+    <h2>{{ historic_rate_table.table_title }}</h2>
+    {% if historic_rate_table.table_description != blank %}<p class="platinum-rate-page__table-description">{{ historic_rate_table.table_description }}</p>{% endif %}
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Month</th><th scope="col">Pt950</th><th scope="col">Pt900</th></tr></thead>
+      <tbody><tr><th scope="row">Current</th><td>&#8377;{{ rate_950_display }}</td><td>&#8377;{{ rate_900_display }}</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if forecast_table != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--table"><div class="page-width platinum-rate-page__copy-block" id="forecast-table">
+    <h2>{{ forecast_table.table_title }}</h2>
+    {% if forecast_table.table_description != blank %}<p class="platinum-rate-page__table-description">{{ forecast_table.table_description }}</p>{% endif %}
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">Scenario</th><th scope="col">Pt950</th><th scope="col">Pt900</th><th scope="col">Note</th></tr></thead>
+      <tbody><tr><th scope="row">Today</th><td>&#8377;{{ rate_950_display }}</td><td>&#8377;{{ rate_900_display }}</td><td>Live rate</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if city_comparison_table != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--table"><div class="page-width platinum-rate-page__copy-block" id="city-comparison">
+    <h2>{{ city_comparison_table.table_title }}</h2>
+    {% if city_comparison_table.table_description != blank %}<p class="platinum-rate-page__table-description">{{ city_comparison_table.table_description }}</p>{% endif %}
+    <div class="platinum-rate-page__table-wrap"><table class="platinum-rate-page__table">
+      <thead><tr><th scope="col">City</th><th scope="col">Pt950</th><th scope="col">Pt900</th><th scope="col">Note</th></tr></thead>
+      <tbody><tr><th scope="row">{{ city_name }}</th><td>&#8377;{{ rate_950_display }}</td><td>&#8377;{{ rate_900_display }}</td><td>Current market</td></tr></tbody>
+    </table></div>
+  </div></div>
+  {% endif %}
+
+  {% if faq_list != blank %}
+  <div class="platinum-rate-page__band platinum-rate-page__band--faq"><div class="page-width platinum-rate-page__copy-block" id="faq">
+    <h2>Frequently Asked Questions — Platinum Rate in {{ city_name }}</h2>
+    <div class="platinum-rate-page__faq-list">
+      {% for faq in faq_list %}{% if faq != blank %}
+        <details class="platinum-rate-page__faq-item">
+          <summary class="platinum-rate-page__faq-question">{{ faq.question }}</summary>
+          <div class="platinum-rate-page__faq-answer">{{ faq.answer | metafield_tag }}</div>
+        </details>
+      {% endif %}{% endfor %}
     </div>
-  </div>
-</div>
+  </div></div>
+  {% endif %}
+
+{% endif %}
+</section>
 
 <style>
-  /* Chrome, Safari, Edge, Opera */
-  input::-webkit-outer-spin-button,
-  input::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
+  .platinum-rate-page {
+    color: #191919;
+    background: #fff;
   }
 
-  /* Firefox */
-  input[type=number] {
-    -moz-appearance: textfield;
+  .platinum-rate-page__hero {
+    padding: 4rem 0 3rem;
+    background: linear-gradient(180deg, #f3f4f5 0%, #fff 100%);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.08);
   }
 
-  /* Location Selector Styling */
-  .location-selector {display: flex; align-items: center; gap: 12px; margin-top: 20px;margin-bottom:20px;flex-direction:column;}
-
-  .location-dropdown {position: relative;display: flex;flex-direction: column;width:100%;}
-  .location-dropdown label {font-size: 12px;color: white;margin-left: 12px;position: absolute;top: -16px;background: transparent;padding: 0 5px;text-transform: capitalize;}
-  .location-dropdown select {padding: 12px 16px;border: 2px solid white;border-radius: 12px;background: transparent;color: white;font-size: 16px;font-weight: 600;text-transform: uppercase;min-width: 180px;cursor: pointer;margin-top:5px;margin-bottom:10px;
-      background-image: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Arrow_down_cc686a73-fcf1-4b17-84c8-edc969caa5c9.svg?v=1771060854);
-  background-size: 1.6em;
-  background-position: calc(100% - 1.3em) center;
-  background-repeat: no-repeat;
-  appearance: none;}
-  .location-dropdown select option {
-    color: black; /* dropdown text */
-  }
-
-  .location-submit {
-    background: white;
-    color: black;
-    font-size: 15px;
-    border: none;
-    border-radius: 12px;
-    padding: 12px 18px;
-    cursor: pointer;
-    transition: 0.2s ease;
+  .platinum-rate-page__hero-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
+    gap: 3rem;
     align-items: center;
-    font-family: 'Futura Std';
+  }
+
+  .platinum-rate-page__eyebrow {
+    margin: 0 0 0.75rem;
+    font-size: 0.82rem;
+    letter-spacing: 0;
     text-transform: uppercase;
-    font-weight: 500;
-    display:flex;
-    gap:6px;
-    width:50%;
-    justify-content: center;
+    color: #5a6169;
   }
 
-  .location-submit:hover {
-    background: #f5f5f5;
+  .platinum-rate-page__eyebrow-sep {
+    margin: 0 0.5rem;
+    color: rgba(25, 25, 25, 0.35);
   }
-  .platinum-widget-section:after {
-      content: "";
-      position: absolute;
-      left: 0;
-      top: 0;
-      width: 100%;
-      height: 100%;
-      background: #00000042;
+
+  .platinum-rate-page__title {
+    margin: 0 0 1rem;
+    font-size: clamp(2.25rem, 3.5vw, 3.5rem);
+    line-height: 1.1;
+    font-weight: 700;
+    color: #191919;
   }
-    .wrapper-platinum{position: absolute; top: 20%; left: 0;z-index:1;}
-    .platinum-widget-section{display:flex;justify-content:center;position:relative;background-size:cover;background-repeat:no-repeat;background-position:top center;background-image:url('{{ section.settings.background_image | image_url }}');background-size:cover;background-position:center;background-repeat:no-repeat;height:100vh}
-    .platinum-widget-section .page-width{position:relative}
-    .platinum-widget__box {margin-top: 12px; background-color: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 0 10px rgba(0, 0, 0, .15); display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  row-gap: 10px;column-gap:40px; }
-  .platinum-widget__date {
-  grid-column: 1 / -1;
-          margin-bottom: 12px;
-        margin-left: 5px;
-        margin-top:0;
-}
-    .platinum-widget__block{padding:0px;text-align:left;flex:1}
-    .platinum-widget__label { color: #000; margin-top: 0; font-weight: 400; font-size: 12px; line-height: 20px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;}
-    .platinum-widget__price { margin: 0; font-weight: 600; font-size: 32px; line-height: 1.8; letter-spacing: normal; color: #000000; }
-    .platinum-widget__unit{font-size:13px;font-weight:300;color:#000}
-    .platinum-widget__date { font-size: 11px; color: #000; margin-bottom: 0; text-transform: uppercase; }
-    .platinum-widget__divider{height:100px;width:1px;background:#e5e7eb;margin:0 20px}
-    span.platinum-unit { font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 20px; line-height: 20px; text-transform: uppercase; }
-    .investment-section__container {display: grid ; grid-template-columns: calc(60% - 40px) calc(40% - 40px); gap: 125px;}
-    .investment-section__container { display: flex ; grid-template-columns: 1fr; gap: 80px; margin: 0 auto; }
-    .investment-section {padding: 40px 0;}
-    .investment-section h2.investment-section__heading {margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase;}
-    .investment-section h3.investment-section__subheading { margin-top: 0; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; margin-bottom: 0; }
-    .investment-section p { font-weight: 400; font-size: 16px; line-height: 1.6; vertical-align: middle; color: #1a1a1a; }
-    li.investment-section__list-item { font-family: Futura Std; font-weight: 400; font-size: 18px; line-height: 1.5; letter-spacing: 1px; vertical-align: middle; margin-bottom: 4px; color: #1a1a1a; }
-    ul.investment-section__list { padding-left: 22px; }
-  .investment-section{
-  padding: 40px 0;
-      width: 75%;
-      margin: 0 auto;
+
+  .platinum-rate-page__richtext,
+  .platinum-rate-page__intro {
+    margin-top: 1rem;
+    font-size: 0.98rem;
+    line-height: 1.7;
   }
-    .platinum-table-v2-title { font-weight: 500; font-size: 24px; line-height: 150%; text-align: center; vertical-align: middle; text-transform: uppercase; color: #000000; margin-bottom: 40px; margin-top: 0; max-width: 840px; margin-left: auto; margin-right: auto; }
-    .platinum-table-v2-wrapper{overflow-x:auto}
-    .platinum-table-v2{width:100%;border-collapse:separate;border-spacing:0;border-radius:8px;overflow:hidden;margin:0 auto;border:1px solid #999;width:100%}
-    .platinum-table-v2 td,.platinum-table-v2 th{border:0px solid #999;padding:20px 12px;}
-    .platinum-table-v2 th{background-color:#f6f0ea;font-weight:unset;color:#000; }
-    .platinum-table-v2 th:not(:first-child){border-left: 1px solid #999999;}
-    .platinum-table-v2 th {border-bottom: 1px solid #999999;}
-    .platinum-table-v2 td:not(:first-child){border-left: 1px solid #999999;}
-    .platinum-table-v2 td {border-bottom: 1px solid #999999;}
-    .platinum-table-v2 td {font-family: 'Futura Std', sans-serif; text-align: center; font-weight: 400; font-size: 18px; line-height: 24px; letter-spacing: 1px; }
-    .platinum-table-v2-section { padding-bottom: 12px;}
-    .platinum-table-v2 {border-bottom: 0;}
-    .rich-text__wrapper--left { justify-content: center !important; }
-    h2.rich-text__heading.rte.inline-richtext.h1 { margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; }
-    .rich-text__text p {font-weight: 400; font-size: 18px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
-    .rich-text__text ul li {font-weight: 400; font-size: 18px; line-height: 1.6; vertical-align: middle; color: #1a1a1a; margin-bottom: 10px;}
-    .platinum-table-v2-wrapper { overflow-x: auto; max-width: 840px; margin: 0 auto; }
-    .rich-text.content-container {padding-bottom: 40px;}
 
+  .platinum-rate-page__intro {
+    color: rgba(25, 25, 25, 0.8);
+  }
 
-    @media screen and (max-width:767px){
-    .platinum-table-v2 td,.platinum-table-v2 th{font-size:14px;padding:10px 6px}
-    .platinum-table-v2{width:100%}
-    .platinum-table-v2-section{padding:20px 0;}
-    .location-selector {display: grid ; grid-template-columns: 1fr; gap: 20px;}
-    .location-dropdown select {display: grid;grid-template-columns: 1fr 1fr;gap: 12px; width: 100%;}
-    .wrapper-platinum { position: absolute; top: 12%; left: 0; z-index: 1; }
-    .wrapper-platinum { padding: 0 14px; }
-      .rich-text.content-container {padding: 20px 0 20px 0;}
+  .platinum-rate-page__richtext p {
+    margin: 0 0 1.25rem;
+    line-height: 1.75;
+    color: rgba(25, 25, 25, 0.85);
+  }
 
+  .platinum-rate-page__richtext p:last-child {
+    margin-bottom: 0;
+  }
+
+  .platinum-rate-page__richtext h3,
+  .platinum-rate-page__richtext h4 {
+    margin: 2rem 0 1rem;
+    font-size: 1.25rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #191919;
+  }
+
+  .platinum-rate-page__richtext h3:first-child,
+  .platinum-rate-page__richtext h4:first-child {
+    margin-top: 0;
+  }
+
+  .platinum-rate-page__richtext ul,
+  .platinum-rate-page__richtext ol {
+    margin: 1.5rem 0;
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .platinum-rate-page__richtext ol {
+    counter-reset: list-item;
+  }
+
+  .platinum-rate-page__richtext ul li,
+  .platinum-rate-page__richtext ol li {
+    margin-bottom: 0.5rem;
+    line-height: 1.6;
+    color: rgba(25, 25, 25, 0.85);
+    padding: 0.75rem 1rem;
+    background: #fafafa;
+    border-radius: 6px;
+    border-left: 3px solid #5a6169;
+  }
+
+  .platinum-rate-page__richtext ul li::before {
+    content: "•";
+    color: #5a6169;
+    font-weight: bold;
+    margin-right: 0.75rem;
+  }
+
+  .platinum-rate-page__richtext ol li {
+    counter-increment: list-item;
+  }
+
+  .platinum-rate-page__richtext ol li::before {
+    content: counter(list-item) ".";
+    color: #5a6169;
+    font-weight: bold;
+    margin-right: 0.75rem;
+  }
+
+  .platinum-rate-page__richtext a {
+    color: #5a6169;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+
+  .platinum-rate-page__richtext a:hover {
+    color: #454b52;
+  }
+
+  .platinum-rate-page__richtext strong,
+  .platinum-rate-page__richtext b {
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .platinum-rate-page__richtext em,
+  .platinum-rate-page__richtext i {
+    font-style: italic;
+  }
+
+  .platinum-rate-page__hero-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin-top: 1.5rem;
+    max-width: 420px;
+  }
+
+  .platinum-rate-page__stat {
+    padding: 0.9rem 1rem;
+    border: 1px solid rgba(25, 25, 25, 0.12);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .platinum-rate-page__stat-label {
+    display: block;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    color: rgba(25, 25, 25, 0.58);
+  }
+
+  .platinum-rate-page__stat-value {
+    display: block;
+    margin-top: 0.35rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+
+  .platinum-rate-page__updated {
+    margin: 1rem 0 0;
+    font-size: 0.9rem;
+    color: rgba(25, 25, 25, 0.62);
+  }
+
+  .platinum-rate-page__hero-media {
+    min-height: 100%;
+  }
+
+  .platinum-rate-page__hero-image,
+  .platinum-rate-page__hero-fallback {
+    display: block;
+    width: 100%;
+    min-height: 420px;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+
+  .platinum-rate-page__hero-fallback {
+    display: grid;
+    place-items: center;
+    background: #e2e4e6;
+    color: #454b52;
+    font-size: 1.25rem;
+    font-weight: 700;
+  }
+
+  .platinum-rate-page__band {
+    padding: 3.5rem 0;
+  }
+
+  .platinum-rate-page__band--subtle {
+    background: #fafbfb;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+  }
+
+  .platinum-rate-page__band--table {
+    background: #fafafa;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+  }
+
+  .platinum-rate-page__band--faq {
+    background: #fafafa;
+    border-top: 1px solid rgba(25, 25, 25, 0.06);
+    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
+    padding: 4.5rem 0;
+  }
+
+  .platinum-rate-page__section-head {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+
+  .platinum-rate-page__section-head h2,
+  .platinum-rate-page__copy-block h2 {
+    margin: 0 0 1rem;
+    font-size: 1.75rem;
+    line-height: 1.2;
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .platinum-rate-page__section-head p,
+  .platinum-rate-page__table-description {
+    margin: 0;
+    color: rgba(25, 25, 25, 0.72);
+    max-width: 56ch;
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .platinum-rate-page__table-wrap {
+    overflow-x: auto;
+  }
+
+  .platinum-rate-page__table {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 680px;
+  }
+
+  .platinum-rate-page__table th,
+  .platinum-rate-page__table td {
+    padding: 0.95rem 1rem;
+    border-bottom: 1px solid rgba(25, 25, 25, 0.1);
+    text-align: left;
+    white-space: nowrap;
+  }
+
+  .platinum-rate-page__table thead th {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: rgba(25, 25, 25, 0.65);
+    background: #fafbfb;
+    font-weight: 600;
+  }
+
+  .platinum-rate-page__table tbody th {
+    font-weight: 600;
+    color: #191919;
+  }
+
+  .platinum-rate-page__table tbody tr:hover {
+    background: rgba(90, 97, 105, 0.04);
+  }
+
+  .platinum-rate-page__copy-block {
+    max-width: 78rem;
+    margin: 0 auto;
+  }
+
+  .platinum-rate-page__faq-list {
+    display: grid;
+    gap: 1rem;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  .platinum-rate-page__faq-item {
+    border: 1px solid rgba(25, 25, 25, 0.12);
+    border-radius: 12px;
+    background: #fff;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .platinum-rate-page__faq-item:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  .platinum-rate-page__faq-question {
+    list-style: none;
+    cursor: pointer;
+    padding: 1.25rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #191919;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .platinum-rate-page__faq-question::after {
+    content: '+';
+    font-size: 1.5rem;
+    font-weight: 400;
+    color: #5a6169;
+    transition: transform 0.2s ease;
+  }
+
+  .platinum-rate-page__faq-item[open] .platinum-rate-page__faq-question::after {
+    transform: rotate(45deg);
+  }
+
+  .platinum-rate-page__faq-question::-webkit-details-marker {
+    display: none;
+  }
+
+  .platinum-rate-page__faq-answer {
+    padding: 0 1.5rem 1.5rem;
+    color: rgba(25, 25, 25, 0.82);
+    font-size: 0.98rem;
+    line-height: 1.6;
+  }
+
+  .platinum-rate-page__faq-answer p {
+    margin: 0 0 0.75rem;
+  }
+
+  .platinum-rate-page__faq-answer p:last-child {
+    margin-bottom: 0;
+  }
+
+  .platinum-rate-page__empty {
+    padding: 3rem 0;
+  }
+
+  .platinum-rate-page__change--up { color: #2a7a2a; font-weight: 600; }
+  .platinum-rate-page__change--down { color: #c0392b; font-weight: 600; }
+
+  @media screen and (max-width: 990px) {
+    .platinum-rate-page__hero-grid {
+      grid-template-columns: 1fr;
     }
-    @media screen and (max-width:767px){
 
-      .platinum-widget__box {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 6px;
-}
-
-.platinum-widget__date {
-  grid-column: 1 / -1;
-          margin-bottom: 12px;
-        margin-left: 12px;
-        margin-top:0;
-}
-
-      .location-submit{
-          font-size: 10px;
-    padding: 12px 8px;
-  letter-spacing:1px;}
-      .platinum-widget-section{background-size:cover;background-repeat:no-repeat;background-position:center;background-image:url('{{ section.settings.background_image_mobile | image_url }}');background-size:cover;background-position:center;background-repeat:no-repeat;height:560px}
-      .platinum-widget__box{background-color:#fff;padding:0 4px;top:10%;left:50%;transform:translateX(-50%); position: relative;}
-      .platinum-widget__divider{width:1px;height:80px;margin:10px 0}
-      .platinum-widget__date,.platinum-widget__label,.platinum-widget__unit{font-size:9px}
-      .platinum-widget__price{font-size:20px}
-      .platinum-widget__block{padding:10px}
-      .investment-section__container { display: grid ; grid-template-columns: 1fr; gap: 10px; }
-      .platinum-table-v2-title {font-size: 18px; margin-bottom: 20px; text-align:center;}
-      .wrapper-platinum {padding: 70px 14px;}
-      .investment-section{
-      width: 91%;
-      margin: 0 auto;
-      padding: 20px 0 20px!important;
-      }
-      .platinum-widget-section {height: 700px;}
+    .platinum-rate-page__hero-image,
+    .platinum-rate-page__hero-fallback {
+      min-height: 320px;
     }
 
-    .platinum-calc-section { background: #F0F0F5; padding: 80px 0 80px 0; margin: 0 0 40px 0;}
-    .platinum-calc__heading { font-size: 24px; font-weight: 500; margin-top: 0; text-align: center; color: #333333; margin-bottom: 32px; letter-spacing: 1px;}
-    .platinum-calc__container{background:#fff;padding:30px;border-radius:10px;max-width:840px;width:100%; margin:0 auto;}
-    .platinum-calc__label { text-align: left; margin-bottom: 12px; font-weight: 400; font-size: 12px; line-height: 1.3; margin-top: 0; }
-    .platinum-calc__karat-options{display:flex;background:#efefef;border-radius:10px;overflow:hidden;margin-bottom:30px;padding:5px;gap: 5px;}
-    .platinum-calc__karat {flex: 1; padding: 12px; border: 0; border-radius: 8px; color: #666666; cursor: pointer; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 1.3; vertical-align: middle; text-transform: capitalize; letter-spacing: 0.3px;}
-    .platinum-calc__karat--active{background:#fff;color:#1A1A1A; box-shadow: 0px 0px 6px 0px #0000001F;}
-    .platinum-calc__inputs{display:flex;gap:20px;flex-direction:row;}
-    .platinum-calc__input-group{flex:1;text-align:left}
-    .platinum-calc__input-label { display: block; margin-bottom: 12px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 0.3px; line-height: 1.3; color: #666666; }
-    .platinum-calc__input { width: 100%; padding: 16px 16px 16px 20px; border-radius: 8px; border: 1px solid #eaeaea; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 0.3px; line-height: 1.2; text-transform: capitalize; color: #666666; }
-    .platinum-calc__input::placeholder {color: #666666;}
-    .platinum-calc__rate-display { background: #f4f4f4; width: 100%; padding: 16px 16px 16px 20px; border-radius: 8px; border: 1px solid #f4f4f4; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 16px; letter-spacing: 0.3px; line-height: 1.2; text-transform: capitalize; color: #666666; }
-    .platinum-calc__button{margin-top:25px;background:#9e6c66;color:#fff;padding:12px;width:100%;border:none;border-radius:6px;font-weight:700;cursor:pointer}
-    .platinum-calc__note{margin-top:12px;font-size:12px;color:#666}
-    .platinum-calc__label--mobile{display:none}
-    .platinum-calc__label--desktop{display:inline;}
-    .platinum-calc__label--mobile{display:none;}
-    .platinum-calc__button {background: #8094A6; color: #fff; padding: 18px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-family: Futura Std; font-weight: 400; font-size: 16px; line-height: 100%; text-align: center; letter-spacing: 1px; }
-    p.platinum-calc__note { font-family: Futura Std; font-weight: 400; font-size: 12px; line-height: 12px; letter-spacing: 1px; text-align: center; margin:unset; margin-top: 10px; }
-    .platinum-calc__input:focus-visible {outline: none; outline-offset: none; box-shadow: none;}
-    span#platinumValueOutput { color: #008000; font-weight: 600; }
-    #platinumCalcResult {background: #eaf6e9;}
-    .rich-text__text ul {list-style: disc outside; padding-left: 1.5em;}
-    .rich-text__text a { color: #5a413f; text-underline-offset: auto;}
-    .investment-section__description a {color: #5a413f; text-underline-offset: auto;}
+    .platinum-rate-page__section-head {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
 
-
-    @media only screen and (min-width:0px) and (max-width:767px){
-      .platinum-calc-section {padding: 20px 0;}
-      .platinum-calc__heading {font-size: 18px;}
-      .platinum-calc__inputs { flex-direction: row; }
-      .platinum-calc__label--mobile{
-        font-size: 10px;
-      }
-      .platinum-calc__label--desktop{display:none;}
-      .platinum-calc__label--mobile{display:inline;}
-      .platinum-calc__container {padding: 24px;}
-      .platinum-calc__karat {font-size: 12px;}
-      p.platinum-calc__note {font-size: 10px;}
-      .platinum-calc__input {padding: 16px 16px 16px 16px;}
-      .platinum-calc__button {font-size: 14px;}
-      .investment-section p { color: #1a1a1a; font-weight: 400; font-size: 14px; line-height: 1.6; margin:0; vertical-align: middle; }
-      .investment-section { padding: 40px 0; }
-      .investment-section h2.investment-section__heading {font-size: 18px;}
-      .investment-section h3.investment-section__subheading {font-size: 18px;}
-      li.investment-section__list-item { letter-spacing: 1px; color: #1a1a1a; font-weight: 400; font-size: 14px; line-height: 1.4; vertical-align: middle; margin-bottom: 8px; }
-      span.platinum-unit {font-size: 12px;}
-      h2.rich-text__heading.rte.inline-richtext.h1 { margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 18px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; }
-      .rich-text__text p {font-weight: 400; font-size: 14px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
-      .rich-text__text ul li {font-weight: 400; font-size: 14px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
-      .platinum-table-v2-title {
-      text-align:center!important;
-      }
+  @media screen and (max-width: 749px) {
+    .platinum-rate-page__hero {
+      padding-top: 2rem;
     }
 
-    @media only screen and (min-width:0px) and (max-width:390px){
-      .platinum-widget__price {font-size: 16px;}
-      .location-submit{letter-spacing:0px;}
+    .platinum-rate-page__band {
+      padding: 1.6rem 0;
     }
+
+    .platinum-rate-page__hero-stats {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
 </style>
-
-<script src="{{ 'jquery.min.js' | asset_url }}"></script>
-
-<script>
-  $(document).ready(function () {
-    let selectedPurity = 999;
-
-    const baseRate = parseFloat($('#platinumRate').data('base'));
-
-    // Helper function to calculate the rate for 1 gram at a specific purity
-    function getRateByPurity(baseRate, purity) {
-      const perGramRate = baseRate / 10; // Rate for 1 gram of 999 purity
-      return perGramRate * (purity / 1000); // Rate for 1 gram of selected purity
-    }
-
-    // Function to update the visible rate display for the selected purity
-    function updateRateDisplay(purity) {
-      const calculatedRate = purity === 999 ? baseRate / 10 : getRateByPurity(baseRate, purity);
-
-      $('.platinum-calc__label--desktop').text(`Today's Standard Rate of Pt${purity}`);
-      $('.platinum-calc__label--mobile').text(`Today's Pt${purity} Rate`);
-      $('#platinumRate').text(
-        '₹ ' +
-          parseFloat(calculatedRate).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      );
-    }
-
-    // --- Initial Setup and Events ---
-
-    // 1. Initial display setup - ONLY update rate display, DO NOT calculate
-    updateRateDisplay(selectedPurity);
-
-    // Hide results initially
-    $('#platinumCalcResult').hide();
-
-    // 2. Purity Button Click Handler (Only updates rate display, no auto-calculation)
-    $('.platinum-calc__karat').on('click', function () {
-      $('.platinum-calc__karat').removeClass('platinum-calc__karat--active');
-      $(this).addClass('platinum-calc__karat--active');
-
-      selectedPurity = parseInt($(this).text().replace('Pt', ''));
-      updateRateDisplay(selectedPurity);
-
-      // DO NOT auto-calculate here
-    });
-
-    // 3. Weight Input Handler (No auto-calculation)
-    $('#weightInput').on('input', function () {
-      // DO NOT auto-calculate here
-    });
-
-    // 4. Calculate Button - ONLY calculate when clicked
-    $('.platinum-calc__button').on('click', function () {
-      const weight = parseFloat($('#weightInput').val());
-
-      // 1. Input Validation
-      if (isNaN(weight) || weight <= 0) {
-        $('#platinumCalcResult').hide();
-        alert('Please enter a valid weight in grams.');
-        return;
-      }
-
-      // 2. Platinum Price Calculation
-      const currentRate = selectedPurity === 999 ? baseRate / 10 : getRateByPurity(baseRate, selectedPurity);
-
-      const platinumPrice = weight * currentRate;
-      const totalExcludingGST = platinumPrice.toFixed(2);
-
-      // 3. Update Calculator Result
-      $('#platinumValueOutput').text(
-        `₹${parseFloat(totalExcludingGST).toLocaleString('en-IN', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        })}`
-      );
-      $('#platinumCalcResult').show();
-    });
-  });
-</script>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    function updateDateTime() {
-      const today = new Date();
-
-      // Format date
-      const formattedDate = today.toLocaleDateString('en-IN', {
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric',
-      });
-
-      // Static time: 10:00 AM
-      const formattedTime = '10:00 AM';
-
-      // Combine date + "Updated on - " + time
-      const dateTime = `Last Updated- ${formattedDate},${formattedTime}`;
-
-      // Update DOM safely
-      const el1 = document.getElementById('rate-today-date');
-      const el2 = document.getElementById('rate-today-date-2');
-
-      if (el1) el1.textContent = dateTime;
-      if (el2) el2.textContent = dateTime;
-    }
-
-    // Run immediately
-    updateDateTime();
-
-    // Update once daily at midnight (optional, since only date changes)
-    setInterval(updateDateTime, 86400000); // 24 hours
-  });
-</script>
-
-<script>
-  function replacePlatinumShortcodes() {
-    const baseEl = document.querySelector('[data-base]');
-    if (!baseEl) return;
-
-    const baseRate = parseFloat(baseEl.getAttribute('data-base'));
-    if (isNaN(baseRate)) return;
-
-    const ratePerGram = baseRate / 10;
-
-    const rates = {
-      // Per 1 gram
-      '[platinum_rate_999]': Math.round(ratePerGram),
-      '[platinum_rate_950]': Math.round(ratePerGram * (950 / 1000)),
-      '[platinum_rate_900]': Math.round(ratePerGram * (900 / 1000)),
-
-      // ✅ Per 10 gram
-      '[platinum_rate_999_10gm]': Math.round(ratePerGram * 10),
-      '[platinum_rate_950_10gm]': Math.round(ratePerGram * 10 * (950 / 1000)),
-      '[platinum_rate_900_10gm]': Math.round(ratePerGram * 10 * (900 / 1000)),
-    };
-
-    const containers = document.querySelectorAll('p, li, span, div, h1, h2, h3, h4, h5, h6');
-
-    containers.forEach((el) => {
-      let html = el.innerHTML;
-      let changed = false;
-
-      Object.entries(rates).forEach(([shortcode, price]) => {
-        if (html.includes(shortcode)) {
-          html = html.replaceAll(shortcode, `₹${price.toLocaleString('en-IN')}`);
-          changed = true;
-        }
-      });
-
-      if (changed) el.innerHTML = html;
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', replacePlatinumShortcodes);
-</script>
-
-<script>
-  $(document).ready(function () {
-    $('.platinum-table-v2 td').each(function () {
-      let text = $(this).text().trim();
-      if (text.startsWith('₹')) {
-        let number = parseInt(text.replace(/[₹,]/g, ''));
-        if (!isNaN(number)) {
-          let formatted = number.toLocaleString('en-IN');
-          $(this).text('₹' + formatted);
-        }
-      }
-    });
-  });
-</script>
-
-<script>
-  function getDaySuffix(day) {
-    if (day > 3 && day < 21) return 'th';
-    switch (day % 10) {
-      case 1:
-        return 'st';
-      case 2:
-        return 'nd';
-      case 3:
-        return 'rd';
-      default:
-        return 'th';
-    }
-  }
-
-  function replaceDateShortcode() {
-    const today = new Date();
-
-    const day = today.getDate();
-    const suffix = getDaySuffix(day);
-
-    const formattedDate = `${day}${suffix} ${today.toLocaleString('en-IN', {
-      month: 'short',
-    })}, ${today.getFullYear()}`;
-
-    const elements = document.querySelectorAll('p, li, span, div, h1, h2, h3, h4, h5, h6');
-
-    elements.forEach((el) => {
-      if (el.innerHTML.includes('[current_date]')) {
-        el.innerHTML = el.innerHTML.replaceAll('[current_date]', formattedDate);
-      }
-    });
-  }
-
-  document.addEventListener('DOMContentLoaded', replaceDateShortcode);
-</script>
-
-<script>
-  // Full mapping from your Excel (state -> cities)
-  const stateCityMap = {
-    'andaman-and-nicobar-islands': ['Port Blair'],
-    'andhra-pradesh': [
-      'Chirala',
-      'Guntur',
-      'Hindupur',
-      'Kagaznagar',
-      'Kakinada',
-      'Kurnool',
-      'Machilipatnam',
-      'Nandyal',
-      'Nellore',
-      'Ongole',
-      'Proddatur',
-      'Rajahmundry',
-      'Tirupati',
-      'Vishakhapatnam',
-      'Vizianagaram',
-    ],
-    'arunachal-pradesh': ['Itanagar'],
-    assam: ['Dibrugarh', 'Dispur', 'Guwahati', 'Jorhat', 'Silchar', 'Tezpur'],
-    bihar: ['Aurangabad', 'Bhagalpur', 'Gaya', 'Muzaffarpur', 'Patna', 'Purnea'],
-    chandigarh: ['Chandigarh'],
-    chhattisgarh: ['Bhilai', 'Bilaspur', 'Raipur'],
-    'dadra-and-nagar-haveli': ['Silvassa'],
-    'daman-and-diu': ['Daman', 'Diu'],
-    delhi: ['Delhi', 'New Delhi'],
-    goa: ['Panaji'],
-    gujarat: ['Ahmedabad', 'Bhavnagar', 'Bhuj', 'Ghandinagar', 'Navsari', 'Porbandar', 'Rajkot', 'Surat', 'Vadodara'],
-    haryana: [
-      'Ambala',
-      'Bhiwani',
-      'Faridabad',
-      'Gurugram',
-      'Hisar',
-      'Karnal',
-      'Panchkula',
-      'Panipat',
-      'Rohtak',
-      'Sirsa',
-      'Sonipat',
-    ],
-    'himachal-pradesh': ['Shimla'],
-    'jammu-and-kashmir': ['Baramula', 'Jammu', 'Saidpur', 'Srinagar'],
-    jharkhand: ['Dhanbad', 'Jamshedpur', 'Ranchi', 'Jorapokhar'],
-    karnataka: [
-      'Belgaum',
-      'Bellary',
-      'Bengaluru',
-      'Bidar',
-      'Bijapur',
-      'Chikka Mandya',
-      'Davangere',
-      'Gulbarga',
-      'Hospet',
-      'Hubli',
-      'Kolar',
-      'Mangalore',
-      'Mysore',
-      'Raichur',
-      'Shimoga',
-    ],
-    kerala: ['Alappuzha', 'Calicut', 'Kochi', 'Kollam', 'Thiruvananthapuram'],
-    lakshadweep: ['Kavaratti'],
-    'madhya-pradesh': ['Bhopal', 'Gwalior', 'Indore', 'Jabalpur', 'Ratlam', 'Saugor', 'Ujjain'],
-    maharashtra: [
-      'Ahmadnagar',
-      'Akola',
-      'Amaravati',
-      'Aurangabad',
-      'Bhiwandi',
-      'Bhusaval',
-      'Chanda',
-      'Kalyan',
-      'Khanapur',
-      'Kolhapur',
-      'Latur',
-      'Malegaon Camp',
-      'Mumbai',
-      'Nanded',
-      'Nasik',
-      'Parbhani',
-      'Pune',
-      'Sangli',
-    ],
-    manipur: ['Imphal'],
-    meghalaya: ['Shillong'],
-    mizoram: ['Aizawl'],
-    nagaland: ['Kohima'],
-    odisha: ['Bhubaneshwar', 'Brahmapur', 'Cuttack', 'Puri', 'Raurkela', 'Samlaipadar', 'Brajrajnagar', 'Talcher'],
-    puducherry: ['Puducherry'],
-    punjab: ['Abohar', 'Amritsar', 'Haripur', 'Ludhiana', 'Pathankot', 'Patiala'],
-    rajasthan: [
-      'Ajmer',
-      'Alwar',
-      'Bharatpur',
-      'Bhilwara',
-      'Bikaner',
-      'Jaipur',
-      'Jodhpur',
-      'Kota',
-      'Pali',
-      'Rampura',
-      'Sikar',
-      'Tonk',
-      'Udaipur',
-    ],
-    sikkim: ['Gangtok'],
-    'tamil-nadu': [
-      'Chennai',
-      'Coimbatore',
-      'Cuddalore',
-      'Dindigul',
-      'Karur',
-      'Krishnapuram',
-      'Kumbakonam',
-      'Madurai',
-      'Nagercoil',
-      'Rajapalaiyam',
-      'Salem',
-      'Thanjavur',
-      'Tiruchchirappalli',
-      'Tirunelveli',
-      'Tiruvannamalai',
-      'Tuticorin',
-      'Valparai',
-      'Vellore',
-    ],
-    telangana: [
-      'Adilabad',
-      'Hyderabad',
-      'Karimnagar',
-      'Khammam',
-      'Mahabubnagar',
-      'Nalgonda',
-      'Nizamabad',
-      'Ramagundam',
-      'Warangal',
-    ],
-    tripura: ['Agartala'],
-    'uttar-pradesh': [
-      'Agra',
-      'Aligarh',
-      'Allahabad',
-      'Bakshpur',
-      'Bamanpuri',
-      'Bareilly',
-      'Bharauri',
-      'Budaun',
-      'Bulandshahr',
-      'Firozabad',
-      'Fyzabad',
-      'Ghaziabad',
-      'Gopalpur',
-      'Hapur',
-      'Hata',
-      'Jhansi',
-      'Lucknow',
-      'Mathura',
-      'Meerut',
-      'Mirzapur',
-      'Moradabad',
-      'Muzaffarnagar',
-      'Pilibhit',
-      'Saharanpur',
-      'Saidapur',
-      'Shahbazpur',
-      'Tharati Etawah',
-      'Varanasi',
-    ],
-    uttarakhand: ['DehraDun'],
-    'west-bengal': [
-      'Alipurduar',
-      'Asansol',
-      'Barddhaman',
-      'Bhatpara',
-      'Haldia',
-      'Haora',
-      'Kolkata',
-      'Krishnanagar',
-      'Shiliguri',
-    ],
-  };
-
-  const stateDropdown = document.getElementById('state');
-  const cityDropdown = document.getElementById('city');
-
-  // Get pre-selected values from Liquid
-  const preselectedCity = "{{ page.metafields.custom.city_name | default: '' }}";
-
-  function populateCities(state) {
-    cityDropdown.innerHTML = '';
-    if (stateCityMap[state]) {
-      stateCityMap[state].forEach((city) => {
-        const option = document.createElement('option');
-        option.value = city.toLowerCase().replace(/\s+/g, '-');
-        option.textContent = city;
-
-        // Check if this city should be pre-selected
-        if (
-          preselectedCity &&
-          (preselectedCity === city || preselectedCity === city.toLowerCase().replace(/\s+/g, '-'))
-        ) {
-          option.selected = true;
-        }
-
-        cityDropdown.appendChild(option);
-      });
-    }
-  }
-
-  // Initialize on page load
-  document.addEventListener('DOMContentLoaded', function () {
-    // Populate cities for the initially selected state
-    populateCities(stateDropdown.value);
-  });
-
-  stateDropdown.addEventListener('change', function () {
-    populateCities(this.value);
-  });
-
-  document.querySelector('.location-submit').addEventListener('click', function () {
-    const state = stateDropdown.value;
-    const city = cityDropdown.value;
-    window.location.href = `/pages/${city}-platinum-rate-today`;
-  });
-</script>
-
 {% schema %}
-{
-  "name": "Platinum Rate Calculate",
-  "tag": "section",
-  "class": "relative",
-  "settings": [
-    {
-      "type": "image_picker",
-      "id": "background_image",
-      "label": "Background Image"
-    },
-    {
-      "type": "image_picker",
-      "id": "background_image_mobile",
-      "label": "Background Image Mobile"
-    },
-    {
-      "type": "text",
-      "id": "rate_today",
-      "label": "Platinum Rate Today (999 Purity)",
-      "default": "₹ 2,85,000"
-    },
-    {
-      "type": "text",
-      "id": "rate_avg",
-      "label": "Average Weekly Rate (950 Purity)",
-      "default": "₹ 2,80,000"
-    },
-    {
-      "type": "text",
-      "id": "rate_avg_label",
-      "label": "Weekly Label",
-      "default": "AVG. THIS WEEK"
-    },
-    {
-      "type": "text",
-      "id": "button_label",
-      "label": "Calculate Button Label",
-      "default": "CALCULATE"
-    },
-    {
-      "type": "text",
-      "id": "investment_heading",
-      "label": "Left Column Heading",
-      "default": "WHY PLATINUM IS A SMART INVESTMENT"
-    },
-    {
-      "type": "richtext",
-      "id": "investment_description",
-      "label": "Left Column Description",
-      "default": "<p>Platinum is one of the rarest and most valuable precious metals. Unlike gold and silver, platinum is primarily used in industrial applications, making it a unique investment opportunity. Its scarcity and industrial demand create strong price stability and growth potential over time.</p>"
-    },
-    {
-      "type": "html",
-      "id": "investment_quick_links",
-      "label": "Quick Links"
-    }
-  ],
-  "presets": [
-    {
-      "name": "Platinum Rate Calculate",
-      "category": "Custom"
-    }
-  ]
-}
+{"name":"Platinum Rate City Page","tag":"section","class":"platinum-rate-city-section","settings":[],"presets":[{"name":"Platinum Rate City Page"}]}
 {% endschema %}
