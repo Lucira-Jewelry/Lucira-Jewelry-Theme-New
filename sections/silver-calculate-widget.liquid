@@ -1,820 +1,842 @@
-{% liquid
-  assign city = page.metafields.custom.silver_rate_city.value
-  assign city_slug = ''
-  if city != blank and city.slug != blank
-    assign city_slug = city.slug
-  elsif page.metafields.custom.city_name != blank
-    assign city_slug = page.metafields.custom.city_name | handleize
-  elsif page.handle contains '-silver-rate-today'
-    assign city_slug = page.handle | remove: '-silver-rate-today'
-  elsif page.handle contains '-silver-rate'
-    assign city_slug = page.handle | remove: '-silver-rate'
-  endif
-  if city == blank and city_slug != blank
-    assign city = shop.metaobjects.silver_rate_city.values | where: 'slug', city_slug | first
-  endif
-  if city == blank and page.metafields.custom.city.value and page.metafields.custom.city.value.hero_title != blank
-    assign city = page.metafields.custom.city.value
-  endif
-  assign global_rates = shop.metaobjects.silver_rates_global['silver-rates']
-  if global_rates == blank
-    assign global_rates = shop.metaobjects.silver_rates_global.values | first
-  endif
-  assign city_name = city.city_name | default: page.title | default: 'Silver Rate'
-  assign city_state = city.state | default: ''
-  assign nearby_city = city.nearby_city_name | default: ''
-  assign nearby_city_note = city.nearby_city_note | default: ''
-  assign hero_title = city.hero_title
-  if hero_title == blank
-    assign hero_title = "Today's Silver Rate in " | append: city_name
-  endif
-  assign hero_subtitle = city.hero_subtitle | default: 'Live silver prices'
-  assign hero_description = city.hero_description
-  assign city_intro = city.city_intro
-  assign hero_image = city.hero_image.value | default: city.hero_image
-  assign rate_999 = global_rates.rate_999 | plus: 0
-  assign rate_925 = global_rates.rate_925 | plus: 0
-  assign updated_at = global_rates.updated_at
-  assign rate_999_display = rate_999 | round
-  assign rate_925_display = rate_925 | round
-  assign rate_999_8g = rate_999 | times: 8 | round
-  assign rate_999_10g = rate_999 | times: 10 | round
-  assign rate_999_100g = rate_999 | times: 100 | round
-  assign rate_999_1kg = rate_999 | times: 1000 | round
-  assign rate_925_8g = rate_925 | times: 8 | round
-  assign rate_925_10g = rate_925 | times: 10 | round
-  assign rate_925_100g = rate_925 | times: 100 | round
-  assign rate_925_1kg = rate_925 | times: 1000 | round
-  assign faq_list = city.faq.value
-  if faq_list == blank
-    assign faq_list = city.faq_reference.value
-  endif
-  assign content_blocks = city.content_blocks.value
-  if content_blocks == blank
-    assign content_blocks = city.content_block_reference.value
-  endif
-  assign table_blocks = city.table_reference.value
-  if table_blocks == blank
-    assign table_blocks = city.tables.value
-  endif
-  assign silver_purity_block = content_blocks | where: 'slug', 'silver-purity' | first
-  assign hallmark_block = content_blocks | where: 'slug', 'hallmark-guide' | first
-  assign buying_block = content_blocks | where: 'slug', 'buying-guide' | first
-  assign investment_block = content_blocks | where: 'slug', 'investment-guide' | first
-  assign factors_block = content_blocks | where: 'slug', 'factors-affecting-silver-prices' | first
-  assign festival_block = content_blocks | where: 'slug', 'festival-calendar' | first
-  assign market_block = content_blocks | where: 'slug', 'market-guide' | first
-  assign today_vs_yesterday_table = table_blocks | where: 'table_slug', 'today-vs-yesterday' | first
-  assign weekly_trend_table = table_blocks | where: 'table_slug', 'weekly-trend' | first
-  assign monthly_trend_table = table_blocks | where: 'table_slug', 'monthly-trend' | first
-  assign historic_rate_table = table_blocks | where: 'table_slug', 'historic-rate' | first
-  assign forecast_table = table_blocks | where: 'table_slug', 'forecast-table' | first
-  assign city_comparison_table = table_blocks | where: 'table_slug', 'city-comparison' | first
-  assign faq_json = ''
-  if faq_list != blank
-    for faq in faq_list
-      if faq != blank
-        capture faq_entry
-          echo '{"@type":"Question","name":' | append: faq.question | strip_html | json | append: ',"acceptedAnswer":{"@type":"Answer","text":' | append: faq.answer | strip_html | json | append: '}}'
-        endcapture
-        if faq_json == blank
-          assign faq_json = faq_entry | strip
-        else
-          assign faq_json = faq_json | append: ',' | append: faq_entry | strip
-        endif
-      endif
-    endfor
-  endif
-%}
-{% if faq_json != blank %}<script type="application/ld+json">{"@context":"https://schema.org","@type":"FAQPage","mainEntity":[{{ faq_json }}]}</script>{% endif %}
-<section class="silver-rate-page">
-{% if city == blank %}
-  <div class="page-width silver-rate-page__empty"><h1>Silver Rate Page</h1><p>Connect a silver_rate_city metaobject to this page via the custom.silver_rate_city metafield.</p></div>
-{% else %}
-  <div class="silver-rate-page__hero"><div class="page-width silver-rate-page__hero-grid">
-    <div class="silver-rate-page__hero-copy">
-      <p class="silver-rate-page__eyebrow">{{ hero_subtitle }}{% if city_state != blank %} <span class="silver-rate-page__eyebrow-sep">|</span> {{ city_state }}{% endif %}</p>
-      <h1 class="silver-rate-page__title">{{ hero_title }}</h1>
-      {% if hero_description != blank %}<div class="silver-rate-page__richtext">{{ hero_description | metafield_tag }}</div>{% endif %}
-      {% if city_intro != blank %}<div class="silver-rate-page__intro">{{ city_intro | metafield_tag }}</div>{% endif %}
-        <div class="silver-rate-page__aeo-block">
-          <p class="silver-rate-page__aeo-meta">Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; Source: MCX / Multi Commodity Exchange &nbsp;|&nbsp; City: {{ city_name }}{% if city_state != blank %}, {{ city_state }}{% endif %}</p>
-          <details class="silver-rate-page__aeo-item" open>
-            <summary class="silver-rate-page__aeo-question">What is today's silver rate in {{ city_name }}?</summary>
-            <div class="silver-rate-page__aeo-answer">
-              <p>Today's silver rate in {{ city_name }} is <strong>&#8377;{{ rate_999_display }} per gram for 999 Fine Silver</strong> and <strong>&#8377;{{ rate_925_display }} per gram for 925 Sterling Silver</strong>. The 10 gram rate for 999 silver is &#8377;{{ rate_999_10g }} and for 925 silver is &#8377;{{ rate_925_10g }}. Prices are updated daily based on MCX and international bullion rates.</p>
-            </div>
-          </details>
-        </div>
-      <div class="silver-rate-page__hero-stats">
-        <div class="silver-rate-page__stat"><span class="silver-rate-page__stat-label">999 Fine</span><span class="silver-rate-page__stat-value">&#8377;{{ rate_999_display }}</span></div>
-        <div class="silver-rate-page__stat"><span class="silver-rate-page__stat-label">925 Sterling</span><span class="silver-rate-page__stat-value">&#8377;{{ rate_925_display }}</span></div>
+<div class="silver-widget-section">
+  <div class="page-width">
+    <div class="wrapper-silver">
+      <div class="silver-cta-block" style="display:flex;">
+      <h1>Todays Silver rate in {{ page.metafields.custom.city_name }}</h1>
+      <button class="silver-rate-flip-cta" id="flipTrigger">Is Silver A Wise Investment?</button>
       </div>
-      {% if updated_at != blank %}<p class="silver-rate-page__updated">Updated {{ updated_at | date: '%d %B %Y' }}</p>{% endif %}
-    </div>
-    <div class="silver-rate-page__hero-media">
-      {% if hero_image != blank %}<img class="silver-rate-page__hero-image" src="{{ hero_image | image_url: width: 1400 }}" alt="{{ city_name | escape }}" loading="eager" width="1400" height="1050">
-      {% else %}<div class="silver-rate-page__hero-fallback"><span>{{ city_name }}</span></div>{% endif %}
-    </div>
-  </div></div>
+      <!-- WRAP silver-widget__box in a flip container -->
+      <div class="silver-flip-wrapper">
+        <div class="silver-flip-inner" id="silverFlipInner">
 
-  <div class="silver-rate-page__band"><div class="page-width">
-    <div class="silver-rate-page__section-head">
-      <h2>Today's Silver Rate in {{ city_name }} at a Glance</h2>
-      <p>Updated {{ updated_at | date: '%d %B %Y' }} &nbsp;|&nbsp; All prices include 3% GST &nbsp;|&nbsp; Making charges are additional</p>
-    </div>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Silver Type</th><th scope="col">Per Gram</th><th scope="col">Per 8g</th><th scope="col">Per 10g</th><th scope="col">Per 100g</th><th scope="col">Per Kg</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">999 Fine Silver (99.9%)</th><td>&#8377;{{ rate_999_display }}</td><td>&#8377;{{ rate_999_8g }}</td><td>&#8377;{{ rate_999_10g }}</td><td>&#8377;{{ rate_999_100g }}</td><td>&#8377;{{ rate_999_1kg }}</td></tr>
-        <tr><th scope="row">925 Sterling Silver (92.5%)</th><td>&#8377;{{ rate_925_display }}</td><td>&#8377;{{ rate_925_8g }}</td><td>&#8377;{{ rate_925_10g }}</td><td>&#8377;{{ rate_925_100g }}</td><td>&#8377;{{ rate_925_1kg }}</td></tr>
-      </tbody>
-    </table></div>
-    <p class="silver-rate-page__table-note">Prices shown are indicative base rates. Actual jewellery and silverware prices will include making charges, GST, and stone setting costs.</p>
-  </div></div>
+          <!-- FRONT FACE (existing content) -->
+          <div class="silver-flip-front silver-widget__box">
+            <div class="silver-widget__block silver-widget__block--today">
+              <p class="silver-widget__label">Silver Rate: </span>999 Fine</p>
+              <p class="silver-widget__price">
+                <span class="silver-unit"></span>{{ section.settings.rate_today -}}
+                <span class="silver-widget__unit">/10 gm</span>
+              </p>
+            </div>
+            <div class="silver-widget__divider"></div>
+            <div class="silver-widget__block silver-widget__block--week">
+              <p class="silver-widget__label">Silver Rate: </span>925 Sterling</p>
+              <p class="silver-widget__price">
+                <span class="silver-unit"></span>{{ section.settings.rate_avg -}}
+                <span class="silver-widget__unit">/1 Kg</span>
+              </p>
+            </div>
+            <p class="silver-widget__date" id="rate-today-date"></p>
+          </div>
 
-  {% assign history_all = shop.metaobjects.silver_rate_history.values %}
-  {% assign history_today = nil %}
-  {% assign found_yesterday = 0 %}
-  {% assign y_999 = 0 %}
-  {% assign y_925 = 0 %}
-  {% assign today_date = '' %}
-  {% for entry in history_all %}
-    {% if entry.is_current_rate == true %}
-      {% assign history_today = entry %}
-      {% assign today_date = entry.rate_date %}
-    {% endif %}
-  {% endfor %}
-  {% if history_today == blank %}
-    {% assign history_today = history_all | first %}
-    {% assign today_date = history_all.first.rate_date %}
-  {% endif %}
-  {% for entry in history_all %}
-    {% if found_yesterday == 0 %}
-      {% assign this_date = entry.rate_date %}
-      {% if this_date == today_date %}
-      {% else %}
-        {% assign y_999 = entry.rate_999 | plus: 0 | round %}
-        {% assign y_925 = entry.rate_925 | plus: 0 | round %}
-        {% assign found_yesterday = 1 %}
+          <!-- BACK FACE (new flip content) -->
+          <div class="silver-flip-back">
+            <div class="silver-flip-back__image-col">
+              {% if section.settings.flip_founder_image %}
+                <img src="{{ section.settings.flip_founder_image | image_url: width: 200 }}" alt="{{ section.settings.flip_founder_name }}" class="silver-flip-back__img">
+              {% endif %}
+              <p class="silver-flip-back__name">{{ section.settings.flip_founder_name }}</p>
+              <p class="silver-flip-back__designation">{{ section.settings.flip_founder_designation }}</p>
+            </div>
+            <div class="silver-flip-back__content-col">
+              <h3 class="silver-flip-back__title">{{ section.settings.flip_card_title }}</h3>
+              <p class="silver-flip-back__desc">{{ section.settings.flip_card_description }}</p>
+              {% if section.settings.flip_card_link_label != blank %}
+                <a href="{{ section.settings.flip_card_link_url }}" class="silver-flip-back__link">{{ section.settings.flip_card_link_label }}</a>
+              {% endif %}
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="location-selector">
+        <div class="location-dropdown">
+          <label for="state">State</label>
+          <select id="state" name="state">
+            {% assign states = 'Andaman and Nicobar Islands,Andhra Pradesh,Arunachal Pradesh,Assam,Bihar,Chandigarh,Chhattisgarh,Dadra and Nagar Haveli,Daman and Diu,Delhi,Goa,Gujarat,Haryana,Himachal Pradesh,Jammu and Kashmir,Jharkhand,Karnataka,Kerala,Lakshadweep,Madhya Pradesh,Maharashtra,Manipur,Meghalaya,Mizoram,Nagaland,Odisha,Puducherry,Punjab,Rajasthan,Sikkim,Tamil Nadu,Telangana,Tripura,Uttar Pradesh,Uttarakhand,West Bengal'
+              | split: ','
+            %}
+            {% assign current_state = page.metafields.custom.state_name %}
+            {% for state in states %}
+              {% assign state_value = state | downcase | replace: ' ', '-' %}
+              {% assign state_selected = false %}
+              {% if current_state == state or current_state == state_value %}
+                {% assign state_selected = true %}
+              {% endif %}
+
+              <option
+                value="{{ state_value }}"
+                {% if state_selected %}
+                  selected
+                {% endif %}
+              >
+                {{ state }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="location-dropdown city-dropdown">
+          <label for="city">City</label>
+          <select id="city" name="city">
+            {% assign current_city = page.metafields.custom.city_name %}
+          </select>
+        </div>
+      </div>
+      <div class="cta-rate-pages" style=" display: flex;gap: 15px;">
+        <button type="button" class="location-submit">
+          Check Silver Rate
+
+          <svg
+            class="button-icon-update"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <mask id="mask0_14179_531" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+              <rect x="20" y="20" width="20" height="20" transform="rotate(-180 20 20)" fill="#D9D9D9"/>
+            </mask>
+            <g mask="url(#mask0_14179_531)">
+              <path d="M14.7018 9.37501L11.9326 6.60584C11.8172 6.49043 11.7581 6.34536 11.7555 6.17064C11.7529 5.99605 11.8119 5.84834 11.9326 5.72751C12.0533 5.60682 12.1997 5.54647 12.3718 5.54647C12.5437 5.54647 12.69 5.60682 12.8107 5.72751L16.5559 9.47272C16.634 9.55077 16.689 9.63307 16.7209 9.71959C16.753 9.80612 16.769 9.89959 16.769 10C16.769 10.1004 16.753 10.1939 16.7209 10.2804C16.689 10.367 16.634 10.4492 16.5559 10.5273L12.8107 14.2725C12.6953 14.3878 12.5503 14.4468 12.3757 14.4496C12.201 14.4522 12.0533 14.3932 11.9326 14.2725C11.8119 14.1517 11.7515 14.0053 11.7515 13.8333C11.7515 13.6614 11.8119 13.515 11.9326 13.3942L14.7018 10.625L3.54155 10.625C3.36418 10.625 3.21571 10.5651 3.09613 10.4454C2.97641 10.3258 2.91654 10.1774 2.91654 10C2.91654 9.82265 2.97641 9.67418 3.09613 9.55459C3.21571 9.43487 3.36418 9.37501 3.54155 9.37501L14.7018 9.37501Z" fill="#1A1A1A"/>
+            </g>
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          class="location-submit"
+          onclick="window.location.href='https://www.lucirajewelry.com/?utm_source=google&utm_medium=organic&utm_campaign=silver-rate-organic-campaign'"
+        >
+          <svg
+            class="button-icon-shop"
+            width="20"
+            height="20"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <mask id="mask0_14179_381" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="20" height="20">
+              <rect width="20" height="20" fill="#D9D9D9"/>
+            </mask>
+            <g mask="url(#mask0_14179_381)">
+              <path d="M4.42296 17.9167C4.00741 17.9167 3.65241 17.7695 3.35796 17.4752C3.06366 17.1808 2.9165 16.8258 2.9165 16.4102V6.92311C2.9165 6.50756 3.06366 6.15256 3.35796 5.85812C3.65241 5.56381 4.00741 5.41666 4.42296 5.41666H6.24984C6.24984 4.3761 6.6147 3.49096 7.34442 2.76124C8.07414 2.03152 8.95928 1.66666 9.99984 1.66666C11.0404 1.66666 11.9255 2.03152 12.6553 2.76124C13.385 3.49096 13.7498 4.3761 13.7498 5.41666H15.5767C15.9923 5.41666 16.3473 5.56381 16.6417 5.85812C16.936 6.15256 17.0832 6.50756 17.0832 6.92311V16.4102C17.0832 16.8258 16.936 17.1808 16.6417 17.4752C16.3473 17.7695 15.9923 17.9167 15.5767 17.9167H4.42296ZM4.42296 16.6667H15.5767C15.6409 16.6667 15.6996 16.6399 15.753 16.5864C15.8064 16.5331 15.8332 16.4744 15.8332 16.4102V6.92311C15.8332 6.85895 15.8064 6.8002 15.753 6.74686C15.6996 6.69339 15.6409 6.66666 15.5767 6.66666H4.42296C4.3588 6.66666 4.30005 6.69339 4.24671 6.74686C4.19324 6.8002 4.1665 6.85895 4.1665 6.92311V16.4102C4.1665 16.4744 4.19324 16.5331 4.24671 16.5864C4.30005 16.6399 4.3588 16.6667 4.42296 16.6667ZM7.49984 5.41666H12.4998C12.4998 4.72221 12.2568 4.13193 11.7707 3.64582C11.2846 3.15971 10.6943 2.91666 9.99984 2.91666C9.30539 2.91666 8.71512 3.15971 8.229 3.64582C7.74289 4.13193 7.49984 4.72221 7.49984 5.41666ZM9.98692 11.25C10.9293 11.25 11.7757 10.9311 12.5263 10.2933C13.2769 9.65541 13.6478 8.93159 13.6392 8.12186C13.6392 7.94978 13.5815 7.80311 13.4661 7.68186C13.3508 7.56061 13.2045 7.49999 13.0271 7.49999C12.8807 7.49999 12.7498 7.55048 12.6344 7.65145C12.519 7.75242 12.4373 7.89318 12.3892 8.07374C12.2685 8.63888 11.9806 9.10124 11.5255 9.46082C11.0703 9.82027 10.5575 9.99999 9.98692 9.99999C9.4165 9.99999 8.90157 9.82027 8.44213 9.46082C7.98268 9.10124 7.69692 8.63888 7.58484 8.07374C7.53678 7.88457 7.45928 7.74166 7.35234 7.64499C7.24553 7.54832 7.11893 7.49999 6.97255 7.49999C6.79518 7.49999 6.64671 7.56061 6.52713 7.68186C6.40741 7.80311 6.34755 7.94978 6.34755 8.12186C6.34755 8.93159 6.71859 9.65541 7.46067 10.2933C8.20262 10.9311 9.0447 11.25 9.98692 11.25Z" fill="#1A1A1A"/>
+            </g>
+          </svg>
+          Explore Lucira
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="silver-calc-section">
+  <div class="page-width">
+    <h1 class="silver-calc__heading">Silver Rate Today in {{ page.metafields.custom.city_name }}</h1>
+  </div>
+  <div class="gst-main page-width">
+    <div class="silver-calc__container">
+      <p class="silver-calc__label">Choose Purity</p>
+
+      <div class="silver-calc__karat-options">
+        <button class="silver-calc__karat">925</button>
+        <button class="silver-calc__karat silver-calc__karat--active">999</button>
+      </div>
+
+      <div class="silver-calc__inputs">
+        <div class="silver-calc__input-group">
+          <label for="weightInput" class="silver-calc__input-label">In Grams</label>
+          <input type="number" id="weightInput" placeholder="Enter Weight" value="10" class="silver-calc__input">
+        </div>
+
+        <div class="silver-calc__input-group">
+          <label for="silverRate" class="silver-calc__input-label">
+            <span class="silver-calc__label--desktop">Today's Standard Rate of 999 Silver</span>
+            <span class="silver-calc__label--mobile">Today's 999 Silver Rate</span>
+          </label>
+          <div
+            id="silverRate"
+            class="silver-calc__rate-display"
+            data-base="{{ section.settings.rate_today | remove: '₹' | remove: ',' | strip }}"
+          ></div>
+        </div>
+      </div>
+
+      <button class="silver-calc__button">CALCULATE</button>
+      {% if page.handle == 'gst-calculator' %}
+        <div class="gst-toggle-container">
+          <button class="gst-button excluding-gst">Excluding GST</button>
+          <button class="gst-button including-gst active">Including GST</button>
+        </div>
       {% endif %}
-    {% endif %}
-  {% endfor %}
-  {% assign diff_999 = rate_999_display | minus: y_999 %}
-  {% assign diff_925 = rate_925_display | minus: y_925 %}
+      <div id="silverCalcResult" class="silver-calc__rate-display" style="margin-top: 15px; display:none;">
+        <span>Estimated Value: </span><span id="silverValueOutput"></span>
+      </div>
 
-  <div class="silver-rate-page__band silver-rate-page__band--subtle"><div class="page-width silver-rate-page__copy-block" id="today-vs-yesterday">
-    <h2>Today vs Yesterday — Silver Rate Change in {{ city_name }}</h2>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Purity</th><th scope="col">Today (&#8377;/g)</th><th scope="col">Yesterday (&#8377;/g)</th><th scope="col">Change</th></tr></thead>
-      <tbody>
-        <tr>
-          <th scope="row">999 Fine Silver</th>
-          <td>&#8377;{{ rate_999_display }}</td>
-          <td>{% if y_999 > 0 %}&#8377;{{ y_999 }}{% else %}&#8212;{% endif %}</td>
-          <td>{% if y_999 > 0 %}{% if diff_999 > 0 %}<span class="silver-rate-page__change silver-rate-page__change--up">&#9650; &#8377;{{ diff_999 }}</span>{% elsif diff_999 < 0 %}<span class="silver-rate-page__change silver-rate-page__change--down">&#9660; &#8377;{{ diff_999 | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
-        </tr>
-        <tr>
-          <th scope="row">925 Sterling Silver</th>
-          <td>&#8377;{{ rate_925_display }}</td>
-          <td>{% if y_925 > 0 %}&#8377;{{ y_925 }}{% else %}&#8212;{% endif %}</td>
-          <td>{% if y_925 > 0 %}{% if diff_925 > 0 %}<span class="silver-rate-page__change silver-rate-page__change--up">&#9650; &#8377;{{ diff_925 }}</span>{% elsif diff_925 < 0 %}<span class="silver-rate-page__change silver-rate-page__change--down">&#9660; &#8377;{{ diff_925 | abs }}</span>{% else %}<span>&#8212; No change</span>{% endif %}{% else %}&#8212;{% endif %}</td>
-        </tr>
-      </tbody>
-    </table></div>
-  </div></div>
-
-  {% if silver_purity_block != blank %}
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="silver-purity">
-    <h2>{{ silver_purity_block.heading | default: silver_purity_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ silver_purity_block.content | metafield_tag }}</div>
-  </div></div>
-  {% endif %}
-
-  {% assign t999 = '999 Fine Silver Rate in ' | append: city_name | append: ' Today' %}
-  {% assign t925 = '925 Sterling Silver Rate in ' | append: city_name | append: ' Today' %}
-  {% assign c999 = '999 Fine Silver Price in ' | append: city_name %}
-  {% assign c925 = '925 Sterling Silver Price in ' | append: city_name %}
-  {% render 'silver-rate-weight-table', table_id: '999-rate-table', table_title: t999, table_description: '999 Fine Silver (99.9% purity) is the purest form of silver available. Used in coins, bars, and digital silver investments. Too soft for daily-wear jewellery.', rate_value: rate_999, row_labels: '1 gram|2 grams|5 grams|8 grams|10 grams|20 grams|50 grams|100 grams|1 kilogram', row_multipliers: '1|2|5|8|10|20|50|100|1000', row_suffixes: '| | | | | | | |', column_label: c999 %}
-  {% render 'silver-rate-weight-table', table_id: '925-rate-table', table_title: t925, table_description: '925 Sterling Silver (92.5% purity) is the most widely used silver alloy for jewellery, tableware, and artefacts in India — the remaining 7.5% is typically copper for added strength.', rate_value: rate_925, row_labels: '1 gram|2 grams|5 grams|8 grams|10 grams|20 grams|50 grams|100 grams|1 kilogram', row_multipliers: '1|2|5|8|10|20|50|100|1000', row_suffixes: '| | | | | | | |', column_label: c925 %}
-
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="silver-purity-comparison">
-    <h2>Silver Purity Comparison — {{ city_name }} Buying Guide</h2>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Purity</th><th scope="col">Fineness</th><th scope="col">Hallmark</th><th scope="col">Best For</th><th scope="col">Relative Price</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">999</th><td>99.9%</td><td>999</td><td>Investment bars, coins, digital silver</td><td>Highest</td></tr>
-        <tr><th scope="row">925</th><td>92.5%</td><td>925</td><td>Jewellery, tableware, decorative artefacts</td><td>Slightly lower (alloy content)</td></tr>
-      </tbody>
-    </table></div>
-  </div></div>
-
-  {% if hallmark_block != blank %}
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="hallmark-guide">
-    <h2>{{ hallmark_block.heading | default: hallmark_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ hallmark_block.content | metafield_tag }}</div>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Hallmark Code</th><th scope="col">Purity</th><th scope="col">Usage</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">999</th><td>99.9%</td><td>Investment-grade silver bars and coins</td></tr>
-        <tr><th scope="row">925</th><td>92.5%</td><td>Jewellery and silverware — most common in {{ city_name }}</td></tr>
-        <tr><th scope="row">800</th><td>80%</td><td>Older/imported silverware, less common today</td></tr>
-      </tbody>
-    </table></div>
-    <p class="silver-rate-page__table-note">BIS hallmarking for silver is not yet mandated as strictly as gold hallmarking in India — look for the BIS mark voluntarily applied by reputable jewellers, and always ask for a purity certificate on higher-value purchases.</p>
-  </div></div>
-  {% endif %}
-
-  {% if history_all.size > 0 %}
-  <div class="silver-rate-page__band silver-rate-page__band--table"><div class="page-width silver-rate-page__copy-block" id="weekly-trend">
-    <h2>Weekly Silver Price Trend in {{ city_name }} (Last 7 Days)</h2>
-    <p class="silver-rate-page__table-description">Daily silver rates in {{ city_name }} based on MCX rates and international bullion prices.</p>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Date</th><th scope="col">999 (&#8377;/g)</th><th scope="col">925 (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
-      <tbody>
-        {% assign weekly_count = 0 %}
-        {% for entry in history_all %}
-          {% if weekly_count < 7 %}
-            {% assign e_999 = entry.rate_999 | plus: 0 %}
-            {% assign e_925 = entry.rate_925 | plus: 0 %}
-            {% assign e_date = entry.rate_date %}
-            {% if e_999 > 0 or e_925 > 0 or e_date != blank %}
-            <tr>
-              <th scope="row">{{ e_date | date: '%d %b %Y' }}</th>
-              <td>&#8377;{{ e_999 | round }}</td>
-              <td>&#8377;{{ e_925 | round }}</td>
-              <td>{{ entry.market_note | default: '&mdash;' }}</td>
-            </tr>
-            {% assign weekly_count = weekly_count | plus: 1 %}
-            {% endif %}
-          {% endif %}
-        {% endfor %}
-      </tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if history_all.size > 0 %}
-  <div class="silver-rate-page__band silver-rate-page__band--table"><div class="page-width silver-rate-page__copy-block" id="monthly-trend">
-    <h2>Monthly Silver Rate Trend in {{ city_name }} — Last 12 Months</h2>
-    <p class="silver-rate-page__table-description">Month-end silver rates in {{ city_name }}. Updated as new daily entries are added.</p>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Month</th><th scope="col">999 (&#8377;/g)</th><th scope="col">925 (&#8377;/g)</th><th scope="col">Market Note</th></tr></thead>
-      <tbody>
-        {% assign seen_months = '|' %}
-        {% assign month_count = 0 %}
-        {% for entry in history_all %}
-          {% assign entry_month_key = entry.rate_date | date: '%Y-%m' %}
-          {% assign check_key = '|' | append: entry_month_key | append: '|' %}
-          {% unless seen_months contains check_key %}
-            {% if month_count < 12 %}
-              <tr>
-                <th scope="row">{{ entry.rate_date | date: '%B %Y' }}</th>
-                <td>&#8377;{{ entry.rate_999 | plus: 0 | round }}</td>
-                <td>&#8377;{{ entry.rate_925 | plus: 0 | round }}</td>
-                <td>{{ entry.market_note | default: '&mdash;' }}</td>
-              </tr>
-              {% assign seen_months = seen_months | append: entry_month_key | append: '|' %}
-              {% assign month_count = month_count | plus: 1 %}
-            {% endif %}
-          {% endunless %}
-        {% endfor %}
-      </tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if nearby_city != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--subtle"><div class="page-width silver-rate-page__copy-block" id="nearby-city-rate">
-    <h2>Today's Silver Rate in {{ nearby_city }}</h2>
-    <p class="silver-rate-page__table-description">{{ nearby_city_note | default: 'Silver rates in ' | append: nearby_city | append: ' are the same as ' | append: city_name | append: ' — both fall under the same state jewellery association pricing.' }}</p>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Purity</th><th scope="col">Per Gram</th><th scope="col">Per 10 Gram</th><th scope="col">Notes</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">999 Fine</th><td>&#8377;{{ rate_999_display }}</td><td>&#8377;{{ rate_999_10g }}</td><td>Investment silver</td></tr>
-        <tr><th scope="row">925 Sterling</th><td>&#8377;{{ rate_925_display }}</td><td>&#8377;{{ rate_925_10g }}</td><td>Jewellery silver</td></tr>
-      </tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if buying_block != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--subtle"><div class="page-width silver-rate-page__copy-block" id="buying-guide">
-    <h2>{{ buying_block.heading | default: buying_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ buying_block.content | metafield_tag }}</div>
-    <h3>How Silverware &amp; Jewellery Prices Are Calculated in {{ city_name }}</h3>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Component</th><th scope="col">Approximate Range</th><th scope="col">Notes</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">Base Silver Rate</th><td>MCX rate</td><td>Published daily — forms the base of your silverware/jewellery cost</td></tr>
-        <tr><th scope="row">Making Charges</th><td>&#8377;50 – &#8377;400/g</td><td>Higher for handcrafted, filigree, and intricate designs</td></tr>
-        <tr><th scope="row">GST</th><td>3%</td><td>On silver value + making charges</td></tr>
-        <tr><th scope="row">Wastage / Karigar</th><td>0–5%</td><td>Applies to handmade pieces, charged by some retailers</td></tr>
-        <tr><th scope="row">Stone / Enamel Cost</th><td>Market rate</td><td>Additional for stone-set or enamelled pieces</td></tr>
-      </tbody>
-    </table></div>
-    <p class="silver-rate-page__table-note">At Lucira Jewellery, silver pieces are priced transparently — the silver cost is calculated on the actual metal weight at daily market rates.</p>
-  </div></div>
-  {% endif %}
-
-  {% if investment_block != blank %}
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="investment-guide">
-    <h2>{{ investment_block.heading | default: investment_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ investment_block.content | metafield_tag }}</div>
-    <h3>Silver vs Other Investments — {{ city_name }} Perspective</h3>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Factor</th><th scope="col">Silver</th><th scope="col">Gold</th><th scope="col">Fixed Deposit</th><th scope="col">Equity MF</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">Liquidity</th><td>High</td><td>High</td><td>Medium</td><td>Low</td></tr>
-        <tr><th scope="row">Price Volatility</th><td>Higher than gold</td><td>Moderate</td><td>None</td><td>High</td></tr>
-        <tr><th scope="row">Industrial Demand Link</th><td>Strong (solar, electronics)</td><td>Weak</td><td>None</td><td>Indirect</td></tr>
-        <tr><th scope="row">Storage Cost</th><td>Yes (bulkier than gold)</td><td>Yes (locker)</td><td>None</td><td>None</td></tr>
-        <tr><th scope="row">Tax on Returns</th><td>LTCG 20%</td><td>LTCG 20%</td><td>Taxable</td><td>Variable</td></tr>
-      </tbody>
-    </table></div>
-    <p class="silver-rate-page__table-note">Silver tends to be more volatile than gold because a large share of demand comes from industrial use (solar panels, electronics) rather than pure investment or jewellery demand. This table is for general information only and is not personalised financial advice.</p>
-  </div></div>
-  {% endif %}
-
-  {% if factors_block != blank %}
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="factors-affecting-silver-prices">
-    <h2>{{ factors_block.heading | default: factors_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ factors_block.content | metafield_tag }}</div>
-    <h3>Key Factors — How They Influence the {{ city_name }} Silver Rate</h3>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Factor</th><th scope="col">How It Influences {{ city_name }} Silver Rate</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">International Spot Price</th><td>The London Bullion Market Association (LBMA) sets the global USD price per troy ounce.</td></tr>
-        <tr><th scope="row">Industrial Demand</th><td>Solar panels, electronics, and EV components consume a large share of mined silver — demand swings move prices more than for gold.</td></tr>
-        <tr><th scope="row">USD-INR Exchange Rate</th><td>As silver is imported, a weaker rupee directly raises the {{ city_name }} silver rate.</td></tr>
-        <tr><th scope="row">Import Duty</th><td>India levies import duty on silver; budget changes affect rates immediately.</td></tr>
-        <tr><th scope="row">MCX Rates</th><td>Multi Commodity Exchange futures prices serve as the daily benchmark in India.</td></tr>
-        <tr><th scope="row">Gold-Silver Ratio</th><td>Investors track this ratio to judge whether silver is under- or over-valued relative to gold.</td></tr>
-        <tr><th scope="row">State Taxes &amp; Levies</th><td>{{ city_state | default: 'State' }} applies its own levies; rates may differ marginally from other states.</td></tr>
-        <tr><th scope="row">GST</th><td>3% GST applies on silver value and making charges at point of purchase.</td></tr>
-        <tr><th scope="row">Local Demand</th><td>Festival season (Dhanteras, Akshaya Tritiya) can add a premium as silver coins/idols are a customary purchase.</td></tr>
-      </tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if festival_block != blank %}
-  <div class="silver-rate-page__band"><div class="page-width silver-rate-page__copy-block" id="festival-calendar">
-    <h2>{{ festival_block.heading | default: festival_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ festival_block.content | metafield_tag }}</div>
-    <h3>{{ city_name }} Silver Buying Calendar</h3>
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Month/Period</th><th scope="col">Occasion</th><th scope="col">Demand Level</th><th scope="col">Buying Note</th></tr></thead>
-      <tbody>
-        <tr><th scope="row">October/November</th><td>Dhanteras</td><td>Very High</td><td>Silver coins and idols are a traditional Dhanteras purchase — expect a modest premium</td></tr>
-        <tr><th scope="row">April/May</th><td>Akshaya Tritiya</td><td>High</td><td>Considered auspicious for buying silver alongside gold</td></tr>
-        <tr><th scope="row">November–February</th><td>Wedding Season</td><td>Moderate</td><td>Silver gifting (utensils, coins) is customary in many Indian households</td></tr>
-        <tr><th scope="row">June–August (Monsoon)</th><td>Slow Season</td><td>Low</td><td>Historically a quieter buying window</td></tr>
-      </tbody>
-    </table></div>
-    <p class="silver-rate-page__table-note">Silver prices are set by global commodity markets, not local festivals — but high local demand during festival periods can add small retail premiums.</p>
-  </div></div>
-  {% endif %}
-
-  {% if market_block != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--subtle"><div class="page-width silver-rate-page__copy-block" id="market-guide">
-    <h2>{{ market_block.heading | default: market_block.title }}</h2>
-    <div class="silver-rate-page__richtext">{{ market_block.content | metafield_tag }}</div>
-  </div></div>
-  {% endif %}
-
-  {% if historic_rate_table != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--table"><div class="page-width silver-rate-page__copy-block" id="historic-rate">
-    <h2>{{ historic_rate_table.table_title }}</h2>
-    {% if historic_rate_table.table_description != blank %}<p class="silver-rate-page__table-description">{{ historic_rate_table.table_description }}</p>{% endif %}
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Month</th><th scope="col">999</th><th scope="col">925</th></tr></thead>
-      <tbody><tr><th scope="row">Current</th><td>&#8377;{{ rate_999_display }}</td><td>&#8377;{{ rate_925_display }}</td></tr></tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if forecast_table != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--table"><div class="page-width silver-rate-page__copy-block" id="forecast-table">
-    <h2>{{ forecast_table.table_title }}</h2>
-    {% if forecast_table.table_description != blank %}<p class="silver-rate-page__table-description">{{ forecast_table.table_description }}</p>{% endif %}
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">Scenario</th><th scope="col">999</th><th scope="col">925</th><th scope="col">Note</th></tr></thead>
-      <tbody><tr><th scope="row">Today</th><td>&#8377;{{ rate_999_display }}</td><td>&#8377;{{ rate_925_display }}</td><td>Live rate</td></tr></tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if city_comparison_table != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--table"><div class="page-width silver-rate-page__copy-block" id="city-comparison">
-    <h2>{{ city_comparison_table.table_title }}</h2>
-    {% if city_comparison_table.table_description != blank %}<p class="silver-rate-page__table-description">{{ city_comparison_table.table_description }}</p>{% endif %}
-    <div class="silver-rate-page__table-wrap"><table class="silver-rate-page__table">
-      <thead><tr><th scope="col">City</th><th scope="col">999</th><th scope="col">925</th><th scope="col">Note</th></tr></thead>
-      <tbody><tr><th scope="row">{{ city_name }}</th><td>&#8377;{{ rate_999_display }}</td><td>&#8377;{{ rate_925_display }}</td><td>Current market</td></tr></tbody>
-    </table></div>
-  </div></div>
-  {% endif %}
-
-  {% if faq_list != blank %}
-  <div class="silver-rate-page__band silver-rate-page__band--faq"><div class="page-width silver-rate-page__copy-block" id="faq">
-    <h2>Frequently Asked Questions — Silver Rate in {{ city_name }}</h2>
-    <div class="silver-rate-page__faq-list">
-      {% for faq in faq_list %}{% if faq != blank %}
-        <details class="silver-rate-page__faq-item">
-          <summary class="silver-rate-page__faq-question">{{ faq.question }}</summary>
-          <div class="silver-rate-page__faq-answer">{{ faq.answer | metafield_tag }}</div>
-        </details>
-      {% endif %}{% endfor %}
+      <p class="silver-calc__note">*This value is not the final value as Silver Rate might change*</p>
     </div>
-  </div></div>
-  {% endif %}
+  </div>
+</div>
 
-{% endif %}
-</section>
+<div class="investment-section">
+  <div class="">
+    <div class="investment-section__container">
+      <!-- Left Column -->
+      <div class="investment-section__container">
+        <div class="investment-section__column investment-section__left" style="width:fit-content">
+          <h2 class="investment-section__heading">{{ section.settings.investment_heading }}</h2>
+          <div class="investment-section__description">
+            {{ section.settings.investment_description }}
+          </div>
+        </div>
+
+        <div class="investment-section__column investment-section__right">
+          <h3 class="investment-section__toc-heading">Table of Contents</h3>
+          {{ section.settings.investment_quick_links }}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="silver-table-v2-section">
+  <div class="page-width">
+    <h2 class="silver-table-v2-title" id="silver-price-breakdown-weight">GST PRICE BREAKDOWN BY SILVER WEIGHT</h2>
+    <div class="silver-table-v2-wrapper">
+      <table class="silver-table-v2">
+        <thead>
+          <tr>
+            <th>PURITY</th>
+            <th>1GM</th>
+            <th>10GM</th>
+            <th>100GM</th>
+            <th>1KG</th>
+          </tr>
+        </thead>
+        <tbody>
+          {%- assign base_999 = section.settings.rate_today | remove: '₹' | remove: ',' | strip | plus: 0 -%}
+          {%- assign rate_per_gram = base_999 | divided_by: 10.0 -%}
+          {%- assign purities = '999,925' | split: ',' -%}
+          {%- assign weights = '1,10,100,1000' | split: ',' -%}
+
+          {%- for purity in purities -%}
+            {%- assign purity_factor = purity | plus: 0 | divided_by: 999.0 -%}
+            <tr>
+              <td>{{ purity }}</td>
+              {%- for w in weights -%}
+                {%- assign price = rate_per_gram | times: w | times: purity_factor -%}
+                <td>₹{{ price | round }}</td>
+              {%- endfor -%}
+            </tr>
+          {%- endfor -%}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="silver-rate-rise-and-fall">
+  <div class="page-width">
+    <div class="information-content-wrapper">
+      <h2>Silver Rate Today in {{ page.metafields.custom.city_name }} – [current_date]</h2>
+      <div id="silver-rise" style="display:none">
+        <h3>Silver Rate Rises</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], 999 fine silver is priced at [silver_rate_999_10gm]
+          per 10 grams, while 925 sterling silver stands at [silver_rate_925_10gm] per 10 grams.
+        </p>
+      </div>
+
+      <div id="silver-fall" style="display:none">
+        <h3>Silver Rate Falls</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], 999 fine silver is available at
+          [silver_rate_999_10gm] per 10 grams, with 925 sterling silver priced at [silver_rate_925_10gm] per 10 grams.
+        </p>
+      </div>
+
+      <div id="silver-stable" style="display:none">
+        <h3>Silver Rate Remains Stable</h3>
+        <p>
+          In {{ page.metafields.custom.city_name }} on [current_date], silver prices remain steady with 999 fine silver at
+          [silver_rate_999_10gm] per 10 grams and 925 sterling silver at [silver_rate_925_10gm] per 10 grams.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 
 <style>
-  .silver-rate-page {
-    color: #191919;
-    background: #fff;
+      .silver-calc__container {
+      flex: 0 0 60%;
+      max-width: 60%;
   }
 
-  .silver-rate-page__hero {
-    padding: 4rem 0 3rem;
-    background: linear-gradient(180deg, #f5f6f7 0%, #fff 100%);
-    border-bottom: 1px solid rgba(25, 25, 25, 0.08);
+  .gst-label-son span{
+  font-size:12px;
+  color:#785754!important;
   }
+  .gst-calculate {
 
-  .silver-rate-page__hero-grid {
-    display: grid;
-    grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
-    gap: 3rem;
-    align-items: center;
+      flex: 0 0 40%;
+      max-width: 40%;
   }
-
-  .silver-rate-page__eyebrow {
-    margin: 0 0 0.75rem;
-    font-size: 0.82rem;
-    letter-spacing: 0;
-    text-transform: uppercase;
-    color: #6b6f76;
-  }
-
-  .silver-rate-page__eyebrow-sep {
-    margin: 0 0.5rem;
-    color: rgba(25, 25, 25, 0.35);
-  }
-
-  .silver-rate-page__title {
-    margin: 0 0 1rem;
-    font-size: clamp(2.25rem, 3.5vw, 3.5rem);
-    line-height: 1.1;
-    font-weight: 700;
-    color: #191919;
-  }
-
-  .silver-rate-page__richtext,
-  .silver-rate-page__intro {
-    margin-top: 1rem;
-    font-size: 0.98rem;
-    line-height: 1.7;
-  }
-
-  .silver-rate-page__intro {
-    color: rgba(25, 25, 25, 0.8);
-  }
-
-  .silver-rate-page__richtext p {
-    margin: 0 0 1.25rem;
-    line-height: 1.75;
-    color: rgba(25, 25, 25, 0.85);
-  }
-
-  .silver-rate-page__richtext p:last-child {
-    margin-bottom: 0;
-  }
-
-  .silver-rate-page__richtext h3,
-  .silver-rate-page__richtext h4 {
-    margin: 2rem 0 1rem;
-    font-size: 1.25rem;
-    font-weight: 600;
-    line-height: 1.3;
-    color: #191919;
-  }
-
-  .silver-rate-page__richtext h3:first-child,
-  .silver-rate-page__richtext h4:first-child {
-    margin-top: 0;
-  }
-
-  .silver-rate-page__richtext ul,
-  .silver-rate-page__richtext ol {
-    margin: 1.5rem 0;
-    padding-left: 0;
-    list-style: none;
-  }
-
-  .silver-rate-page__richtext ol {
-    counter-reset: list-item;
-  }
-
-  .silver-rate-page__richtext ul li,
-  .silver-rate-page__richtext ol li {
-    margin-bottom: 0.5rem;
-    line-height: 1.6;
-    color: rgba(25, 25, 25, 0.85);
-    padding: 0.75rem 1rem;
-    background: #fafafa;
-    border-radius: 6px;
-    border-left: 3px solid #6b6f76;
-  }
-
-  .silver-rate-page__richtext ul li::before {
-    content: "•";
-    color: #6b6f76;
-    font-weight: bold;
-    margin-right: 0.75rem;
-  }
-
-  .silver-rate-page__richtext ol li {
-    counter-increment: list-item;
-  }
-
-  .silver-rate-page__richtext ol li::before {
-    content: counter(list-item) ".";
-    color: #6b6f76;
-    font-weight: bold;
-    margin-right: 0.75rem;
-  }
-
-  .silver-rate-page__richtext a {
-    color: #6b6f76;
-    text-decoration: underline;
-    text-underline-offset: 2px;
-  }
-
-  .silver-rate-page__richtext a:hover {
-    color: #565a60;
-  }
-
-  .silver-rate-page__richtext strong,
-  .silver-rate-page__richtext b {
-    font-weight: 600;
-    color: #191919;
-  }
-
-  .silver-rate-page__richtext em,
-  .silver-rate-page__richtext i {
-    font-style: italic;
-  }
-
-  .silver-rate-page__hero-stats {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-    margin-top: 1.5rem;
-    max-width: 420px;
-  }
-
-  .silver-rate-page__stat {
-    padding: 0.9rem 1rem;
-    border: 1px solid rgba(25, 25, 25, 0.12);
-    border-radius: 8px;
-    background: #fff;
-  }
-
-  .silver-rate-page__stat-label {
-    display: block;
-    font-size: 0.78rem;
-    text-transform: uppercase;
-    color: rgba(25, 25, 25, 0.58);
-  }
-
-  .silver-rate-page__stat-value {
-    display: block;
-    margin-top: 0.35rem;
-    font-size: 1.15rem;
-    font-weight: 700;
-  }
-
-  .silver-rate-page__updated {
-    margin: 1rem 0 0;
-    font-size: 0.9rem;
-    color: rgba(25, 25, 25, 0.62);
-  }
-
-  .silver-rate-page__hero-media {
-    min-height: 100%;
-  }
-
-  .silver-rate-page__hero-image,
-  .silver-rate-page__hero-fallback {
-    display: block;
-    width: 100%;
-    min-height: 420px;
-    object-fit: cover;
-    border-radius: 8px;
-  }
-
-  .silver-rate-page__hero-fallback {
-    display: grid;
-    place-items: center;
-    background: #e4e6e8;
-    color: #565a60;
-    font-size: 1.25rem;
-    font-weight: 700;
-  }
-
-  .silver-rate-page__band {
-    padding: 3.5rem 0;
-  }
-
-  .silver-rate-page__band--subtle {
-    background: #fafbfb;
-    border-top: 1px solid rgba(25, 25, 25, 0.06);
-    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
-  }
-
-  .silver-rate-page__band--table {
-    background: #fafafa;
-    border-top: 1px solid rgba(25, 25, 25, 0.06);
-    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
-  }
-
-  .silver-rate-page__band--faq {
-    background: #fafafa;
-    border-top: 1px solid rgba(25, 25, 25, 0.06);
-    border-bottom: 1px solid rgba(25, 25, 25, 0.06);
-    padding: 4.5rem 0;
-  }
-
-  .silver-rate-page__section-head {
+  .gst-toggle-container {
     display: flex;
-    align-items: end;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1rem;
-  }
-
-  .silver-rate-page__section-head h2,
-  .silver-rate-page__copy-block h2 {
-    margin: 0 0 1rem;
-    font-size: 1.75rem;
-    line-height: 1.2;
-    font-weight: 600;
-    color: #191919;
-  }
-
-  .silver-rate-page__section-head p,
-  .silver-rate-page__table-description {
-    margin: 0;
-    color: rgba(25, 25, 25, 0.72);
-    max-width: 56ch;
-    font-size: 1rem;
-    line-height: 1.5;
-  }
-
-  .silver-rate-page__table-wrap {
-    overflow-x: auto;
-  }
-
-  .silver-rate-page__table {
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 680px;
-  }
-
-  .silver-rate-page__table th,
-  .silver-rate-page__table td {
-    padding: 0.95rem 1rem;
-    border-bottom: 1px solid rgba(25, 25, 25, 0.1);
-    text-align: left;
-    white-space: nowrap;
-  }
-
-  .silver-rate-page__table thead th {
-    font-size: 0.85rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: rgba(25, 25, 25, 0.65);
-    background: #fafbfb;
-    font-weight: 600;
-  }
-
-  .silver-rate-page__table tbody th {
-    font-weight: 600;
-    color: #191919;
-  }
-
-  .silver-rate-page__table tbody tr:hover {
-    background: rgba(107, 111, 118, 0.04);
-  }
-
-  .silver-rate-page__copy-block {
-    max-width: 78rem;
-    margin: 0 auto;
-  }
-
-  .silver-rate-page__faq-list {
-    display: grid;
-    gap: 1rem;
-    max-width: 900px;
-    margin: 0 auto;
-  }
-
-  .silver-rate-page__faq-item {
-    border: 1px solid rgba(25, 25, 25, 0.12);
-    border-radius: 12px;
-    background: #fff;
+    justify-content: center;
+    gap: 0;
+    margin-top: 20px;
+    border-radius: 10px;
     overflow: hidden;
-    transition: box-shadow 0.2s ease;
+    width: 100%;
+    background:#F4F0F0;
   }
-
-  .silver-rate-page__faq-item:hover {
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  .gst-value-sons, .gst-label-son{
+      color:#785754!important;
+      font-size: 16px;
+      font-weight: 600!important;
   }
-
-  .silver-rate-page__faq-question {
-    list-style: none;
+  .gst-button {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    outline: none;
+    background: #F4F0F0;
+    color: #333;
+    font-size: 16px;
+    font-weight: 500;
     cursor: pointer;
-    padding: 1.25rem 1.5rem;
-    font-weight: 600;
-    font-size: 1.05rem;
-    color: #191919;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    font-family: 'Futura Std';
+    transition: all 0.3s ease;
   }
 
-  .silver-rate-page__faq-question::after {
-    content: '+';
-    font-size: 1.5rem;
-    font-weight: 400;
-    color: #6b6f76;
-    transition: transform 0.2s ease;
+  .gst-button:first-child {
+    border-radius: 10px 0 0 10px;
   }
 
-  .silver-rate-page__faq-item[open] .silver-rate-page__faq-question::after {
-    transform: rotate(45deg);
+  .gst-button:last-child {
+    border-radius: 0 10px 10px 0;
   }
 
-  .silver-rate-page__faq-question::-webkit-details-marker {
-    display: none;
+  .gst-button.active {
+    background-color: #a05a64;
+    color: #fff;
+    border-radius:8px;
+  }
+  .gst-value-sons {
+  color:#785754!important;
+  font-size:18px;
+  font-weight:600;
   }
 
-  .silver-rate-page__faq-answer {
-    padding: 0 1.5rem 1.5rem;
-    color: rgba(25, 25, 25, 0.82);
-    font-size: 0.98rem;
-    line-height: 1.6;
+  @media screen and (max-width: 767px) {
+      .gst-main {
+         display: flex
+  ;
+      flex-direction: row;
+      justify-content: space-between;
+      gap: 20px;
+
+      }
+  .gst-label-son
+  {
+  font-size:16px;
+  font-weight:600;
   }
+  .gst-value-sons {
 
-  .silver-rate-page__faq-answer p {
-    margin: 0 0 0.75rem;
+  font-size:16px;
   }
-
-  .silver-rate-page__faq-answer p:last-child {
-    margin-bottom: 0;
-  }
-
-  .silver-rate-page__empty {
-    padding: 3rem 0;
-  }
-
-  .silver-rate-page__change--up { color: #2a7a2a; font-weight: 600; }
-  .silver-rate-page__change--down { color: #c0392b; font-weight: 600; }
-
-  @media screen and (max-width: 990px) {
-    .silver-rate-page__hero-grid {
-      grid-template-columns: 1fr;
-    }
-
-    .silver-rate-page__hero-image,
-    .silver-rate-page__hero-fallback {
-      min-height: 320px;
-    }
-
-    .silver-rate-page__section-head {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-  }
-
-  @media screen and (max-width: 749px) {
-    .silver-rate-page__hero {
-      padding-top: 2rem;
-    }
-
-    .silver-rate-page__band {
-      padding: 1.6rem 0;
-    }
-
-    .silver-rate-page__hero-stats {
-      grid-template-columns: 1fr 1fr;
-    }
+      .silver-calc__container, .gst-calculate {
+          flex: 1;
+          max-width: 100%;
+      }
   }
 </style>
-{% schema %}
-{"name":"Silver Rate City Page","tag":"section","class":"silver-rate-city-section","settings":[],"presets":[{"name":"Silver Rate City Page"}]}
-{% endschema %}
+
+<style>
+    /* Location Selector Styling */
+    .location-selector {display: flex; align-items: center; gap: 12px; margin-top: 20px;margin-bottom:20px;flex-direction:column;}
+
+    .location-dropdown {position: relative;display: flex;flex-direction: column;width:100%;}
+    .location-dropdown label {font-size: 12px;color: white;margin-left: 12px;position: absolute;top: -16px;background: transparent;padding: 0 5px;text-transform: capitalize;}
+    .location-dropdown select {padding: 12px 16px;border: 2px solid white;border-radius: 12px;background: transparent;color: white;font-size: 16px;font-weight: 600;text-transform: uppercase;min-width: 180px;cursor: pointer;margin-top:5px;margin-bottom:10px;
+        background-image: url(https://cdn.shopify.com/s/files/1/0739/8516/3482/files/Arrow_down_cc686a73-fcf1-4b17-84c8-edc969caa5c9.svg?v=1771060854);
+    background-size: 1.6em;
+    background-position: calc(100% - 1.3em) center;
+    background-repeat: no-repeat;
+    appearance: none;}
+    .location-dropdown select option {
+      color: black;
+    }
+
+    .location-submit {
+      background: white;
+      color: black;
+      font-size: 15px;
+      border: none;
+      border-radius: 12px;
+      padding: 12px 18px;
+      cursor: pointer;
+      transition: 0.2s ease;
+      align-items: center;
+      font-family: 'Futura Std';
+      text-transform: uppercase;
+      font-weight: 500;
+      display:flex;
+      gap:8px;
+      width:50%;
+      justify-content: center;
+    }
+
+    .location-submit:hover {
+      background: #f5f5f5;
+    }
+    .silver-widget-section:after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background: #00000042;
+    }
+      .wrapper-silver{position: absolute; top: 20%; left: 0;z-index:1;}
+      .silver-widget-section{display:flex;justify-content:center;position:relative;background-size:cover;background-repeat:no-repeat;background-position:top center;background-image:url('{{ section.settings.background_image | image_url }}');background-size:cover;background-position:center;background-repeat:no-repeat;height:100vh}
+      .silver-widget-section .page-width{position:relative}
+      .silver-widget__box {margin-top: 12px; background-color: #fff; padding: 16px; border-radius: 12px; box-shadow: 0 0 10px rgba(0, 0, 0, .15); display: flex ; flex-direction: row; align-items: flex-start;    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 10px;column-gap:40px; }
+
+   /* ── Flip CTA ── */
+.silver-rate-flip-cta {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-family: 'Futura Std', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 10px;
+  display: block;
+  text-align: right;
+  width: 100%;
+}
+
+/* ── Flip container ── */
+.silver-flip-wrapper {
+  perspective: 1200px;
+}
+
+.silver-flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.65s cubic-bezier(0.45, 0.05, 0.55, 0.95);
+}
+
+.silver-flip-inner.is-flipped {
+  transform: rotateX(180deg);
+}
+
+/* ── Shared face styles ── */
+.silver-flip-front,
+.silver-flip-back {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,.15);
+}
+
+/* ── Front face ── */
+.silver-flip-front {
+  position: relative;
+  z-index: 2;
+}
+
+/* ── Back face ── */
+.silver-flip-back {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotateX(180deg);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 16px;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.silver-flip-back__image-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.silver-flip-back__img {
+  width: 100px;
+  height: 108px;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.silver-flip-back__name {
+  font-family: 'Futura Std', sans-serif;
+  margin-bottom:4px;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin: 0 0 2px 0;
+  line-height: 0.5;
+    margin-top: 8px;
+    font-size:12px;
+}
+
+.silver-flip-back__designation {
+  font-family: 'Futura Std', sans-serif;
+  font-size: 9px;
+  color: #666;
+  margin: 0;
+}
+
+.silver-flip-back__content-col {
+  flex: 1;
+  text-align: left;
+}
+
+.silver-flip-back__title {
+  font-family: 'Futura Std', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin: 0 0 8px 0;
+  line-height: 1.3;
+}
+
+.silver-flip-back__desc {
+  font-family: 'Futura Std', sans-serif;
+  font-size: 12px;
+  color: #444;
+  line-height: 1.6;
+  margin: 0 0 10px 0;
+}
+
+.silver-flip-back__link {
+  font-family: 'Futura Std', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  color: #a05a64;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ── Mobile overrides ── */
+@media screen and (max-width: 767px) {
+  .silver-flip-back {
+    flex-direction: row;
+    padding: 12px;
+    gap: 10px;
+  }
+  .silver-flip-back__img {
+    width: 70px;
+    height: 70px;
+  }
+  .silver-flip-back__title {
+    font-size: 12px;
+    margin-bottom:4px;
+  }
+  .silver-flip-back__desc {
+        font-size: 9px;
+        line-height: 1.2;
+        letter-spacing: 1px;
+      margin-bottom:0;
+      }
+}
+
+    .silver-widget__date {
+    grid-column: 1 / -1;
+            margin-bottom: 12px;
+          margin-left: 5px;
+          margin-top:0;
+  }
+      .silver-widget__block{padding:0px;text-align:left;flex:1}
+      .silver-widget__label { color: #000; margin-top: 0; font-weight: 400; font-size: 12px; line-height: 20px; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px;}
+      .silver-widget__price { margin: 0; font-weight: 600; font-size: 32px; line-height: 1.8; letter-spacing: normal; color: #000000; }
+      .silver-widget__unit{font-size:13px;font-weight:300;color:#000}
+      .silver-widget__date { font-size: 11px; color: #000; margin-bottom: 0; text-transform: uppercase; }
+      .silver-widget__divider{height:100px;width:1px;background:#e5e7eb;margin:0 20px}
+      span.silver-unit { font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 20px; line-height: 20px; text-transform: uppercase; }
+      .investment-section__container {display: grid ; grid-template-columns: calc(60% - 40px) calc(40% - 40px); gap: 125px;}
+      .investment-section__container { display: flex ; grid-template-columns: 1fr; gap: 80px; margin: 0 auto; }
+      .investment-section {padding: 40px 0;}
+      .investment-section h2.investment-section__heading {margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase;}
+      .investment-section h3.investment-section__subheading { margin-top: 0; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; margin-bottom: 0; }
+      .investment-section p { font-weight: 400; font-size: 16px; line-height: 1.6; vertical-align: middle; color: #1a1a1a; }
+      li.investment-section__list-item { font-family: Futura Std; font-weight: 400; font-size: 18px; line-height: 1.5; letter-spacing: 1px; vertical-align: middle; margin-bottom: 4px; color: #1a1a1a; }
+      ul.investment-section__list { padding-left: 22px; }
+    .investment-section{
+    padding: 40px 0;
+        width: 75%;
+        margin: 0 auto;
+    }
+      .silver-table-v2-title { font-weight: 500; font-size: 24px; line-height: 150%; text-align: center; vertical-align: middle; text-transform: uppercase; color: #000000; margin-bottom: 40px; margin-top: 0; max-width: 840px; margin-left: auto; margin-right: auto; }
+      .silver-table-v2-wrapper{overflow-x:auto}
+      .silver-table-v2{width:100%;border-collapse:separate;border-spacing:0;border-radius:8px;overflow:hidden;margin:0 auto;border:1px solid #999;width:100%}
+      .silver-table-v2 td,.silver-table-v2 th{border:0px solid #999;padding:20px 12px;}
+      .silver-table-v2 th{background-color:#f6f0ea;font-weight:unset;color:#000; }
+      .silver-table-v2 th:not(:first-child){border-left: 1px solid #999999;}
+      .silver-table-v2 th {border-bottom: 1px solid #999999;}
+      .silver-table-v2 td:not(:first-child){border-left: 1px solid #999999;}
+      .silver-table-v2 td {border-bottom: 1px solid #999999;}
+      .silver-table-v2 td {font-family: 'Futura Std', sans-serif; text-align: center; font-weight: 400; font-size: 18px; line-height: 24px; letter-spacing: 1px; }
+      .silver-table-v2-section { padding-bottom: 12px;}
+      .silver-table-v2 {border-bottom: 0;}
+      .rich-text__wrapper--left { justify-content: center !important; }
+      h2.rich-text__heading.rte.inline-richtext.h1 { margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 24px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; }
+      .rich-text__text p {font-weight: 400; font-size: 18px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
+      .rich-text__text ul li {font-weight: 400; font-size: 18px; line-height: 1.6; vertical-align: middle; color: #1a1a1a; margin-bottom: 10px;}
+      .silver-table-v2-wrapper { overflow-x: auto; max-width: 840px; margin: 0 auto; }
+      .rich-text.content-container {padding-bottom: 40px;}
+
+      @media screen and (max-width:767px){
+      .silver-table-v2 td,.silver-table-v2 th{font-size:14px;padding:10px 6px}
+      .silver-table-v2{width:100%}
+      .silver-table-v2-section{padding:20px 0;}
+      .location-selector {display: grid ; grid-template-columns: 1fr; gap: 20px;}
+      .location-dropdown select {display: grid;grid-template-columns: 1fr 1fr;gap: 12px; width: 100%;}
+      .wrapper-silver { position: absolute; top: 12%; left: 0; z-index: 1; }
+      .wrapper-silver { padding: 0 14px; }
+      .gst-calculate{margin-bottom:24px;}
+        .rich-text.content-container {padding: 20px 0 20px 0;}
+
+      }
+      @media screen and (max-width:767px){
+
+        .silver-widget__box {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .silver-widget__date {
+    grid-column: 1 / -1;
+            margin-bottom: 12px;
+          margin-left: 12px;
+          margin-top:0;
+  }
+
+        .location-submit{
+            font-size: 10px;
+      padding: 10px 16px;
+    letter-spacing:1px;}
+        .silver-widget-section{background-size:cover;background-repeat:no-repeat;background-position:center;background-image:url('{{ section.settings.background_image_mobile | image_url }}');background-size:cover;background-position:center;background-repeat:no-repeat;height:560px}
+        .silver-widget__box{background-color:#fff;padding:0 4px;top:10%;left:50%;transform:translateX(-50%); position: relative;}
+        .silver-widget__divider{width:1px;height:80px;margin:10px 0}
+        .silver-widget__date,.silver-widget__label,.silver-widget__unit{font-size:9px}
+        .silver-widget__price{font-size:20px}
+        .silver-widget__block{padding:10px}
+        .investment-section__container { display: grid ; grid-template-columns: 1fr; gap: 10px; }
+        .silver-table-v2-title {font-size: 18px; margin-bottom: 20px; text-align:center;}
+        .wrapper-silver {padding: 70px 14px;}
+        .investment-section{
+        width: 91%;
+        margin: 0 auto;
+        padding: 20px 0 20px!important;
+        }
+        .silver-widget-section {height: 700px;}
+        .gst-main{
+    max-width:100%!important;
+    }
+    .silver-calc__container{
+    max-width:unset!important;
+    width:unset!important;
+    }
+    .silver-calc-section {
+        margin: 0 0 20px 0!important;
+    }
+      }
+
+      .silver-calc-section { background: #FAF3EC; padding: 80px 0 80px 0; margin: 0 0 40px 0;}
+      .silver-calc__heading { font-size: 24px; font-weight: 500; margin-top: 0; text-align: center; color: #333333; margin-bottom: 32px; letter-spacing: 1px;}
+      .silver-calc__container{background:#fff;padding:30px;border-radius:10px;max-width:840px;width:100%; margin:0 auto;}
+      .silver-calc__label { text-align: left; margin-bottom: 12px; font-weight: 400; font-size: 12px; line-height: 1.3; margin-top: 0; }
+      .silver-calc__karat-options{display:flex;background:#efefef;border-radius:10px;overflow:hidden;margin-bottom:30px;padding:5px;gap: 5px;}
+      .silver-calc__karat {flex: 1; padding: 12px; border: 0; border-radius: 8px; color: #666666; cursor: pointer; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; line-height: 1.3; vertical-align: middle; text-transform: capitalize; letter-spacing: 0.3px;}
+      .silver-calc__karat--active{background:#fff;color:#1A1A1A; box-shadow: 0px 0px 6px 0px #0000001F;}
+      .silver-calc__inputs{display:flex;gap:20px;flex-direction:row;}
+      .silver-calc__input-group{flex:1;text-align:left}
+      .silver-calc__input-label { display: block; margin-bottom: 12px; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 12px; letter-spacing: 0.3px; line-height: 1.3; color: #666666; }
+      .silver-calc__input { width: 100%; padding: 16px 16px 16px 20px; border-radius: 8px; border: 1px solid #eaeaea; font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 16px; letter-spacing: 0.3px; line-height: 1.2; text-transform: capitalize; color: #666666; }
+      .silver-calc__input::placeholder {color: #666666;}
+      .silver-calc__rate-display { background: #f4f4f4; width: 100%; padding: 16px 16px 16px 20px; border-radius: 8px; border: 1px solid #f4f4f4; font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 16px; letter-spacing: 0.3px; line-height: 1.2; text-transform: capitalize; color: #666666; }
+      .silver-calc__button{margin-top:25px;background:#9e6c66;color:#fff;padding:12px;width:100%;border:none;border-radius:6px;font-weight:700;cursor:pointer}
+      .silver-calc__note{margin-top:12px;font-size:12px;color:#666}
+      .silver-calc__label--mobile{display:none}
+      .silver-calc__label--desktop{display:inline;}
+      .silver-calc__label--mobile{display:none;}
+      .silver-calc__button {background: #a05a64; color: #fff; padding: 18px; width: 100%; border: none; border-radius: 8px; cursor: pointer; font-family: Futura Std; font-weight: 400; font-size: 16px; line-height: 100%; text-align: center; letter-spacing: 1px; }
+      p.silver-calc__note { font-family: Futura Std; font-weight: 400; font-size: 12px; line-height: 12px; letter-spacing: 1px; text-align: center; margin:unset; margin-top: 10px; }
+      .silver-calc__input:focus-visible {outline: none; outline-offset: none; box-shadow: none;}
+      span#silverValueOutput { color: #008000; font-weight: 600; }
+      #silverCalcResult {background: #eaf6e9;}
+      .rich-text__text ul {list-style: disc outside; padding-left: 1.5em;}
+      .rich-text__text a { color: #5a413f; text-underline-offset: auto;}
+      .investment-section__description a {color: #5a413f; text-underline-offset: auto;}
+
+
+      @media only screen and (min-width:0px) and (max-width:767px){
+        .silver-calc-section {padding: 20px 0;}
+        .silver-calc__heading {font-size: 18px;}
+        .silver-calc__inputs { flex-direction: row; }
+        .silver-calc__label--mobile{
+          font-size: 10px;
+        }
+        .silver-calc__label--desktop{display:none;}
+        .silver-calc__label--mobile{display:inline;}
+        .silver-calc__container {padding: 24px;}
+        .silver-calc__karat {font-size: 12px;}
+        p.silver-calc__note {font-size: 10px;}
+        .silver-calc__input {padding: 16px 16px 16px 16px;}
+        .silver-calc__button {font-size: 14px;}
+        .investment-section p { color: #1a1a1a; font-weight: 400; font-size: 14px; line-height: 1.6; margin:0; vertical-align: middle; }
+        .investment-section { padding: 40px 0; }
+        .investment-section h2.investment-section__heading {font-size: 18px;}
+        .investment-section h3.investment-section__subheading {font-size: 18px;}
+        li.investment-section__list-item { letter-spacing: 1px; color: #1a1a1a; font-weight: 400; font-size: 14px; line-height: 1.4; vertical-align: middle; margin-bottom: 8px; }
+        span.silver-unit {font-size: 12px;}
+        h2.rich-text__heading.rte.inline-richtext.h1 { margin-top: 0; color: #1a1a1a; font-weight: 500; font-size: 18px; line-height: 150%; letter-spacing: 1px; vertical-align: middle; text-transform: uppercase; }
+        .rich-text__text p {font-weight: 400; font-size: 14px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
+        .rich-text__text ul li {font-weight: 400; font-size: 14px; line-height: 1.6; vertical-align: middle; color: #1a1a1a;}
+        .silver-table-v2-title {
+        text-align:center!important;
+        }
+      }
+
+      @media only screen and (min-width:0px) and (max-width:390px){
+        .silver-widget__price {font-size: 16px;}
+      }
+      /* GST CALCULATOR SPECIFIC STYLES */
+    .gst-main {
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      gap: 20px;
+      max-width: 80%;
+        margin: 0 auto;
+    }
+    .silver-calc__container, .gst-calculate {
+        flex: 1;
+    }
+    .gst-calculate {
+      background: #fff;
+      border-radius: 10px;
+    }
+    .gst-results-container {
+      padding: 40px;
+    }
+    .gst-result-item {display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;}
+    .gst-result-item:last-of-type {margin-bottom: 0;}
+    .gst-result-item.final-amount {
+    border-top: 1px solid #eaeaea;  border-radius: 8px;
+      padding: 15px;
+      padding-left:0;
+      padding-right:0;
+      padding-top:32px;
+      padding-bottom:0;
+      margin-top: 20px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+    }
+    .gst-result-item.final-amount p{
+    color:#785754!important;
+    font-weight: 600;
+        font-size: 20px;
+    }
+    .gst-label {font-family: 'Futura Std', sans-serif; font-weight: 400; font-size: 14px; color: #666; text-transform: capitalize;}
+    .gst-value {font-family: 'Futura Std', sans-serif; font-weight: 500; font-size: 16px; color: #333;}
+    .gst-result-item.final-amount .gst-label,
+    .gst-result-item.final-amount .gst-value {color: #fff; font-weight: 500; margin: 0;}
+    .gst-result-item.final-amount .gst-value {font-size: 20px; font-weight: 600;}
+    .gst-result-item.final-amount .silver-calc__note {color: #fff;}
+
+    @media screen and (max-width:767px){
+      .gst-main {flex-direction: column;}
+      .gst-results-container {
+      padding: 20px;
+    }
+    .silver-calc__rate-display{
+      font-size: 12px;
+    }
+    .silver-calc__karat{
+      padding: 5px;
+    }
+    .final-amount .gst-label {
+    font-size:16px;
+    }
+    .gst-result-item.final-amount .gst-value {
+        font-size: 16px;
+        font-weight: 600;
+    }
+    .gst-button{
+      font-size:14px;
+      }
+      .gst-main {
+        gap: 16px;
+      }
+    .silver-calc__heading{
+    margin-bottom:24px;
+    }
+        .silver-calc-section {
+            padding: 40px 0 40px 0;
+        }
+    }
+</style>
+
+<script src="{{ 'jquery.min.js' | asset_url }}"></script>
+<script>
+  $(document).ready(function () {
+    function calculateSilverValue() {
+      const weight = parseFloat($('#weightInput').val());
+      const resultContainer = $('#silverCalcResult');
+
+      if (isNaN(weight) || weight <= 0) {
+        resultContainer.hide();
+        return;
+      }
+
+      const baseRate = parseFloat($('#silverRate').data('base'));
+      const activePurity = $('.silver-calc__karat.silver-calc__karat--active').text().trim();
+
+      let currentRate;
+      if (activePurity === '999') {
+        currentRate = baseRate / 10;
+      } else {
+        currentRate = (baseRate / 10) * (parseInt(activePurity) / 999);
+      }
+
+      const value = weight * currentRate;
+      $('#silverValueOutput').text('₹' + value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+      resultContainer.show();
+    }
+
+    $('.silver-calc__karat').on('click', function () {
+      $('.silver-calc__karat').removeClass('silver-calc__karat--active');
+      $(this).addClass('silver-calc__karat--active');
+      calculateSilverValue();
+    });
+
+    $('#weightInput').val(10);
+    calculateSilverValue();
+
+    $('.silver-calc__button').on('click', calculateSilverValue);
+  });
+</script>
